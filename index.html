@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#070a12">
+  <title>THE LAST LIGHT</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/ui.css">
+  <link rel="stylesheet" href="styles/game.css">
+</head>
+<body data-screen="splash">
+  <!-- Game world (Canvas 2D). Every screen below is a DOM overlay. -->
+  <canvas id="world"></canvas>
+
+  <!-- ===== Splash → TAP TO PLAY (H5 §1) ===== -->
+  <section class="screen active" id="screen-splash">
+    <div class="splash-inner">
+      <h1 class="logo fade"><span class="logo-the">THE</span><span class="logo-main">LAST LIGHT</span></h1>
+      <p class="tap-prompt" id="tapPrompt" data-i18n="tap.toPlay"></p>
+    </div>
+  </section>
+
+  <!-- ===== Main menu (decision D5) ===== -->
+  <section class="screen" id="screen-menu">
+    <div class="menu-logo" aria-hidden="true"><span class="logo-the">THE</span><span class="logo-main">LAST LIGHT</span></div>
+    <nav class="menu-list">
+      <button class="menu-item" data-action="newGame" data-i18n="menu.newGame"></button>
+      <button class="menu-item" data-action="openSettings" data-i18n="menu.settings"></button>
+      <button class="menu-item" data-action="openCredits" data-i18n="menu.credits"></button>
+    </nav>
+    <div class="corner corner-tr">
+      <button class="ring-btn" data-action="fullscreen" data-fs data-i18n-aria="aria.fullscreen">
+        <svg class="ico ico-fs-enter" viewBox="0 0 24 24"><path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/></svg>
+        <svg class="ico ico-fs-exit" viewBox="0 0 24 24"><path d="M9 3v6H3M21 9h-6V3M15 21v-6h6M3 15h6v6"/></svg>
+      </button>
+      <button class="ring-btn" data-action="askReset" data-i18n-aria="aria.reset">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4 3.5v4.5h4.5"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===== Map select (Underlords mode-select layout) ===== -->
+  <section class="screen" id="screen-mapSelect">
+    <div class="corner corner-tl">
+      <button class="ring-btn" data-action="backToMenu" data-i18n-aria="aria.back">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M15 4l-8 8 8 8"/></svg>
+      </button>
+    </div>
+    <div class="map-layout">
+      <div class="map-grid" id="mapGrid"></div>
+      <div class="map-side">
+        <aside class="panel map-info">
+          <h2 class="map-info-name" id="mapName"></h2>
+          <p class="map-info-desc" id="mapDesc"></p>
+          <ul class="map-info-facts">
+            <li id="mapWaves"></li>
+            <li id="mapBoss"></li>
+          </ul>
+        </aside>
+        <button class="brush-btn brush-cta" data-action="beginMap" data-i18n="map.begin"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Game scene HUD (Phase 1: system buttons only) ===== -->
+  <section class="screen" id="screen-game">
+    <div class="corner corner-tl corner-col">
+      <button class="ring-btn" data-action="askExit" data-i18n-aria="aria.exit">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M14 4H5v16h9"/><path d="M20 12H9M13 8l-4 4 4 4"/></svg>
+      </button>
+      <button class="ring-btn" data-action="fullscreen" data-fs data-i18n-aria="aria.fullscreen">
+        <svg class="ico ico-fs-enter" viewBox="0 0 24 24"><path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/></svg>
+        <svg class="ico ico-fs-exit" viewBox="0 0 24 24"><path d="M9 3v6H3M21 9h-6V3M15 21v-6h6M3 15h6v6"/></svg>
+      </button>
+    </div>
+    <div class="corner corner-tr">
+      <button class="ring-btn" data-action="openSettings" data-i18n-aria="aria.settings">
+        <svg class="ico ico-gear" viewBox="0 0 24 24"><path d="M19.42 10.37L22.13 10.80L22.13 13.20L19.42 13.63L18.40 16.10L20.01 18.31L18.31 20.01L16.10 18.40L13.63 19.42L13.20 22.13L10.80 22.13L10.37 19.42L7.90 18.40L5.69 20.01L3.99 18.31L5.60 16.10L4.58 13.63L1.87 13.20L1.87 10.80L4.58 10.37L5.60 7.90L3.99 5.69L5.69 3.99L7.90 5.60L10.37 4.58L10.80 1.87L13.20 1.87L13.63 4.58L16.10 5.60L18.31 3.99L20.01 5.69L18.40 7.90Z"/><circle cx="12" cy="12" r="3.2"/></svg>
+      </button>
+    </div>
+    <div class="stamp paused-stamp" data-i18n="hud.paused"></div>
+  </section>
+
+  <!-- ===== Settings (= pause in the game scene) ===== -->
+  <div class="popup" id="popup-settings" role="dialog" aria-modal="true">
+    <div class="panel settings-panel">
+      <div class="tabs-row">
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" data-tab="game" data-i18n="tab.game"></button>
+          <button class="tab" role="tab" data-tab="video" data-i18n="tab.video"></button>
+          <button class="tab" role="tab" data-tab="audio" data-i18n="tab.audio"></button>
+          <button class="tab" role="tab" data-tab="language" data-i18n="tab.language"></button>
+        </div>
+        <span class="build-label" id="buildLabel"></span>
+        <button class="ring-btn ring-close" data-action="closeSettings" data-i18n-aria="aria.close">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="tab-body">
+        <section class="tab-page" data-page="game">
+          <h3 class="section-title" data-i18n="game.progress"></h3>
+          <p class="hint" data-i18n="game.resetHint"></p>
+          <button class="flat-btn danger" data-action="askReset" data-i18n="game.resetBtn"></button>
+        </section>
+        <section class="tab-page" data-page="video">
+          <h3 class="section-title" data-i18n="video.quality"></h3>
+          <button class="check-row" role="switch" id="qualityAuto"><span class="check"></span><span data-i18n="video.auto"></span></button>
+          <div class="qslider" id="qualitySlider" role="slider" aria-valuemin="0" aria-valuemax="2">
+            <div class="qslider-track"><div class="qslider-fill"></div></div>
+            <span class="qslider-notch" style="left:0%"></span>
+            <span class="qslider-notch" style="left:50%"></span>
+            <span class="qslider-notch" style="left:100%"></span>
+            <div class="qslider-thumb"></div>
+          </div>
+          <div class="qslider-labels">
+            <span data-i18n="video.fastest"></span>
+            <span class="qslider-value" id="qualityName"></span>
+            <span data-i18n="video.best"></span>
+          </div>
+        </section>
+        <section class="tab-page" data-page="audio">
+          <h3 class="section-title" data-i18n="audio.header"></h3>
+          <button class="check-row" role="switch" id="toggleSound"><span class="check"></span><span data-i18n="audio.sound"></span></button>
+          <button class="check-row" role="switch" id="toggleMusic"><span class="check"></span><span data-i18n="audio.music"></span></button>
+        </section>
+        <section class="tab-page" data-page="language">
+          <h3 class="section-title" data-i18n="tab.language"></h3>
+          <div class="lang-grid" id="langGrid"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Credits (H5 §6.3: publisher logo + close only) ===== -->
+  <div class="popup" id="popup-credits" role="dialog" aria-modal="true">
+    <div class="panel credits-panel">
+      <button class="ring-btn ring-close" data-action="closeCredits" data-i18n-aria="aria.close">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <img class="credits-logo" src="assets/ui/qplaze-logo.png" alt="" draggable="false">
+    </div>
+  </div>
+
+  <!-- ===== Confirmation: YES left, NO right (H5 §4) ===== -->
+  <div class="popup popup-confirm" id="popup-confirm" role="alertdialog" aria-modal="true">
+    <div class="panel confirm-panel">
+      <p class="confirm-text" id="confirmText"></p>
+      <div class="confirm-btns">
+        <button class="brush-btn confirm-yes" id="confirmYes" data-i18n="common.yes"></button>
+        <button class="flat-btn confirm-no" id="confirmNo" data-i18n="common.no"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Rotate your phone (H5 §13): image only ===== -->
+  <div id="orientation-blocker"><img src="assets/ui/Orientation.png" alt="" draggable="false"></div>
+
+  <div id="debugOverlay" hidden></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
