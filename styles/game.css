@@ -1,0 +1,52 @@
+/* ===== THE LAST LIGHT — canvas, game scene HUD, rotate blocker, debug ===== */
+
+#world {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: block;
+  z-index: 0;
+  touch-action: none; /* gameplay gestures (Phase 2 touch controls) */
+}
+
+/* The game scene overlay lets taps through to the canvas except on its own buttons. */
+#screen-game.active { pointer-events: none; }
+#screen-game .ring-btn { pointer-events: auto; }
+
+.paused-stamp {
+  position: absolute;
+  top: var(--safe-t);
+  left: 50%;
+  translate: -50% 0;
+  font-size: calc(26px * var(--fs));
+  display: none;
+}
+body.paused .paused-stamp { display: inline-block; }
+
+/* Rotate blocker: shown only via body.rotate-blocked set by OrientationGuard (one condition, PITFALLS 48). Image only. */
+#orientation-blocker {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #000;
+  align-items: center;
+  justify-content: center;
+}
+#orientation-blocker img { width: min(70vw, 340px); height: auto; }
+body.rotate-blocked #orientation-blocker { display: flex; }
+
+#debugOverlay {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 9000;
+  padding: 6px 8px;
+  font: 12px/1.35 ui-monospace, Consolas, monospace;
+  white-space: pre;
+  color: #b8ffb8;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
