@@ -401,11 +401,11 @@ body.paused .shop-btn.can-shop { animation-play-state: paused; }
   pointer-events: none;
 }
 body.map-over .shop-btn { display: none; }
-/* "+25" for an early wave start (D40): floats up under the shop button */
+/* "+25" for an early wave start (D40): floats up left of the shop button */
 .coin-pop {
   position: absolute;
-  top: calc(var(--ring) + 18px);
-  right: calc(var(--ring) + var(--gap) + 4px);
+  top: calc(var(--ring) / 2 - 10px);
+  right: calc(var(--ring) * 2 + var(--gap) * 2);
   display: none;
   font: 800 calc(22px * var(--fs)) / 1 var(--font-display);
   color: #ffd27a;
@@ -414,6 +414,86 @@ body.map-over .shop-btn { display: none; }
 }
 .coin-pop.show { display: block; animation: coinPop 1.3s ease-out forwards; }
 @keyframes coinPop { 0% { opacity: 0; transform: translateY(8px); } 15% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-22px); } }
+/* ===================== Phase 6: grenades, crate, boon cards ===================== */
+.gico { display: inline-block; width: 62%; height: 62%; background: center / contain no-repeat; }
+.gico-frag { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='14' r='6.5'/><path d='M11 7.5V5h3l2-2M14 5l3 3'/></svg>"); }
+.gico-cryo { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239fe4ff' stroke-width='2' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M12 6v12M7 9l10 6M17 9L7 15'/></svg>"); }
+.gico-molotov { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffae6a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M10 9h4v3l2 3v6H8v-6l2-3z'/><path d='M12 9V6M12 2c1.5 1.5 1.5 3 0 4-1.5-1-1.5-2.5 0-4z'/></svg>"); }
+
+.grenade-slots {
+  position: absolute;
+  top: calc(var(--ring) + 22px);
+  right: calc(var(--ring) + var(--gap) + (var(--ring) - 44px) / 2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gslot {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  background: rgba(14, 16, 22, 0.82);
+  border: 2px solid rgba(160, 170, 200, 0.35);
+}
+.gslot b { position: absolute; right: -4px; bottom: -4px; min-width: 18px; padding: 0 4px; font: 800 13px/18px var(--font-display); color: #fff; background: #23272b; border-radius: 9px; }
+.gslot kbd { position: absolute; left: -6px; top: -6px; font: 700 11px/16px var(--font-display); color: #c9cfe0; }
+.gslot.sel { border-color: #ffd27a; box-shadow: 0 0 10px rgba(255, 210, 122, 0.6); }
+.gslot.empty { opacity: 0.35; }
+body.touch .gslot kbd { display: none; }
+body.map-over .grenade-slots { display: none; }
+/* Low phones: a row under the shop + gear buttons, so the column never covers the touch buttons */
+@media (max-height: 500px) {
+  .grenade-slots { flex-direction: row; right: 0; top: calc(var(--ring) + 18px); gap: 4px; }
+  .gslot { width: 36px; height: 36px; }
+  .coin-pop { top: calc(var(--ring) * 2 + 32px); right: calc(var(--ring) * 2 + var(--gap)); }
+}
+
+.touch-col-left { justify-content: flex-end; }
+.touch-col-left .neon-btn.neon-small { margin-bottom: 0; }
+.touch-col-left > .neon-btn:last-child { margin-bottom: calc(var(--neon) * 0.15); }
+.grenade-neon { position: relative; }
+.grenade-neon .gico { width: 58%; height: 58%; }
+.grenade-count { position: absolute; right: -4px; bottom: -4px; min-width: 18px; padding: 0 4px; font: 800 13px/18px var(--font-display); color: #fff; background: #23272b; border-radius: 9px; }
+.grenade-neon.empty { opacity: 0.4; }
+.grenade-neon.denied { animation: denyShake 0.3s; }
+@keyframes denyShake { 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
+
+.crate-timer { margin-left: 6px; color: #ffd27a; }
+.offscreen-arrow.crate svg { fill: #ffe08a; }
+body.map-over .crate-prompt { display: none; }
+
+.popup-crate { background: rgba(2, 3, 8, 0.7); }
+.crate-panel { display: flex; flex-direction: column; align-items: center; gap: calc(22px * var(--fs)); width: min(1000px, 100%); }
+.crate-title { font-size: calc(40px * var(--fs)); }
+.crate-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(18px * var(--fs)); width: 100%; }
+.boon-card {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: #0d0e10;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+  transition: transform 0.1s;
+  min-width: 0;
+}
+@media (hover: hover) { .boon-card:hover { transform: translateY(-3px); box-shadow: 0 0 0 2px #ffd27a, 0 8px 20px rgba(0, 0, 0, 0.55); } }
+.boon-card:active { transform: translateY(1px); }
+.boon-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: linear-gradient(180deg, #6f7a83, #545d65); }
+.boon-name { font: 800 calc(22px * var(--fs)) / 1.05 var(--font-display); letter-spacing: 0.04em; color: #fff; text-transform: uppercase; }
+.boon-body { display: flex; flex-direction: column; gap: 10px; padding: 14px; min-height: calc(110px * var(--fs)); }
+.boon-fx { font-size: calc(19px * var(--fs)); line-height: 1.35; color: #e6e9ee; }
+.boon-note { margin-top: auto; font: 700 calc(13px * var(--fs)) / 1.2 var(--font-display); letter-spacing: 0.08em; color: #ffd27a; }
+@media (max-height: 500px) {
+  .crate-title { font-size: calc(30px * var(--fs)); }
+  .boon-head { padding: 6px 8px; }
+  .boon-body { padding: 8px 10px; min-height: 0; gap: 6px; }
+  .boon-fx { font-size: 13px; }
+  .boon-name { font-size: calc(17px * var(--fs)); }
+}
+
 /* Beacon integrity bar in the repair card */
 .shop-repair { grid-column: 1 / -1; }
 .shop-integrity { display: block; height: 10px; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 210, 122, 0.35); }

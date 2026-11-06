@@ -158,6 +158,39 @@ const RECIPES = {
     }
     return s * 0.1;
   }),
+  // Grenade throw: short airy whoosh.
+  throw: () => {
+    let lp = 0;
+    return render(0.3, (t) => { lp += (noise() - lp) * 0.2; return lp * Math.sin(Math.PI * (t / 0.3)) * 0.5; });
+  },
+  // Frag blast: sharp crack + low boom.
+  boom: () => {
+    let lp = 0;
+    return render(0.9, (t) => {
+      lp += (noise() - lp) * 0.09;
+      return (noise() * 0.6 * Math.exp(-t * 30) + lp * 0.9 * Math.exp(-t * 4) + Math.sin(2 * Math.PI * (60 - 25 * t) * t) * 0.5 * Math.exp(-t * 5)) * 0.8;
+    });
+  },
+  // Cryo: icy crack + glassy shimmer.
+  freeze: () => render(0.7, (t) => (noise() * 0.35 * Math.exp(-t * 25)
+    + (Math.sin(2 * Math.PI * 1760 * t) + Math.sin(2 * Math.PI * 2350 * t)) * 0.07 * Math.exp(-t * 5))),
+  // Molotov: glass break + fire whoosh.
+  fire: () => {
+    let lp = 0;
+    return render(0.9, (t) => {
+      lp += (noise() - lp) * 0.15;
+      const glass = (Math.sin(2 * Math.PI * 3100 * t) * 0.15 + noise() * 0.2) * Math.exp(-t * 35);
+      return glass + lp * 0.55 * Math.min(1, t * 8) * Math.exp(-t * 2.2);
+    });
+  },
+  // Crate appears: sparkling three-note chime.
+  crate: () => render(0.8, (t) => {
+    let s = 0;
+    for (const [f, d] of [[1175, 0], [1568, 0.08], [1976, 0.16]]) { const u = t - d; if (u > 0) s += Math.sin(2 * Math.PI * f * u) * Math.exp(-u * 7); }
+    return s * 0.09;
+  }),
+  // Perk chosen: warm rising swell.
+  perk: () => render(0.8, (t) => (Math.sin(2 * Math.PI * (440 + 330 * t) * t) * 0.18 + Math.sin(2 * Math.PI * 880 * t) * 0.06) * Math.min(1, t * 20) * Math.exp(-t * 3.5)),
   // Popup open: soft paper/cloth whoosh.
   open: () => {
     let lp = 0;

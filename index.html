@@ -84,6 +84,12 @@
         <span class="coin-badge"><i class="coin-ico"></i><b id="hudCoins">0</b></span>
       </button>
       <span class="coin-pop" id="coinPop"></span>
+      <!-- Grenade slots under the shop (Underlords layout §6.4): tap / 1-2-3 selects a type in stock -->
+      <div class="grenade-slots" id="grenadeSlots">
+        <button class="gslot" data-action="selectGrenade" data-type="frag" data-nosfx data-i18n-aria="grenade.frag"><i class="gico gico-frag"></i><b>0</b><kbd>1</kbd></button>
+        <button class="gslot" data-action="selectGrenade" data-type="cryo" data-nosfx data-i18n-aria="grenade.cryo"><i class="gico gico-cryo"></i><b>0</b><kbd>2</kbd></button>
+        <button class="gslot" data-action="selectGrenade" data-type="molotov" data-nosfx data-i18n-aria="grenade.molotov"><i class="gico gico-molotov"></i><b>0</b><kbd>3</kbd></button>
+      </div>
       <button class="ring-btn" data-action="openSettings" data-i18n-aria="aria.settings">
         <svg class="ico ico-gear" viewBox="0 0 24 24"><path d="M19.42 10.37L22.13 10.80L22.13 13.20L19.42 13.63L18.40 16.10L20.01 18.31L18.31 20.01L16.10 18.40L13.63 19.42L13.20 22.13L10.80 22.13L10.37 19.42L7.90 18.40L5.69 20.01L3.99 18.31L5.60 16.10L4.58 13.63L1.87 13.20L1.87 10.80L4.58 10.37L5.60 7.90L3.99 5.69L5.69 3.99L7.90 5.60L10.37 4.58L10.80 1.87L13.20 1.87L13.63 4.58L16.10 5.60L18.31 3.99L20.01 5.69L18.40 7.90Z"/><circle cx="12" cy="12" r="3.2"/></svg>
       </button>
@@ -128,6 +134,8 @@
 
     <!-- Label above the kiosk between waves (positioned from the 3D projection); tap / E opens the shop when in reach -->
     <button class="kiosk-prompt" id="kioskPrompt" data-action="openShop" data-nosfx><span class="kiosk-key">E</span><span data-i18n="hud.shop"></span></button>
+    <!-- Crate label: E / tap opens it in reach; countdown until it disappears -->
+    <button class="kiosk-prompt crate-prompt" id="cratePrompt" data-action="openCrate" data-nosfx><span class="kiosk-key">E</span><span data-i18n="hud.open"></span><span class="crate-timer" id="crateTimer"></span></button>
 
     <!-- Bottom-right: weapon block + player plate (Underlords "LOCAL PLAYER" corner) -->
     <div class="hud-player">
@@ -158,9 +166,15 @@
     <div class="touch-controls" id="touchControls">
       <div class="touch-stick" id="touchStick"><div class="touch-knob" id="touchKnob"></div></div>
       <div class="touch-actions">
-        <button class="neon-btn neon-small" data-touch-action="reload" data-nosfx data-i18n-aria="aria.reload">
-          <svg class="ico" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M19 3.5V8h-4.5"/><path d="M11 9h2v6h-2z" class="fill"/></svg>
-        </button>
+        <div class="touch-col touch-col-left">
+          <!-- Grenade: hold + drag to aim (circle + dotted arc), release to throw; tap = straight ahead (D41) -->
+          <button class="neon-btn neon-small grenade-neon" id="grenadeBtn" data-nosfx data-i18n-aria="aria.grenade">
+            <i class="gico" id="grenadeBtnIco"></i><b class="grenade-count" id="grenadeBtnCount">0</b>
+          </button>
+          <button class="neon-btn neon-small" data-touch-action="reload" data-nosfx data-i18n-aria="aria.reload">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M19 3.5V8h-4.5"/><path d="M11 9h2v6h-2z" class="fill"/></svg>
+          </button>
+        </div>
         <div class="touch-col">
           <button class="neon-btn neon-small flare-neon" data-touch-action="flare" data-nosfx data-i18n-aria="aria.flare">
             <svg class="flare-ring" viewBox="0 0 48 48"><circle class="flare-track" cx="24" cy="24" r="21"/><circle class="flare-fill" cx="24" cy="24" r="21" pathLength="100"/></svg>
@@ -182,6 +196,7 @@
           <button class="tab" role="tab" data-shop-tab="weapons" data-i18n="shop.tab.weapons"></button>
           <button class="tab" role="tab" data-shop-tab="weaponUpgrades" data-i18n="shop.tab.weaponUpgrades"></button>
           <button class="tab" role="tab" data-shop-tab="playerUpgrades" data-i18n="shop.tab.playerUpgrades"></button>
+          <button class="tab" role="tab" data-shop-tab="grenades" data-i18n="shop.tab.grenades"></button>
           <button class="tab" role="tab" data-shop-tab="defenses" data-i18n="shop.tab.defenses"></button>
         </div>
         <span class="shop-coins"><i class="coin-ico"></i><b id="shopCoins">0</b></span>
@@ -197,6 +212,14 @@
       </div>
       <div class="shop-sub" id="shopSub"></div>
       <div class="shop-grid" id="shopGrid"></div>
+    </div>
+  </div>
+
+  <!-- ===== Crate reward (Underlords "CHOOSE A BOON"): 3 cards, the world is frozen until one is chosen ===== -->
+  <div class="popup popup-crate" id="popup-crate" role="dialog" aria-modal="true">
+    <div class="crate-panel">
+      <h2 class="stamp crate-title" data-i18n="crate.title"></h2>
+      <div class="crate-cards" id="crateCards"></div>
     </div>
   </div>
 

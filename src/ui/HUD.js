@@ -46,6 +46,12 @@ export class HUD {
       lv: $('hudLv'),
       xpFill: $('hudXpFill'),
       kiosk: $('kioskPrompt'),
+      crate: $('cratePrompt'),
+      crateTimer: $('crateTimer'),
+      gslots: [...document.querySelectorAll('#grenadeSlots .gslot')],
+      gBtn: $('grenadeBtn'),
+      gBtnIco: $('grenadeBtnIco'),
+      gBtnCount: $('grenadeBtnCount'),
     };
     this.pt = { x: 0, y: 0 };
     // Bottom edge of the top HUD block, measured only when it can change (layout reads stay rare).
@@ -68,6 +74,7 @@ export class HUD {
     });
     game.events.on('waveCleared', (index, reward, final) => { if (!final) this._showBanner('banner.waveCleared', null); });
     game.events.on('levelUp', (level) => { if (game.sm.inMap) this._showBanner('banner.levelUp', { n: level }); });
+    game.events.on('crateSpawn', () => this._showBanner('banner.crate', null));
     // Early wave start bonus (D40): "+25" floats up from the coin badge
     const pop = document.getElementById('coinPop');
     game.events.on('coinReward', (amount, reason) => {
@@ -88,6 +95,7 @@ export class HUD {
       hp: -1, maxHp: -1, ammo: -1, mag: -1, weaponId: '', reloading: null, reloadPct: -1, integrity: -1, hit: null, low: null,
       waveLabel: '', waveSub: '', nextWave: null, bossOn: null, bossPct: -1, flarePct: -1, flareFull: null, flareReady: null,
       coins: -1, lv: '', xpPct: -1, canShop: null, kioskOn: null, kioskNear: null, kx: -1, ky: -1,
+      gKey: '', crateOn: null, crateNear: null, crateSec: -1, cx: -1, cy: -1,
     };
   }
 
@@ -118,6 +126,25 @@ export class HUD {
       c.kx = x; c.ky = y; c.kBelow = below;
       el.style.transform = `translate(${x}px, ${y}px) translate(-50%, ${below ? '30%' : '-100%'})`;
     }
+  }
+
+  /** "E · OPEN 0:24" above the crate while it exists; highlighted in reach (tap opens on touch). */
+  _crateLabel(run, running, time) {
+    const c = this.cache, el = this.el.crate, r3 = this.game.renderer3d, cr = run.crates.crate;
+    let on = running && !!cr && !!r3;
+    if (on) {
+      r3.projectToScreen(cr.x, cr.y, 56, this.pt);
+      const W = r3.canvas.clientWidth, H = r3.canvas.clientHeight;
+      on = this.pt.x > 0 && this.pt.x < W && this.pt.y > 0 && this.pt.y < H;
+    }
+    if (on !== c.crateOn) { c.crateOn = on; el.classList.toggle('on', on); }
+    if (!on) return;
+    const near = run.canOpenCrate;
+    if (near !== c.crateNear) { c.crateNear = near; el.classList.toggle('near', near); }
+    const sec = Math.ceil(run.crates.timeLeft(time));
+    if (sec !== c.crateSec) { c.crateSec = sec; this.el.crateTimer.textContent = `0:${String(sec).padStart(2, '0')}`; }
+    const x = Math.round(this.pt.x), y = Math.round(this.pt.y);
+    if (x !== c.cx || y !== c.cy) { c.cx = x; c.cy = y; el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`; }
   }
 
   _showBanner(key, params) {
@@ -205,6 +232,23 @@ export class HUD {
     const canShop = running && run.canShop;
     if (canShop !== c.canShop) { c.canShop = canShop; el.shop.classList.toggle('can-shop', canShop); }
     this._kioskLabel(run, running);
+    this._crateLabel(run, running, time);
+
+    // Grenade slots (counts, selected) + the touch grenade button (selected type icon + count)
+    const gs = run.grenades;
+    const gKey = `${gs.stock.frag},${gs.stock.cryo},${gs.stock.molotov},${gs.selected}`;
+    if (gKey !== c.gKey) {
+      c.gKey = gKey;
+      for (const slot of el.gslots) {
+        const t = slot.dataset.type, n = gs.stock[t];
+        slot.querySelector('b').textContent = String(n);
+        slot.classList.toggle('empty', n === 0);
+        slot.classList.toggle('sel', gs.selected === t && n > 0);
+      }
+      el.gBtnIco.className = `gico gico-${gs.selected}`;
+      el.gBtnCount.textContent = String(gs.stock[gs.selected]);
+      el.gBtn.classList.toggle('empty', gs.total() === 0);
+    }
 
     // Emergency Flare charge ring
     const fl = run.flare;

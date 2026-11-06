@@ -26,7 +26,7 @@ export function computeDamage(base, source, target, mods, rng) {
   let dmg = base;                                          // 1
   dmg *= mods.weaponDamageMult * (source.weaponDamageMult || 1); // 2 (permanent weapon upgrades, systems/Loadout.js)
   dmg *= mods.playerDamageMult;                            // 3
-  dmg *= mods.temporaryDamageMult;                         // 4
+  dmg *= mods.temporaryDamageMult * (source.temporaryDamageMult || 1); // 4 (crate perks, MapRun withPerks)
   const critChance = (source.critChance || 0) + (mods.critChanceBonus || 0);
   result.crit = critChance > 0 && rng.next() < critChance;
   if (result.crit) dmg *= source.critMultiplier || 1;     // 5

@@ -1,6 +1,6 @@
 // Shop overlay (Underlords shop style, PROJECT_AUDIT.md §6.6; 02_SPEC §12). Shown while the game is in SHOP_OPEN
 // (and stays under the Settings popup when paused from the shop). Tabs: WEAPONS · UPGRADES (weapon) · KEEPER
-// (player upgrades) · DEFENSES (devices on build pads). Grenades join in Phase 6.
+// (player upgrades) · GRENADES (Phase 6) · DEFENSES (beacon repair + devices on build pads).
 // The view only displays offers computed by the Economy/Game and calls Game commands — it never edits the profile.
 // DOM is rebuilt on open / tab switch / after a purchase / on language change — never per frame.
 import { STATES } from '../core/GameStateMachine.js';
@@ -8,6 +8,7 @@ import { T, onLanguageChange } from '../i18n/i18n.js';
 import { WEAPONS } from '../data/weapons.js';
 import { WEAPON_NODES, UPGRADE_NODES, NODE_NAME_OVERRIDES, PLAYER_UPGRADES, PLAYER_UPGRADE_ORDER } from '../data/upgrades.js';
 import { DEFENSES } from '../data/defenses.js';
+import { GRENADES, GRENADE_ORDER } from '../data/grenades.js';
 import { levelProgress } from '../data/progression.js';
 import { effectiveWeaponStats } from '../systems/Loadout.js';
 import { MVP_WEAPON_IDS, REASON } from '../systems/Economy.js';
@@ -32,6 +33,9 @@ const ICON = { // 24×24 stroke icons (white line style, see art-prompts/06_SHOP
   guard_turret: '<path d="M6 20h12l-2-6H8z"/><path d="M8 14V9h8v5M16 11h6"/>',
   frost_coil: '<path d="M12 2v20M3 7l18 10M21 7L3 17"/>',
   repair: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
+  g_frag: '<circle cx="11" cy="14" r="6.5"/><path d="M11 7.5V5h3l2-2M14 5l3 3"/>',
+  g_cryo: '<circle cx="12" cy="12" r="9"/><path d="M12 6v12M7 9l10 6M17 9L7 15"/>',
+  g_molotov: '<path d="M10 9h4v3l2 3v6H8v-6l2-3z"/><path d="M12 9V6M12 2c1.5 1.5 1.5 3 0 4-1.5-1-1.5-2.5 0-4z"/>',
 };
 const COIN = '<i class="coin-ico" aria-hidden="true"></i>';
 
@@ -100,6 +104,7 @@ export class ShopView {
     else if (cmd === 'player') r = g.shopBuyPlayerUpgrade(a);
     else if (cmd === 'defense') r = g.shopBuyDefense(Number(a), c);
     else if (cmd === 'repair') r = g.shopRepairBeacon();
+    else if (cmd === 'grenade') r = g.shopBuyGrenade(a);
     else if (cmd === 'pickWeapon') { this.upgradeWeaponId = a; this.refresh(); return; }
     if (!r) return;
     Sfx.play(r.ok ? (cmd === 'equip' ? 'click' : 'buy') : 'deny');
@@ -127,7 +132,21 @@ export class ShopView {
     if (this.tab === 'weapons') this._weapons();
     else if (this.tab === 'weaponUpgrades') this._weaponUpgrades();
     else if (this.tab === 'playerUpgrades') this._playerUpgrades();
+    else if (this.tab === 'grenades') this._grenades();
     else this._defenses();
+  }
+
+  /** GRENADES (Phase 6, D15): one at a time, cap 3 per type for this map; stock is lost on a new map / retry. */
+  _grenades() {
+    const g = this.game;
+    for (const id of GRENADE_ORDER) {
+      const G = GRENADES[id];
+      const o = g.grenadeOffer(id);
+      const body = `${this._pips(o.stock, o.cap)}<p class="shop-fx">${T(`fx.grenade.${id}`)}</p>`;
+      const card = this._card(`g_${id}`, T(G.nameKey), body, o.reason === REASON.LEVEL ? 'locked' : '');
+      this._footer(card, { cmd: `grenade:${id}`, price: o.price, enabled: o.canBuy, reason: o.canBuy ? null : o.reason, reasonParams: { n: o.requiredLevel } });
+      this.grid.append(card);
+    }
   }
 
   _card(icon, title, bodyHtml, extraCls = '') {

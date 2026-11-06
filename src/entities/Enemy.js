@@ -59,9 +59,10 @@ export class Enemy {
   }
 
   /** Applies a slow without stacking: max(amount), duration refreshed to at least time + duration. */
-  applySlow(amount, duration, time) {
+  applySlow(amount, duration, time, scaled = true) {
     if (!this.alive || !(amount > 0) || !(duration > 0)) return;
-    const a = Math.min(0.9, amount * (this.type.bossSlowFactor ?? 1));
+    // scaled: the boss gets bossSlowFactor of it; false = the caller already passes the boss value (Cryo grenade)
+    const a = Math.min(0.9, amount * (scaled ? (this.type.bossSlowFactor ?? 1) : 1));
     if (time >= this.slowUntil) this.slowAmount = a;
     else this.slowAmount = Math.max(this.slowAmount, a);
     this.slowUntil = Math.max(this.slowUntil, time + duration);

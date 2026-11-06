@@ -29,8 +29,29 @@ import { WAVE_TIMING } from '../data/waves.js';
 import { BEACON } from '../data/beacon.js';
 import { defaultLoadout } from '../systems/Loadout.js';
 import { buildCollisionWorld } from '../systems/Collision.js';
+import { GrenadeSystem } from '../systems/GrenadeSystem.js';
+import { CrateSystem } from '../systems/CrateSystem.js';
+import { GRENADE_RULES } from '../data/grenades.js';
+import { CRATE, PERKS } from '../data/perks.js';
 
 const MAX_ENEMIES = 80; // hard cap of live entities (performance guard; waves stay far below it)
+const AIM = { x: 0, y: 0 }; // reused
+
+/** Weapon stats with the temporary crate perks of this run on top (never stored in the profile). */
+function withPerks(ws, perks) {
+  const s = { ...ws, temporaryDamageMult: 1, knockback: 0 };
+  for (const id of perks) {
+    const k = PERKS[id];
+    if (!k) continue;
+    if (k.damageMult) s.temporaryDamageMult *= k.damageMult;
+    if (k.reloadMult) s.reloadDuration *= k.reloadMult;
+    if (k.magazineMult) s.magazineSize = Math.ceil(s.magazineSize * k.magazineMult - 1e-9);
+    if (k.fireRateMult) s.fireInterval /= k.fireRateMult;
+    if (k.penetration) s.penetrationCount += k.penetration;
+    if (k.knockback) s.knockback += k.knockback;
+  }
+  return s;
+}
 
 export class MapRun {
   /**
@@ -69,6 +90,15 @@ export class MapRun {
     this.bossSystem = new BossSystem(events);
     this.defenses = new DefenseSystem(map.buildPads, this.projectiles, this.rng, events);
     this.flare = new FlareSystem(events); // charge is temporary: a new run starts at 0
+    // Temporary map data (MapRunState): grenade stock, crate + perks — gone with this run (retry / new map).
+    this.temporaryPerks = [];
+    this.crateChoices = null;          // perk ids offered by the open crate
+    this.grenades = new GrenadeSystem(this.rng, events);
+    this.crates = new CrateSystem(map, new SeededRandom((runSeed ^ 0x2545f491) >>> 0), events);
+    this.grenadePreview = { active: false, x: 0, y: 0 }; // aim landing point (presentation: circle + dotted arc)
+    this._gWasDown = false;
+    this._gTarget = { x: 0, y: 0 };
+    this.lastTime = 0;
     this.waves = new WaveSystem(getWaves(map.id) || [], map.spawnPoints, this.rng, events,
       (id, x, y, time) => this._spawnEnemy(id, x, y, time));
 
@@ -95,6 +125,11 @@ export class MapRun {
       events.on('frostPulse', (x, y) => this.particles.burst(x, y, 14, 210, 0.45, 2.5, '#9fd8ff')),
       events.on('bulletBlocked', (x, y) => this.particles.burst(x, y, 5, 130, 0.18, 2, '#c9c3b5')), // stone chips
       events.on('waveCleared', (index, reward, final) => this._onWaveCleared(index, reward, final)),
+      events.on('waveStart', (index) => this.crates.onWaveStart(index, this.lastTime)),
+      events.on('grenadeBlast', (type, x, y, r) => {
+        const color = type === 'frag' ? '#ffb070' : type === 'cryo' ? '#a8e4ff' : '#ff7a2a';
+        this.particles.burst(x, y, 26, r * 2.4, 0.5, 3, color);
+      }),
     ];
 
     this.applyLoadout(loadout, true);
@@ -106,29 +141,114 @@ export class MapRun {
     this.ai.world = this.world;
     this.projectileSystem.world = this.world;
     this.defenses.world = this.world;
+    this.crates.world = this.world;
     this.world.pushOut(this.player);
     this.waves.start(0);
   }
 
   /**
-   * Applies permanent progression (map start, and after shop purchases between waves).
-   * A changed weapon is re-equipped with a full magazine; VITALITY adds its HP right away.
+   * Applies permanent progression (map start, after shop purchases) with the run's temporary perks on top.
+   * Another weapon is equipped with a full magazine; the same weapon keeps its ammo; VITALITY adds HP right away.
    */
   applyLoadout(loadout, initial = false) {
-    const ws = loadout.weaponStats;
-    const changed = initial || ws.id !== this.weaponStats.id || JSON.stringify(ws) !== JSON.stringify(this.weaponStats);
+    this.baseLoadout = loadout;
+    const ws = withPerks(loadout.weaponStats, this.temporaryPerks);
+    const prev = this.weaponStats;
     this.weaponStats = ws;
-    if (changed && !initial) this.weapon.equip(ws);
+    if (initial || ws.id !== prev.id) this.weapon.equip(ws);
+    else { this.weapon.stats = ws; this.weapon.ammo = Math.min(this.weapon.ammo, ws.magazineSize); }
+    let speed = loadout.player.speedMult, taken = loadout.player.damageTakenMult, beam = 0;
+    for (const id of this.temporaryPerks) {
+      const k = PERKS[id];
+      if (!k) continue;
+      if (k.speedMult) speed *= k.speedMult;
+      if (k.damageTakenMult) taken *= k.damageTakenMult;
+      if (k.beamDeg) beam += k.beamDeg;
+    }
     const m = loadout.player, p = this.player;
     const gained = m.maxHp - p.maxHp;
     p.maxHp = m.maxHp;
     if (gained > 0 && !initial) p.hp += gained;
     p.hp = Math.min(p.hp, p.maxHp);
-    p.damageTakenMult = m.damageTakenMult;
-    this.controller.speedMult = m.speedMult;
+    p.damageTakenMult = taken;
+    this.controller.speedMult = speed;
     this.controller.dodgeCooldownMult = m.dodgeCooldownMult;
     this.interactMult = m.interactMult;
+    this.light.extraWidthDeg = beam;
   }
+
+  // ---------------- crate & temporary perks (02_SPEC §14) ----------------
+  get canOpenCrate() {
+    const c = this.crates.crate, p = this.player;
+    return !!c && !this.over && p.alive && Math.hypot(p.x - c.x, p.y - c.y) <= CRATE.interactRadius * this.interactMult + p.radius;
+  }
+
+  _perkOffered(perk) {
+    if (this.temporaryPerks.includes(perk.id)) return false;
+    if (perk.repair && this.beacon.integrity >= this.beacon.maxIntegrity) return false; // nothing to repair
+    return true;
+  }
+
+  /** Opens the crate in reach: rolls the offered perks (seeded). The crate is gone afterwards. */
+  openCrate(time) {
+    if (!this.canOpenCrate || this.crateChoices) return null;
+    const choices = this.crates.open(time, (perk) => this._perkOffered(perk));
+    this.crateChoices = choices && choices.length ? choices : null;
+    return this.crateChoices;
+  }
+
+  /** Applies ONE of the offered perks, once; it lasts until the end of this map. */
+  choosePerk(id) {
+    if (!this.crateChoices || !this.crateChoices.includes(id)) return false;
+    this.crateChoices = null;
+    this.temporaryPerks.push(id);
+    const k = PERKS[id];
+    if (k.repair) this.beacon.repair(k.repair);
+    this.applyLoadout(this.baseLoadout);
+    this.events.emit('perkChosen', id);
+    return true;
+  }
+
+  // ---------------- grenades: hold G / drag the touch button to aim, release to throw (D41) ----------------
+  _forward(out) {
+    const p = this.player;
+    out.x = p.x + Math.cos(p.aimAngle) * GRENADE_RULES.tapThrowRange;
+    out.y = p.y + Math.sin(p.aimAngle) * GRENADE_RULES.tapThrowRange;
+    return out;
+  }
+
+  _grenadeInput(input, time) {
+    const g = this.grenades, p = this.player, pv = this.grenadePreview;
+    if (input.consumePressed('grenade1')) g.select('frag');
+    if (input.consumePressed('grenade2')) g.select('cryo');
+    if (input.consumePressed('grenade3')) g.select('molotov');
+    const down = input.isDown('throwGrenade');
+    const quickTap = input.consumePressed('throwGrenade') && !down && !this._gWasDown; // pressed + released in one step
+    const ga = input.grenadeAim;
+    pv.active = false;
+    if (ga && ga.active) {
+      pv.active = true;
+      GrenadeSystem.landing(p.x, p.y, p.x + ga.ox, p.y + ga.oy, pv);
+    } else if (down || quickTap) {
+      pv.active = true;
+      const a = input.getAimWorld ? input.getAimWorld(AIM) : null;
+      if (a) GrenadeSystem.landing(p.x, p.y, a.x, a.y, pv); else this._forward(pv);
+    }
+    if (pv.active) { this._gTarget.x = pv.x; this._gTarget.y = pv.y; }
+    if ((this._gWasDown && !down) || quickTap) g.throw(p, this._gTarget.x, this._gTarget.y, time);
+    this._gWasDown = down;
+    if (ga && ga.released) {
+      ga.released = false;
+      if (ga.tap) this._forward(this._gTarget);
+      else GrenadeSystem.landing(p.x, p.y, p.x + ga.ox, p.y + ga.oy, this._gTarget);
+      ga.tap = false;
+      g.throw(p, this._gTarget.x, this._gTarget.y, time);
+    }
+    pv.active = pv.active && g.total() > 0 && p.alive;
+  }
+
+  /** Leaving RUNNING (pause, shop, crate): an aim in progress is dropped, never thrown on resume. */
+  cancelGrenadeAim() { this._gWasDown = false; this.grenadePreview.active = false; }
 
   /** Radius in which the keeper can open the shop (base × INTERACT RANGE). */
   get interactRadius() { return KIOSK.interactRadius * this.interactMult; }
@@ -199,6 +319,7 @@ export class MapRun {
    * An early start pays a one-off coin bonus (D40) — once per wave, because the break ends with it.
    */
   startNextWave(time) {
+    this.lastTime = time;
     if (this.over || !this.waves.startNextWave(time)) return false;
     const bonus = WAVE_TIMING.earlyStartBonus | 0;
     if (bonus > 0) {
@@ -226,17 +347,21 @@ export class MapRun {
   /** @param {import('../platform/InputManager.js').InputManager} input */
   update(input, dt, time) {
     if (this.over) return; // the world stops on defeat / victory
+    this.lastTime = time;
     const p = this.player;
     this.controller.update(p, input, dt, time);
     this.weapons.update(this.weapon, p, input.isDown('fire'), input.consumePressed('reload'), time);
     if (input.consumePressed('flare')) this.useFlare(time);
+    this._grenadeInput(input, time);
     this.light.update(this.beacon, this.enemies, time);
     if (this.ai.update(this.enemies, this.beacon, dt, time, p)) this._setDefeat('beacon');
     if (this.bossSystem.update(p, this.beacon, time)) this._setDefeat('beacon');
     this.defenses.update(this.enemies, time);
     this.projectileSystem.update(this.enemies, dt, time);
+    this.grenades.update(this.enemies, time);
     if (!p.alive) this._setDefeat('player');
     if (!this.defeat) this.waves.update(this.enemies, time);
+    this.crates.update(p, this.kiosk, time);
 
     // Remove dead bodies after their fade (removal never grants anything).
     for (let i = this.enemies.length - 1; i >= 0; i--) {
@@ -271,6 +396,10 @@ export class MapRun {
     this.projectiles.clear();
     this.particles.clear();
     this.defenses.clear();
+    this.grenades.clear();      // temporary map data is gone with the run (02_SPEC §13–14)
+    this.crates.clear();
+    this.temporaryPerks.length = 0;
+    this.crateChoices = null;
   }
 }
 

@@ -17,6 +17,7 @@ import { QUALITY_LEVELS, QUALITY_PRESETS, resolveAutoQuality } from '../config/s
 import { getMap, MAPS } from '../data/maps.js';
 import { getDefense } from '../data/defenses.js';
 import { shopPrice } from '../data/upgrades.js';
+import { getGrenade, GRENADE_RULES } from '../data/grenades.js';
 import { SaveManager } from './SaveManager.js';
 import { Economy, REASON } from '../systems/Economy.js';
 
@@ -67,7 +68,8 @@ export class Game {
     this.sm.onChange((next) => {
       // Edge presses made while the world was frozen must not fire on resume.
       if (next === STATES.RUNNING) this.input.clearPressed();
-      if (next === STATES.PAUSED || next === STATES.SHOP_OPEN) this.input.releaseAll();
+      if (next === STATES.PAUSED || next === STATES.SHOP_OPEN || next === STATES.CRATE_REWARD_OPEN) this.input.releaseAll();
+      if (next !== STATES.RUNNING && this.run) this.run.cancelGrenadeAim(); // never thrown on resume
       if (this.renderer3d) this.renderer3d.pausedDrawn = false; // redraw once with the new overlay state
     });
   }
@@ -87,8 +89,11 @@ export class Game {
     // Shaders still compiling or the WebGL context is lost: the game waits (H5 3D guide §5.3).
     if (this.renderer3d && this.renderer3d.busy()) return;
     this.clock.advance(dt);
-    // E opens the shop at the kiosk (prep / intermission only) — a top-level state change, so it is handled here.
-    if (this.run && this.input.consumePressed('interact') && this.run.canShop) { this.openShop(); return; }
+    // E: open the crate in reach, else the shop at the kiosk (prep / intermission) — top-level state changes.
+    if (this.run && this.input.consumePressed('interact')) {
+      if (this.run.canOpenCrate) { this.openCrate(); return; }
+      if (this.run.canShop) { this.openShop(); return; }
+    }
     if (this.run) this.run.update(this.input, dt, this.clock.time);
   }
 
@@ -180,11 +185,54 @@ export class Game {
 
   /** Pause from the map or from the open shop; resume returns exactly there (02_SPEC §2, C3). */
   pause() {
-    if (this.sm.is(STATES.RUNNING) || this.sm.is(STATES.SHOP_OPEN)) this.resumeState = this.sm.state;
+    if (this.sm.is(STATES.RUNNING) || this.sm.is(STATES.SHOP_OPEN) || this.sm.is(STATES.CRATE_REWARD_OPEN)) this.resumeState = this.sm.state;
     return this.sm.set(STATES.PAUSED);
   }
 
-  resume() { return this.sm.set(this.resumeState === STATES.SHOP_OPEN ? STATES.SHOP_OPEN : STATES.RUNNING); }
+  resume() {
+    const back = this.resumeState === STATES.SHOP_OPEN || this.resumeState === STATES.CRATE_REWARD_OPEN ? this.resumeState : STATES.RUNNING;
+    return this.sm.set(back);
+  }
+
+  // ---------------- crate (02_SPEC §14): the world is frozen until ONE perk is chosen ----------------
+  openCrate() {
+    if (!this.sm.is(STATES.RUNNING) || !this.run || !this.run.canOpenCrate) return false;
+    if (!this.run.openCrate(this.clock.time)) return false;
+    return this.sm.set(STATES.CRATE_REWARD_OPEN);
+  }
+
+  chooseCratePerk(id) {
+    if (!this.sm.is(STATES.CRATE_REWARD_OPEN) || !this.run) return false;
+    if (!this.run.choosePerk(id)) return false;
+    return this.sm.set(STATES.RUNNING);
+  }
+
+  // ---------------- grenades (shop, one at a time, cap per type) ----------------
+  grenadeOffer(type) {
+    const G = getGrenade(type);
+    const run = this.run;
+    const o = { type, price: G ? shopPrice(G.price) : 0, requiredLevel: G ? G.requiredPlayerLevel : 1,
+      stock: run ? run.grenades.stock[type] | 0 : 0, cap: GRENADE_RULES.capPerType, canBuy: false, reason: null };
+    if (!G) o.reason = REASON.UNKNOWN;
+    else if (!this.shopOpen || !run || !run.betweenWaves) o.reason = REASON.CLOSED;
+    else if (this.economy.level < G.requiredPlayerLevel) o.reason = REASON.LEVEL;
+    else if (o.stock >= o.cap) o.reason = 'cap';
+    else if (this.economy.coins < o.price) o.reason = REASON.COINS;
+    else o.canBuy = true;
+    return o;
+  }
+
+  shopBuyGrenade(type) {
+    const o = this.grenadeOffer(type);
+    if (!o.canBuy) return { ok: false, reason: o.reason };
+    if (!this.economy.spend(o.price)) return { ok: false, reason: REASON.COINS };
+    this.run.grenades.add(type, 1);
+    this.events.emit('purchase', 'grenade', type);
+    return { ok: true };
+  }
+
+  /** HUD grenade slot tap / click: select a type that is in stock. */
+  selectGrenade(type) { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.grenades.select(type)); }
 
   // ---------------- shop (02_SPEC §12): opening freezes the world and the intermission timer ----------------
   openShop() {

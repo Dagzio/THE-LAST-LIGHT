@@ -31,6 +31,11 @@ export class OffscreenIndicators {
     ki.innerHTML = ARROW_SVG;
     this.root.appendChild(ki);
     this.kioskArrow = { el: ki, on: false, x: 0, y: 0, a: 0 }; // between waves only (D28)
+    const cr = document.createElement('div');
+    cr.className = 'offscreen-arrow crate';
+    cr.innerHTML = ARROW_SVG;
+    this.root.appendChild(cr);
+    this.crateArrow = { el: cr, on: false, x: 0, y: 0, a: 0 }; // while a crate lies on the map (Phase 6)
     this.pick = new Array(MAX_ENEMY_ARROWS).fill(null);
     this.pickD = new Array(MAX_ENEMY_ARROWS).fill(Infinity);
     this.pt = { x: 0, y: 0 };
@@ -39,7 +44,7 @@ export class OffscreenIndicators {
 
   _hideAll() {
     for (const a of this.arrows) if (a.on) { a.on = false; a.el.classList.remove('on'); }
-    for (const b of [this.beaconArrow, this.kioskArrow]) if (b.on) { b.on = false; b.el.classList.remove('on'); }
+    for (const b of [this.beaconArrow, this.kioskArrow, this.crateArrow]) if (b.on) { b.on = false; b.el.classList.remove('on'); }
   }
 
   /** Places arrow `a` on the screen edge towards the projected point; hides it when the point is on screen. */
@@ -61,7 +66,7 @@ export class OffscreenIndicators {
     const g = this.game;
     const r3 = g.renderer3d;
     if (!g.sm.inMap || !g.run || !r3) { this._hideAll(); return; }
-    if ((g.sm.is(STATES.PAUSED) || g.sm.is(STATES.SHOP_OPEN)) && r3.pausedDrawn) return; // frozen frame — arrows stay
+    if (!g.sm.is(STATES.RUNNING) && r3.pausedDrawn) return; // frozen frame — arrows stay
     const W = r3.canvas.clientWidth, H = r3.canvas.clientHeight;
     const p = g.run.player;
 
@@ -91,6 +96,13 @@ export class OffscreenIndicators {
       r3.projectToScreen(g.run.kiosk.x, g.run.kiosk.y, 30, this.pt);
       this._place(ka, this.pt.x, this.pt.y, W, H);
     } else if (ka.on) { ka.on = false; ka.el.classList.remove('on'); }
+
+    // Crate: while it lies on the map
+    const ca = this.crateArrow, crate = g.run.crates.crate;
+    if (crate) {
+      r3.projectToScreen(crate.x, crate.y, 20, this.pt);
+      this._place(ca, this.pt.x, this.pt.y, W, H);
+    } else if (ca.on) { ca.on = false; ca.el.classList.remove('on'); }
 
     const cx = W / 2, cy = H / 2;
     for (let i = 0; i < this.arrows.length; i++) {

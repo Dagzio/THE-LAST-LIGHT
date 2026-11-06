@@ -21,6 +21,15 @@ export function createMaterials() {
     // Boss telegraphs: red danger zone (normal blending — readable on any ground), violet impact flash.
     telegraphFill: new THREE.MeshBasicMaterial({ color: 0xff3b2f, transparent: true, opacity: 0.3, depthWrite: false }),
     telegraphEdge: new THREE.MeshBasicMaterial({ color: 0xff6a4a, transparent: true, opacity: 0.85, depthWrite: false }),
+    // Phase 6: crate glow, grenade aim (dotted arc + landing ring), blast and fire-zone effects
+    crateGlow: new THREE.MeshBasicMaterial({
+      color: 0xffd27a, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    }),
+    grenadeAim: new THREE.MeshBasicMaterial({ color: 0xfff0c8, transparent: true, opacity: 0.9, depthWrite: false }),
+    grenadeAimRing: new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.75, depthWrite: false }),
+    grenadeBody: new THREE.MeshLambertMaterial({ vertexColors: true }),
+    blast: new THREE.MeshBasicMaterial({ color: 0xffb070, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }),
+    fire: new THREE.MeshBasicMaterial({ color: 0xff6a1a, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }),
     impact: new THREE.MeshBasicMaterial({
       color: 0xc9a0ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false,
     }),

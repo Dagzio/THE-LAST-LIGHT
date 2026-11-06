@@ -12,7 +12,9 @@ import {
   coilGeometry, coilCrystalGeometry, reticleGeometry,
   runnerGeometry, runnerEyesGeometry, bruteGeometry, bruteEyesGeometry, wardenGeometry, wardenEyesGeometry,
   telegraphDiscGeometry, telegraphRingGeometry, kioskGeometry, kioskLanternGeometry,
+  crateGeometry, crateGlowGeometry, grenadeGeometry,
 } from './models.js';
+import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
 import { BEACON } from '../data/beacon.js';
 import { GLOAM_WARDEN } from '../data/boss.js';
 import { FLARE } from '../data/balance.js';
@@ -165,6 +167,28 @@ export class Renderer3D {
     this.kiosk.add(this.kioskLight);
     this.scene.add(tag(this.kiosk, 'kiosk'));
     this.kioskRing = tele(telegraphRingGeometry(0.94), m.padRune, 2);
+
+    // Phase 6 — crate, grenade aim (dotted arc + landing ring), grenades in flight, blasts and fire zones
+    this.crate = new THREE.Group();
+    const cb = new THREE.Mesh(crateGeometry(), m.prop);
+    cb.castShadow = true;
+    this.crate.add(cb, new THREE.Mesh(crateGlowGeometry(), m.crateGlow));
+    this.crate.visible = false;
+    this.scene.add(tag(this.crate, 'crate'));
+    const dot = new THREE.SphereGeometry(2.2, 8, 6);
+    this.aimDots = new THREE.InstancedMesh(dot, m.grenadeAim, GRENADE_RULES.previewDots);
+    this.aimDots.frustumCulled = false;
+    this.aimDots.renderOrder = 6;
+    this.aimDots.visible = false;
+    this.scene.add(this.aimDots);
+    this.aimRing = tele(telegraphRingGeometry(0.9), m.grenadeAimRing, 6);
+    this.grenadeMesh = new THREE.InstancedMesh(grenadeGeometry(), m.grenadeBody, 16);
+    this.grenadeMesh.frustumCulled = false;
+    this.grenadeMesh.setColorAt(0, WHITE);
+    this.grenadeMesh.visible = false;
+    this.scene.add(this.grenadeMesh);
+    this.blastRings = [0, 1, 2, 3].map(() => tele(telegraphRingGeometry(0.6), m.blast, 5));
+    this.fireZones = [0, 1, 2, 3].map(() => tele(telegraphDiscGeometry(), m.fire, 3));
 
     // Emergency Flare pulse: a warm light ring rolling out from the beacon over the arena
     this.flareRing = tele(telegraphRingGeometry(0.93), m.impact, 5);
@@ -508,6 +532,80 @@ export class Renderer3D {
     }
   }
 
+  // ---------------- Phase 6: crate, grenade aim / flight / blasts (same numbers as the simulation) ----------------
+  _syncGrenades(run, time) {
+    // crate (bobbing, glowing pillar)
+    const cr = run.crates.crate;
+    this.crate.visible = !!cr;
+    if (cr) {
+      this.crate.position.set(cr.x, Math.sin(time * 3) * 1.5, cr.y);
+      this.crate.rotation.y = time * 0.6;
+      const left = cr.expiresAt - time; // blink in the last 5 s
+      this.crate.children[1].visible = left > 5 || Math.floor(time * 6) % 2 === 0;
+    }
+
+    // aim: landing ring with the grenade radius + dotted lob from the keeper
+    const pv = run.grenadePreview, gs = run.grenades, p = run.player;
+    const aiming = pv.active;
+    this.aimDots.visible = aiming;
+    this.aimRing.visible = false;
+    if (aiming) {
+      const G = GRENADES[gs.selected];
+      this._flat(this.aimRing, pv.x, pv.y, G.radius, 1.5, 0.55 + 0.25 * Math.sin(time * 10));
+      const n = GRENADE_RULES.previewDots;
+      const d = Math.hypot(pv.x - p.x, pv.y - p.y);
+      const H = GRENADE_RULES.arcHeight + d * 0.12;
+      Q.identity(); S.setScalar(1);
+      for (let i = 0; i < n; i++) {
+        const t = (i + 1) / (n + 1);
+        P.set(p.x + (pv.x - p.x) * t, 30 + 4 * H * t * (1 - t) - 26 * t, p.y + (pv.y - p.y) * t);
+        M.compose(P, Q, S);
+        this.aimDots.setMatrixAt(i, M);
+      }
+      this.aimDots.count = n;
+      this.aimDots.instanceMatrix.needsUpdate = true;
+    }
+
+    // grenades in flight (same arc)
+    let k = 0;
+    for (const g of gs.flying) {
+      if (k >= 16) break;
+      const t = Math.min(1, Math.max(0, (time - g.t0) / (g.t1 - g.t0)));
+      const d = Math.hypot(g.x1 - g.x0, g.y1 - g.y0);
+      const H = GRENADE_RULES.arcHeight + d * 0.12;
+      P.set(g.x0 + (g.x1 - g.x0) * t, 30 + 4 * H * t * (1 - t) - 26 * t, g.y0 + (g.y1 - g.y0) * t);
+      Q.setFromAxisAngle(UP, time * 9); S.setScalar(1);
+      M.compose(P, Q, S);
+      this.grenadeMesh.setMatrixAt(k, M);
+      this.grenadeMesh.setColorAt(k, rgbOf(g.type === 'frag' ? '#59616b' : g.type === 'cryo' ? '#8fd4ff' : '#c76a2a'));
+      k++;
+    }
+    this.grenadeMesh.count = k;
+    this.grenadeMesh.visible = k > 0;
+    if (k > 0) {
+      this.grenadeMesh.instanceMatrix.needsUpdate = true;
+      if (this.grenadeMesh.instanceColor) this.grenadeMesh.instanceColor.needsUpdate = true;
+    }
+
+    // blasts (short expanding ring) and molotov fire zones (flickering disc for their duration)
+    for (const r of this.blastRings) r.visible = false;
+    let bi = 0;
+    for (const b of gs.blasts) {
+      const f = (time - b.at) / 0.4;
+      if (f < 0 || f >= 1 || bi >= this.blastRings.length) continue;
+      const ring = this.blastRings[bi++];
+      ring.material.color.set(b.type === 'frag' ? 0xffb070 : b.type === 'cryo' ? 0x9fe4ff : 0xff7a2a);
+      this._flat(ring, b.x, b.y, b.r * (0.4 + 0.75 * f), 2.5, 0.9 * (1 - f));
+    }
+    for (const z of this.fireZones) z.visible = false;
+    let zi = 0;
+    for (const z of gs.zones) {
+      if (zi >= this.fireZones.length) break;
+      const fade = Math.min(1, (z.until - time) / 0.4);
+      this._flat(this.fireZones[zi++], z.x, z.y, z.r, 1.8, (0.32 + 0.12 * Math.sin(time * 23 + z.x)) * Math.max(0, fade));
+    }
+  }
+
   _flat(mesh, x, y, scale, h, opacity) {
     mesh.visible = true;
     mesh.position.set(x, h, y);
@@ -610,6 +708,8 @@ export class Renderer3D {
       const near = run.playerAtKiosk;
       this._flat(this.kioskRing, k.x, k.y, run.interactRadius, 1.6, near ? 0.75 : 0.3 + 0.15 * Math.sin(time * 4));
     }
+
+    this._syncGrenades(run, time);
 
     // Emergency Flare pulse ring
     const fk = (time - run.flare.lastUsedAt) / FLARE.pulseFx;

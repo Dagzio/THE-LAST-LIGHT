@@ -338,6 +338,40 @@ export function kioskLanternGeometry() {
   ]);
 }
 
+/** Reward crate: iron-bound wooden chest with a glowing lock (≈ 30 × 22, height 22). Faces +X. */
+export function crateGeometry() {
+  const P = [];
+  P.push(part(new THREE.BoxGeometry(30, 16, 22), '#6b4a2f', { y: 8 }));
+  P.push(part(new THREE.BoxGeometry(31, 6, 23), '#5a3d26', { y: 19, rz: 0 }));               // lid
+  for (const x of [-11, 11]) P.push(part(new THREE.BoxGeometry(3, 23, 23.5), '#3a3f46', { x, y: 11 })); // iron bands
+  P.push(part(new THREE.BoxGeometry(31.5, 2.5, 23.5), '#3a3f46', { y: 16 }));
+  return mergeParts(P);
+}
+
+/** Crate glow: the lock + a soft light pillar so the crate reads from afar (additive, separate material). */
+export function crateGlowGeometry() {
+  const lock = part(new THREE.BoxGeometry(2, 5, 5), '#ffffff', { x: 15.5, y: 13 });
+  const pillar = new THREE.CylinderGeometry(9, 14, 140, 16, 1, true).toNonIndexed();
+  pillar.translate(0, 70, 0);
+  const pos = pillar.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const k = Math.max(0, 1 - pos.getY(i) / 140) * 0.55;
+    col[i * 3] = k; col[i * 3 + 1] = k * 0.82; col[i * 3 + 2] = k * 0.45;
+  }
+  pillar.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  pillar.deleteAttribute('uv');
+  return mergeParts([lock, pillar]);
+}
+
+/** Grenade in flight: small sphere with a fuse cap (tinted per type by instance colour). */
+export function grenadeGeometry() {
+  return mergeParts([
+    part(new THREE.SphereGeometry(4.5, 10, 8), '#ffffff', {}),
+    part(new THREE.CylinderGeometry(1.4, 1.4, 3, 6), '#888888', { y: 5 }),
+  ]);
+}
+
 /** Aim reticle on the ground: ring + 4 ticks (like the reference screenshot). */
 export function reticleGeometry() {
   const P = [part(new THREE.RingGeometry(9, 11.5, 28), '#ffffff', { rx: -Math.PI / 2 })];
@@ -414,6 +448,10 @@ export function buildShowcase(materials, rng) {
   const coil = new THREE.Group();
   coil.add(new THREE.Mesh(coilGeometry(), materials.character), new THREE.Mesh(coilCrystalGeometry(), materials.crystal));
   out.set('frost-coil', tag(coil, 'frost-coil'));
+  const crate = new THREE.Group();
+  crate.add(new THREE.Mesh(crateGeometry(), materials.prop), new THREE.Mesh(crateGlowGeometry(), materials.crateGlow));
+  out.set('crate', tag(crate, 'crate'));
+  out.set('grenade', tag(new THREE.Mesh(grenadeGeometry(), materials.character), 'grenade'));
   const kiosk = new THREE.Group();
   kiosk.add(new THREE.Mesh(kioskGeometry(), materials.prop), new THREE.Mesh(kioskLanternGeometry(), materials.lantern));
   out.set('kiosk', tag(kiosk, 'kiosk'));

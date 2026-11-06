@@ -3,8 +3,11 @@
 // finger is down; dragging moves the aim point) and neon action buttons (DASH, RELOAD) bottom-right. It only feeds InputManager sources — gameplay code is the
 // same for keyboard and touch. Shown only on touch devices. Multi-touch: each pointer is tracked by id.
 import { STATES } from '../core/GameStateMachine.js';
+import { GRENADE_RULES } from '../data/grenades.js';
 
 const SOURCE = 'touch';
+const GRENADE_DRAG_FULL = 110; // CSS px of drag for the maximum throw range
+const GRENADE_DRAG_DEAD = 12;  // below this it is a tap (throw straight ahead)
 const STICK_ZONE = 0.45;     // left 45% of the screen width starts the stick
 const STICK_RADIUS = 56;     // CSS px of thumb travel for full speed
 const DEAD_ZONE = 0.12;
@@ -50,6 +53,42 @@ export class TouchControls {
       btn.addEventListener('pointercancel', release);
       btn.addEventListener('pointerleave', release);
     });
+
+    // Grenade (D41): hold the button and drag — the drag vector (scaled) is the throw offset in the world;
+    // release throws, a tap without dragging throws straight ahead. Pointer capture keeps tracking off the button.
+    this.grenadeBtn = document.getElementById('grenadeBtn');
+    this.grenadePointer = null;
+    this.gx = 0; this.gy = 0; this.gDragged = false;
+    const gb = this.grenadeBtn;
+    gb.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!this.game.sm.is(STATES.RUNNING) || this.grenadePointer !== null) return;
+      if (!this.game.run || this.game.run.grenades.total() === 0) { gb.classList.add('denied'); return; }
+      this.grenadePointer = e.pointerId;
+      this.gx = e.clientX; this.gy = e.clientY; this.gDragged = false;
+      try { gb.setPointerCapture(e.pointerId); } catch (err) { /* old browsers */ }
+      gb.classList.add('pressed');
+    });
+    gb.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== this.grenadePointer) return;
+      const dx = e.clientX - this.gx, dy = e.clientY - this.gy;
+      if (!this.gDragged && Math.hypot(dx, dy) < GRENADE_DRAG_DEAD) return;
+      this.gDragged = true;
+      const ga = this.input.grenadeAim;
+      const k = GRENADE_RULES.maxThrowRange / GRENADE_DRAG_FULL; // screen right/down = world +x/+y (top-down camera)
+      ga.active = true; ga.ox = dx * k; ga.oy = dy * k;
+    });
+    const end = (e) => {
+      if (e.pointerId !== this.grenadePointer) return;
+      this.grenadePointer = null;
+      gb.classList.remove('pressed');
+      const ga = this.input.grenadeAim;
+      if (e.type === 'pointercancel') { ga.active = false; return; }
+      ga.active = false; ga.released = true; ga.tap = !this.gDragged;
+    };
+    gb.addEventListener('pointerup', end);
+    gb.addEventListener('pointercancel', end);
+    gb.addEventListener('animationend', () => gb.classList.remove('denied'));
 
     // Leaving RUNNING (pause, popups, exit) drops every touch so nothing sticks on resume.
     game.sm.onChange((state) => { if (state !== STATES.RUNNING) this.reset(); });
@@ -105,6 +144,10 @@ export class TouchControls {
 
   reset() {
     this.stickPointer = null;
+    this.grenadePointer = null;
+    if (this.grenadeBtn) this.grenadeBtn.classList.remove('pressed');
+    const ga = this.input.grenadeAim;
+    ga.active = false; ga.released = false; ga.tap = false;
     if (this.aimPointer !== null) { this.aimPointer = null; this.input.clearAim(); }
     this.input.setSourceAction(SOURCE, 'fire', false);
     this.input.setSourceAxis(SOURCE, 0, 0);

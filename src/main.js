@@ -36,6 +36,9 @@ function wireCombatSounds(events) {
   events.on('flareReady', () => Sfx.play('flareReady'));
   events.on('levelUp', () => Sfx.play('levelUp'));
   events.on('coinReward', (a, reason) => { if (reason === 'earlyStart') Sfx.play('buy'); });
+  events.on('grenadeThrow', () => Sfx.play('throw'));
+  events.on('grenadeBlast', (type) => Sfx.play(type === 'frag' ? 'boom' : type === 'cryo' ? 'freeze' : 'fire'));
+  events.on('crateSpawn', () => Sfx.play('crate'));
   let lastRicochetAt = 0;
   events.on('bulletBlocked', () => {
     const now = performance.now();

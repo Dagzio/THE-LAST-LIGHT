@@ -11,6 +11,7 @@ import { toggleFullscreen, initFullscreenButtons } from '../platform/Fullscreen.
 import { SPLASH_TAP_DELAY_MS } from '../config/constants.js';
 import { SettingsView } from './SettingsView.js';
 import { ShopView } from './ShopView.js';
+import { CrateView } from './CrateView.js';
 
 const SCREEN_BY_STATE = {
   BOOT: 'splash',
@@ -22,6 +23,7 @@ const SCREEN_BY_STATE = {
   MAP_DEFEAT: 'game',
   MAP_VICTORY: 'game',
   SHOP_OPEN: 'game',
+  CRATE_REWARD_OPEN: 'game',
 };
 
 const SAVE_NOTICE = { 'restored-backup': 'save.restored', 'reset-corrupt': 'save.reset', repaired: 'save.repaired' };
@@ -32,6 +34,7 @@ export class UIManager {
     this.game = game;
     this.settings = new SettingsView(game);
     this.shop = new ShopView(game);
+    this.crate = new CrateView(game);
     this.toast = document.getElementById('toast');
     this.openPopups = [];          // stack of open popup names (top = last)
     this.confirmKind = null;       // 'reset' | 'exit'
@@ -137,7 +140,8 @@ export class UIManager {
 
   /** Page hidden / focus lost / phone rotated: a real pause, the same path as the Pause button (H5 §5, C3). */
   autoPause() {
-    if (this.game.sm.is(STATES.RUNNING) || this.game.sm.is(STATES.SHOP_OPEN)) this.openSettings();
+    const sm = this.game.sm;
+    if (sm.is(STATES.RUNNING) || sm.is(STATES.SHOP_OPEN) || sm.is(STATES.CRATE_REWARD_OPEN)) this.openSettings();
   }
 
   /** Short notice at the bottom (not a gameplay timer — presentation only). */
@@ -192,6 +196,8 @@ export class UIManager {
       case 'flare': this.game.useFlare(); break;
       case 'openShop': if (!this.game.openShop()) Sfx.play('deny'); break; // glows only when it can open
       case 'closeShop': this.game.closeShop(); break;
+      case 'openCrate': if (!this.game.openCrate()) Sfx.play('deny'); break;
+      case 'selectGrenade': if (this.game.selectGrenade(btn.dataset.type)) Sfx.play('click'); else Sfx.play('deny'); break;
       default: break;
     }
   }

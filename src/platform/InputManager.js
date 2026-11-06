@@ -23,6 +23,9 @@ export class InputManager {
     this.pointer = { clientX: 0, clientY: 0, inside: false, world: { x: 0, y: 0 } };
     this.pointerMapper = null;          // (clientX, clientY, out) → world point; set by the 3D renderer in a map
     this.aim = { active: false, clientX: 0, clientY: 0 }; // screen point the keeper looks/shoots at
+    // Touch grenade aiming (D41): drag offset from the button in WORLD units relative to the keeper;
+    // `released` is set once on finger up (tap = no drag → straight ahead). Consumed by the map run.
+    this.grenadeAim = { active: false, ox: 0, oy: 0, released: false, tap: false };
     this._attached = false;
   }
 
@@ -137,6 +140,8 @@ export class InputManager {
   clearPressed() { this.pressedQueue.clear(); }
 
   releaseAll() {
+    const ga = this.grenadeAim;
+    ga.active = false; ga.released = false; ga.tap = false; // a pause never throws a grenade
     this.keyboardDown.clear();
     for (const set of this.sourceDown.values()) set.clear();
     for (const v of this.sourceAxes.values()) { v.x = 0; v.y = 0; }
