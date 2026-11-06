@@ -42,6 +42,19 @@ export const FLARE = {
   pulseRadius: 1100,        // world units the ring reaches (covers the arena from the beacon)
 };
 
+// Enemy body tuning (EnemyAISystem): contact reach and crowd separation.
+export const AI = {
+  contactPad: 2,            // world units of extra reach for contact damage
+  separation: 0.5,          // share of an overlap between two bodies resolved per step
+};
+
+// Static collision circles (D40, systems/Collision.js); decor circles come from systems/Props.js.
+export const COLLIDERS = {
+  beacon: 60,               // the stone plinth of the lighthouse (model radius 58–64)
+  pad: 36,                  // build pad disc (devices stand on it)
+  kiosk: 28,
+};
+
 export const ENEMY_FX = {
   deathFade: 0.45,             // s — dead body fades out, then the entity is removed
   hitFlash: 0.08,              // s

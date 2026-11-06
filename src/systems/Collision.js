@@ -2,6 +2,7 @@
 // engine — bodies are pushed out of circles; straight-line walkers slide around obstacles (no pathfinding, rule 14).
 // Bullets stop at the first circle on their segment. A uniform grid keeps queries local (weak phones).
 import { layoutProps, propColliders } from './Props.js';
+import { COLLIDERS } from '../data/balance.js';
 
 const CELL = 128;
 const OFFSET = 64; // cells may be negative (border rocks)
@@ -138,11 +139,7 @@ export class CollisionWorld {
   clear(x0, y0, x1, y1) { return this.segmentHit(x0, y0, x1, y1, 0) === Infinity; }
 }
 
-export const COLLIDER = {
-  beacon: 60,       // the stone plinth of the lighthouse (model radius 58–64)
-  pad: 36,          // build pad disc (devices stand on it)
-  kiosk: 28,
-};
+export const COLLIDER = COLLIDERS; // sizes live in data/balance.js
 
 /** Builds the static world of a map run: beacon, pads, kiosk (this run's spot) and every decor prop. */
 export function buildCollisionWorld(map, kiosk) {

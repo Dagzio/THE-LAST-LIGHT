@@ -8,9 +8,10 @@
 // Emergency Flare (D38): a stunned enemy stands still, does not attack and deals no contact damage.
 import { ENEMY_STATES } from '../entities/Enemy.js';
 import { BEACON } from '../data/beacon.js';
+import { AI } from '../data/balance.js';
 
-const CONTACT_PAD = 2;       // world units of extra reach for contact damage
-const SEPARATION = 0.5;      // share of the overlap resolved per step
+const CONTACT_PAD = AI.contactPad;
+const SEPARATION = AI.separation;
 
 export class EnemyAISystem {
   /** @param {import('../core/GameEvents.js').GameEvents} events */
