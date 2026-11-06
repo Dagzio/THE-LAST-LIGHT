@@ -16,12 +16,9 @@
 #screen-game .ring-btn { pointer-events: auto; }
 
 .paused-stamp {
-  position: absolute;
-  top: var(--safe-t);
-  left: 50%;
-  translate: -50% 0;
   font-size: calc(26px * var(--fs));
   display: none;
+  margin-top: calc(6px * var(--fs));
 }
 body.paused .paused-stamp { display: inline-block; }
 
@@ -212,12 +209,19 @@ body.paused .offscreen-arrow.alert svg { animation-play-state: paused; }
 /* Manual aim on desktop: precise crosshair over the 3D map (the 3D reticle marks the ground point) */
 @media (hover: hover) and (pointer: fine) { #world3d { cursor: crosshair; } }
 
-/* ===================== Beacon Integrity (top centre) ===================== */
-.hud-beacon {
+/* ===================== Top centre: beacon Integrity + wave header + boss bar ===================== */
+.hud-top {
   position: absolute;
   top: var(--safe-t);
   left: 50%;
   translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(4px * var(--fs));
+  pointer-events: none;
+}
+.hud-beacon {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -233,10 +237,60 @@ body.paused .offscreen-arrow.alert svg { animation-play-state: paused; }
 .hud-beacon-val { min-width: 2.6em; font-size: calc(24px * var(--fs)); color: #ffe2a8; }
 .hud-beacon.low .hud-beacon-bar i { background: linear-gradient(90deg, #a8443b, #e06a4a); }
 .hud-beacon.hit .hud-beacon-bar { border-color: #ff6a4a; }
-body.paused .paused-stamp { top: calc(var(--safe-t) + 48px * var(--fs)); }
 
-/* ===================== Defeat ===================== */
-.defeat-panel {
+.hud-wave {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-stretch: condensed;
+  text-transform: uppercase;
+  line-height: 1.1;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.75), 0 0 10px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+.hud-wave-label { font-size: calc(20px * var(--fs)); letter-spacing: 0.12em; color: #fff; }
+.hud-wave-sub { font-size: calc(15px * var(--fs)); letter-spacing: 0.08em; color: #ffd27a; }
+.hud-wave-sub[hidden] { display: none; }
+
+.hud-boss { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: calc(4px * var(--fs)); }
+.hud-boss[hidden] { display: none; }
+.hud-boss-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-stretch: condensed;
+  font-size: calc(17px * var(--fs));
+  letter-spacing: 0.14em;
+  color: #d9c2ff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.8);
+}
+.hud-boss-bar { display: block; width: calc(360px * var(--fs)); max-width: 46vw; height: calc(12px * var(--fs)); background: rgba(0, 0, 0, 0.65); border: 1px solid rgba(198, 156, 255, 0.5); }
+.hud-boss-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #6a2fb8, #b48cff); transition: width 0.15s; }
+
+/* Wave banner (WAVE N / FINAL WAVE / WAVE CLEARED) */
+.wave-banner { position: absolute; left: 0; right: 0; top: 30%; display: none; justify-content: center; pointer-events: none; }
+.wave-banner.show { display: flex; animation: waveBanner 1.8s ease-out forwards; }
+.wave-banner .stamp { font-size: calc(44px * var(--fs)); padding: 0.2em 0.9em; }
+@keyframes waveBanner {
+  0% { opacity: 0; transform: scale(1.25); }
+  12% { opacity: 1; transform: scale(1); }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+body.paused .wave-banner.show { animation-play-state: paused; }
+
+/* START NEXT WAVE — intermission only. Desktop: bottom centre (user choice). Touch: under the wave timer, because
+   the bottom centre holds the player plate next to the neon buttons. */
+.next-wave-btn { display: none; font-size: calc(26px * var(--fs)); pointer-events: auto; white-space: nowrap; }
+.next-wave-bottom { position: absolute; left: 50%; bottom: var(--safe-b); translate: -50% 0; }
+.next-wave-top { margin-top: calc(6px * var(--fs)); font-size: calc(22px * var(--fs)); }
+body:not(.touch) .next-wave-bottom.on,
+body.touch .next-wave-top.on { display: inline-flex; }
+body.touch .wave-banner { top: 44%; }
+
+/* ===================== Map result (defeat / victory) ===================== */
+.result-panel {
   display: none;
   position: absolute;
   inset: 0;
@@ -248,12 +302,18 @@ body.paused .paused-stamp { top: calc(var(--safe-t) + 48px * var(--fs)); }
   background: radial-gradient(ellipse at center, rgba(40, 6, 8, 0.45), rgba(2, 3, 8, 0.78));
   pointer-events: auto;
 }
-body.defeat .defeat-panel { display: flex; }
-body.defeat #screen-game [data-action="askExit"],
-body.defeat #screen-game [data-action="openSettings"],
-body.defeat .touch-controls,
-body.defeat .hud-player { display: none; }
-.defeat-stamp { font-size: calc(54px * var(--fs)); padding: 0.25em 0.9em; color: #f4d8cc; background: #4a0d10; }
-.defeat-btns { display: flex; gap: clamp(26px, 6vw, 70px); align-items: center; }
-.defeat-btns .brush-btn { font-size: calc(40px * var(--fs)); }
-.defeat-btns .flat-btn { font-size: calc(26px * var(--fs)); min-height: 52px; }
+body.victory .result-panel { background: radial-gradient(ellipse at center, rgba(60, 40, 8, 0.4), rgba(2, 3, 8, 0.75)); }
+body.map-over .result-panel { display: flex; }
+body.map-over #screen-game [data-action="askExit"],
+body.map-over #screen-game [data-action="openSettings"],
+body.map-over .touch-controls,
+body.map-over .hud-player,
+body.map-over .hud-wave,
+body.map-over .hud-boss,
+body.map-over .next-wave-btn,
+body.map-over .wave-banner { display: none; }
+.result-stamp { font-size: calc(54px * var(--fs)); padding: 0.25em 0.9em; color: #f4d8cc; background: #4a0d10; }
+body.victory .result-stamp { color: #2a1a05; background: linear-gradient(180deg, #ffd88a, #d9932b); }
+.result-btns { display: flex; gap: clamp(26px, 6vw, 70px); align-items: center; }
+.result-btns .brush-btn { font-size: calc(40px * var(--fs)); }
+.result-btns .flat-btn { font-size: calc(26px * var(--fs)); min-height: 52px; }

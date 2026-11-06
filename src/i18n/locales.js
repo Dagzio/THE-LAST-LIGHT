@@ -115,6 +115,18 @@ const ROWS = [
   ['defeat.retry', 'RETRY', 'ЩЕ РАЗ', 'ЕЩЁ РАЗ', 'NOCHMAL', 'RIPROVA', 'REJOUER', 'REINTENTAR', 'TENTAR DE NOVO', 'أعد المحاولة', 'リトライ'],
   ['defeat.menu', 'MAIN MENU', 'ГОЛОВНЕ МЕНЮ', 'ГЛАВНОЕ МЕНЮ', 'HAUPTMENÜ', 'MENU PRINCIPALE', 'MENU PRINCIPAL', 'MENÚ PRINCIPAL', 'MENU PRINCIPAL', 'القائمة الرئيسية', 'メインメニュー'],
 
+  ['hud.wave', 'WAVE {n}/{total}', 'ХВИЛЯ {n}/{total}', 'ВОЛНА {n}/{total}', 'WELLE {n}/{total}', 'ONDATA {n}/{total}', 'VAGUE {n}/{total}', 'OLEADA {n}/{total}', 'ONDA {n}/{total}', 'الموجة {n}/{total}', 'ウェーブ {n}/{total}'],
+  ['hud.nextWave', 'NEXT WAVE IN {t}', 'НАСТУПНА ХВИЛЯ ЧЕРЕЗ {t}', 'СЛЕДУЮЩАЯ ВОЛНА ЧЕРЕЗ {t}', 'NÄCHSTE WELLE IN {t}', 'PROSSIMA ONDATA TRA {t}', 'PROCHAINE VAGUE DANS {t}', 'SIGUIENTE OLEADA EN {t}', 'PRÓXIMA ONDA EM {t}', 'الموجة التالية بعد {t}', '次のウェーブまで {t}'],
+  ['hud.getReady', 'GET READY: {t}', 'ПРИГОТУЙСЯ: {t}', 'ПРИГОТОВЬСЯ: {t}', 'MACH DICH BEREIT: {t}', 'PREPARATI: {t}', 'PRÉPARE-TOI : {t}', 'PREPÁRATE: {t}', 'PREPARE-SE: {t}', 'استعد: {t}', '準備せよ: {t}'],
+  ['hud.enemiesLeft', 'ENEMIES LEFT: {n}', 'ЗАЛИШИЛОСЯ ВОРОГІВ: {n}', 'ОСТАЛОСЬ ВРАГОВ: {n}', 'VERBLEIBENDE GEGNER: {n}', 'NEMICI RIMASTI: {n}', 'ENNEMIS RESTANTS : {n}', 'ENEMIGOS RESTANTES: {n}', 'INIMIGOS RESTANTES: {n}', 'الأعداء المتبقون: {n}', '残りの敵: {n}'],
+  ['hud.startNextWave', 'START NEXT WAVE', 'ПОЧАТИ НАСТУПНУ ХВИЛЮ', 'НАЧАТЬ СЛЕДУЮЩУЮ ВОЛНУ', 'NÄCHSTE WELLE STARTEN', 'AVVIA PROSSIMA ONDATA', 'LANCER LA VAGUE SUIVANTE', 'INICIAR SIGUIENTE OLEADA', 'INICIAR PRÓXIMA ONDA', 'ابدأ الموجة التالية', '次のウェーブを開始'],
+  ['banner.wave', 'WAVE {n}', 'ХВИЛЯ {n}', 'ВОЛНА {n}', 'WELLE {n}', 'ONDATA {n}', 'VAGUE {n}', 'OLEADA {n}', 'ONDA {n}', 'الموجة {n}', 'ウェーブ {n}'],
+  ['banner.finalWave', 'FINAL WAVE', 'ОСТАННЯ ХВИЛЯ', 'ПОСЛЕДНЯЯ ВОЛНА', 'LETZTE WELLE', 'ULTIMA ONDATA', 'DERNIÈRE VAGUE', 'OLEADA FINAL', 'ONDA FINAL', 'الموجة الأخيرة', '最終ウェーブ'],
+  ['banner.waveCleared', 'WAVE CLEARED', 'ХВИЛЮ ВІДБИТО', 'ВОЛНА ОТБИТА', 'WELLE ABGEWEHRT', 'ONDATA RESPINTA', 'VAGUE REPOUSSÉE', 'OLEADA REPELIDA', 'ONDA REPELIDA', 'تم صد الموجة', 'ウェーブ撃退'],
+  ['boss.gloam_warden', 'GLOAM WARDEN', 'ВАРТОВИЙ МОРОКУ', 'СТРАЖ МРАКА', 'WÄCHTER DER DÄMMERUNG', 'GUARDIANO DEL CREPUSCOLO', 'GARDIEN DES TÉNÈBRES', 'GUARDIÁN DE LA PENUMBRA', 'GUARDIÃO DA PENUMBRA', 'حارس العتمة', '宵闇の番人'],
+  ['victory.title', 'THE BEACON HOLDS', 'МАЯК ВИСТОЯВ', 'МАЯК ВЫСТОЯЛ', 'DAS LEUCHTFEUER HÄLT STAND', 'IL FARO RESISTE', 'LE PHARE TIENT BON', 'EL FARO RESISTE', 'O FAROL RESISTE', 'صمدت المنارة', '灯台は守られた'],
+  ['victory.again', 'PLAY AGAIN', 'ГРАТИ ЗНОВУ', 'ИГРАТЬ СНОВА', 'NOCHMAL SPIELEN', 'GIOCA ANCORA', 'REJOUER', 'JUGAR DE NUEVO', 'JOGAR NOVAMENTE', 'العب مجددًا', 'もう一度プレイ'],
+
   ['hud.paused', 'GAME PAUSED', 'ГРУ ПРИЗУПИНЕНО', 'ИГРА НА ПАУЗЕ', 'PAUSIERT', 'GIOCO IN PAUSA', 'JEU EN PAUSE', 'JUEGO EN PAUSA', 'JOGO PAUSADO', 'اللعبة متوقفة', '一時停止中'],
 ];
 

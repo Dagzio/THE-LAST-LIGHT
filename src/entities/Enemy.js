@@ -38,7 +38,12 @@ export class Enemy {
     this.slowUntil = -Infinity;
     // Beacon attack timing (game clock)
     this.nextAttackAt = 0;
-    this.lastAttackAt = -Infinity;
+    this.lastAttackAt = -Infinity;  // presentation: lunge on a beacon hit / contact hit
+    // Runner ATTACK_PLAYER (D17)
+    this.chaseEndsAt = 0;
+    this.chaseReadyAt = 0;
+    // Boss: true while an attack is telegraphed (the boss stands still)
+    this.casting = false;
   }
 
   /** Current speed multiplier from slows (1 = no slow). */

@@ -34,7 +34,9 @@ export function initDebugOverlay(game) {
         `ammo ${w.ammo}/${w.stats.magazineSize}  reload ${w.reloading ? (w.reloadProgress(game.clock.time) * 100).toFixed(0) + '%' : '-'}`,
         `beacon ${Math.ceil(b.integrity)}/${b.maxIntegrity}  beam ${run.light.angle.toFixed(2)}rad  devices ${run.defenses.pads.map((d) => (d.device ? d.device.id : '-')).join(',')}`,
         `enemies ${alive}/${run.enemies.length}  projectiles ${run.projectiles.activeCount}  particles ${run.particles.activeCount}`,
-        `kills ${run.stats.kills}  shots ${run.stats.shotsFired}`,
+        `kills ${run.stats.kills}  shots ${run.stats.shotsFired}  rewards ${run.rewards.coins}c ${run.rewards.xp}xp`,
+        `wave ${run.waves.waveNumber}/${run.waves.total} ${run.waves.phase}  left ${run.waves.remaining(run.enemies)}  t ${run.waves.timeLeft(game.clock.time).toFixed(1)}s`
+          + (run.boss ? `  boss ${Math.ceil(run.boss.hp)}/${run.boss.maxHp} ${run.bossSystem.attack ? run.bossSystem.attack.kind : '-'}` : ''),
       );
     }
     el.textContent = lines.join('\n');

@@ -10,9 +10,11 @@ import {
   playerGeometry, gruntGeometry, gruntEyesGeometry, bulletGeometry, muzzleGeometry, tag,
   beaconGeometry, beaconLanternGeometry, beamGeometry, padGeometry, turretBaseGeometry, turretHeadGeometry,
   coilGeometry, coilCrystalGeometry, reticleGeometry,
+  runnerGeometry, runnerEyesGeometry, bruteGeometry, bruteEyesGeometry, wardenGeometry, wardenEyesGeometry,
+  telegraphDiscGeometry, telegraphRingGeometry,
 } from './models.js';
-import { beamAngle } from '../systems/LightSystem.js';
 import { BEACON } from '../data/beacon.js';
+import { GLOAM_WARDEN } from '../data/boss.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { CAMERA } from '../config/camera.js';
 import { QUALITY_PRESETS, antialiasFor } from '../config/settings.js';
@@ -20,6 +22,14 @@ import { ENEMY_FX } from '../data/balance.js';
 import { PLAYER } from '../data/player.js';
 
 const MAX_ENEMIES = 96;
+// One instanced body + eyes per enemy type (2 draw calls per type that is on the map; empty types are hidden).
+const ENEMY_MODELS = {
+  grunt: { body: gruntGeometry, eyes: gruntEyesGeometry, eyesMat: 'eyes', cap: MAX_ENEMIES, tag: 'grunt' },
+  runner: { body: runnerGeometry, eyes: runnerEyesGeometry, eyesMat: 'eyes', cap: 48, tag: 'runner' },
+  brute: { body: bruteGeometry, eyes: bruteEyesGeometry, eyesMat: 'eyes', cap: 16, tag: 'brute' },
+  gloam_warden: { body: wardenGeometry, eyes: wardenEyesGeometry, eyesMat: 'eyesBoss', cap: 2, tag: 'gloam-warden' },
+};
+const CASTING = new THREE.Color(1.35, 1.0, 1.7); // boss tint while an attack is telegraphed
 const MAX_BULLETS = 192;
 const RELOAD_SEGMENTS = 16;
 const GUN_HEIGHT = 34;
@@ -115,14 +125,35 @@ export class Renderer3D {
     });
     this.scene.add(this.player);
 
-    // Enemies (instanced): body + glowing eyes.
-    this.grunts = new THREE.InstancedMesh(gruntGeometry(), m.character, MAX_ENEMIES);
-    this.grunts.castShadow = true;
-    this.grunts.setColorAt(0, WHITE);
-    this.grunts.frustumCulled = false;
-    this.gruntEyes = new THREE.InstancedMesh(gruntEyesGeometry(), m.eyes, MAX_ENEMIES);
-    this.gruntEyes.frustumCulled = false;
-    this.scene.add(tag(this.grunts, 'grunt'), this.gruntEyes);
+    // Enemies (instanced per type): body + glowing eyes.
+    this.enemyViews = {};
+    for (const [id, def] of Object.entries(ENEMY_MODELS)) {
+      const body = new THREE.InstancedMesh(def.body(), m.character, def.cap);
+      body.castShadow = true;
+      body.setColorAt(0, WHITE);
+      body.frustumCulled = false;
+      const eyes = new THREE.InstancedMesh(def.eyes(), m[def.eyesMat], def.cap);
+      eyes.frustumCulled = false;
+      body.visible = eyes.visible = false;
+      this.scene.add(tag(body, def.tag), eyes);
+      this.enemyViews[id] = { body, eyes, cap: def.cap, n: 0 };
+    }
+
+    // Boss telegraphs (own materials: their opacity animates independently)
+    const tele = (geo, mat, order) => {
+      const mesh = new THREE.Mesh(geo, mat.clone());
+      mesh.visible = false;
+      mesh.renderOrder = order;
+      this.scene.add(mesh);
+      return mesh;
+    };
+    this.tele = {
+      slamFill: tele(telegraphDiscGeometry(), m.telegraphFill, 3),
+      slamEdge: tele(telegraphRingGeometry(0.95), m.telegraphEdge, 4),
+      tideEdge: tele(telegraphRingGeometry(0.97), m.telegraphEdge, 4),
+      tideWave: tele(telegraphRingGeometry(0.8), m.telegraphFill, 3),
+      impact: tele(telegraphRingGeometry(0.72), m.impact, 5),
+    };
 
     // Bullets (instanced), muzzle flash, aim reticle, HP bars, reload arc, blob shadows, particles.
     this.bullets = new THREE.InstancedMesh(bulletGeometry(), m.bullet, MAX_BULLETS);
@@ -318,10 +349,13 @@ export class Renderer3D {
       }
     }
 
-    // Enemies + HP bars + blob shadows
-    let n = 0, bars = 0, blobs = 0;
+    // Enemies (per type) + HP bars + blob shadows
+    const views = this.enemyViews;
+    for (const id in views) views[id].n = 0;
+    let bars = 0, blobs = 0;
     for (const e of run.enemies) {
-      if (n >= MAX_ENEMIES) break;
+      const v = views[e.typeId] || views.grunt;
+      if (v.n >= v.cap) continue;
       let scale = 1, sink = 0;
       if (!e.alive) {
         const f = Math.min(1, (time - e.deathAt) / ENEMY_FX.deathFade);
@@ -331,33 +365,49 @@ export class Renderer3D {
       const face = e.faceAngle;
       Q.setFromAxisAngle(UP, -face);
       S.setScalar(scale);
-      const lunge = e.alive && time - e.lastAttackAt < 0.22 ? Math.sin(((time - e.lastAttackAt) / 0.22) * Math.PI) * 7 : 0;
+      const reach = e.radius * 0.4;
+      const lunge = e.alive && time - e.lastAttackAt < 0.22 ? Math.sin(((time - e.lastAttackAt) / 0.22) * Math.PI) * reach : 0;
       P.set(e.x + Math.cos(face) * lunge, sink, e.y + Math.sin(face) * lunge);
       M.compose(P, Q, S);
-      this.grunts.setMatrixAt(n, M);
-      this.gruntEyes.setMatrixAt(n, M);
+      v.body.setMatrixAt(v.n, M);
+      v.eyes.setMatrixAt(v.n, M);
       const slowed = e.alive && time < e.slowUntil;
       let tint = WHITE;
       if (e.alive && time - e.lastHitAt < ENEMY_FX.hitFlash) tint = FLASH;
+      else if (e.alive && e.casting) tint = CASTING;
       else if (e.alive && e.illuminated) tint = slowed ? LIT_SLOWED : LIT;
       else if (slowed) tint = SLOWED;
-      this.grunts.setColorAt(n, tint);
-      if (e.alive && e.hp < e.maxHp) {
-        const w = 34, fill = Math.max(0, e.hp / e.maxHp);
-        P.set(e.x, 46, e.y - 24); S.set(w + 2, 6, 1); M.compose(P, FLAT_X, S); this.hpBack.setMatrixAt(bars, M);
-        P.set(e.x - (w * (1 - fill)) / 2, 46.5, e.y - 24); S.set(Math.max(0.01, w * fill), 4, 1); M.compose(P, FLAT_X, S);
+      v.body.setColorAt(v.n, tint);
+      v.n++;
+      const barY = e.type.barHeight;
+      if (e.alive && barY > 0 && e.hp < e.maxHp) {
+        const w = Math.max(34, e.radius * 2), fill = Math.max(0, e.hp / e.maxHp);
+        const bz = e.y - e.radius - 8;
+        P.set(e.x, barY, bz); S.set(w + 2, 6, 1); M.compose(P, FLAT_X, S); this.hpBack.setMatrixAt(bars, M);
+        P.set(e.x - (w * (1 - fill)) / 2, barY + 0.5, bz); S.set(Math.max(0.01, w * fill), 4, 1); M.compose(P, FLAT_X, S);
         this.hpFill.setMatrixAt(bars, M);
         bars++;
       }
-      if (this.blobs.visible && e.alive) { P.set(e.x, 0.6, e.y); S.set(44, 44, 1); M.compose(P, FLAT_X, S); this.blobs.setMatrixAt(blobs++, M); }
-      n++;
+      if (this.blobs.visible && e.alive && blobs < MAX_ENEMIES) {
+        const s = e.radius * 2.6;
+        P.set(e.x, 0.6, e.y); S.set(s, s, 1); M.compose(P, FLAT_X, S); this.blobs.setMatrixAt(blobs++, M);
+      }
     }
     if (this.blobs.visible && p.alive) { P.set(p.x, 0.6, p.y); S.set(44, 44, 1); M.compose(P, FLAT_X, S); this.blobs.setMatrixAt(blobs++, M); }
-    this.grunts.count = this.gruntEyes.count = n;
+    for (const id in views) {
+      const v = views[id];
+      v.body.count = v.eyes.count = v.n;
+      v.body.visible = v.eyes.visible = v.n > 0; // no draw call for types that are not on the map
+      if (v.n > 0) {
+        v.body.instanceMatrix.needsUpdate = v.eyes.instanceMatrix.needsUpdate = true;
+        if (v.body.instanceColor) v.body.instanceColor.needsUpdate = true;
+      }
+    }
     this.hpBack.count = this.hpFill.count = bars;
     this.blobs.count = blobs;
-    for (const im of [this.grunts, this.gruntEyes, this.hpBack, this.hpFill, this.blobs]) im.instanceMatrix.needsUpdate = true;
-    if (this.grunts.instanceColor) this.grunts.instanceColor.needsUpdate = true;
+    for (const im of [this.hpBack, this.hpFill, this.blobs]) im.instanceMatrix.needsUpdate = true;
+
+    this._syncBoss(run, time);
 
     // Aim reticle on the ground (cursor / finger) — where the keeper shoots
     this.reticle.visible = p.alive && p.hasAim;
@@ -414,6 +464,38 @@ export class Renderer3D {
     this.particleGeo.setDrawRange(0, k);
     this.particleGeo.attributes.position.needsUpdate = true;
     this.particleGeo.attributes.color.needsUpdate = true;
+  }
+
+  // ---------------- boss telegraphs (same circle/ring as the damage test in BossSystem) ----------------
+  _syncBoss(run, time) {
+    const t = this.tele;
+    for (const k in t) t[k].visible = false;
+    const bs = run.bossSystem;
+    if (!bs || !bs.boss) return;
+    const a = bs.attack;
+    const pulse = 0.5 + 0.5 * Math.sin(time * 18);
+    if (a) {
+      const k = bs.progress(time);
+      if (a.kind === 'slam') {
+        this._flat(t.slamEdge, a.x, a.y, a.radius, 1.3, 0.55 + 0.4 * pulse);
+        this._flat(t.slamFill, a.x, a.y, Math.max(0.01, a.radius * k), 1.2, 0.18 + 0.3 * k);
+      } else {
+        this._flat(t.tideEdge, a.x, a.y, a.radius, 1.3, 0.45 + 0.4 * pulse);
+        this._flat(t.tideWave, a.x, a.y, Math.max(0.01, a.radius * k), 1.2, 0.2 + 0.35 * k);
+      }
+    }
+    const imp = bs.lastImpact;
+    if (imp && time - imp.at < GLOAM_WARDEN.impactFx && time >= imp.at) {
+      const f = (time - imp.at) / GLOAM_WARDEN.impactFx;
+      this._flat(t.impact, imp.x, imp.y, imp.radius * (0.92 + 0.25 * f), 1.4, 0.85 * (1 - f));
+    }
+  }
+
+  _flat(mesh, x, y, scale, h, opacity) {
+    mesh.visible = true;
+    mesh.position.set(x, h, y);
+    mesh.scale.set(scale, 1, scale);
+    mesh.material.opacity = opacity;
   }
 
   // ---------------- beacon, beam, pads, devices ----------------

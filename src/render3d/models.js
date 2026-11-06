@@ -107,6 +107,90 @@ export function gruntEyesGeometry() {
   return mergeParts([-1, 1].map((s) => part(new THREE.SphereGeometry(1.9, 8, 6), '#ffffff', { x: 20, y: 16, z: s * 3 })));
 }
 
+const R = { // runner / brute / warden palette
+  runSkin: '#4a3552', runBelly: '#36263d', runBone: '#22161f',
+  bruSkin: '#3d2b25', bruPlate: '#5b5249', bruPlateDark: '#3f3832', bruBone: '#1f1511',
+  cloak: '#1e1828', cloakDark: '#120e18', robe: '#2b2238', bone: '#8f8574', boneDark: '#5e5649',
+};
+
+/** Runner: thin, low, long-legged, head stretched forward. Height ≈ 28, radius 13. */
+export function runnerGeometry() {
+  const P = [];
+  for (const [x, z, rz] of [[-7, -6, 0.25], [-7, 6, 0.25], [6, -6, -0.3], [6, 6, -0.3]]) {
+    P.push(part(new THREE.CylinderGeometry(1.3, 1.8, 15, 5), R.runBone, { x, y: 7, z, rz }));
+  }
+  P.push(part(new THREE.SphereGeometry(8, 12, 8), R.runSkin, { y: 16, sx: 1.7, sy: 0.62, sz: 0.85 }));
+  P.push(part(new THREE.SphereGeometry(5, 10, 7), R.runBelly, { x: 2, y: 13, sx: 1.6, sy: 0.5, sz: 0.8 }));
+  P.push(part(new THREE.CylinderGeometry(2.2, 3, 9, 6), R.runSkin, { x: 13, y: 19, rz: -1.1 }));       // neck
+  P.push(part(new THREE.SphereGeometry(4.4, 10, 8), R.runSkin, { x: 18, y: 21, sx: 1.4, sy: 0.8 }));   // head
+  P.push(part(new THREE.ConeGeometry(1.6, 7, 5), R.runBone, { x: 24, y: 19.5, rz: -Math.PI / 2 }));   // snout spike
+  P.push(part(new THREE.ConeGeometry(2.2, 16, 6), R.runSkin, { x: -19, y: 15, rz: Math.PI / 2 + 0.15 })); // tail
+  for (let i = 0; i < 3; i++) P.push(part(new THREE.ConeGeometry(1.4, 6, 5), R.runBone, { x: -6 + i * 5, y: 21.5, rz: 0.5 }));
+  for (const s of [-1, 1]) P.push(part(new THREE.BoxGeometry(10, 2, 2), R.runBone, { x: 13, y: 10, z: s * 6, rz: 0.4 }));
+  return mergeParts(P);
+}
+
+export function runnerEyesGeometry() {
+  return mergeParts([-1, 1].map((s) => part(new THREE.SphereGeometry(1.4, 8, 6), '#ffffff', { x: 21.5, y: 22.5, z: s * 2.2 })));
+}
+
+/** Brute: massive knuckle-walker with stone-like plates on the shoulders. Height ≈ 58, radius 27. */
+export function bruteGeometry() {
+  const P = [];
+  for (const z of [-11, 11]) P.push(part(new THREE.CylinderGeometry(6, 7, 18, 7), R.bruSkin, { x: -12, y: 9, z }));      // hind legs
+  P.push(part(new THREE.SphereGeometry(24, 14, 10), R.bruSkin, { y: 32, sx: 1.05, sy: 0.85, sz: 1.0 }));               // torso
+  P.push(part(new THREE.SphereGeometry(16, 12, 9), R.bruSkin, { x: -6, y: 46, sx: 1.2, sy: 0.75 }));                  // hump
+  for (const s of [-1, 1]) {
+    P.push(part(new THREE.BoxGeometry(22, 14, 18), R.bruPlate, { x: 4, y: 50, z: s * 15, rx: s * 0.35, rz: 0.15 }));   // shoulder plates
+    P.push(part(new THREE.BoxGeometry(14, 4, 14), R.bruPlateDark, { x: 6, y: 58, z: s * 16, rx: s * 0.4 }));
+    P.push(part(new THREE.BoxGeometry(10, 26, 10), R.bruSkin, { x: 16, y: 20, z: s * 22, rz: -0.25 }));              // forearms
+    P.push(part(new THREE.BoxGeometry(14, 8, 13), R.bruPlateDark, { x: 20, y: 5, z: s * 23 }));                      // fists
+  }
+  P.push(part(new THREE.SphereGeometry(9, 10, 8), R.bruPlate, { x: 22, y: 32, sx: 1.1, sy: 0.85 }));                 // head
+  for (let i = 0; i < 4; i++) P.push(part(new THREE.ConeGeometry(3.6, 13 - i, 6), R.bruBone, { x: -20 + i * 8, y: 56 - Math.abs(i - 1.5) * 2, rz: 0.5 }));
+  for (const s of [-1, 1]) P.push(part(new THREE.ConeGeometry(2.4, 10, 5), R.bruBone, { x: 28, y: 28, z: s * 5, rz: -Math.PI / 2 + 0.3 })); // tusks
+  return mergeParts(P);
+}
+
+export function bruteEyesGeometry() {
+  return mergeParts([-1, 1].map((s) => part(new THREE.SphereGeometry(2.2, 8, 6), '#ffffff', { x: 29.5, y: 34, z: s * 4 })));
+}
+
+/** Gloam Warden (boss): tall hooded shade in a flared cloak, bone crown, long clawed arms. Height ≈ 112, radius 46. */
+export function wardenGeometry() {
+  const P = [];
+  P.push(part(new THREE.CylinderGeometry(20, 44, 64, 14), R.cloak, { y: 32 }));                                // cloak
+  P.push(part(new THREE.TorusGeometry(42, 3, 6, 20), R.cloakDark, { y: 3, rx: Math.PI / 2 }));                 // ragged hem
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    P.push(part(new THREE.ConeGeometry(6, 14, 4), R.cloakDark, { x: Math.cos(a) * 42, y: 5, z: Math.sin(a) * 42, rx: Math.PI }));
+  }
+  P.push(part(new THREE.SphereGeometry(22, 14, 10), R.robe, { y: 72, sx: 0.95, sy: 0.75, sz: 1.15 }));          // chest
+  for (const s of [-1, 1]) {
+    P.push(part(new THREE.SphereGeometry(12, 10, 8), R.cloak, { y: 80, z: s * 24 }));                          // shoulders
+    P.push(part(new THREE.BoxGeometry(46, 8, 8), R.robe, { x: 20, y: 64, z: s * 30, rz: -0.55 }));             // arms
+    for (const k of [-3, 0, 3]) P.push(part(new THREE.ConeGeometry(1.8, 14, 5), R.bone, { x: 42, y: 46, z: s * 30 + k, rz: -Math.PI / 2 - 0.5 }));
+  }
+  P.push(part(new THREE.ConeGeometry(15, 30, 10), R.cloakDark, { x: -2, y: 100, rz: 0.25 }));                   // hood
+  P.push(part(new THREE.SphereGeometry(8.5, 12, 9), R.boneDark, { x: 7, y: 90, sx: 0.9 }));                     // skull face
+  for (let i = 0; i < 5; i++) {                                                                                 // bone crown
+    const a = -Math.PI / 2 + (i / 4) * Math.PI;
+    P.push(part(new THREE.ConeGeometry(2.4, 15, 5), R.bone, { x: -2 + Math.cos(a) * 3, y: 110, z: Math.sin(a) * 12, rx: Math.sin(a) * 0.5 }));
+  }
+  return mergeParts(P);
+}
+
+/** Boss eyes + the gloam orb in its claw (unlit violet glow). */
+export function wardenEyesGeometry() {
+  const P = [-1, 1].map((s) => part(new THREE.SphereGeometry(2.4, 8, 6), '#ffffff', { x: 14.5, y: 92, z: s * 4 }));
+  P.push(part(new THREE.IcosahedronGeometry(7, 1), '#ffffff', { x: 46, y: 50, z: 30 }));
+  return mergeParts(P);
+}
+
+/** Flat telegraph shapes for boss attacks (unit size, scaled by the renderer). */
+export function telegraphDiscGeometry() { return new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2); }
+export function telegraphRingGeometry(inner = 0.95) { return new THREE.RingGeometry(inner, 1, 72).rotateX(-Math.PI / 2); }
+
 /** Bullet tracer: thin capsule along +X. */
 export function bulletGeometry() {
   return mergeParts([part(new THREE.CapsuleGeometry(1.5, 12, 2, 6), '#ffffff', { rz: Math.PI / 2 })]);
@@ -153,18 +237,37 @@ export function beaconLanternGeometry() {
   return mergeParts([part(new THREE.CylinderGeometry(19, 19, 18, 12), '#ffffff', { y: 131 })]);
 }
 
-/** Beam sector lying on the ground along +X: vertex colours fade from the beacon to the end of the range. */
+/**
+ * Beam sector lying on the ground along +X (additive). Built from radial rings so the falloff curve is real
+ * (a plain fan interpolates linearly from the centre to the rim and reads as a flat white wedge): bright near the
+ * beacon, fading to nothing at the range, with softened side edges. Same angle/range as the LightSystem test.
+ */
 export function beamGeometry(range, halfAngle) {
-  const g = new THREE.CircleGeometry(range, 40, -halfAngle, halfAngle * 2);
-  g.rotateX(-Math.PI / 2); // XY → XZ (angles flip sign, the sector is symmetric so it does not matter)
-  const pos = g.attributes.position;
-  const col = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
-    const d = Math.hypot(pos.getX(i), pos.getZ(i)) / range;
-    const k = Math.pow(Math.max(0, 1 - d), 1.4) * 0.55;
-    col[i * 3] = k; col[i * 3 + 1] = k * 0.78; col[i * 3 + 2] = k * 0.45;
+  const RINGS = 14, SEGS = 24, PEAK = 0.22;
+  const pos = [], col = [], idx = [];
+  for (let r = 0; r <= RINGS; r++) {
+    const d = r / RINGS;
+    const radial = Math.pow(1 - d, 2.2) * PEAK;
+    for (let s = 0; s <= SEGS; s++) {
+      const u = s / SEGS * 2 - 1;                 // -1 … 1 across the sector
+      const a = u * halfAngle;
+      pos.push(Math.cos(a) * range * d, 0, -Math.sin(a) * range * d);
+      const k = radial * (1 - 0.65 * Math.pow(Math.abs(u), 3)); // softer side edges
+      col.push(k, k * 0.8, k * 0.5);
+    }
   }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const row = SEGS + 1;
+  for (let r = 0; r < RINGS; r++) {
+    for (let s = 0; s < SEGS; s++) {
+      const a = r * row + s, b = a + 1, c = a + row, e = c + 1;
+      idx.push(a, c, b, b, c, e);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeBoundingSphere();
   return g;
 }
 
@@ -262,6 +365,15 @@ export function buildShowcase(materials, rng) {
   grunt.add(new THREE.Mesh(gruntGeometry(), materials.character));
   grunt.add(new THREE.Mesh(gruntEyesGeometry(), materials.eyes));
   out.set('grunt', tag(grunt, 'grunt'));
+  for (const [name, body, eyes, eyesMat] of [
+    ['runner', runnerGeometry, runnerEyesGeometry, 'eyes'],
+    ['brute', bruteGeometry, bruteEyesGeometry, 'eyes'],
+    ['gloam-warden', wardenGeometry, wardenEyesGeometry, 'eyesBoss'],
+  ]) {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(body(), materials.character), new THREE.Mesh(eyes(), materials[eyesMat]));
+    out.set(name, tag(g, name));
+  }
   out.set('bullet', tag(new THREE.Mesh(bulletGeometry(), materials.bullet), 'bullet'));
   out.set('muzzle', tag(new THREE.Mesh(muzzleGeometry(), materials.muzzle), 'muzzle'));
   const beacon = new THREE.Group();

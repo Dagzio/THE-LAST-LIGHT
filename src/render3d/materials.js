@@ -17,6 +17,13 @@ export function createMaterials() {
     character: new THREE.MeshLambertMaterial({ vertexColors: true }),
     prop: new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }),
     eyes: new THREE.MeshBasicMaterial({ color: 0xff7a4a }),
+    eyesBoss: new THREE.MeshBasicMaterial({ color: 0xc69cff }),
+    // Boss telegraphs: red danger zone (normal blending — readable on any ground), violet impact flash.
+    telegraphFill: new THREE.MeshBasicMaterial({ color: 0xff3b2f, transparent: true, opacity: 0.3, depthWrite: false }),
+    telegraphEdge: new THREE.MeshBasicMaterial({ color: 0xff6a4a, transparent: true, opacity: 0.85, depthWrite: false }),
+    impact: new THREE.MeshBasicMaterial({
+      color: 0xc9a0ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false,
+    }),
     lantern: new THREE.MeshBasicMaterial({ color: 0xffd38a }),
     bullet: new THREE.MeshBasicMaterial({ color: 0xffd27a, vertexColors: true }),
     muzzle: new THREE.MeshBasicMaterial({

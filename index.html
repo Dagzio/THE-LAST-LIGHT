@@ -82,20 +82,38 @@
         <svg class="ico ico-gear" viewBox="0 0 24 24"><path d="M19.42 10.37L22.13 10.80L22.13 13.20L19.42 13.63L18.40 16.10L20.01 18.31L18.31 20.01L16.10 18.40L13.63 19.42L13.20 22.13L10.80 22.13L10.37 19.42L7.90 18.40L5.69 20.01L3.99 18.31L5.60 16.10L4.58 13.63L1.87 13.20L1.87 10.80L4.58 10.37L5.60 7.90L3.99 5.69L5.69 3.99L7.90 5.60L10.37 4.58L10.80 1.87L13.20 1.87L13.63 4.58L16.10 5.60L18.31 3.99L20.01 5.69L18.40 7.90Z"/><circle cx="12" cy="12" r="3.2"/></svg>
       </button>
     </div>
-    <!-- Top centre: beacon Integrity (wave title joins it in Phase 4) -->
-    <div class="hud-beacon" id="hudBeacon">
-      <svg class="hud-beacon-ico" viewBox="0 0 24 24"><path d="M9 22l1.5-12h3L15 22zM8.5 8h7l-1-3h-5zM11 2h2v2h-2z"/></svg>
-      <i class="hud-beacon-bar"><i id="hudBeaconFill"></i></i>
-      <b class="hud-beacon-val" id="hudBeaconVal">0</b>
+    <!-- Top centre (Underlords round header): beacon Integrity, wave + timer / enemies left, boss bar -->
+    <div class="hud-top">
+      <div class="hud-beacon" id="hudBeacon">
+        <svg class="hud-beacon-ico" viewBox="0 0 24 24"><path d="M9 22l1.5-12h3L15 22zM8.5 8h7l-1-3h-5zM11 2h2v2h-2z"/></svg>
+        <i class="hud-beacon-bar"><i id="hudBeaconFill"></i></i>
+        <b class="hud-beacon-val" id="hudBeaconVal">0</b>
+      </div>
+      <div class="hud-wave" id="hudWave">
+        <b class="hud-wave-label" id="hudWaveLabel"></b>
+        <span class="hud-wave-sub" id="hudWaveSub"></span>
+      </div>
+      <div class="hud-boss" id="hudBoss" hidden>
+        <span class="hud-boss-name" data-i18n="boss.gloam_warden"></span>
+        <i class="hud-boss-bar"><i id="hudBossFill"></i></i>
+      </div>
+      <!-- touch layout: under the timer (the bottom centre holds the player plate next to the touch buttons) -->
+      <button class="brush-btn next-wave-btn next-wave-top" data-action="startNextWave" data-nosfx data-i18n="hud.startNextWave"></button>
+      <div class="stamp paused-stamp" data-i18n="hud.paused"></div>
     </div>
-    <div class="stamp paused-stamp" data-i18n="hud.paused"></div>
 
-    <!-- Defeat (Phase 3: stamp + RETRY / MAIN MENU; results screen in Phase 7) -->
-    <div class="defeat-panel" id="defeatPanel">
-      <div class="stamp defeat-stamp" id="defeatTitle"></div>
-      <div class="defeat-btns">
-        <button class="brush-btn" data-action="retryMap" data-i18n="defeat.retry"></button>
-        <button class="flat-btn" data-action="defeatMenu" data-i18n="defeat.menu"></button>
+    <!-- Wave banner: WAVE N / FINAL WAVE / WAVE CLEARED -->
+    <div class="wave-banner" id="waveBanner"><span class="stamp" id="waveBannerText"></span></div>
+
+    <!-- Bottom centre (desktop), intermission only: START NEXT WAVE (double-press safe in the domain) -->
+    <button class="brush-btn next-wave-btn next-wave-bottom" id="btnNextWave" data-action="startNextWave" data-nosfx data-i18n="hud.startNextWave"></button>
+
+    <!-- Map result (Phase 3–4: stamp + RETRY / MAIN MENU; results screen in Phase 7) -->
+    <div class="result-panel" id="resultPanel">
+      <div class="stamp result-stamp" id="resultTitle"></div>
+      <div class="result-btns">
+        <button class="brush-btn" data-action="retryMap" id="resultRetry"></button>
+        <button class="flat-btn" data-action="resultMenu" data-i18n="defeat.menu"></button>
       </div>
     </div>
 

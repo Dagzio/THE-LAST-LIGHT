@@ -82,6 +82,48 @@ const RECIPES = {
   // Defeat: low falling drone.
   defeat: () => render(1.6, (t) => (Math.sin(2 * Math.PI * (130 - 50 * t) * t) * 0.35 + Math.sin(2 * Math.PI * (97 - 40 * t) * t) * 0.25)
     * Math.min(1, t * 8) * Math.exp(-t * 1.6)),
+  // Wave start: low fog horn.
+  waveStart: () => render(1.3, (t) => {
+    const env = Math.min(1, t * 5) * Math.exp(-t * 1.6);
+    return (Math.sin(2 * Math.PI * 82 * t) * 0.4 + Math.sin(2 * Math.PI * 123 * t) * 0.22 + Math.sin(2 * Math.PI * 164 * t) * 0.1) * env;
+  }),
+  // Wave cleared: two warm bell tones.
+  waveClear: () => render(1.1, (t) => {
+    const a = Math.sin(2 * Math.PI * 523 * t) * Math.exp(-t * 3.5);
+    const t2 = t - 0.16;
+    const b = t2 > 0 ? Math.sin(2 * Math.PI * 784 * t2) * Math.exp(-t2 * 3.5) : 0;
+    return (a + b) * 0.18 * Math.min(1, t * 60);
+  }),
+  // Keeper hurt: short dull hit + breath of noise.
+  playerHurt: () => render(0.22, (t) => (Math.sin(2 * Math.PI * (180 - 300 * t) * t) * 0.45 + noise() * 0.18) * Math.exp(-t * 18)),
+  // Boss telegraph: rising dark hum.
+  bossWarn: () => render(1.0, (t) => {
+    const f = 60 + 90 * t;
+    return (Math.sin(2 * Math.PI * f * t) * 0.3 + Math.sin(2 * Math.PI * f * 1.5 * t) * 0.12) * Math.min(1, t * 3) * Math.exp(-Math.max(0, t - 0.8) * 12);
+  }),
+  // Boss slam: heavy boom.
+  bossSlam: () => {
+    let lp = 0;
+    return render(0.7, (t) => {
+      lp += (noise() - lp) * 0.06;
+      return (Math.sin(2 * Math.PI * (55 - 30 * t) * t) * 0.7 + lp * 0.8) * Math.exp(-t * 6);
+    });
+  },
+  // Dark tide: long low whoosh.
+  bossTide: () => {
+    let lp = 0;
+    return render(0.9, (t) => {
+      lp += (noise() - lp) * 0.05;
+      return (lp * 1.1 + Math.sin(2 * Math.PI * 70 * t) * 0.25) * Math.sin(Math.PI * Math.min(1, t / 0.9));
+    });
+  },
+  // Victory: rising major chord.
+  victory: () => render(2.0, (t) => {
+    let s = 0;
+    const notes = [[392, 0], [494, 0.15], [587, 0.3], [784, 0.45]];
+    for (const [f, d] of notes) { const u = t - d; if (u > 0) s += Math.sin(2 * Math.PI * f * u) * Math.exp(-u * 1.8) * Math.min(1, u * 40); }
+    return s * 0.11;
+  }),
   // Popup open: soft paper/cloth whoosh.
   open: () => {
     let lp = 0;

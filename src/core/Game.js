@@ -43,8 +43,9 @@ export class Game {
     this.run = null;                 // MapRun of the current map attempt
     this._view = { scene: 'backdrop', realTime: 0, simTime: 0, quality: this.quality };
     this.frameListeners = new Set();
-    // Defeat is reported once by the MapRun; the state machine ignores repeats.
+    // Defeat / victory are reported once by the MapRun; the state machine ignores repeats.
     this.events.on('mapDefeat', () => this.sm.set(STATES.MAP_DEFEAT));
+    this.events.on('mapVictory', () => this.sm.set(STATES.MAP_VICTORY));
 
     this.sm.onChange((next) => {
       // Edge presses made while the world was frozen must not fire on resume.
@@ -124,11 +125,17 @@ export class Game {
     return this._startRun(map);
   }
 
-  /** RETRY after a defeat: a completely fresh run of the same map (temporary data reset, 01_GDD §15). */
+  /** RETRY / PLAY AGAIN after the map is over: a completely fresh run of the same map (01_GDD §15). */
   retryMap() {
     const map = getMap(this.mapId);
-    if (!this.sm.is(STATES.MAP_DEFEAT) || !map) return false;
+    if (!this.sm.mapOver || !map) return false;
     return this._startRun(map);
+  }
+
+  /** START NEXT WAVE (HUD): only while the map runs; the run ignores it outside the intro / intermission. */
+  startNextWave() {
+    if (!this.sm.is(STATES.RUNNING) || !this.run) return false;
+    return this.run.startNextWave(this.clock.time);
   }
 
   _startRun(map) {

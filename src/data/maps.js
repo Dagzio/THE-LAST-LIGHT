@@ -1,5 +1,5 @@
 // Campaign maps (data-driven, 04_ARCH §11). MVP: one map.
-// waveCount is shown on the map card; Phase 4 must keep it equal to the wave config length.
+// waveCount is shown on the map card and must equal the wave config length in data/waves.js (unit-tested).
 
 export const MAPS = [
   {
@@ -8,6 +8,7 @@ export const MAPS = [
     descKey: 'map.ashen_coast.desc',
     waveCount: 5,
     finalWaveBoss: true,
+    completionReward: 50, // coins, once on victory (03_ECONOMY §4)
     artSeed: 7331, // cosmetic decoration layout of the arena ground
     width: 2000,   // world units (3D map, decision 2026-11-06: bigger map, camera follows the player)
     height: 1300,

@@ -19,6 +19,7 @@ const SCREEN_BY_STATE = {
   RUNNING: 'game',
   PAUSED: 'game',
   MAP_DEFEAT: 'game',
+  MAP_VICTORY: 'game',
 };
 
 export class UIManager {
@@ -29,7 +30,8 @@ export class UIManager {
     this.openPopups = [];          // stack of open popup names (top = last)
     this.confirmKind = null;       // 'reset' | 'exit'
     this.confirmText = document.getElementById('confirmText');
-    this.defeatTitle = document.getElementById('defeatTitle');
+    this.resultTitle = document.getElementById('resultTitle');
+    this.resultRetry = document.getElementById('resultRetry');
 
     document.addEventListener('click', (e) => this._onClick(e));
     document.getElementById('confirmYes').addEventListener('click', () => this._confirm(true));
@@ -77,12 +79,23 @@ export class UIManager {
       document.body.dataset.screen = id;
     }
     document.body.classList.toggle('paused', state === STATES.PAUSED);
+    const over = state === STATES.MAP_DEFEAT || state === STATES.MAP_VICTORY;
     document.body.classList.toggle('defeat', state === STATES.MAP_DEFEAT);
-    if (state === STATES.MAP_DEFEAT) {
+    document.body.classList.toggle('victory', state === STATES.MAP_VICTORY);
+    document.body.classList.toggle('map-over', over);
+    if (over) {
       this._closeAll();
-      const reason = this.game.run && this.game.run.defeat;
-      this.defeatTitle.textContent = T(reason === 'player' ? 'defeat.player' : 'defeat.beacon');
+      this._refreshResultText();
     }
+  }
+
+  _refreshResultText() {
+    const sm = this.game.sm;
+    if (!sm.mapOver) return;
+    const victory = sm.is(STATES.MAP_VICTORY);
+    const reason = this.game.run && this.game.run.defeat;
+    this.resultTitle.textContent = T(victory ? 'victory.title' : reason === 'player' ? 'defeat.player' : 'defeat.beacon');
+    this.resultRetry.textContent = T(victory ? 'victory.again' : 'defeat.retry');
   }
 
   // ---------------- popups (close only with their own button, H5 §4) ----------------
@@ -158,7 +171,8 @@ export class UIManager {
       case 'fullscreen': toggleFullscreen(); break;
       case 'selectMap': this.game.selectMap(btn.dataset.mapId); this._refreshMapSelect(); break;
       case 'retryMap': this.game.retryMap(); break;
-      case 'defeatMenu': this.game.exitToMenu(); break; // the map is already over: nothing to lose, no confirmation
+      case 'resultMenu': this.game.exitToMenu(); break; // the map is already over: nothing to lose, no confirmation
+      case 'startNextWave': this.game.startNextWave(); break;
       default: break;
     }
   }
@@ -196,6 +210,7 @@ export class UIManager {
 
   _refreshDynamicText() {
     this._refreshMapSelect();
+    this._refreshResultText();
     if (this.confirmKind) this.confirmText.textContent = T(this.confirmKind === 'reset' ? 'confirm.reset' : 'confirm.exit');
   }
 }
