@@ -1,5 +1,9 @@
 // Permanent upgrades (03_ECONOMY §6–7). Data only: the formulas live in systems/Loadout.js and systems/Economy.js.
 
+/** Every shop price (weapons, upgrades, devices; grenades from Phase 6) × this (user decision D40: −15%). */
+export const SHOP_PRICE_MULT = 0.85;
+export const shopPrice = (base) => (base > 0 ? Math.max(1, Math.round(base * SHOP_PRICE_MULT)) : 0);
+
 // ---------------- weapon upgrade tree ----------------
 export const WEAPON_UPGRADE = {
   maxWeaponLevel: 10,           // weaponLevel = 1 + purchased nodes (≤ 9 nodes per weapon)

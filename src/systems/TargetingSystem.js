@@ -33,10 +33,11 @@ export class TargetingSystem {
    * @param {Array} enemies
    * @param {number} range
    * @param {number} time  game clock
+   * @param {((e:object)=>boolean)|null} [canSee] line of sight (D40: the beacon and decor block bullets)
    * @returns {object|null} current target
    */
-  update(origin, enemies, range, time) {
-    if (this.target && !this.isValid(this.target, origin.x, origin.y, range)) {
+  update(origin, enemies, range, time, canSee = null) {
+    if (this.target && (!this.isValid(this.target, origin.x, origin.y, range) || (canSee && !canSee(this.target)))) {
       this.target = null;
       this.nextSearchAt = time; // look for the next one right away
     }
@@ -51,6 +52,7 @@ export class TargetingSystem {
       const dx = e.x - origin.x, dy = e.y - origin.y;
       const d2 = dx * dx + dy * dy;
       if (d2 > range2) continue;
+      if (canSee && !canSee(e)) continue;
       const s = this.score(e, d2, range);
       if (e === this.target) currentScore = s;
       if (s > bestScore) { bestScore = s; best = e; }

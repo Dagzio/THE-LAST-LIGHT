@@ -3,7 +3,7 @@
 // and the economy just books them. Purchases follow validate → debit → apply → save → notify; an invalid purchase
 // changes nothing. Offers (state + price + reason) are computed here so the UI only displays them.
 import { WEAPONS, getWeapon } from '../data/weapons.js';
-import { WEAPON_UPGRADE, UPGRADE_NODES, WEAPON_NODES, PLAYER_UPGRADES, PLAYER_UPGRADE_COST_GROWTH } from '../data/upgrades.js';
+import { WEAPON_UPGRADE, UPGRADE_NODES, WEAPON_NODES, PLAYER_UPGRADES, PLAYER_UPGRADE_COST_GROWTH, shopPrice } from '../data/upgrades.js';
 import { levelForXp } from '../data/progression.js';
 import { effectiveWeaponStats, playerModifiers } from './Loadout.js';
 
@@ -88,10 +88,10 @@ export class Economy {
     const p = this.profile;
     if (!w || !w.inMvp) return { id, canBuy: false, reason: REASON.UNKNOWN };
     const owned = p.ownedWeapons.includes(id);
-    const o = { id, price: w.price, requiredLevel: w.requiredPlayerLevel, owned, equipped: p.equippedWeaponId === id, canBuy: false, reason: null };
+    const o = { id, price: shopPrice(w.price), requiredLevel: w.requiredPlayerLevel, owned, equipped: p.equippedWeaponId === id, canBuy: false, reason: null };
     if (owned) o.reason = REASON.OWNED;
     else if (p.playerLevel < w.requiredPlayerLevel) o.reason = REASON.LEVEL;
-    else if (p.coins < w.price) o.reason = REASON.COINS;
+    else if (p.coins < o.price) o.reason = REASON.COINS;
     else o.canBuy = true;
     return o;
   }
@@ -100,7 +100,7 @@ export class Economy {
     const node = UPGRADE_NODES[nodeId];
     const base = WEAPON_UPGRADE.baseCost[weaponId] || 0;
     const mult = node && node.unique ? WEAPON_UPGRADE.uniqueCostMultiplier : 1;
-    return Math.round(base * (1 + WEAPON_UPGRADE.costGrowth * (this.weaponLevel(weaponId) - 1)) * mult);
+    return shopPrice(base * (1 + WEAPON_UPGRADE.costGrowth * (this.weaponLevel(weaponId) - 1)) * mult);
   }
 
   /** @returns {{weaponId, nodeId, rank, max, cost, canBuy, reason}} */
@@ -120,7 +120,7 @@ export class Economy {
 
   playerUpgradeCost(id) {
     const u = PLAYER_UPGRADES[id];
-    return u ? Math.round(u.baseCost * (1 + PLAYER_UPGRADE_COST_GROWTH * (this.profile.playerUpgrades[id] | 0))) : 0;
+    return u ? shopPrice(u.baseCost * (1 + PLAYER_UPGRADE_COST_GROWTH * (this.profile.playerUpgrades[id] | 0))) : 0;
   }
 
   playerUpgradeOffer(id) {

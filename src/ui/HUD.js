@@ -68,6 +68,16 @@ export class HUD {
     });
     game.events.on('waveCleared', (index, reward, final) => { if (!final) this._showBanner('banner.waveCleared', null); });
     game.events.on('levelUp', (level) => { if (game.sm.inMap) this._showBanner('banner.levelUp', { n: level }); });
+    // Early wave start bonus (D40): "+25" floats up from the coin badge
+    const pop = document.getElementById('coinPop');
+    game.events.on('coinReward', (amount, reason) => {
+      if (reason !== 'earlyStart' || !pop) return;
+      pop.textContent = `+${amount}`;
+      pop.classList.remove('show');
+      void pop.offsetWidth;
+      pop.classList.add('show');
+    });
+    pop.addEventListener('animationend', () => pop.classList.remove('show'));
     game.sm.onChange(() => { if (!game.sm.inMap) this._hideBanner(); });
     this.el.banner.addEventListener('animationend', () => this._hideBanner());
     game.onFrame(() => this.update());

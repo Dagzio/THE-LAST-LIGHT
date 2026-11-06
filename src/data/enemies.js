@@ -63,7 +63,7 @@ export const ENEMIES = {
     armor: 0,
     bossSlowFactor: 0.5,     // slows are half as strong, never a full freeze (02_SPEC §10)
     barHeight: 0,            // no world bar: the boss bar is in the HUD
-    reward: { coins: 30, xp: 80 },
+    reward: { coins: 36, xp: 92 }, // 30 / 80 +20% / +15% (user decision D40)
   },
 };
 

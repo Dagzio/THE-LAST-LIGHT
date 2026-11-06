@@ -16,6 +16,7 @@ import { createRunSeed } from './SeededRandom.js';
 import { QUALITY_LEVELS, QUALITY_PRESETS, resolveAutoQuality } from '../config/settings.js';
 import { getMap, MAPS } from '../data/maps.js';
 import { getDefense } from '../data/defenses.js';
+import { shopPrice } from '../data/upgrades.js';
 import { SaveManager } from './SaveManager.js';
 import { Economy, REASON } from '../systems/Economy.js';
 
@@ -222,10 +223,32 @@ export class Game {
     return { ok: true };
   }
 
+  /** Beacon repair to full (D40): validate → debit → repair. Not discounted (its price is set directly). */
+  repairOffer() {
+    const run = this.run;
+    const cost = run ? run.beaconRepairCost() : 0;
+    const o = { cost, canBuy: false, reason: null };
+    if (!this.shopOpen || !run || !run.betweenWaves) o.reason = REASON.CLOSED;
+    else if (cost <= 0) o.reason = 'full';
+    else if (this.economy.coins < cost) o.reason = REASON.COINS;
+    else o.canBuy = true;
+    return o;
+  }
+
+  shopRepairBeacon() {
+    const o = this.repairOffer();
+    if (!o.canBuy) return { ok: false, reason: o.reason };
+    if (!this.economy.spend(o.cost)) return { ok: false, reason: REASON.COINS };
+    const b = this.run.beacon;
+    b.repair(b.maxIntegrity - b.integrity);
+    this.events.emit('purchase', 'repair', o.cost);
+    return { ok: true };
+  }
+
   defenseOffer(padIndex, defenseId) {
     const d = getDefense(defenseId);
     const pad = this.run && this.run.defenses.pads[padIndex];
-    const o = { padIndex, defenseId, price: d ? d.price : 0, canBuy: false, reason: null };
+    const o = { padIndex, defenseId, price: d ? shopPrice(d.price) : 0, canBuy: false, reason: null };
     if (!this.shopOpen || !this.run || !this.run.betweenWaves) o.reason = REASON.CLOSED;
     else if (!d || !pad) o.reason = REASON.UNKNOWN;
     else if (pad.device) o.reason = REASON.PAD_BUSY;

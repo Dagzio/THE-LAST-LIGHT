@@ -11,4 +11,6 @@ export const BEACON = {
     illuminatedLinger: 0.5,   // s — status stays this long after leaving the beam (same in logic and visuals)
     startAngle: -Math.PI / 2, // beam points north at the start of a map
   },
+  // Shop repair to full integrity (user decision D40): price ∝ damage; from 1% to 100% costs 50 coins.
+  repair: { fullFromOnePercent: 50 },
 };

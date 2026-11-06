@@ -16,6 +16,14 @@ export class EnemyAISystem {
   /** @param {import('../core/GameEvents.js').GameEvents} events */
   constructor(events) {
     this.events = events;
+    /** @type {import('./Collision.js').CollisionWorld|null} static obstacles (D40): walkers slide around them */
+    this.world = null;
+  }
+
+  /** Moves an enemy; with a collision world it slides around obstacles (side preference from its id). */
+  _step(e, dx, dy) {
+    if (this.world) this.world.move(e, dx, dy, (e.id & 1) ? 1 : -1);
+    else { e.x += dx; e.y += dy; }
   }
 
   /**
@@ -36,6 +44,7 @@ export class EnemyAISystem {
         const k = Math.min(dt, e.pushUntil - time);
         e.x += e.pushVX * k;
         e.y += e.pushVY * k;
+        if (this.world) this.world.pushOut(e); // a knockback never throws into a rock
       }
       if (e.isStunned(time)) { e.attackingBeacon = false; continue; }
       const t = e.type;
@@ -66,7 +75,7 @@ export class EnemyAISystem {
         }
         const touch = e.radius + player.radius;
         const step = Math.min(Math.max(0, pd - touch), t.moveSpeed * e.slowFactor(time) * dt);
-        if (pd > 1e-6 && step > 0) { e.x += (px / pd) * step; e.y += (py / pd) * step; }
+        if (pd > 1e-6 && step > 0) this._step(e, (px / pd) * step, (py / pd) * step);
         e.faceAngle = Math.atan2(py, px);
       } else if (e.state === ENEMY_STATES.MOVE_TO_BEACON) {
         e.attackingBeacon = false;
@@ -76,10 +85,7 @@ export class EnemyAISystem {
           continue;
         }
         const step = Math.min(dist - stopAt, t.moveSpeed * e.slowFactor(time) * dt);
-        if (dist > 1e-6 && step > 0) {
-          e.x += (dx / dist) * step;
-          e.y += (dy / dist) * step;
-        }
+        if (dist > 1e-6 && step > 0) this._step(e, (dx / dist) * step, (dy / dist) * step);
         e.faceAngle = Math.atan2(dy, dx);
       } else if (e.state === ENEMY_STATES.ATTACK_BEACON) {
         e.attackingBeacon = !beacon.destroyed;
@@ -133,6 +139,8 @@ export class EnemyAISystem {
       e.x = beacon.x + (dx / d) * r;
       e.y = beacon.y + (dy / d) * r;
     }
+    // Static obstacles win over crowd separation (nobody is pushed into a rock or a pad).
+    if (this.world) for (let i = 0; i < n; i++) if (enemies[i].alive) this.world.pushOut(enemies[i]);
   }
 
   /** Contact damage: the first touching enemy hurts the keeper; his hit invulnerability blocks the rest. */

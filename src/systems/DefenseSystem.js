@@ -19,6 +19,8 @@ export class DefenseSystem {
     this.pool = pool;
     this.rng = rng;
     this.events = events;
+    /** @type {import('./Collision.js').CollisionWorld|null} turret line of sight (D40) */
+    this.world = null;
   }
 
   /**
@@ -59,7 +61,8 @@ export class DefenseSystem {
 
   _turret(d, enemies, time) {
     const s = d.stats;
-    const target = d.targeting.update(d, enemies, s.range, time);
+    if (this.world && !d.canSee) d.canSee = (e) => this.world.clear(d.x, d.y, e.x, e.y); // own pad is skipped (start inside)
+    const target = d.targeting.update(d, enemies, s.range, time, this.world ? d.canSee : null);
     if (target) d.aimAngle = Math.atan2(target.y - d.y, target.x - d.x);
     if (!target || time < d.nextActionAt) return;
     d.nextActionAt = time + s.fireInterval;

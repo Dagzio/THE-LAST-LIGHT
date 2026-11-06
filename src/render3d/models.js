@@ -4,6 +4,7 @@
 // Each object is tagged userData.model for the dev asset viewer (src/dev/debug-models.js).
 // Final art can replace a model by a .glb with the same tag (art-prompts/02_PLAYER_COMBAT.md).
 import * as THREE from '../../lib/three.module.js';
+import { PROP_KINDS, rollProp } from '../systems/Props.js';
 
 const tmpColor = new THREE.Color();
 
@@ -348,29 +349,29 @@ export function reticleGeometry() {
   return mergeParts(P);
 }
 
-// ---------------- environment props (decorative, never block movement in MVP) ----------------
-export const PROP_KINDS = ['rock', 'ruin', 'stump', 'post'];
+// ---------------- environment props: geometry from the shared layout descriptors (systems/Props.js) ----------------
+// They collide since D40 — the colliders come from the same descriptors, so visuals and blocking always match.
+export { PROP_KINDS };
 
-export function propParts(kind, rng, x, z) {
+/** @param {object} p descriptor from systems/Props.js rollProp() */
+export function propParts(p) {
   const P = [];
-  const r = () => rng.next();
-  if (kind === 'rock') {
-    const s = 10 + r() * 22;
-    P.push(part(new THREE.DodecahedronGeometry(s, 0), r() < 0.5 ? '#2e333b' : '#3a4049', { x, y: s * 0.35, z, rx: r() * 3, ry: r() * 3, sy: 0.55 + r() * 0.3 }));
-    if (r() < 0.5) P.push(part(new THREE.DodecahedronGeometry(s * 0.45, 0), '#262a31', { x: x + s * 0.8, y: s * 0.2, z: z + s * 0.3, ry: r() * 3, sy: 0.6 }));
-  } else if (kind === 'ruin') {
-    const w = 18 + r() * 26, h = 14 + r() * 26, d = 10 + r() * 8, ry = r() * Math.PI;
+  const x = p.x, z = p.y;
+  if (p.kind === 'rock') {
+    const s = p.s;
+    P.push(part(new THREE.DodecahedronGeometry(s, 0), p.dark ? '#2e333b' : '#3a4049', { x, y: s * 0.35, z, rx: p.rx, ry: p.ry, sy: p.sy }));
+    if (p.twin) P.push(part(new THREE.DodecahedronGeometry(s * 0.45, 0), '#262a31', { x: x + s * 0.8, y: s * 0.2, z: z + s * 0.3, ry: p.twinRy, sy: 0.6 }));
+  } else if (p.kind === 'ruin') {
+    const { w, h, d, ry } = p;
     P.push(part(new THREE.BoxGeometry(w, h, d), '#3b4048', { x, y: h / 2, z, ry }));
     P.push(part(new THREE.BoxGeometry(w * 0.5, h * 0.3, d * 1.1), '#2f343b', { x: x + 6, y: h + 2, z, ry, rz: 0.2 }));
-    P.push(part(new THREE.BoxGeometry(8, 6, 8), '#33383f', { x: x - w * 0.7, y: 3, z: z + 9, ry: r() }));
-  } else if (kind === 'stump') {
-    const h = 10 + r() * 18;
-    P.push(part(new THREE.CylinderGeometry(5, 8, h, 7), '#2b241e', { x, y: h / 2, z }));
-    P.push(part(new THREE.CylinderGeometry(1.6, 2.4, 18, 5), '#2b241e', { x: x + 6, y: h + 4, z, rz: -0.9 }));
+    P.push(part(new THREE.BoxGeometry(8, 6, 8), '#33383f', { x: x - w * 0.7, y: 3, z: z + 9, ry: p.blockRy }));
+  } else if (p.kind === 'stump') {
+    P.push(part(new THREE.CylinderGeometry(5, 8, p.h, 7), '#2b241e', { x, y: p.h / 2, z }));
+    P.push(part(new THREE.CylinderGeometry(1.6, 2.4, 18, 5), '#2b241e', { x: x + 6, y: p.h + 4, z, rz: -0.9 }));
   } else {
-    const h = 16 + r() * 12;
-    P.push(part(new THREE.BoxGeometry(4, h, 4), '#3a2f25', { x, y: h / 2, z, rz: (r() - 0.5) * 0.4 }));
-    P.push(part(new THREE.BoxGeometry(26, 2.5, 2), '#3a2f25', { x: x + 12, y: h * 0.7, z, rz: -0.25 }));
+    P.push(part(new THREE.BoxGeometry(4, p.h, 4), '#3a2f25', { x, y: p.h / 2, z, rz: p.rz }));
+    P.push(part(new THREE.BoxGeometry(26, 2.5, 2), '#3a2f25', { x: x + 12, y: p.h * 0.7, z, rz: -0.25 }));
   }
   return P;
 }
@@ -416,6 +417,6 @@ export function buildShowcase(materials, rng) {
   const kiosk = new THREE.Group();
   kiosk.add(new THREE.Mesh(kioskGeometry(), materials.prop), new THREE.Mesh(kioskLanternGeometry(), materials.lantern));
   out.set('kiosk', tag(kiosk, 'kiosk'));
-  for (const kind of PROP_KINDS) out.set(`prop-${kind}`, tag(new THREE.Mesh(mergeParts(propParts(kind, rng, 0, 0)), materials.prop), `prop-${kind}`));
+  for (const kind of PROP_KINDS) out.set(`prop-${kind}`, tag(new THREE.Mesh(mergeParts(propParts(rollProp(kind, rng, 0, 0))), materials.prop), `prop-${kind}`));
   return out;
 }

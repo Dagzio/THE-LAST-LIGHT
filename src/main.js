@@ -35,6 +35,14 @@ function wireCombatSounds(events) {
   events.on('flare', () => Sfx.play('flare'));
   events.on('flareReady', () => Sfx.play('flareReady'));
   events.on('levelUp', () => Sfx.play('levelUp'));
+  events.on('coinReward', (a, reason) => { if (reason === 'earlyStart') Sfx.play('buy'); });
+  let lastRicochetAt = 0;
+  events.on('bulletBlocked', () => {
+    const now = performance.now();
+    if (now - lastRicochetAt < 60) return; // SMG bursts into a wall must not turn into noise
+    lastRicochetAt = now;
+    Sfx.play('hit', 1.6 + Math.random() * 0.3);
+  });
   events.on('waveStart', () => Sfx.play('waveStart'));
   events.on('waveCleared', (i, reward, final) => { if (!final) Sfx.play('waveClear'); });
   events.on('playerHit', () => Sfx.play('playerHurt', 0.95 + Math.random() * 0.1));

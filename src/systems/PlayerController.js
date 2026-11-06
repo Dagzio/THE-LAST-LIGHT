@@ -17,6 +17,8 @@ export class PlayerController {
     // Permanent (Phase 5) and temporary (Phase 6) speed multipliers.
     this.speedMult = 1;
     this.dodgeCooldownMult = 1;
+    /** @type {import('./Collision.js').CollisionWorld|null} static obstacles (D40) */
+    this.world = null;
   }
 
   /**
@@ -59,6 +61,10 @@ export class PlayerController {
     const r = player.radius;
     player.x = clamp(player.x + player.vx * dt, r, this.bounds.w - r);
     player.y = clamp(player.y + player.vy * dt, r, this.bounds.h - r);
+    if (this.world && this.world.pushOut(player)) { // obstacles: slide along them (radial push-out keeps the tangent)
+      player.x = clamp(player.x, r, this.bounds.w - r);
+      player.y = clamp(player.y, r, this.bounds.h - r);
+    }
   }
 
   _tryDodge(player, input, moving, time) {

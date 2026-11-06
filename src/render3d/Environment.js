@@ -1,11 +1,11 @@
 // Map environment in 3D: painted ash ground, dark shore/water around the map, merged decorative props.
 // Ground texture is painted once on a CPU canvas (render-guard rule 1: survives a GPU-process restart).
-// Props are decorative and never block movement in the MVP (01_GDD §11); all static props = one draw call.
+// Props block movement and bullets since D40 (colliders from the same layout); all static props = one draw call.
 import * as THREE from '../../lib/three.module.js';
 import { cpuCanvas } from './render-guard.js';
 import { SeededRandom } from '../core/SeededRandom.js';
-import { mergeParts, propParts, PROP_KINDS, tag } from './models.js';
-import { KIOSK } from '../data/kiosk.js';
+import { mergeParts, propParts, tag } from './models.js';
+import { layoutProps } from '../systems/Props.js';
 
 const TEX_W = 2048;
 
@@ -114,28 +114,9 @@ export function buildEnvironment(map, materials, { merge = true } = {}) {
   shore.position.set(mapW / 2, -2, mapH / 2);
   group.add(shore);
 
-  // Props: border rocks along the map edge + scattered ruins/rocks/stumps/posts (never on the plaza or spawn)
-  const rng = new SeededRandom(map.artSeed ^ 0x5bd1e995);
+  // Props from the shared layout (systems/Props.js): the simulation builds its colliders from the same list (D40).
   const parts = [];
-  const step = 70;
-  for (let x = 0; x <= mapW; x += step) {
-    parts.push(...propParts('rock', rng, x + (rng.next() - 0.5) * 30, -18 - rng.next() * 30));
-    parts.push(...propParts('rock', rng, x + (rng.next() - 0.5) * 30, mapH + 18 + rng.next() * 30));
-  }
-  for (let y = step; y < mapH; y += step) {
-    parts.push(...propParts('rock', rng, -18 - rng.next() * 30, y + (rng.next() - 0.5) * 30));
-    parts.push(...propParts('rock', rng, mapW + 18 + rng.next() * 30, y + (rng.next() - 0.5) * 30));
-  }
-  const cx = mapW / 2, cy = mapH / 2;
-  let placed = 0;
-  for (let tries = 0; tries < 400 && placed < 46; tries++) {
-    const x = 60 + rng.next() * (mapW - 120), y = 60 + rng.next() * (mapH - 120);
-    if (Math.hypot(x - cx, y - cy) < KIOSK.maxDistFromBeacon + 50) continue;          // plaza + kiosk zone (D39)
-    if (Math.hypot(x - map.playerSpawn.x, y - map.playerSpawn.y) < 120) continue;    // spawn
-    if (Math.abs(x - cx) < 40 || Math.abs(y - cy) < 40) continue;                     // keep the four paths clear
-    parts.push(...propParts(PROP_KINDS[Math.floor(rng.next() * PROP_KINDS.length)], rng, x, y));
-    placed++;
-  }
+  for (const prop of layoutProps(map)) parts.push(...propParts(prop));
   const props = new THREE.Mesh(mergeParts(parts), materials.prop);
   props.castShadow = true;
   props.receiveShadow = true;

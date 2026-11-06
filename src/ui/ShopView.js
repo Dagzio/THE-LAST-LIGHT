@@ -31,6 +31,7 @@ const ICON = { // 24×24 stroke icons (white line style, see art-prompts/06_SHOP
   interact_range: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/>',
   guard_turret: '<path d="M6 20h12l-2-6H8z"/><path d="M8 14V9h8v5M16 11h6"/>',
   frost_coil: '<path d="M12 2v20M3 7l18 10M21 7L3 17"/>',
+  repair: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
 };
 const COIN = '<i class="coin-ico" aria-hidden="true"></i>';
 
@@ -98,6 +99,7 @@ export class ShopView {
     else if (cmd === 'upgrade') r = g.shopBuyWeaponUpgrade(a, c);
     else if (cmd === 'player') r = g.shopBuyPlayerUpgrade(a);
     else if (cmd === 'defense') r = g.shopBuyDefense(Number(a), c);
+    else if (cmd === 'repair') r = g.shopRepairBeacon();
     else if (cmd === 'pickWeapon') { this.upgradeWeaponId = a; this.refresh(); return; }
     if (!r) return;
     Sfx.play(r.ok ? (cmd === 'equip' ? 'click' : 'buy') : 'deny');
@@ -218,6 +220,17 @@ export class ShopView {
   _defenses() {
     const g = this.game;
     const pads = g.run ? g.run.defenses.pads : [];
+    // Beacon repair to full (D40): price grows with the damage
+    if (g.run) {
+      const b = g.run.beacon, o = g.repairOffer();
+      const pct = Math.max(0, Math.min(100, (b.integrity / b.maxIntegrity) * 100));
+      const body = `<i class="shop-integrity"><i style="width:${pct.toFixed(1)}%"></i></i>`
+        + `<p class="shop-fx">${T('fx.repair', { n: Math.ceil(b.integrity), max: b.maxIntegrity })}</p>`;
+      const card = this._card('repair', T('shop.beacon'), body, `shop-repair${o.reason === 'full' ? ' maxed' : ''}`);
+      if (o.reason === 'full') this._footer(card, { label: T('shop.reason.full'), enabled: false, done: true });
+      else this._footer(card, { cmd: 'repair', price: o.cost, enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
+      this.grid.append(card);
+    }
     pads.forEach((pad, i) => {
       const col = el('div', 'shop-pad');
       const title = el('h4', 'shop-pad-title');

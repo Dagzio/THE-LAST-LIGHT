@@ -25,7 +25,10 @@ import { getEnemyType } from '../data/enemies.js';
 import { getWaves } from '../data/waves.js';
 import { CAPS, ENEMY_FX } from '../data/balance.js';
 import { KIOSK } from '../data/kiosk.js';
+import { WAVE_TIMING } from '../data/waves.js';
+import { BEACON } from '../data/beacon.js';
 import { defaultLoadout } from '../systems/Loadout.js';
+import { buildCollisionWorld } from '../systems/Collision.js';
 
 const MAX_ENEMIES = 80; // hard cap of live entities (performance guard; waves stay far below it)
 
@@ -90,12 +93,20 @@ export class MapRun {
       }),
       events.on('bossImpact', (kind, x, y, r) => this.particles.burst(x, y, kind === 'slam' ? 22 : 30, r * 2.2, 0.45, 3, '#b48cff')),
       events.on('frostPulse', (x, y) => this.particles.burst(x, y, 14, 210, 0.45, 2.5, '#9fd8ff')),
+      events.on('bulletBlocked', (x, y) => this.particles.burst(x, y, 5, 130, 0.18, 2, '#c9c3b5')), // stone chips
       events.on('waveCleared', (index, reward, final) => this._onWaveCleared(index, reward, final)),
     ];
 
     this.applyLoadout(loadout, true);
     this.player.hp = this.player.maxHp;
     this.kiosk = placeKiosk(map, runSeed); // new spot every run (D39); its own RNG keeps combat RNG unchanged
+    // Static obstacles (D40): beacon, pads, kiosk, decor — for the keeper, enemies, bullets and turret sight.
+    this.world = buildCollisionWorld(map, this.kiosk);
+    this.controller.world = this.world;
+    this.ai.world = this.world;
+    this.projectileSystem.world = this.world;
+    this.defenses.world = this.world;
+    this.world.pushOut(this.player);
     this.waves.start(0);
   }
 
@@ -155,6 +166,7 @@ export class MapRun {
     const cx = Math.min(this.map.width - type.radius, Math.max(type.radius, x));
     const cy = Math.min(this.map.height - type.radius, Math.max(type.radius, y));
     const e = new Enemy(type, cx, cy);
+    if (this.world) this.world.pushOut(e); // never spawn inside a rock
     this.enemies.push(e);
     if (type.boss) this.bossSystem.setBoss(e, time);
     this.events.emit('enemySpawn', e);
@@ -182,10 +194,27 @@ export class MapRun {
     if (final) this._setVictory();
   }
 
-  /** START NEXT WAVE (HUD button): only during the intro / intermission, ignored otherwise. */
+  /**
+   * START NEXT WAVE (HUD / shop button): only during the intro / intermission, ignored otherwise.
+   * An early start pays a one-off coin bonus (D40) — once per wave, because the break ends with it.
+   */
   startNextWave(time) {
-    if (this.over) return false;
-    return this.waves.startNextWave(time);
+    if (this.over || !this.waves.startNextWave(time)) return false;
+    const bonus = WAVE_TIMING.earlyStartBonus | 0;
+    if (bonus > 0) {
+      this.rewards.coins += bonus;
+      this.events.emit('coinReward', bonus, 'earlyStart');
+    }
+    return true;
+  }
+
+  /** Beacon repair price (D40): proportional to the damage; a full repair from 1% costs `fullFromOnePercent`. */
+  beaconRepairCost() {
+    const b = this.beacon;
+    const missing = Math.max(0, b.maxIntegrity - b.integrity);
+    if (missing <= 0 || b.destroyed) return 0;
+    const cost = (BEACON.repair.fullFromOnePercent * missing) / (b.maxIntegrity * 0.99);
+    return Math.max(1, Math.round(cost));
   }
 
   /** Emergency Flare (Q / flare button): only during an active wave at full charge; ignored otherwise. */

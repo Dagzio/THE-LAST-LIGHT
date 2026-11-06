@@ -7,6 +7,7 @@ export const WAVE_TIMING = {
   intro: 10.0,             // s of preparation before wave 1 — shop open, START WAVE available (user decision D39)
   intermission: 20.0,      // s between waves (START NEXT WAVE skips it)
   maxAliveAdds: 8,         // boss wave: cap of alive non-boss enemies (adds wait while the cap is reached)
+  earlyStartBonus: 25,     // coins for START NEXT WAVE before the timer runs out — once per wave (user decision D40)
 };
 
 export const WAVES = {

@@ -16,6 +16,8 @@ export class ProjectileSystem {
     this.events = events;
     this.getWeaponStats = getWeaponStats;
     this.modifiers = NEUTRAL_MODIFIERS;
+    /** @type {import('./Collision.js').CollisionWorld|null} bullets stop at decor / beacon / pads / kiosk (D40) */
+    this.world = null;
   }
 
   update(enemies, dt, time) {
@@ -37,8 +39,10 @@ export class ProjectileSystem {
     const sx = p.prevX, sy = p.prevY;
     const ex = p.x - sx, ey = p.y - sy;
     const segLen2 = ex * ex + ey * ey;
+    // First static obstacle on this step's segment: enemies behind it are not hit.
+    const wallT = this.world ? this.world.segmentHit(sx, sy, p.x, p.y, p.radius) : Infinity;
     while (p.hitsLeft > 0) {
-      let hit = null, hitT = Infinity;
+      let hit = null, hitT = wallT;
       for (let j = 0; j < enemies.length; j++) {
         const e = enemies[j];
         if (!e.alive || p.hasHit(e.id)) continue;
@@ -49,7 +53,7 @@ export class ProjectileSystem {
         const rr = e.radius + p.radius;
         if (cx * cx + cy * cy <= rr * rr && t < hitT) { hitT = t; hit = e; }
       }
-      if (!hit) return;
+      if (!hit) break;
       p.markHit(hit.id);
       const stats = this.getWeaponStats(p.weaponId);
       const r = computeDamage(stats.damage, stats, hit, this.modifiers, this.rng);
@@ -58,6 +62,10 @@ export class ProjectileSystem {
       this.events.emit('hit', hx, hy, r.amount, r.crit);
       if (killed) this.events.emit('kill', hit, time);
       if (p.hitsLeft <= 0) { this.pool.release(p); return; }
+    }
+    if (wallT !== Infinity && p.active) { // still flying and the segment reaches an obstacle → it stops there
+      this.events.emit('bulletBlocked', sx + ex * wallT, sy + ey * wallT, p.angle);
+      this.pool.release(p);
     }
   }
 }
