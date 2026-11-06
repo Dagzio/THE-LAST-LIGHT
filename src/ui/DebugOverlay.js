@@ -20,6 +20,10 @@ export function initDebugOverlay(game) {
       `state ${game.sm.state}  sim ${game.clock.time.toFixed(2)}s`,
       `quality ${game.quality} (${game.qualitySetting}) dpr ${vp.dpr.toFixed(2)} buffer ${vp.bufferWidth}x${vp.bufferHeight}`,
     ];
+    if (game.renderer3d && game.sm.inMap) {
+      const i = game.renderer3d.info();
+      lines.push(`3D draw calls ${i.calls}  triangles ${i.triangles}  pixelRatio ${i.pixelRatio.toFixed(2)}`);
+    }
     const run = game.run;
     if (run) {
       const p = run.player, w = run.weapon, t = run.target;

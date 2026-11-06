@@ -170,3 +170,41 @@ body.paused .touch-controls { opacity: 0.35; }
 }
 .neon-btn.neon-small { width: var(--neon-small); height: var(--neon-small); margin-bottom: calc(var(--neon) * 0.6); }
 .neon-btn.pressed { transform: scale(0.94); filter: brightness(1.25); }
+
+/* ===================== 3D canvas switching ===================== */
+#world3d { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: none; z-index: 0; touch-action: none; }
+body[data-screen="game"] #world3d { display: block; }
+body[data-screen="game"] #world { display: none; }
+
+/* ===================== Splash loading bar (H5 3D guide §7) ===================== */
+.load-bar {
+  width: min(calc(420px * var(--fs)), 60vw);
+  height: 6px;
+  margin: calc(34px * var(--fs)) auto 0;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.load-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #d9862b, #ffd27a); transition: width 0.2s; }
+.load-pct { margin-top: 8px; font-family: var(--font-display); font-weight: 700; font-size: calc(16px * var(--fs)); letter-spacing: 0.1em; color: var(--c-muted); }
+#screen-splash.ready-tap .load-bar, #screen-splash.ready-tap .load-pct { display: none; }
+
+/* ===================== Off-screen indicators ===================== */
+.offscreen { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.offscreen-arrow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  display: none;
+  will-change: transform;
+}
+.offscreen-arrow.on { display: block; }
+.offscreen-arrow svg { width: 100%; height: 100%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8)); }
+.offscreen-arrow.enemy svg { fill: #ff7a5a; }
+.offscreen-arrow.beacon svg { fill: #ffd27a; }
+.offscreen-arrow.kiosk svg { fill: #aab2ff; }
+.offscreen-arrow.alert svg { animation: arrowAlert 0.5s steps(2) infinite; }
+@keyframes arrowAlert { 50% { opacity: 0.35; } }
+body.paused .offscreen-arrow.alert svg { animation-play-state: paused; }

@@ -3,7 +3,10 @@
 /** H5 standard: debug tools only in a disabled state in the project. Set true locally to see the debug overlay. */
 export const DEBUG_ENABLED = false;
 
-export const BUILD_VERSION = '0.2.0-phase2';
+/** Dev 3D asset viewer (H5 3D guide: asset-viewer-3d.md). TRUE while the user works with models — MUST be false in a release. */
+export const DEBUG_MODELS = true;
+
+export const BUILD_VERSION = '0.2.5-3d';
 
 /** Prefix for every localStorage key of the game (H5 §9). */
 export const STORAGE_PREFIX = 'tll.';

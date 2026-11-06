@@ -41,16 +41,20 @@ export class UIManager {
     this._syncScreen(game.sm.state);
   }
 
-  // ---------------- splash / TAP TO PLAY (H5 §1) ----------------
-  runSplash() {
+  // ---------------- splash / TAP TO PLAY (H5 §1 + 3D guide §7: only after 100% loaded) ----------------
+  /** @param {{loaded: Promise<void>, shownAt: number}} boot */
+  runSplash({ loaded, shownAt }) {
     const el = document.getElementById('screen-splash');
     const prompt = document.getElementById('tapPrompt');
     requestAnimationFrame(() => el.querySelectorAll('.fade').forEach((n) => n.classList.add('show')));
-    setTimeout(() => {
-      this.game.showTapToPlay();
-      prompt.classList.add('show');
-      el.classList.add('ready-tap');
-    }, SPLASH_TAP_DELAY_MS);
+    loaded.then(() => {
+      const wait = Math.max(250, SPLASH_TAP_DELAY_MS - (performance.now() - shownAt)); // 100% stays readable a moment
+      setTimeout(() => {
+        this.game.showTapToPlay();
+        prompt.classList.add('show');
+        el.classList.add('ready-tap');
+      }, wait);
+    });
     const enter = () => {
       if (!el.classList.contains('ready-tap')) return; // early tap = no-op
       el.removeEventListener('click', enter);

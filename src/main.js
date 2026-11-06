@@ -1,5 +1,6 @@
-// Entry point: wires platform services, the game runtime and the UI. No globals are created.
-import { DEBUG_ENABLED, MUSIC_TRACKS } from './config/constants.js';
+// Game start (imported by boot.js after the preload): wires platform services, the runtime and the UI.
+// No globals are created (except window.__game while the dev asset viewer flag is on).
+import { DEBUG_ENABLED, DEBUG_MODELS, MUSIC_TRACKS } from './config/constants.js';
 import { installBrowserHygiene } from './platform/BrowserHygiene.js';
 import { initAudioLifecycle } from './platform/AudioLifecycle.js';
 import { initOrientationGuard } from './platform/OrientationGuard.js';
@@ -9,6 +10,7 @@ import { Game } from './core/Game.js';
 import { UIManager } from './ui/UIManager.js';
 import { HUD } from './ui/HUD.js';
 import { TouchControls } from './ui/TouchControls.js';
+import { OffscreenIndicators } from './ui/OffscreenIndicators.js';
 import { initDebugOverlay } from './ui/DebugOverlay.js';
 
 /** Gameplay facts → sounds. Repeated shots get a small cosmetic pitch variation (GDD §18). */
@@ -27,14 +29,16 @@ function wireCombatSounds(events) {
   events.on('dash', () => Sfx.play('dash'));
 }
 
-function boot() {
+/** @param {{loaded: Promise<void>, shownAt: number}} boot */
+export function startGame(boot) {
   installBrowserHygiene();
   Music.init(MUSIC_TRACKS);
 
-  const game = new Game(document.getElementById('world'));
+  const game = new Game(document.getElementById('world'), document.getElementById('world3d'));
   const ui = new UIManager(game);
   new HUD(game);
   new TouchControls(game);
+  new OffscreenIndicators(game);
   wireCombatSounds(game.events);
 
   // Hidden tab / lost focus / wrong orientation → real pause (same path as the pause button).
@@ -42,9 +46,11 @@ function boot() {
   initOrientationGuard({ onBlock: () => ui.autoPause() });
 
   if (DEBUG_ENABLED) initDebugOverlay(game); // H5: off in the project (constant false)
+  if (DEBUG_MODELS) {
+    window.__game = game; // dev asset viewer reads the live renderer through it
+    import('./dev/debug-models.js').then((m) => m.initModelViewer()).catch((e) => console.error(e));
+  }
 
   game.start();
-  ui.runSplash();
+  ui.runSplash(boot);
 }
-
-boot();

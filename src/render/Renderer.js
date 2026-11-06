@@ -1,14 +1,10 @@
-// Canvas 2D renderer. Reads state only — never mutates game state (rule 12).
+// Canvas 2D renderer of the menu backdrop. Reads state only — never mutates game state (rule 12).
 // Static layers are cached in offscreen canvases and rebuilt only when the viewport buffer,
 // the map or the quality preset changes; the per-frame work is a few drawImage calls.
 import { WORLD_WIDTH as W, WORLD_HEIGHT as H } from '../config/constants.js';
 import {
   makeCanvas, makeGlowSprite, makeBeamSprite, drawBackdropStatic, drawArenaGround, BACKDROP_LANTERN,
 } from './ProceduralArt.js';
-import { createSprites } from './Sprites.js';
-import { ENEMY_FX } from '../data/balance.js';
-
-const CORNERS = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 
 export class Renderer {
   /** @param {HTMLCanvasElement} canvas @param {import('../platform/Viewport.js').Viewport} viewport */
@@ -16,8 +12,8 @@ export class Renderer {
     this.canvas = canvas;
     this.viewport = viewport;
     this.ctx = canvas.getContext('2d', { alpha: false });
-    this.layers = { backdrop: null, arena: null };
-    this.layerKeys = { backdrop: '', arena: '' };
+    this.layers = { backdrop: null };
+    this.layerKeys = { backdrop: '' };
     this.rect = { x: 0, y: 0, w: W, h: H };
     // Sprites are created once and reused by every frame.
     this.sprites = {
@@ -25,7 +21,6 @@ export class Renderer {
       lanternGlow: makeGlowSprite(90, 'rgba(255,200,120,0.9)'),
       fog: makeGlowSprite(220, 'rgba(150,170,200,0.10)'),
     };
-    this.entitySprites = createSprites();
   }
 
   _layer(name, key, draw) {
@@ -43,16 +38,11 @@ export class Renderer {
     return c;
   }
 
-  /**
-   * @param {{scene:'backdrop'|'arena', realTime:number, simTime:number, quality:string,
-   *          mapSeed?:number, probe?:{x:number,y:number}|null}} view
-   */
+  /** Menu backdrop (splash, main menu, map select). The map run itself is drawn in 3D (render3d/). */
   render(view) {
-    const vp = this.viewport;
     const g = this.ctx;
     g.setTransform(1, 0, 0, 1, 0, 0);
-    if (view.scene === 'arena') this._renderArena(g, view);
-    else this._renderBackdrop(g, view);
+    this._renderBackdrop(g, view);
   }
 
   _renderBackdrop(g, view) {
@@ -94,121 +84,6 @@ export class Renderer {
     const glow = this.sprites.lanternGlow;
     g.drawImage(glow, -glow.width / 2, -glow.height / 2);
     g.restore();
-  }
-
-  _renderArena(g, view) {
-    const vp = this.viewport;
-    const seed = view.mapSeed || 1;
-    const layer = this._layer('arena', `${vp.version}|${seed}`, (lg, rect) => drawArenaGround(lg, rect, seed));
-    g.drawImage(layer, 0, 0);
-    vp.applyWorldTransform(g);
-
-    // Fog wisps driven by SIMULATION time: they freeze when the game is paused (H5 §5).
-    const t = view.simTime;
-    const fog = this.sprites.fog;
-    const fogCount = view.quality === 'low' ? 2 : 3;
-    for (let i = 0; i < fogCount; i++) {
-      const fx = -fog.width + ((t * (10 + i * 4) + i * 520) % (W + fog.width * 2));
-      const fy = 140 + i * 210;
-      g.drawImage(fog, fx, fy - fog.height / 2, fog.width * 1.8, fog.height);
-    }
-
-    if (view.run) this._renderRun(g, view.run, t, view.quality);
-  }
-
-  /** Entities of the current map run. Reads state only. Order: enemies → projectiles → player → fx → bars. */
-  _renderRun(g, run, t, quality) {
-    const S = this.entitySprites;
-    const player = run.player;
-
-    // Enemies (with death fade and hit flash).
-    for (const e of run.enemies) {
-      const dead = !e.alive;
-      const fade = dead ? Math.max(0, 1 - (t - e.deathAt) / ENEMY_FX.deathFade) : 1;
-      if (fade <= 0) continue;
-      const face = Math.atan2(player.y - e.y, player.x - e.x);
-      const flash = !dead && t - e.lastHitAt < ENEMY_FX.hitFlash;
-      g.globalAlpha = fade;
-      this._drawRotated(g, flash ? S.gruntFlash : S.grunt, e.x, e.y, face, dead ? 1 + (1 - fade) * 0.25 : 1);
-    }
-    g.globalAlpha = 1;
-
-    // Target marker (gameplay signal: who the gun is shooting at).
-    const target = run.target;
-    if (target && target.alive) this._drawTargetMarker(g, target, t);
-
-    // Projectiles.
-    const bullet = S.bullet;
-    for (const p of run.projectiles.items) {
-      if (p.active) this._drawRotated(g, bullet, p.x, p.y, p.angle, 1);
-    }
-
-    // Player: dodge ghosts (decorative, off on LOW), i-frame flicker, muzzle flash.
-    if (player.alive) {
-      const aim = player.aimAngle;
-      if (player.dodging && quality !== 'low') {
-        for (let k = 1; k <= 2; k++) {
-          g.globalAlpha = 0.22 / k;
-          this._drawRotated(g, S.player, player.x - player.vx * 0.025 * k, player.y - player.vy * 0.025 * k, aim, 1);
-        }
-      }
-      g.globalAlpha = player.isInvulnerable(t) && Math.floor(t * 30) % 2 === 0 ? 0.55 : 1;
-      this._drawRotated(g, S.player, player.x, player.y, aim, 1);
-      g.globalAlpha = 1;
-      if (t - run.weapon.lastShotAt < 0.06) {
-        const mx = player.x + Math.cos(aim) * 30, my = player.y + Math.sin(aim) * 30;
-        this._drawRotated(g, S.muzzle, mx, my, aim, 1);
-      }
-      // Reload arc above the player.
-      if (run.weapon.reloading) {
-        const prog = run.weapon.reloadProgress(t);
-        g.lineWidth = 4;
-        g.strokeStyle = 'rgba(0,0,0,0.5)';
-        g.beginPath(); g.arc(player.x, player.y - 34, 9, 0, Math.PI * 2); g.stroke();
-        g.strokeStyle = '#ffd27a';
-        g.beginPath(); g.arc(player.x, player.y - 34, 9, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2); g.stroke();
-      }
-    }
-
-    // Particles (decorative).
-    for (const p of run.particles.items) {
-      if (!p.active) continue;
-      g.globalAlpha = p.life / p.maxLife;
-      g.fillStyle = p.color;
-      g.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
-    }
-    g.globalAlpha = 1;
-
-    // Enemy health bars (only when damaged).
-    for (const e of run.enemies) {
-      if (!e.alive || e.hp >= e.maxHp) continue;
-      const w = 34, h = 4, x = e.x - w / 2, y = e.y - e.radius - 12;
-      g.fillStyle = 'rgba(0,0,0,0.65)';
-      g.fillRect(x - 1, y - 1, w + 2, h + 2);
-      g.fillStyle = '#d2453a';
-      g.fillRect(x, y, w * (e.hp / e.maxHp), h);
-    }
-  }
-
-  _drawRotated(g, img, x, y, angle, scale) {
-    const c = Math.cos(angle) * scale, s = Math.sin(angle) * scale;
-    g.save();
-    g.transform(c, s, -s, c, x, y);
-    g.drawImage(img, -img.width / 2, -img.height / 2);
-    g.restore();
-  }
-
-  _drawTargetMarker(g, e, t) {
-    const r = e.radius + 8 + Math.sin(t * 8) * 1.5;
-    const k = 7;
-    g.strokeStyle = 'rgba(255,200,120,0.9)';
-    g.lineWidth = 2;
-    g.beginPath();
-    for (const [sx, sy] of CORNERS) {
-      const cx = e.x + sx * r, cy = e.y + sy * r;
-      g.moveTo(cx - sx * k, cy); g.lineTo(cx, cy); g.lineTo(cx, cy - sy * k);
-    }
-    g.stroke();
   }
 
   /** Small preview of a map for the map-select card (drawn once into its own canvas). */

@@ -19,6 +19,7 @@ export class InputManager {
     this.sourceAxes = new Map();        // sourceId → {x, y} analog axes (virtual stick)
     this.pressedQueue = new Set();      // edge-triggered presses not yet consumed by a fixed update
     this.pointer = { clientX: 0, clientY: 0, inside: false, world: { x: 0, y: 0 } };
+    this.pointerMapper = null;          // (clientX, clientY, out) → world point; set by the 3D renderer in a map
     this._attached = false;
   }
 
@@ -29,10 +30,11 @@ export class InputManager {
     window.addEventListener('keyup', (e) => this._onKey(e, false));
     window.addEventListener('blur', () => this.releaseAll());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.releaseAll(); });
-    const canvas = this.viewport.canvas;
-    canvas.addEventListener('pointermove', (e) => this._onPointer(e, true));
-    canvas.addEventListener('pointerdown', (e) => this._onPointer(e, true));
-    canvas.addEventListener('pointerleave', (e) => this._onPointer(e, false));
+    for (const canvas of document.querySelectorAll('canvas.game-canvas')) {
+      canvas.addEventListener('pointermove', (e) => this._onPointer(e, true));
+      canvas.addEventListener('pointerdown', (e) => this._onPointer(e, true));
+      canvas.addEventListener('pointerleave', (e) => this._onPointer(e, false));
+    }
   }
 
   _onKey(e, down) {
@@ -99,7 +101,9 @@ export class InputManager {
 
   /** Pointer position in world units (computed on demand, no per-frame work). */
   pointerWorld() {
-    return this.viewport.clientToWorld(this.pointer.clientX, this.pointer.clientY, this.pointer.world);
+    const { clientX, clientY, world } = this.pointer;
+    if (this.pointerMapper) return this.pointerMapper(clientX, clientY, world);
+    return this.viewport.clientToWorld(clientX, clientY, world);
   }
 
   /** Drops edge presses that happened while the simulation was not running (pause, menus). */

@@ -38,7 +38,7 @@ export class MapRun {
     this.weaponStats = getWeapon('pistol');
     this.weapon = new WeaponState(this.weaponStats);
 
-    this.controller = new PlayerController(events);
+    this.controller = new PlayerController(events, { w: map.width, h: map.height });
     this.targeting = new TargetingSystem();
     this.weapons = new WeaponSystem(this.projectiles, this.rng, events);
     this.projectileSystem = new ProjectileSystem(this.projectiles, this.rng, events, (id) => this._statsFor(id));

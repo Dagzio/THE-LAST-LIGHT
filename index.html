@@ -10,13 +10,16 @@
   <link rel="stylesheet" href="styles/game.css">
 </head>
 <body data-screen="splash">
-  <!-- Game world (Canvas 2D). Every screen below is a DOM overlay. -->
-  <canvas id="world"></canvas>
+  <!-- Menu backdrop (Canvas 2D) and the map run (three.js WebGL, top-down 3D). Every screen below is a DOM overlay. -->
+  <canvas id="world" class="game-canvas"></canvas>
+  <canvas id="world3d" class="game-canvas"></canvas>
 
   <!-- ===== Splash → TAP TO PLAY (H5 §1) ===== -->
   <section class="screen active" id="screen-splash">
     <div class="splash-inner">
       <h1 class="logo fade"><span class="logo-the">THE</span><span class="logo-main">LAST LIGHT</span></h1>
+      <div class="load-bar" id="loadBar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i id="loadFill"></i></div>
+      <p class="load-pct" id="loadPct">0%</p>
       <p class="tap-prompt" id="tapPrompt" data-i18n="tap.toPlay"></p>
     </div>
   </section>
@@ -80,6 +83,9 @@
       </button>
     </div>
     <div class="stamp paused-stamp" data-i18n="hud.paused"></div>
+
+    <!-- Off-screen indicators: arrows at the screen edge towards enemies (beacon / kiosk from Phase 3 / 5) -->
+    <div class="offscreen" id="offscreen"></div>
 
     <!-- Bottom-right: weapon block + player plate (Underlords "LOCAL PLAYER" corner) -->
     <div class="hud-player">
@@ -189,6 +195,6 @@
 
   <div id="debugOverlay" hidden></div>
 
-  <script type="module" src="src/main.js"></script>
+  <script type="module" src="src/boot.js"></script>
 </body>
 </html>

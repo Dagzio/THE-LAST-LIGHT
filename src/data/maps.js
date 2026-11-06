@@ -9,7 +9,9 @@ export const MAPS = [
     waveCount: 5,
     finalWaveBoss: true,
     artSeed: 7331, // cosmetic decoration layout of the arena ground
-    playerSpawn: { x: 640, y: 470 },
+    width: 2000,   // world units (3D map, decision 2026-11-06: bigger map, camera follows the player)
+    height: 1300,
+    playerSpawn: { x: 1000, y: 820 },
   },
 ];
 

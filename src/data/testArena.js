@@ -3,9 +3,11 @@
 
 export const TEST_ARENA = {
   dummies: [
-    { enemyId: 'grunt', x: 360, y: 200 },
-    { enemyId: 'grunt', x: 980, y: 260 },
-    { enemyId: 'grunt', x: 820, y: 560 },
+    { enemyId: 'grunt', x: 760, y: 640 },
+    { enemyId: 'grunt', x: 1260, y: 700 },
+    { enemyId: 'grunt', x: 1150, y: 1010 },
+    { enemyId: 'grunt', x: 380, y: 300 },   // far away: off-screen indicator check
+    { enemyId: 'grunt', x: 1720, y: 1120 }, // far away: off-screen indicator check
   ],
   respawnDelay: 2.0, // s of game time after the last dummy dies
 };

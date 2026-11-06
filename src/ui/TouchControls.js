@@ -25,7 +25,7 @@ export class TouchControls {
     if (coarse.matches) markTouch();
     window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') markTouch(); }, true);
 
-    const canvas = game.viewport.canvas;
+    const canvas = document.getElementById('world3d'); // the stick lives on the 3D map canvas
     canvas.addEventListener('pointerdown', (e) => this._stickDown(e));
     window.addEventListener('pointermove', (e) => this._stickMove(e));
     window.addEventListener('pointerup', (e) => this._stickUp(e));

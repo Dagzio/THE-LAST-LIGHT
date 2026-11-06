@@ -29,8 +29,12 @@ export class GameLoop {
     this.frameDt = 0;
     this.updateMs = 0;   // diagnostics: cost of the fixed updates in the last frame
     this.renderMs = 0;   // diagnostics: cost of the last render
+    this.fpsCap = 0;     // >0: skip animation frames faster than this (90–120 Hz phones, H5 3D guide §3)
+    this._lastFrameTs = -Infinity;
     this._frame = (ts) => {
       if (!this.running) return;
+      if (this.fpsCap > 0 && ts - this._lastFrameTs < 1000 / this.fpsCap - 6) { this.rafId = this.raf(this._frame); return; }
+      this._lastFrameTs = ts;
       this.tick(ts);
       this.rafId = this.raf(this._frame);
     };

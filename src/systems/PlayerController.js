@@ -6,9 +6,13 @@ import { WORLD_WIDTH, WORLD_HEIGHT } from '../config/constants.js';
 const move = { x: 0, y: 0 }; // reused
 
 export class PlayerController {
-  /** @param {import('../core/GameEvents.js').GameEvents} events */
-  constructor(events) {
+  /**
+   * @param {import('../core/GameEvents.js').GameEvents} events
+   * @param {{w:number,h:number}} bounds playable map size in world units
+   */
+  constructor(events, bounds = { w: WORLD_WIDTH, h: WORLD_HEIGHT }) {
     this.events = events;
+    this.bounds = bounds;
     // Permanent (Phase 5) and temporary (Phase 6) speed multipliers.
     this.speedMult = 1;
     this.dodgeCooldownMult = 1;
@@ -42,8 +46,8 @@ export class PlayerController {
     }
 
     const r = player.radius;
-    player.x = clamp(player.x + player.vx * dt, r, WORLD_WIDTH - r);
-    player.y = clamp(player.y + player.vy * dt, r, WORLD_HEIGHT - r);
+    player.x = clamp(player.x + player.vx * dt, r, this.bounds.w - r);
+    player.y = clamp(player.y + player.vy * dt, r, this.bounds.h - r);
   }
 
   _tryDodge(player, input, moving, time) {

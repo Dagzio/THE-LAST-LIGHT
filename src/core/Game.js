@@ -1,5 +1,6 @@
-// Game: owns the runtime (state machine, clock, loop, viewport, input, renderer) and exposes
-// domain commands for the UI. The UI never changes state directly — it calls these commands.
+// Game: owns the runtime (state machine, clock, loop, input, renderers) and exposes domain commands for the UI.
+// The UI never changes state directly — it calls these commands.
+// Rendering: menus use the 2D canvas backdrop (#world); a map run is drawn in top-down 3D by three.js (#world3d).
 import { GameStateMachine, STATES } from './GameStateMachine.js';
 import { GameClock } from './GameClock.js';
 import { GameLoop } from './GameLoop.js';
@@ -8,6 +9,7 @@ import { InputManager } from '../platform/InputManager.js';
 import { Storage } from '../platform/StorageService.js';
 import { Prefs } from '../platform/Prefs.js';
 import { Renderer } from '../render/Renderer.js';
+import { Renderer3D } from '../render3d/Renderer3D.js';
 import { GameEvents } from './GameEvents.js';
 import { MapRun } from './MapRun.js';
 import { createRunSeed } from './SeededRandom.js';
@@ -15,30 +17,38 @@ import { QUALITY_LEVELS, QUALITY_PRESETS, resolveAutoQuality } from '../config/s
 import { getMap, MAPS } from '../data/maps.js';
 
 export class Game {
-  /** @param {HTMLCanvasElement} canvas */
-  constructor(canvas) {
+  /** @param {HTMLCanvasElement} canvas2d menu backdrop @param {HTMLCanvasElement} canvas3d map run */
+  constructor(canvas2d, canvas3d) {
     this.sm = new GameStateMachine(STATES.BOOT);
     this.clock = new GameClock();
     const savedQuality = Prefs.getQuality() || 'auto';
     this.qualitySetting = savedQuality === 'auto' || QUALITY_LEVELS.includes(savedQuality) ? savedQuality : 'auto';
     this.quality = this._resolveQuality();
-    this.viewport = new Viewport(canvas, () => QUALITY_PRESETS[this.quality].dprCap);
+    this.viewport = new Viewport(canvas2d, () => QUALITY_PRESETS[this.quality].dprCap);
     this.input = new InputManager(this.viewport);
-    this.renderer = new Renderer(canvas, this.viewport);
+    this.renderer = new Renderer(canvas2d, this.viewport);
+    this.renderer3d = null;
+    try {
+      this.renderer3d = new Renderer3D(canvas3d, this.quality);
+    } catch (e) {
+      console.error('WebGL renderer could not be created', e); // the menus keep working; a map cannot start
+    }
     this.loop = new GameLoop({ update: (dt) => this.update(dt), render: (a, fdt) => this.render(a, fdt) });
+    this.loop.fpsCap = QUALITY_PRESETS[this.quality].fpsCap;
 
     this.presentationTime = 0;   // real time for menu decoration only (not simulation)
     this.selectedMapId = MAPS[0].id;
     this.mapId = null;
     this.events = new GameEvents();  // presentation hooks: sound, particles, HUD
     this.run = null;                 // MapRun of the current map attempt
-    this._view = { scene: 'backdrop', realTime: 0, simTime: 0, quality: this.quality, mapSeed: 0, run: null };
+    this._view = { scene: 'backdrop', realTime: 0, simTime: 0, quality: this.quality };
     this.frameListeners = new Set();
 
     this.sm.onChange((next) => {
       // Edge presses made while the world was frozen must not fire on resume.
       if (next === STATES.RUNNING) this.input.clearPressed();
       if (next === STATES.PAUSED) this.input.releaseAll();
+      if (this.renderer3d) this.renderer3d.pausedDrawn = false; // redraw once with the new overlay state
     });
   }
 
@@ -49,9 +59,13 @@ export class Game {
     this.loop.start();
   }
 
+  get canPlay() { return !!this.renderer3d; }
+
   // ---------------- simulation ----------------
   update(dt) {
     if (!this.sm.simulating) return;
+    // Shaders still compiling or the WebGL context is lost: the game waits (H5 3D guide §5.3).
+    if (this.renderer3d && this.renderer3d.busy()) return;
     this.clock.advance(dt);
     if (this.run) this.run.update(this.input, dt, this.clock.time);
   }
@@ -59,15 +73,16 @@ export class Game {
   // ---------------- presentation (reads state only) ----------------
   render(alpha, frameDt) {
     this.presentationTime += frameDt;
-    this.viewport.ensure();
-    const v = this._view;
-    v.scene = this.sm.inMap ? 'arena' : 'backdrop';
-    v.realTime = this.presentationTime;
-    v.simTime = this.clock.time;
-    v.quality = this.quality;
-    v.mapSeed = this.mapId ? getMap(this.mapId).artSeed : 0;
-    v.run = this.sm.inMap ? this.run : null;
-    this.renderer.render(v);
+    if (this.sm.inMap && this.run && this.renderer3d) {
+      this.renderer3d.render(this.run, frameDt, this.clock.time, this.sm.is(STATES.PAUSED));
+    } else {
+      this.viewport.ensure();
+      const v = this._view;
+      v.realTime = this.presentationTime;
+      v.simTime = this.clock.time;
+      v.quality = this.quality;
+      this.renderer.render(v);
+    }
     for (const fn of this.frameListeners) fn(frameDt);
   }
 
@@ -76,14 +91,17 @@ export class Game {
   // ---------------- quality ----------------
   _resolveQuality() { return this.qualitySetting === 'auto' ? resolveAutoQuality() : this.qualitySetting; }
 
-  /** @param {'auto'|'low'|'medium'|'high'} setting */
+  /** @param {'auto'|'low'|'medium'|'high'} setting — applied live, the run continues */
   setQuality(setting) {
     if (setting !== 'auto' && !QUALITY_LEVELS.includes(setting)) return;
     this.qualitySetting = setting;
+    const prev = this.quality;
     this.quality = this._resolveQuality();
     Prefs.setQuality(setting);
     this.viewport.invalidate();
+    this.loop.fpsCap = QUALITY_PRESETS[this.quality].fpsCap;
     if (this.run) this.run.particles.setQualityFactor(QUALITY_PRESETS[this.quality].particles);
+    if (this.renderer3d && prev !== this.quality) this.renderer3d.applyQuality(this.quality);
   }
 
   // ---------------- commands (called by UI) ----------------
@@ -99,12 +117,15 @@ export class Game {
 
   /** Starts the selected map with a fresh MapRun. Guarded against double start. */
   beginMap() {
-    if (!this.sm.is(STATES.MAP_SELECT) || !getMap(this.selectedMapId)) return false;
-    this.mapId = this.selectedMapId;
+    const map = getMap(this.selectedMapId);
+    if (!this.sm.is(STATES.MAP_SELECT) || !map || !this.renderer3d) return false;
+    this.mapId = map.id;
     this.clock.reset();
     this._disposeRun();
-    this.run = new MapRun(getMap(this.mapId), createRunSeed(), this.events);
+    this.run = new MapRun(map, createRunSeed(), this.events);
     this.run.particles.setQualityFactor(QUALITY_PRESETS[this.quality].particles);
+    this.renderer3d.loadMap(map, this.run.player.x, this.run.player.y); // warm-up: no step until shaders are ready
+    this.input.pointerMapper = (cx, cy, out) => this.renderer3d.screenToGround(cx, cy, out);
     this.input.releaseAll();
     this.loop.resetTiming();
     return this.sm.set(STATES.RUNNING);
@@ -119,7 +140,10 @@ export class Game {
     if (!this.sm.inMap) return false;
     this.mapId = null;
     this._disposeRun();
+    if (this.renderer3d) this.renderer3d.unloadMap();
+    this.input.pointerMapper = null;
     this.clock.reset();
+    this.viewport.invalidate();
     return this.sm.set(STATES.MAIN_MENU);
   }
 
