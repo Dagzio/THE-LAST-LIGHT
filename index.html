@@ -122,6 +122,12 @@
 
     <!-- Bottom-right: weapon block + player plate (Underlords "LOCAL PLAYER" corner) -->
     <div class="hud-player">
+      <!-- Emergency Flare (desktop): charge ring, Q or click; the touch version is a neon button above DASH -->
+      <button class="flare-hud" data-action="flare" data-nosfx data-i18n-aria="aria.flare">
+        <svg class="flare-ring" viewBox="0 0 48 48"><circle class="flare-track" cx="24" cy="24" r="21"/><circle class="flare-fill" cx="24" cy="24" r="21" pathLength="100"/></svg>
+        <svg class="ico flare-ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.6" class="fill"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2M5.3 5.3l2.2 2.2M16.5 16.5l2.2 2.2M5.3 18.7l2.2-2.2M16.5 7.5l2.2-2.2"/></svg>
+        <span class="flare-key">Q</span>
+      </button>
       <div class="hud-weapon" id="hudWeapon">
         <svg class="hud-gun" viewBox="0 0 48 24"><path d="M4 7h30l2-3h6v6h-4l-2 2H24l-2 9h-7l2-9H4z"/></svg>
         <span class="hud-weapon-name" id="hudWeaponName"></span>
@@ -145,9 +151,15 @@
         <button class="neon-btn neon-small" data-touch-action="reload" data-nosfx data-i18n-aria="aria.reload">
           <svg class="ico" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M19 3.5V8h-4.5"/><path d="M11 9h2v6h-2z" class="fill"/></svg>
         </button>
-        <button class="neon-btn" data-touch-action="dash" data-nosfx data-i18n-aria="aria.dash">
-          <svg class="ico" viewBox="0 0 24 24"><path d="M5 5l7 7-7 7"/><path d="M12 5l7 7-7 7"/></svg>
-        </button>
+        <div class="touch-col">
+          <button class="neon-btn neon-small flare-neon" data-touch-action="flare" data-nosfx data-i18n-aria="aria.flare">
+            <svg class="flare-ring" viewBox="0 0 48 48"><circle class="flare-track" cx="24" cy="24" r="21"/><circle class="flare-fill" cx="24" cy="24" r="21" pathLength="100"/></svg>
+            <svg class="ico flare-ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.6" class="fill"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2M5.3 5.3l2.2 2.2M16.5 16.5l2.2 2.2M5.3 18.7l2.2-2.2M16.5 7.5l2.2-2.2"/></svg>
+          </button>
+          <button class="neon-btn" data-touch-action="dash" data-nosfx data-i18n-aria="aria.dash">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M5 5l7 7-7 7"/><path d="M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   </section>

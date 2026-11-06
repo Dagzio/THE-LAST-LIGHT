@@ -100,6 +100,7 @@ const ROWS = [
   ['hud.keeper', 'KEEPER', 'ДОГЛЯДАЧ', 'СМОТРИТЕЛЬ', 'WÄRTER', 'GUARDIANO', 'GARDIEN', 'GUARDIÁN', 'GUARDIÃO', 'الحارس', '灯台守'],
   ['hud.reloading', 'RELOADING', 'ПЕРЕЗАРЯДЖАННЯ', 'ПЕРЕЗАРЯДКА', 'NACHLADEN', 'RICARICA', 'RECHARGEMENT', 'RECARGANDO', 'RECARREGANDO', 'إعادة التلقيم', 'リロード中'],
   ['aria.dash', 'Dash', 'Ривок', 'Рывок', 'Ausweichen', 'Scatto', 'Esquive', 'Esquivar', 'Esquiva', 'اندفاع', 'ダッシュ'],
+  ['aria.flare', 'Emergency flare', 'Аварійна ракета', 'Аварийная вспышка', 'Notfackel', 'Razzo di emergenza', 'Fusée de détresse', 'Bengala de emergencia', 'Sinalizador de emergência', 'شعلة الطوارئ', '緊急フレア'],
   ['aria.reload', 'Reload', 'Перезарядити', 'Перезарядить', 'Nachladen', 'Ricarica', 'Recharger', 'Recargar', 'Recarregar', 'إعادة التلقيم', 'リロード'],
 
   ['weapon.pistol', 'SERVICE PISTOL', 'СЛУЖБОВИЙ ПІСТОЛЕТ', 'СЛУЖЕБНЫЙ ПИСТОЛЕТ', 'DIENSTPISTOLE', "PISTOLA D'ORDINANZA", 'PISTOLET DE SERVICE', 'PISTOLA REGLAMENTARIA', 'PISTOLA DE SERVIÇO', 'مسدس الخدمة', '制式拳銃'],

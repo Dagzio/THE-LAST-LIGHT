@@ -36,7 +36,8 @@ export class LightSystem {
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
       if (!e.alive) { e.illuminated = false; continue; }
-      if (inBeam(beacon.x, beacon.y, e.x, e.y, this.angle, half, range)) e.illuminatedUntil = time + linger;
+      // max(): a longer Illuminated from the Emergency Flare is never shortened by the beam
+      if (inBeam(beacon.x, beacon.y, e.x, e.y, this.angle, half, range)) e.illuminatedUntil = Math.max(e.illuminatedUntil, time + linger);
       e.illuminated = time < e.illuminatedUntil;
     }
   }

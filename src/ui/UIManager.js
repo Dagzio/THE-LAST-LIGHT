@@ -173,6 +173,7 @@ export class UIManager {
       case 'retryMap': this.game.retryMap(); break;
       case 'resultMenu': this.game.exitToMenu(); break; // the map is already over: nothing to lose, no confirmation
       case 'startNextWave': this.game.startNextWave(); break;
+      case 'flare': this.game.useFlare(); break;
       default: break;
     }
   }

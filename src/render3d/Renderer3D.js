@@ -15,6 +15,7 @@ import {
 } from './models.js';
 import { BEACON } from '../data/beacon.js';
 import { GLOAM_WARDEN } from '../data/boss.js';
+import { FLARE } from '../data/balance.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { CAMERA } from '../config/camera.js';
 import { QUALITY_PRESETS, antialiasFor } from '../config/settings.js';
@@ -154,6 +155,9 @@ export class Renderer3D {
       tideWave: tele(telegraphRingGeometry(0.8), m.telegraphFill, 3),
       impact: tele(telegraphRingGeometry(0.72), m.impact, 5),
     };
+    // Emergency Flare pulse: a warm light ring rolling out from the beacon over the arena
+    this.flareRing = tele(telegraphRingGeometry(0.93), m.impact, 5);
+    this.flareRing.material.color.set(0xffd890);
 
     // Bullets (instanced), muzzle flash, aim reticle, HP bars, reload arc, blob shadows, particles.
     this.bullets = new THREE.InstancedMesh(bulletGeometry(), m.bullet, MAX_BULLETS);
@@ -362,7 +366,8 @@ export class Renderer3D {
         scale = 1 - f * 0.6;
         sink = -f * 14;
       }
-      const face = e.faceAngle;
+      const stunned = e.alive && e.isStunned(time);
+      const face = e.faceAngle + (stunned ? Math.sin(time * 22 + e.id) * 0.35 : 0); // flare stun: dazed wobble
       Q.setFromAxisAngle(UP, -face);
       S.setScalar(scale);
       const reach = e.radius * 0.4;
@@ -579,7 +584,17 @@ export class Renderer3D {
       const k = Math.max(0, 1 - (time - b.lastHitAt) / 0.3);
       this.lanternMat.color.copy(LANTERN_OK).lerp(LANTERN_HIT, k);
       this.beaconLight.visible = true;
-      this.beaconLight.intensity = 2200 * (0.9 + 0.1 * Math.sin(time * 2.7));
+      const sinceFlare = time - run.flare.lastUsedAt;
+      const flash = sinceFlare >= 0 && sinceFlare < 0.5 ? 1 + 2.5 * (1 - sinceFlare / 0.5) : 1;
+      this.beaconLight.intensity = 2200 * (0.9 + 0.1 * Math.sin(time * 2.7)) * flash;
+    }
+
+    // Emergency Flare pulse ring
+    const fk = (time - run.flare.lastUsedAt) / FLARE.pulseFx;
+    this.flareRing.visible = false;
+    if (fk >= 0 && fk < 1) {
+      // linear growth: the wave stays readable while it crosses the screen
+      this._flat(this.flareRing, b.x, b.y, Math.max(1, FLARE.pulseRadius * fk), 2, 0.9 * (1 - fk * 0.7));
     }
 
     // Pads & devices

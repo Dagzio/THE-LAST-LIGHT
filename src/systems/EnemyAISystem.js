@@ -5,6 +5,7 @@
 // ATTACK_PLAYER — only types with `chase` (Runner, D17): a close keeper pulls it off its path for a short time;
 // contact damage (D17) — any enemy touching the keeper hurts him; the keeper's hit invulnerability limits the rate.
 // A light separation pass keeps bodies from stacking on one spot (no physics engine).
+// Emergency Flare (D38): a stunned enemy stands still, does not attack and deals no contact damage.
 import { ENEMY_STATES } from '../entities/Enemy.js';
 import { BEACON } from '../data/beacon.js';
 
@@ -30,6 +31,13 @@ export class EnemyAISystem {
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
       if (!e.alive) { e.attackingBeacon = false; continue; }
+      // Emergency Flare: knockback slide, then stun (no movement, no attacks)
+      if (time < e.pushUntil) {
+        const k = Math.min(dt, e.pushUntil - time);
+        e.x += e.pushVX * k;
+        e.y += e.pushVY * k;
+      }
+      if (e.isStunned(time)) { e.attackingBeacon = false; continue; }
       const t = e.type;
       const dx = beacon.x - e.x, dy = beacon.y - e.y;
       const dist = Math.hypot(dx, dy);
@@ -132,7 +140,7 @@ export class EnemyAISystem {
     if (!player.alive || player.isInvulnerable(time)) return;
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
-      if (!e.alive || !(e.type.contactDamage > 0)) continue;
+      if (!e.alive || !(e.type.contactDamage > 0) || e.isStunned(time)) continue;
       const r = e.radius + player.radius + CONTACT_PAD;
       const dx = player.x - e.x, dy = player.y - e.y;
       if (dx * dx + dy * dy > r * r) continue;

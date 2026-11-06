@@ -1,7 +1,7 @@
 // Runtime of one map attempt: entities + systems, created fresh on every map start / retry.
 // Holds only temporary data (MapRunState side); the permanent PlayerProfile arrives in Phase 5 — until then kill and
 // wave rewards are accumulated here (`rewards`) exactly once each and are not yet spent or saved.
-// Update order: player → weapon → light → enemy AI (beacon attacks, contact) → boss attacks → defenses →
+// Update order: player → weapon → flare → light → enemy AI (beacon attacks, contact) → boss attacks → defenses →
 // projectiles → defeat checks → waves (spawns / clear / victory) → cleanup → particles.
 // The result (defeat or victory) is decided exactly once; the world stops after it.
 import { Player } from '../entities/Player.js';
@@ -16,6 +16,7 @@ import { EnemyAISystem } from '../systems/EnemyAISystem.js';
 import { BossSystem } from '../systems/BossSystem.js';
 import { DefenseSystem } from '../systems/DefenseSystem.js';
 import { WaveSystem, WAVE_PHASE } from '../systems/WaveSystem.js';
+import { FlareSystem } from '../systems/FlareSystem.js';
 import { SeededRandom } from './SeededRandom.js';
 import { Particles } from '../render/Particles.js';
 import { getWeapon } from '../data/weapons.js';
@@ -61,6 +62,7 @@ export class MapRun {
     this.ai = new EnemyAISystem(events);
     this.bossSystem = new BossSystem(events);
     this.defenses = new DefenseSystem(map.buildPads, this.projectiles, this.rng, events);
+    this.flare = new FlareSystem(events); // charge is temporary: a new run starts at 0
     this.waves = new WaveSystem(getWaves(map.id) || [], map.spawnPoints, this.rng, events,
       (id, x, y, time) => this._spawnEnemy(id, x, y, time));
 
@@ -122,6 +124,7 @@ export class MapRun {
     this.stats.kills += 1;
     const r = e.type.reward;
     if (r) { this.rewards.coins += r.coins | 0; this.rewards.xp += r.xp | 0; }
+    this.flare.addKill(e);
     this.particles.burst(e.x, e.y, e.type.boss ? 40 : 16, e.type.boss ? 320 : 190, 0.5, 3, '#7a2333');
   }
 
@@ -139,12 +142,19 @@ export class MapRun {
     return this.waves.startNextWave(time);
   }
 
+  /** Emergency Flare (Q / flare button): only during an active wave at full charge; ignored otherwise. */
+  useFlare(time) {
+    if (this.over) return false;
+    return this.flare.activate(this.enemies, this.beacon, time, this.waves.phase === WAVE_PHASE.ACTIVE);
+  }
+
   /** @param {import('../platform/InputManager.js').InputManager} input */
   update(input, dt, time) {
     if (this.over) return; // the world stops on defeat / victory
     const p = this.player;
     this.controller.update(p, input, dt, time);
     this.weapons.update(this.weapon, p, input.isDown('fire'), input.consumePressed('reload'), time);
+    if (input.consumePressed('flare')) this.useFlare(time);
     this.light.update(this.beacon, this.enemies, time);
     if (this.ai.update(this.enemies, this.beacon, dt, time, p)) this._setDefeat('beacon');
     if (this.bossSystem.update(p, this.beacon, time)) this._setDefeat('beacon');

@@ -32,6 +32,8 @@ function wireCombatSounds(events) {
   events.on('frostPulse', () => Sfx.play('frostPulse'));
   events.on('mapDefeat', () => Sfx.play('defeat'));
   events.on('mapVictory', () => Sfx.play('victory'));
+  events.on('flare', () => Sfx.play('flare'));
+  events.on('flareReady', () => Sfx.play('flareReady'));
   events.on('waveStart', () => Sfx.play('waveStart'));
   events.on('waveCleared', (i, reward, final) => { if (!final) Sfx.play('waveClear'); });
   events.on('playerHit', () => Sfx.play('playerHurt', 0.95 + Math.random() * 0.1));

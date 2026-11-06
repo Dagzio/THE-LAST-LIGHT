@@ -44,7 +44,14 @@ export class Enemy {
     this.chaseReadyAt = 0;
     // Boss: true while an attack is telegraphed (the boss stands still)
     this.casting = false;
+    // Emergency Flare: stun (no movement, no attacks, no contact damage) + short knockback
+    this.stunUntil = 0;
+    this.pushVX = 0;
+    this.pushVY = 0;
+    this.pushUntil = 0;
   }
+
+  isStunned(time) { return time < this.stunUntil; }
 
   /** Current speed multiplier from slows (1 = no slow). */
   slowFactor(time) {

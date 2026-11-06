@@ -1,5 +1,5 @@
 // In-game HUD (Underlords layout, PROJECT_AUDIT.md §6.4): top centre — beacon Integrity, wave header (number +
-// countdown / enemies left), boss bar; bottom-right — weapon block + player plate; bottom centre — START NEXT WAVE
+// countdown / enemies left), boss bar; bottom-right — flare charge ring + weapon block + player plate; bottom centre — START NEXT WAVE
 // (intermission only); wave banners. DOM is written only when a value changes. Reads state only; the button calls
 // the Game command through UIManager.
 import { T, onLanguageChange } from '../i18n/i18n.js';
@@ -35,6 +35,7 @@ export class HUD {
       bossFill: $('hudBossFill'),
       nextWave: [...document.querySelectorAll('.next-wave-btn')], // desktop (bottom) + touch (top) variants
       banner: $('waveBanner'),
+      screen: $('screen-game'),   // carries --flare (0–100) and .flare-full / .flare-ready for both flare buttons
       bannerText: $('waveBannerText'),
     };
     this.cache = {};
@@ -56,7 +57,7 @@ export class HUD {
   _resetCache() {
     this.cache = {
       hp: -1, maxHp: -1, ammo: -1, mag: -1, weaponId: '', reloading: null, reloadPct: -1, integrity: -1, hit: null, low: null,
-      waveLabel: '', waveSub: '', nextWave: null, bossOn: null, bossPct: -1,
+      waveLabel: '', waveSub: '', nextWave: null, bossOn: null, bossPct: -1, flarePct: -1, flareFull: null, flareReady: null,
     };
   }
 
@@ -130,6 +131,14 @@ export class HUD {
 
     const showNext = phase === WAVE_PHASE.INTERMISSION && !run.over;
     if (showNext !== c.nextWave) { c.nextWave = showNext; for (const b of el.nextWave) b.classList.toggle('on', showNext); }
+
+    // Emergency Flare charge ring
+    const fl = run.flare;
+    const flarePct = Math.round(fl.fraction * 100);
+    if (flarePct !== c.flarePct) { c.flarePct = flarePct; el.screen.style.setProperty('--flare', String(flarePct)); }
+    if (fl.ready !== c.flareFull) { c.flareFull = fl.ready; el.screen.classList.toggle('flare-full', fl.ready); }
+    const flareReady = fl.ready && phase === WAVE_PHASE.ACTIVE && !run.over;
+    if (flareReady !== c.flareReady) { c.flareReady = flareReady; el.screen.classList.toggle('flare-ready', flareReady); }
 
     // Boss bar
     if (bossOn !== c.bossOn) { c.bossOn = bossOn; el.boss.hidden = !bossOn; }

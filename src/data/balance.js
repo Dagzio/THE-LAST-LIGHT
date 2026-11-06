@@ -28,6 +28,20 @@ export const CAPS = {
   particles: 220,              // decorative; scaled by the quality preset
 };
 
+// Emergency Flare (01_GDD §9.3, approved before Phase 4b — PROJECT_AUDIT.md D38). No direct damage.
+export const FLARE = {
+  maxCharge: 100,
+  chargePerKill: { grunt: 5, runner: 5, brute: 12, gloam_warden: 0 }, // ≈ 3 uses per map
+  illuminate: 4.0,          // s of Illuminated for regular enemies (same +15% bonus, no stacking)
+  bossIlluminate: 2.0,      // s for the boss; its telegraphs / attacks are never interrupted
+  stun: 1.2,                // s regular enemies stand still and do not attack (beacon attack timer restarts)
+  knockbackRadius: 220,     // enemies this close to the beacon are thrown outwards…
+  knockbackDistance: 80,    // …by this many world units…
+  knockbackTime: 0.25,      // …over this time
+  pulseFx: 1.0,             // s of the expanding light ring (presentation)
+  pulseRadius: 1100,        // world units the ring reaches (covers the arena from the beacon)
+};
+
 export const ENEMY_FX = {
   deathFade: 0.45,             // s — dead body fades out, then the entity is removed
   hitFlash: 0.08,              // s

@@ -1,6 +1,6 @@
 // Keyboard bindings → abstract actions (02_SPEC §3). Game code reads actions, never keys.
 // No pause/close key: the H5 standard forbids keyboard pause (PROJECT_AUDIT.md C1).
-// 'flare' is reserved for Phase 4b (Emergency Flare).
+// 'flare' — Emergency Flare (Phase 4b, D38).
 
 export const KEY_BINDINGS = {
   moveUp: ['KeyW', 'ArrowUp'],

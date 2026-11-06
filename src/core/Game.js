@@ -132,6 +132,12 @@ export class Game {
     return this._startRun(map);
   }
 
+  /** Emergency Flare from the HUD button (desktop click); keyboard Q / touch go through the input actions. */
+  useFlare() {
+    if (!this.sm.is(STATES.RUNNING) || !this.run) return false;
+    return this.run.useFlare(this.clock.time);
+  }
+
   /** START NEXT WAVE (HUD): only while the map runs; the run ignores it outside the intro / intermission. */
   startNextWave() {
     if (!this.sm.is(STATES.RUNNING) || !this.run) return false;

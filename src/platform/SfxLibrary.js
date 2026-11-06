@@ -124,6 +124,24 @@ const RECIPES = {
     for (const [f, d] of notes) { const u = t - d; if (u > 0) s += Math.sin(2 * Math.PI * f * u) * Math.exp(-u * 1.8) * Math.min(1, u * 40); }
     return s * 0.11;
   }),
+  // Emergency Flare: bright rising whoosh + high bell.
+  flare: () => {
+    let lp = 0;
+    return render(1.2, (t) => {
+      lp += (noise() - lp) * 0.25;
+      const whoosh = lp * Math.sin(Math.PI * Math.min(1, t / 0.6)) * 0.35 * (t < 0.6 ? 1 : 0);
+      const bell = (Math.sin(2 * Math.PI * 880 * t) + 0.5 * Math.sin(2 * Math.PI * 1320 * t)) * Math.exp(-t * 3) * 0.14;
+      const boom = Math.sin(2 * Math.PI * (90 - 40 * t) * t) * Math.exp(-t * 6) * 0.3;
+      return whoosh + bell + boom;
+    });
+  },
+  // Flare charged: short soft double chime.
+  flareReady: () => render(0.5, (t) => {
+    const a = Math.sin(2 * Math.PI * 988 * t) * Math.exp(-t * 9);
+    const t2 = t - 0.09;
+    const b = t2 > 0 ? Math.sin(2 * Math.PI * 1319 * t2) * Math.exp(-t2 * 9) : 0;
+    return (a + b) * 0.13;
+  }),
   // Popup open: soft paper/cloth whoosh.
   open: () => {
     let lp = 0;

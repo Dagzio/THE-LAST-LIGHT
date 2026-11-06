@@ -167,6 +167,57 @@ body.paused .touch-controls { opacity: 0.35; }
 }
 .neon-btn.neon-small { width: var(--neon-small); height: var(--neon-small); margin-bottom: calc(var(--neon) * 0.6); }
 .neon-btn.pressed { transform: scale(0.94); filter: brightness(1.25); }
+.touch-col { display: flex; flex-direction: column; align-items: center; gap: var(--gap); }
+
+/* ===================== Emergency Flare: charge ring (desktop HUD + touch neon button) ===================== */
+/* --flare (0–100) is set on #screen-game by the HUD; .flare-full = charged; .flare-ready = charged and usable now */
+.flare-hud {
+  position: relative;
+  width: calc(58px * var(--fs));
+  height: calc(58px * var(--fs));
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffe2a8;
+  background: radial-gradient(circle at 50% 40%, rgba(60, 46, 20, 0.85), rgba(14, 12, 10, 0.85));
+}
+body.touch .flare-hud { display: none; }
+.flare-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); pointer-events: none; }
+.flare-track { fill: none; stroke: rgba(0, 0, 0, 0.55); stroke-width: 4; }
+.flare-fill {
+  fill: none;
+  stroke: #d9862b;
+  stroke-width: 4;
+  stroke-linecap: butt; /* round caps would draw a dot at 0% */
+  stroke-dasharray: 100;
+  stroke-dashoffset: calc(100 - var(--flare, 0));
+  transition: stroke-dashoffset 0.2s;
+}
+.flare-ico { width: 52%; height: 52%; opacity: 0.55; }
+.flare-key {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 18px;
+  padding: 0 4px;
+  font: 800 12px/18px var(--font-display);
+  color: #1a1206;
+  background: #ffd27a;
+  border-radius: 4px;
+}
+.flare-neon { position: relative; }
+.flare-neon .flare-ring { inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px); }
+#screen-game.flare-full .flare-fill { stroke: #ffd27a; }
+#screen-game.flare-full .flare-ico { opacity: 1; }
+#screen-game.flare-ready .flare-hud,
+#screen-game.flare-ready .flare-neon { animation: flareGlow 0.9s ease-in-out infinite alternate; }
+@keyframes flareGlow { from { box-shadow: 0 0 6px rgba(255, 200, 110, 0.4); } to { box-shadow: 0 0 22px rgba(255, 210, 120, 0.95); } }
+body.paused #screen-game.flare-ready .flare-hud,
+body.paused #screen-game.flare-ready .flare-neon { animation-play-state: paused; }
 
 /* ===================== 3D canvas switching ===================== */
 #world3d { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: none; z-index: 0; touch-action: none; }
