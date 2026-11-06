@@ -4,6 +4,10 @@
 // the Game command through UIManager.
 import { T, onLanguageChange } from '../i18n/i18n.js';
 import { WAVE_PHASE } from '../systems/WaveSystem.js';
+import { levelProgress } from '../data/progression.js';
+import { STATES } from '../core/GameStateMachine.js';
+
+const KIOSK_LABEL_HEIGHT = 74; // world height above the kiosk where its label sits
 
 const BANNER_CLASS = 'show';
 
@@ -37,7 +41,21 @@ export class HUD {
       banner: $('waveBanner'),
       screen: $('screen-game'),   // carries --flare (0–100) and .flare-full / .flare-ready for both flare buttons
       bannerText: $('waveBannerText'),
+      shop: $('hudShop'),
+      coins: $('hudCoins'),
+      lv: $('hudLv'),
+      xpFill: $('hudXpFill'),
+      kiosk: $('kioskPrompt'),
     };
+    this.pt = { x: 0, y: 0 };
+    // Bottom edge of the top HUD block, measured only when it can change (layout reads stay rare).
+    this.hudTopDirty = true;
+    this.hudTopBottom = 0;
+    this.labelH = 24;
+    const dirty = () => { this.hudTopDirty = true; };
+    window.addEventListener('resize', dirty);
+    onLanguageChange(dirty);
+    game.sm.onChange(dirty);
     this.cache = {};
     this._resetCache();
     this.banner = null; // { key, params } of the banner on screen (re-translated on language change)
@@ -49,6 +67,7 @@ export class HUD {
       this._showBanner(boss ? 'banner.finalWave' : 'banner.wave', { n: index + 1 });
     });
     game.events.on('waveCleared', (index, reward, final) => { if (!final) this._showBanner('banner.waveCleared', null); });
+    game.events.on('levelUp', (level) => { if (game.sm.inMap) this._showBanner('banner.levelUp', { n: level }); });
     game.sm.onChange(() => { if (!game.sm.inMap) this._hideBanner(); });
     this.el.banner.addEventListener('animationend', () => this._hideBanner());
     game.onFrame(() => this.update());
@@ -58,7 +77,37 @@ export class HUD {
     this.cache = {
       hp: -1, maxHp: -1, ammo: -1, mag: -1, weaponId: '', reloading: null, reloadPct: -1, integrity: -1, hit: null, low: null,
       waveLabel: '', waveSub: '', nextWave: null, bossOn: null, bossPct: -1, flarePct: -1, flareFull: null, flareReady: null,
+      coins: -1, lv: '', xpPct: -1, canShop: null, kioskOn: null, kioskNear: null, kx: -1, ky: -1,
     };
+  }
+
+  /** "E · SHOP" above the kiosk while shopping is possible this phase; highlighted when the keeper is in reach. */
+  _kioskLabel(run, running) {
+    const c = this.cache, el = this.el.kiosk, r3 = this.game.renderer3d;
+    let on = running && run.betweenWaves && !!r3;
+    let below = false;
+    if (on) {
+      const W = r3.canvas.clientWidth, H = r3.canvas.clientHeight;
+      r3.projectToScreen(run.kiosk.x, run.kiosk.y, KIOSK_LABEL_HEIGHT, this.pt);
+      // Under the wave header (beacon bar / timer / START button)? → put the label under the kiosk instead.
+      if (this.hudTopDirty) {
+        const top = document.querySelector('#screen-game .hud-top');
+        this.hudTopBottom = top ? top.getBoundingClientRect().bottom : 0;
+        this.labelH = el.offsetHeight || 24;
+        this.hudTopDirty = false;
+      }
+      if (this.pt.y - this.labelH < this.hudTopBottom + 6) { r3.projectToScreen(run.kiosk.x, run.kiosk.y, 0, this.pt); below = true; }
+      on = this.pt.x > 0 && this.pt.x < W && this.pt.y > 0 && this.pt.y < H;
+    }
+    if (on !== c.kioskOn) { c.kioskOn = on; el.classList.toggle('on', on); }
+    if (!on) return;
+    const near = run.playerAtKiosk;
+    if (near !== c.kioskNear) { c.kioskNear = near; el.classList.toggle('near', near); }
+    const x = Math.round(this.pt.x), y = Math.round(this.pt.y);
+    if (x !== c.kx || y !== c.ky || below !== c.kBelow) {
+      c.kx = x; c.ky = y; c.kBelow = below;
+      el.style.transform = `translate(${x}px, ${y}px) translate(-50%, ${below ? '30%' : '-100%'})`;
+    }
   }
 
   _showBanner(key, params) {
@@ -129,8 +178,23 @@ export class HUD {
     else if (phase === WAVE_PHASE.ACTIVE && !bossOn) sub = T('hud.enemiesLeft', { n: ws.remaining(run.enemies) });
     if (sub !== c.waveSub) { c.waveSub = sub; el.waveSub.textContent = sub; el.waveSub.hidden = !sub; }
 
-    const showNext = phase === WAVE_PHASE.INTERMISSION && !run.over;
-    if (showNext !== c.nextWave) { c.nextWave = showNext; for (const b of el.nextWave) b.classList.toggle('on', showNext); }
+    const showNext = (phase === WAVE_PHASE.INTERMISSION || phase === WAVE_PHASE.INTRO) && !run.over; // prep too (D39)
+    if (showNext !== c.nextWave) { c.nextWave = showNext; for (const b of el.nextWave) b.classList.toggle('on', showNext); this.hudTopDirty = true; }
+
+    // Profile: coins badge, Player Level + XP bar
+    const prof = this.game.economy.profile;
+    if (prof.coins !== c.coins) { c.coins = prof.coins; el.coins.textContent = String(prof.coins); }
+    const lp = levelProgress(prof.totalXp);
+    const lv = T('hud.level', { n: lp.level });
+    if (lv !== c.lv) { c.lv = lv; el.lv.textContent = lv; }
+    const xpPct = Math.round((lp.into / lp.need) * 100);
+    if (xpPct !== c.xpPct) { c.xpPct = xpPct; el.xpFill.style.width = `${xpPct}%`; }
+
+    // Shop button glows only when the shop can open; kiosk label between waves
+    const running = this.game.sm.is(STATES.RUNNING);
+    const canShop = running && run.canShop;
+    if (canShop !== c.canShop) { c.canShop = canShop; el.shop.classList.toggle('can-shop', canShop); }
+    this._kioskLabel(run, running);
 
     // Emergency Flare charge ring
     const fl = run.flare;

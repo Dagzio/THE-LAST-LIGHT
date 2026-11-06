@@ -5,6 +5,7 @@ import * as THREE from '../../lib/three.module.js';
 import { cpuCanvas } from './render-guard.js';
 import { SeededRandom } from '../core/SeededRandom.js';
 import { mergeParts, propParts, PROP_KINDS, tag } from './models.js';
+import { KIOSK } from '../data/kiosk.js';
 
 const TEX_W = 2048;
 
@@ -129,7 +130,7 @@ export function buildEnvironment(map, materials, { merge = true } = {}) {
   let placed = 0;
   for (let tries = 0; tries < 400 && placed < 46; tries++) {
     const x = 60 + rng.next() * (mapW - 120), y = 60 + rng.next() * (mapH - 120);
-    if (Math.hypot(x - cx, y - cy) < 260) continue;                                   // plaza / beacon area
+    if (Math.hypot(x - cx, y - cy) < KIOSK.maxDistFromBeacon + 50) continue;          // plaza + kiosk zone (D39)
     if (Math.hypot(x - map.playerSpawn.x, y - map.playerSpawn.y) < 120) continue;    // spawn
     if (Math.abs(x - cx) < 40 || Math.abs(y - cy) < 40) continue;                     // keep the four paths clear
     parts.push(...propParts(PROP_KINDS[Math.floor(rng.next() * PROP_KINDS.length)], rng, x, y));

@@ -24,7 +24,8 @@ import { getDefense } from '../data/defenses.js';
 import { getEnemyType } from '../data/enemies.js';
 import { getWaves } from '../data/waves.js';
 import { CAPS, ENEMY_FX } from '../data/balance.js';
-import { TEST_ARENA } from '../data/testArena.js';
+import { KIOSK } from '../data/kiosk.js';
+import { defaultLoadout } from '../systems/Loadout.js';
 
 const MAX_ENEMIES = 80; // hard cap of live entities (performance guard; waves stay far below it)
 
@@ -33,8 +34,9 @@ export class MapRun {
    * @param {object} map entry of data/maps.js
    * @param {number} runSeed
    * @param {import('./GameEvents.js').GameEvents} events
+   * @param {{weaponStats:object, player:object}} [loadout] permanent progression (Economy.loadout())
    */
-  constructor(map, runSeed, events) {
+  constructor(map, runSeed, events, loadout = defaultLoadout()) {
     this.map = map;
     this.mapId = map.id;
     this.runSeed = runSeed;
@@ -51,9 +53,10 @@ export class MapRun {
     this.projectiles = new ProjectilePool(CAPS.projectiles);
     this.particles = new Particles(CAPS.particles);
 
-    // Equipped weapon — still the starting pistol (profile/shop arrive in Phase 5).
-    this.weaponStats = getWeapon('pistol');
+    // Equipped weapon + keeper modifiers from the profile (applyLoadout also runs after shop purchases).
+    this.weaponStats = loadout.weaponStats;
     this.weapon = new WeaponState(this.weaponStats);
+    this.interactMult = 1;
 
     this.controller = new PlayerController(events, { w: map.width, h: map.height });
     this.weapons = new WeaponSystem(this.projectiles, this.rng, events);
@@ -90,9 +93,50 @@ export class MapRun {
       events.on('waveCleared', (index, reward, final) => this._onWaveCleared(index, reward, final)),
     ];
 
-    // TEST HARNESS until the shop (D36): devices through the real placement command.
-    for (const d of TEST_ARENA.devices) this.defenses.place(d.padIndex, d.defenseId, 0);
+    this.applyLoadout(loadout, true);
+    this.player.hp = this.player.maxHp;
+    this.kiosk = placeKiosk(map, runSeed); // new spot every run (D39); its own RNG keeps combat RNG unchanged
     this.waves.start(0);
+  }
+
+  /**
+   * Applies permanent progression (map start, and after shop purchases between waves).
+   * A changed weapon is re-equipped with a full magazine; VITALITY adds its HP right away.
+   */
+  applyLoadout(loadout, initial = false) {
+    const ws = loadout.weaponStats;
+    const changed = initial || ws.id !== this.weaponStats.id || JSON.stringify(ws) !== JSON.stringify(this.weaponStats);
+    this.weaponStats = ws;
+    if (changed && !initial) this.weapon.equip(ws);
+    const m = loadout.player, p = this.player;
+    const gained = m.maxHp - p.maxHp;
+    p.maxHp = m.maxHp;
+    if (gained > 0 && !initial) p.hp += gained;
+    p.hp = Math.min(p.hp, p.maxHp);
+    p.damageTakenMult = m.damageTakenMult;
+    this.controller.speedMult = m.speedMult;
+    this.controller.dodgeCooldownMult = m.dodgeCooldownMult;
+    this.interactMult = m.interactMult;
+  }
+
+  /** Radius in which the keeper can open the shop (base × INTERACT RANGE). */
+  get interactRadius() { return KIOSK.interactRadius * this.interactMult; }
+
+  get playerAtKiosk() {
+    const p = this.player, k = this.kiosk;
+    return p.alive && Math.hypot(p.x - k.x, p.y - k.y) <= this.interactRadius + p.radius;
+  }
+
+  /** Shop availability (02_SPEC §12): preparation / intermission only, inside the kiosk radius. */
+  get canShop() {
+    const ph = this.waves.phase;
+    return !this.over && (ph === WAVE_PHASE.INTRO || ph === WAVE_PHASE.INTERMISSION) && this.playerAtKiosk;
+  }
+
+  /** Between waves (prep / intermission): the only time shop purchases are allowed. */
+  get betweenWaves() {
+    const ph = this.waves.phase;
+    return !this.over && (ph === WAVE_PHASE.INTRO || ph === WAVE_PHASE.INTERMISSION);
   }
 
   get over() { return !!this.defeat || this.victory; }
@@ -125,6 +169,7 @@ export class MapRun {
     const r = e.type.reward;
     if (r) { this.rewards.coins += r.coins | 0; this.rewards.xp += r.xp | 0; }
     this.flare.addKill(e);
+    this.events.emit('killReward', r, e); // → Economy (profile coins + XP), exactly once per enemy
     this.particles.burst(e.x, e.y, e.type.boss ? 40 : 16, e.type.boss ? 320 : 190, 0.5, 3, '#7a2333');
   }
 
@@ -133,6 +178,7 @@ export class MapRun {
     if (this.over) return;
     this.stats.wavesCleared += 1;
     this.rewards.coins += reward;
+    this.events.emit('coinReward', reward, 'wave'); // → Economy, once per wave
     if (final) this._setVictory();
   }
 
@@ -181,10 +227,14 @@ export class MapRun {
     if (this.over) return;
     this.victory = true;
     this.rewards.coins += this.map.completionReward | 0;
+    this.events.emit('coinReward', this.map.completionReward | 0, 'map'); // → Economy, once per map run
     this.events.emit('mapVictory', this.mapId);
   }
 
   get wavePhase() { return this.waves.phase; }
+
+  /** Id of the weapon used in this run. */
+  get equippedWeaponId() { return this.weaponStats.id; }
 
   dispose() {
     for (const u of this._unsub) u();
@@ -196,3 +246,26 @@ export class MapRun {
 }
 
 export { WAVE_PHASE };
+
+/**
+ * Random kiosk spot for this run (D39): ≤ maxDistFromBeacon from the beacon, clear of the beacon, the build pads and
+ * the keeper's spawn. Deterministic for a run seed. Falls back to a fixed safe spot if no sample fits.
+ */
+export function placeKiosk(map, runSeed) {
+  const rng = new SeededRandom((runSeed ^ 0x6b5f1a3d) >>> 0);
+  const b = map.beacon;
+  const ok = (x, y) => {
+    if (x < 60 || y < 60 || x > map.width - 60 || y > map.height - 60) return false;
+    for (const pad of map.buildPads) if (Math.hypot(x - pad.x, y - pad.y) < KIOSK.minDistFromPads) return false;
+    return Math.hypot(x - map.playerSpawn.x, y - map.playerSpawn.y) >= KIOSK.minDistFromSpawn;
+  };
+  for (let i = 0; i < KIOSK.placementTries; i++) {
+    const a = rng.next() * Math.PI * 2;
+    // sqrt → uniform over the ring area, not crowded at the inner edge
+    const r2min = KIOSK.minDistFromBeacon ** 2, r2max = KIOSK.maxDistFromBeacon ** 2;
+    const d = Math.sqrt(r2min + rng.next() * (r2max - r2min));
+    const x = b.x + Math.cos(a) * d, y = b.y + Math.sin(a) * d;
+    if (ok(x, y)) return { x, y };
+  }
+  return { x: b.x - 260, y: b.y + 200 };
+}

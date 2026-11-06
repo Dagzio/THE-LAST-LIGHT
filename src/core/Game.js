@@ -15,6 +15,9 @@ import { MapRun } from './MapRun.js';
 import { createRunSeed } from './SeededRandom.js';
 import { QUALITY_LEVELS, QUALITY_PRESETS, resolveAutoQuality } from '../config/settings.js';
 import { getMap, MAPS } from '../data/maps.js';
+import { getDefense } from '../data/defenses.js';
+import { SaveManager } from './SaveManager.js';
+import { Economy, REASON } from '../systems/Economy.js';
 
 export class Game {
   /** @param {HTMLCanvasElement} canvas2d menu backdrop @param {HTMLCanvasElement} canvas3d map run */
@@ -43,14 +46,27 @@ export class Game {
     this.run = null;                 // MapRun of the current map attempt
     this._view = { scene: 'backdrop', realTime: 0, simTime: 0, quality: this.quality };
     this.frameListeners = new Set();
+    // Permanent progression: the economy is the only owner of the PlayerProfile (saved after every change).
+    this.economy = new Economy(new SaveManager(), this.events);
+    this.resumeState = STATES.RUNNING; // where PAUSED returns to (RUNNING or SHOP_OPEN)
+
     // Defeat / victory are reported once by the MapRun; the state machine ignores repeats.
-    this.events.on('mapDefeat', () => this.sm.set(STATES.MAP_DEFEAT));
-    this.events.on('mapVictory', () => this.sm.set(STATES.MAP_VICTORY));
+    this.events.on('mapDefeat', () => {
+      this.sm.set(STATES.MAP_DEFEAT);
+      if (this.run) this.economy.recordMapResult(this.run.mapId, false);
+    });
+    this.events.on('mapVictory', (mapId) => {
+      this.sm.set(STATES.MAP_VICTORY);
+      this.economy.recordMapResult(mapId, true);
+    });
+    // Rewards: the MapRun reports each kill / wave / map completion exactly once.
+    this.events.on('killReward', (reward) => this.economy.grantKill(reward));
+    this.events.on('coinReward', (amount) => this.economy.grantCoins(amount));
 
     this.sm.onChange((next) => {
       // Edge presses made while the world was frozen must not fire on resume.
       if (next === STATES.RUNNING) this.input.clearPressed();
-      if (next === STATES.PAUSED) this.input.releaseAll();
+      if (next === STATES.PAUSED || next === STATES.SHOP_OPEN) this.input.releaseAll();
       if (this.renderer3d) this.renderer3d.pausedDrawn = false; // redraw once with the new overlay state
     });
   }
@@ -70,6 +86,8 @@ export class Game {
     // Shaders still compiling or the WebGL context is lost: the game waits (H5 3D guide §5.3).
     if (this.renderer3d && this.renderer3d.busy()) return;
     this.clock.advance(dt);
+    // E opens the shop at the kiosk (prep / intermission only) — a top-level state change, so it is handled here.
+    if (this.run && this.input.consumePressed('interact') && this.run.canShop) { this.openShop(); return; }
     if (this.run) this.run.update(this.input, dt, this.clock.time);
   }
 
@@ -140,7 +158,9 @@ export class Game {
 
   /** START NEXT WAVE (HUD): only while the map runs; the run ignores it outside the intro / intermission. */
   startNextWave() {
-    if (!this.sm.is(STATES.RUNNING) || !this.run) return false;
+    if (!this.run) return false;
+    if (this.sm.is(STATES.SHOP_OPEN)) { if (!this.run.betweenWaves) return false; this.closeShop(); } // from inside the shop
+    if (!this.sm.is(STATES.RUNNING)) return false;
     return this.run.startNextWave(this.clock.time);
   }
 
@@ -148,7 +168,7 @@ export class Game {
     this.mapId = map.id;
     this.clock.reset();
     this._disposeRun();
-    this.run = new MapRun(map, createRunSeed(), this.events);
+    this.run = new MapRun(map, createRunSeed(), this.events, this.economy.loadout());
     this.run.particles.setQualityFactor(QUALITY_PRESETS[this.quality].particles);
     this.renderer3d.loadMap(map, this.run.player.x, this.run.player.y); // warm-up: no step until shaders are ready
     this.input.pointerMapper = (cx, cy, out) => this.renderer3d.screenToGround(cx, cy, out);
@@ -157,9 +177,62 @@ export class Game {
     return this.sm.set(STATES.RUNNING);
   }
 
-  pause() { return this.sm.set(STATES.PAUSED); }
+  /** Pause from the map or from the open shop; resume returns exactly there (02_SPEC §2, C3). */
+  pause() {
+    if (this.sm.is(STATES.RUNNING) || this.sm.is(STATES.SHOP_OPEN)) this.resumeState = this.sm.state;
+    return this.sm.set(STATES.PAUSED);
+  }
 
-  resume() { return this.sm.set(STATES.RUNNING); }
+  resume() { return this.sm.set(this.resumeState === STATES.SHOP_OPEN ? STATES.SHOP_OPEN : STATES.RUNNING); }
+
+  // ---------------- shop (02_SPEC §12): opening freezes the world and the intermission timer ----------------
+  openShop() {
+    if (!this.sm.is(STATES.RUNNING) || !this.run || !this.run.canShop) return false;
+    return this.sm.set(STATES.SHOP_OPEN);
+  }
+
+  closeShop() { return this.sm.is(STATES.SHOP_OPEN) && this.sm.set(STATES.RUNNING); }
+
+  get shopOpen() { return this.sm.is(STATES.SHOP_OPEN); }
+
+  /** After a profile purchase/equip: the current run gets the new stats (between waves). */
+  _afterProfileChange(result) {
+    if (result.ok && this.run) this.run.applyLoadout(this.economy.loadout());
+    return result;
+  }
+
+  shopBuyWeapon(id) { return this.shopOpen ? this._afterProfileChange(this.economy.buyWeapon(id)) : { ok: false, reason: REASON.CLOSED }; }
+
+  shopEquipWeapon(id) { return this.shopOpen ? this._afterProfileChange(this.economy.equipWeapon(id)) : { ok: false, reason: REASON.CLOSED }; }
+
+  shopBuyWeaponUpgrade(weaponId, nodeId) {
+    return this.shopOpen ? this._afterProfileChange(this.economy.buyWeaponUpgrade(weaponId, nodeId)) : { ok: false, reason: REASON.CLOSED };
+  }
+
+  shopBuyPlayerUpgrade(id) { return this.shopOpen ? this._afterProfileChange(this.economy.buyPlayerUpgrade(id)) : { ok: false, reason: REASON.CLOSED }; }
+
+  /** Defense device on a free pad for this map run: validate → debit (profile coins) → place. */
+  shopBuyDefense(padIndex, defenseId) {
+    const offer = this.defenseOffer(padIndex, defenseId);
+    if (!offer.canBuy) return { ok: false, reason: offer.reason };
+    if (!this.economy.spend(offer.price)) return { ok: false, reason: REASON.COINS };
+    const placed = this.run.defenses.place(padIndex, defenseId, this.clock.time);
+    if (!placed) { this.economy.grantCoins(offer.price); return { ok: false, reason: REASON.PAD_BUSY }; } // never lose coins
+    this.events.emit('purchase', 'defense', defenseId, padIndex);
+    return { ok: true };
+  }
+
+  defenseOffer(padIndex, defenseId) {
+    const d = getDefense(defenseId);
+    const pad = this.run && this.run.defenses.pads[padIndex];
+    const o = { padIndex, defenseId, price: d ? d.price : 0, canBuy: false, reason: null };
+    if (!this.shopOpen || !this.run || !this.run.betweenWaves) o.reason = REASON.CLOSED;
+    else if (!d || !pad) o.reason = REASON.UNKNOWN;
+    else if (pad.device) o.reason = REASON.PAD_BUSY;
+    else if (this.economy.coins < d.price) o.reason = REASON.COINS;
+    else o.canBuy = true;
+    return o;
+  }
 
   /** Leaves the map (after the exit confirmation). The map run is discarded. */
   exitToMenu() {

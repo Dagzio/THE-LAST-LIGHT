@@ -12,6 +12,7 @@ export const STATES = Object.freeze({
   PAUSED: 'PAUSED',
   MAP_DEFEAT: 'MAP_DEFEAT',
   MAP_VICTORY: 'MAP_VICTORY',
+  SHOP_OPEN: 'SHOP_OPEN',   // world + intermission timer frozen (02_SPEC §12)
 });
 
 const TRANSITIONS = {
@@ -19,8 +20,9 @@ const TRANSITIONS = {
   TAP_TO_PLAY: ['MAIN_MENU'],
   MAIN_MENU: ['MAP_SELECT'],
   MAP_SELECT: ['MAIN_MENU', 'RUNNING'],
-  RUNNING: ['PAUSED', 'MAIN_MENU', 'MAP_DEFEAT', 'MAP_VICTORY'],
-  PAUSED: ['RUNNING', 'MAIN_MENU'],
+  RUNNING: ['PAUSED', 'MAIN_MENU', 'MAP_DEFEAT', 'MAP_VICTORY', 'SHOP_OPEN'],
+  SHOP_OPEN: ['RUNNING', 'PAUSED', 'MAIN_MENU'],
+  PAUSED: ['RUNNING', 'SHOP_OPEN', 'MAIN_MENU'], // resume returns to where the pause started
   MAP_DEFEAT: ['RUNNING', 'MAIN_MENU'],  // RETRY → a fresh run; or back to the main menu
   MAP_VICTORY: ['RUNNING', 'MAIN_MENU'], // PLAY AGAIN → a fresh run; or back to the main menu
 };
@@ -29,7 +31,7 @@ const TRANSITIONS = {
 const SIMULATING = new Set([STATES.RUNNING]);
 
 /** In-map states: the game scene is on screen. */
-const IN_MAP = new Set([STATES.RUNNING, STATES.PAUSED, STATES.MAP_DEFEAT, STATES.MAP_VICTORY]);
+const IN_MAP = new Set([STATES.RUNNING, STATES.PAUSED, STATES.MAP_DEFEAT, STATES.MAP_VICTORY, STATES.SHOP_OPEN]);
 
 export class GameStateMachine {
   constructor(initial = STATES.BOOT) {

@@ -11,7 +11,7 @@ import {
   beaconGeometry, beaconLanternGeometry, beamGeometry, padGeometry, turretBaseGeometry, turretHeadGeometry,
   coilGeometry, coilCrystalGeometry, reticleGeometry,
   runnerGeometry, runnerEyesGeometry, bruteGeometry, bruteEyesGeometry, wardenGeometry, wardenEyesGeometry,
-  telegraphDiscGeometry, telegraphRingGeometry,
+  telegraphDiscGeometry, telegraphRingGeometry, kioskGeometry, kioskLanternGeometry,
 } from './models.js';
 import { BEACON } from '../data/beacon.js';
 import { GLOAM_WARDEN } from '../data/boss.js';
@@ -155,6 +155,17 @@ export class Renderer3D {
       tideWave: tele(telegraphRingGeometry(0.8), m.telegraphFill, 3),
       impact: tele(telegraphRingGeometry(0.72), m.impact, 5),
     };
+    // Shop kiosk (moves to the run's random spot) + its interact-radius ring (between waves)
+    this.kiosk = new THREE.Group();
+    const kb = new THREE.Mesh(kioskGeometry(), m.prop);
+    kb.castShadow = true;
+    this.kiosk.add(kb, new THREE.Mesh(kioskLanternGeometry(), m.lantern));
+    this.kioskLight = new THREE.PointLight(0xffb36a, 500, 160, 1.6);
+    this.kioskLight.position.set(10, 46, 0);
+    this.kiosk.add(this.kioskLight);
+    this.scene.add(tag(this.kiosk, 'kiosk'));
+    this.kioskRing = tele(telegraphRingGeometry(0.94), m.padRune, 2);
+
     // Emergency Flare pulse: a warm light ring rolling out from the beacon over the arena
     this.flareRing = tele(telegraphRingGeometry(0.93), m.impact, 5);
     this.flareRing.material.color.set(0xffd890);
@@ -241,6 +252,7 @@ export class Renderer3D {
     sh.mapSize.set(pr.shadowSize, pr.shadowSize);
     this.blobs.visible = !pr.shadows;
     this.lanternLight.visible = pr.lantern;
+    this.kioskLight.visible = pr.lantern; // light count changes only here, followed by the shader warm-up
     if (this.env) this.env.groundTexture.anisotropy = pr.aniso;
     for (const mat of Object.values(this.mats)) mat.needsUpdate = true;
     this.sizeDirty = true;
@@ -587,6 +599,16 @@ export class Renderer3D {
       const sinceFlare = time - run.flare.lastUsedAt;
       const flash = sinceFlare >= 0 && sinceFlare < 0.5 ? 1 + 2.5 * (1 - sinceFlare / 0.5) : 1;
       this.beaconLight.intensity = 2200 * (0.9 + 0.1 * Math.sin(time * 2.7)) * flash;
+    }
+
+    // Kiosk faces the beacon; its reach ring shows between waves and brightens when the keeper is inside
+    const k = run.kiosk;
+    this.kiosk.position.set(k.x, 0, k.y);
+    this.kiosk.rotation.y = -Math.atan2(b.y - k.y, b.x - k.x);
+    this.kioskRing.visible = false;
+    if (run.betweenWaves) {
+      const near = run.playerAtKiosk;
+      this._flat(this.kioskRing, k.x, k.y, run.interactRadius, 1.6, near ? 0.75 : 0.3 + 0.15 * Math.sin(time * 4));
     }
 
     // Emergency Flare pulse ring

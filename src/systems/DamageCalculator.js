@@ -24,7 +24,7 @@ const result = { amount: 0, crit: false }; // reused output object (no per-hit a
  */
 export function computeDamage(base, source, target, mods, rng) {
   let dmg = base;                                          // 1
-  dmg *= mods.weaponDamageMult;                            // 2
+  dmg *= mods.weaponDamageMult * (source.weaponDamageMult || 1); // 2 (permanent weapon upgrades, systems/Loadout.js)
   dmg *= mods.playerDamageMult;                            // 3
   dmg *= mods.temporaryDamageMult;                         // 4
   const critChance = (source.critChance || 0) + (mods.critChanceBonus || 0);

@@ -142,6 +142,22 @@ const RECIPES = {
     const b = t2 > 0 ? Math.sin(2 * Math.PI * 1319 * t2) * Math.exp(-t2 * 9) : 0;
     return (a + b) * 0.13;
   }),
+  // Purchase: two bright coin clinks.
+  buy: () => render(0.4, (t) => {
+    const c = (u, f) => (u > 0 ? (Math.sin(2 * Math.PI * f * u) + 0.4 * Math.sin(2 * Math.PI * f * 2.7 * u)) * Math.exp(-u * 18) : 0);
+    return (c(t, 2100) + c(t - 0.07, 2600)) * 0.16;
+  }),
+  // Purchase refused / shop not reachable: short low buzz.
+  deny: () => render(0.18, (t) => (Math.sign(Math.sin(2 * Math.PI * 140 * t)) * 0.12 + Math.sin(2 * Math.PI * 95 * t) * 0.1) * Math.exp(-t * 14)),
+  // Player Level up: rising four-note arpeggio.
+  levelUp: () => render(1.1, (t) => {
+    let s = 0;
+    for (const [f, d] of [[523, 0], [659, 0.09], [784, 0.18], [1047, 0.27]]) {
+      const u = t - d;
+      if (u > 0) s += Math.sin(2 * Math.PI * f * u) * Math.exp(-u * 4) * Math.min(1, u * 60);
+    }
+    return s * 0.1;
+  }),
   // Popup open: soft paper/cloth whoosh.
   open: () => {
     let lp = 0;

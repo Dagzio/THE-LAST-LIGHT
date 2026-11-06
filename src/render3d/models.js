@@ -310,6 +310,33 @@ export function coilCrystalGeometry() {
   return mergeParts([part(new THREE.OctahedronGeometry(8, 0), '#ffffff', { y: 56, sy: 1.6 })]);
 }
 
+const K = { wood: '#5a3f2a', woodDark: '#3a281b', awningA: '#c98a2e', awningB: '#3b2b3f', metal: '#5b616b', gold: '#e2b04a', crate: '#6b4a2f' };
+
+/** Shop kiosk: a small lantern-lit market stall (faces +X towards the counter). Footprint ≈ 24, height ≈ 56. */
+export function kioskGeometry() {
+  const P = [];
+  P.push(part(new THREE.BoxGeometry(50, 4, 40), K.woodDark, { y: 2 }));                         // floor
+  P.push(part(new THREE.BoxGeometry(12, 16, 38), K.wood, { x: 16, y: 12 }));                   // counter
+  P.push(part(new THREE.BoxGeometry(14, 2, 40), K.woodDark, { x: 16, y: 21 }));                // counter top
+  for (const [x, z] of [[-22, -18], [-22, 18], [22, -18], [22, 18]]) P.push(part(new THREE.CylinderGeometry(1.6, 1.8, 46, 6), K.woodDark, { x, y: 25, z }));
+  for (let i = 0; i < 6; i++) {                                                                  // striped awning
+    P.push(part(new THREE.BoxGeometry(58, 2.4, 8), i % 2 ? K.awningB : K.awningA, { y: 50 - 0, z: -20 + i * 8 + 4, rz: -0.2 }));
+  }
+  P.push(part(new THREE.CylinderGeometry(7, 7, 1.6, 16), K.gold, { x: 30, y: 40, rz: Math.PI / 2 })); // coin sign
+  P.push(part(new THREE.BoxGeometry(2, 10, 2), K.metal, { x: 26, y: 44 }));
+  P.push(part(new THREE.BoxGeometry(12, 10, 12), K.crate, { x: -12, y: 9, z: 10, ry: 0.4 }));    // goods
+  P.push(part(new THREE.CylinderGeometry(5, 5, 12, 10), K.wood, { x: -12, y: 10, z: -10 }));
+  return mergeParts(P);
+}
+
+/** Kiosk lanterns (unlit glowing material). */
+export function kioskLanternGeometry() {
+  return mergeParts([
+    part(new THREE.SphereGeometry(2.8, 10, 8), '#ffffff', { x: 22, y: 38, z: -18 }),
+    part(new THREE.SphereGeometry(2.8, 10, 8), '#ffffff', { x: 22, y: 38, z: 18 }),
+  ]);
+}
+
 /** Aim reticle on the ground: ring + 4 ticks (like the reference screenshot). */
 export function reticleGeometry() {
   const P = [part(new THREE.RingGeometry(9, 11.5, 28), '#ffffff', { rx: -Math.PI / 2 })];
@@ -386,6 +413,9 @@ export function buildShowcase(materials, rng) {
   const coil = new THREE.Group();
   coil.add(new THREE.Mesh(coilGeometry(), materials.character), new THREE.Mesh(coilCrystalGeometry(), materials.crystal));
   out.set('frost-coil', tag(coil, 'frost-coil'));
+  const kiosk = new THREE.Group();
+  kiosk.add(new THREE.Mesh(kioskGeometry(), materials.prop), new THREE.Mesh(kioskLanternGeometry(), materials.lantern));
+  out.set('kiosk', tag(kiosk, 'kiosk'));
   for (const kind of PROP_KINDS) out.set(`prop-${kind}`, tag(new THREE.Mesh(mergeParts(propParts(kind, rng, 0, 0)), materials.prop), `prop-${kind}`));
   return out;
 }

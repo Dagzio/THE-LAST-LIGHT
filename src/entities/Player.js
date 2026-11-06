@@ -27,18 +27,20 @@ export class Player {
     this.dodgeDirY = 0;
     this.invulnerableUntil = 0;
     this.lastHitAt = -Infinity; // presentation: hurt flash
+    this.damageTakenMult = 1;   // permanent ARMOR upgrade (−2% per rank), set from the loadout
   }
 
   isInvulnerable(time) { return time < this.invulnerableUntil; }
 
   /**
-   * Incoming damage after armor/temporary reductions (02_SPEC §6): invulnerability check → HP change.
+   * Incoming damage (02_SPEC §6): base → permanent Armor → (temporary armor, Phase 6) → invulnerability → HP.
    * @returns {number} damage actually applied (0 if ignored)
    */
   applyDamage(amount, time, hitInvulnerability = PLAYER.hitInvulnerability) {
     if (!this.alive || !(amount > 0) || !Number.isFinite(amount)) return 0;
     if (this.isInvulnerable(time)) return 0;
-    const applied = Math.min(this.hp, amount);
+    const reduced = amount * (this.damageTakenMult > 0 ? this.damageTakenMult : 1);
+    const applied = Math.min(this.hp, reduced);
     this.hp -= applied;
     this.lastHitAt = time;
     this.invulnerableUntil = Math.max(this.invulnerableUntil, time + hitInvulnerability);

@@ -10,6 +10,7 @@ import { AC } from '../platform/AudioUnlock.js';
 import { toggleFullscreen, initFullscreenButtons } from '../platform/Fullscreen.js';
 import { SPLASH_TAP_DELAY_MS } from '../config/constants.js';
 import { SettingsView } from './SettingsView.js';
+import { ShopView } from './ShopView.js';
 
 const SCREEN_BY_STATE = {
   BOOT: 'splash',
@@ -20,13 +21,18 @@ const SCREEN_BY_STATE = {
   PAUSED: 'game',
   MAP_DEFEAT: 'game',
   MAP_VICTORY: 'game',
+  SHOP_OPEN: 'game',
 };
+
+const SAVE_NOTICE = { 'restored-backup': 'save.restored', 'reset-corrupt': 'save.reset', repaired: 'save.repaired' };
 
 export class UIManager {
   /** @param {import('../core/Game.js').Game} game */
   constructor(game) {
     this.game = game;
     this.settings = new SettingsView(game);
+    this.shop = new ShopView(game);
+    this.toast = document.getElementById('toast');
     this.openPopups = [];          // stack of open popup names (top = last)
     this.confirmKind = null;       // 'reset' | 'exit'
     this.confirmText = document.getElementById('confirmText');
@@ -66,6 +72,8 @@ export class UIManager {
       Sfx.play('start');
       this.game.enterMainMenu();
       Music.start();             // once, on entering the main menu; never restarted
+      const notice = SAVE_NOTICE[this.game.economy.loadStatus];
+      if (notice) this.showToast(T(notice)); // damaged save: say what happened (02_SPEC §15)
     };
     el.addEventListener('click', enter);
   }
@@ -127,9 +135,17 @@ export class UIManager {
     this._open('settings');
   }
 
-  /** Page hidden / focus lost / phone rotated: a real pause, the same path as the Pause button (H5 §5). */
+  /** Page hidden / focus lost / phone rotated: a real pause, the same path as the Pause button (H5 §5, C3). */
   autoPause() {
-    if (this.game.sm.is(STATES.RUNNING)) this.openSettings();
+    if (this.game.sm.is(STATES.RUNNING) || this.game.sm.is(STATES.SHOP_OPEN)) this.openSettings();
+  }
+
+  /** Short notice at the bottom (not a gameplay timer — presentation only). */
+  showToast(text, ms = 5000) {
+    this.toast.textContent = text;
+    this.toast.classList.add('show');
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => this.toast.classList.remove('show'), ms);
   }
 
   _ask(kind) {
@@ -174,6 +190,8 @@ export class UIManager {
       case 'resultMenu': this.game.exitToMenu(); break; // the map is already over: nothing to lose, no confirmation
       case 'startNextWave': this.game.startNextWave(); break;
       case 'flare': this.game.useFlare(); break;
+      case 'openShop': if (!this.game.openShop()) Sfx.play('deny'); break; // glows only when it can open
+      case 'closeShop': this.game.closeShop(); break;
       default: break;
     }
   }

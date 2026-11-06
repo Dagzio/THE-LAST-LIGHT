@@ -78,6 +78,11 @@
       </button>
     </div>
     <div class="corner corner-tr">
+      <!-- Shop (Underlords layout: left of the gear): glows only between waves inside the kiosk radius; coins badge -->
+      <button class="ring-btn shop-btn" id="hudShop" data-action="openShop" data-nosfx data-i18n-aria="aria.shop">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M3 4h2.5l2.2 11h10.6L21 7H7"/><circle cx="9.5" cy="19" r="1.6" class="fill"/><circle cx="17" cy="19" r="1.6" class="fill"/></svg>
+        <span class="coin-badge"><i class="coin-ico"></i><b id="hudCoins">0</b></span>
+      </button>
       <button class="ring-btn" data-action="openSettings" data-i18n-aria="aria.settings">
         <svg class="ico ico-gear" viewBox="0 0 24 24"><path d="M19.42 10.37L22.13 10.80L22.13 13.20L19.42 13.63L18.40 16.10L20.01 18.31L18.31 20.01L16.10 18.40L13.63 19.42L13.20 22.13L10.80 22.13L10.37 19.42L7.90 18.40L5.69 20.01L3.99 18.31L5.60 16.10L4.58 13.63L1.87 13.20L1.87 10.80L4.58 10.37L5.60 7.90L3.99 5.69L5.69 3.99L7.90 5.60L10.37 4.58L10.80 1.87L13.20 1.87L13.63 4.58L16.10 5.60L18.31 3.99L20.01 5.69L18.40 7.90Z"/><circle cx="12" cy="12" r="3.2"/></svg>
       </button>
@@ -117,8 +122,11 @@
       </div>
     </div>
 
-    <!-- Off-screen indicators: arrows at the screen edge towards enemies (beacon / kiosk from Phase 3 / 5) -->
+    <!-- Off-screen indicators: arrows at the screen edge towards enemies, the beacon and (between waves) the kiosk -->
     <div class="offscreen" id="offscreen"></div>
+
+    <!-- Label above the kiosk between waves (positioned from the 3D projection); tap / E opens the shop when in reach -->
+    <button class="kiosk-prompt" id="kioskPrompt" data-action="openShop" data-nosfx><span class="kiosk-key">E</span><span data-i18n="hud.shop"></span></button>
 
     <!-- Bottom-right: weapon block + player plate (Underlords "LOCAL PLAYER" corner) -->
     <div class="hud-player">
@@ -135,12 +143,13 @@
         <span class="hud-reload"><span class="hud-reload-label" data-i18n="hud.reloading"></span><i class="hud-reload-bar"><i id="hudReloadFill"></i></i></span>
       </div>
       <div class="hud-plate">
-        <span class="hud-name" data-i18n="hud.keeper"></span>
+        <span class="hud-name"><span data-i18n="hud.keeper"></span> <span class="hud-lv" id="hudLv"></span></span>
         <span class="hud-hp">
           <svg class="hud-heart" viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11.2A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8 2.8C20 15.8 12 21 12 21z"/></svg>
           <b id="hudHp">100</b>
         </span>
         <i class="hud-hpbar"><i id="hudHpFill"></i></i>
+        <i class="hud-xpbar"><i id="hudXpFill"></i></i>
       </div>
     </div>
 
@@ -163,6 +172,35 @@
       </div>
     </div>
   </section>
+
+  <!-- ===== Shop (Phase 5, Underlords shop style). Before Settings in the DOM: pausing from the shop shows Settings on top ===== -->
+  <div class="popup popup-shop" id="popup-shop" role="dialog" aria-modal="true">
+    <div class="panel shop-panel">
+      <div class="tabs-row">
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" data-shop-tab="weapons" data-i18n="shop.tab.weapons"></button>
+          <button class="tab" role="tab" data-shop-tab="weaponUpgrades" data-i18n="shop.tab.weaponUpgrades"></button>
+          <button class="tab" role="tab" data-shop-tab="playerUpgrades" data-i18n="shop.tab.playerUpgrades"></button>
+          <button class="tab" role="tab" data-shop-tab="defenses" data-i18n="shop.tab.defenses"></button>
+        </div>
+        <span class="shop-coins"><i class="coin-ico"></i><b id="shopCoins">0</b></span>
+        <button class="ring-btn ring-close" data-action="closeShop" data-i18n-aria="aria.close">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="shop-bar">
+        <span class="shop-level" id="shopLevel"></span>
+        <i class="shop-xp"><i id="shopXpFill"></i></i>
+        <span class="shop-timer" id="shopTimer"></span>
+        <button class="brush-btn shop-start" data-action="startNextWave" data-nosfx data-i18n="hud.startNextWave"></button>
+      </div>
+      <div class="shop-sub" id="shopSub"></div>
+      <div class="shop-grid" id="shopGrid"></div>
+    </div>
+  </div>
+
+  <!-- Save notice (damaged save restored / reset) -->
+  <div class="toast" id="toast" role="status"></div>
 
   <!-- ===== Settings (= pause in the game scene) ===== -->
   <div class="popup" id="popup-settings" role="dialog" aria-modal="true">

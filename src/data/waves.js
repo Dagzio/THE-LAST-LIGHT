@@ -4,7 +4,7 @@
 // if the boss dies first, the group is skipped. `reward` = wave-clear coin bonus (granted once).
 
 export const WAVE_TIMING = {
-  intro: 3.0,              // s of "GET READY" before wave 1
+  intro: 10.0,             // s of preparation before wave 1 — shop open, START WAVE available (user decision D39)
   intermission: 20.0,      // s between waves (START NEXT WAVE skips it)
   maxAliveAdds: 8,         // boss wave: cap of alive non-boss enemies (adds wait while the cap is reached)
 };
