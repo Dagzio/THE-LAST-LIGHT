@@ -59,22 +59,37 @@ export class ShopView {
     this.grid = document.getElementById('shopGrid');
     this.sub = document.getElementById('shopSub');
     this.coins = document.getElementById('shopCoins');
+    this.coinsBar = document.getElementById('shopCoinsBar'); // phones: the coins sit in the level row
     this.levelEl = document.getElementById('shopLevel');
     this.xpFill = document.getElementById('shopXpFill');
     this.timer = document.getElementById('shopTimer');
     this.tabs = [...this.root.querySelectorAll('[data-shop-tab]')];
+    this.prevBtn = document.getElementById('shopPrev');
+    this.nextBtn = document.getElementById('shopNext');
     this.tab = 'weapons';
+    this.page = 0; // phones: page of the card row
     this.upgradeWeaponId = null; // weapon shown in the UPGRADES tab
+    // Phone step (≤ 500 px high, base.css): one row of cards with page arrows, weapon picker card in UPGRADES
+    this.phoneMQ = matchMedia('(max-height: 500px)');
 
     this.tabs.forEach((t) => t.addEventListener('click', () => {
       this.tab = t.dataset.shopTab;
+      this.page = 0;
       if (this.tab === 'weaponUpgrades') this.upgradeWeaponId = game.economy.profile.equippedWeaponId; // equipped first
       this.refresh();
     }));
+    this.prevBtn.addEventListener('click', () => this._turn(-1));
+    this.nextBtn.addEventListener('click', () => this._turn(1));
     this.root.addEventListener('click', (e) => this._onClick(e));
     game.sm.onChange(() => this._syncVisible());
     game.events.on('profileChanged', () => { if (this.visible) this.refresh(); });
     onLanguageChange(() => { if (this.visible) this.refresh(); });
+    this.phoneMQ.addEventListener('change', () => { if (this.visible) this.refresh(); });
+    let raf = 0; // resize / rotation: re-fit tabs and pages (no DOM rebuild)
+    window.addEventListener('resize', () => {
+      if (!this.visible || raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; this._layout(); });
+    });
   }
 
   get visible() { return this.root.classList.contains('show'); }
@@ -116,15 +131,14 @@ export class ShopView {
     const g = this.game, eco = g.economy, p = eco.profile;
     this.tabs.forEach((t) => t.classList.toggle('active', t.dataset.shopTab === this.tab));
     this.coins.textContent = String(p.coins);
+    this.coinsBar.textContent = String(p.coins);
     const lp = levelProgress(p.totalXp);
     this.levelEl.textContent = T('hud.level', { n: lp.level });
     this.xpFill.style.width = `${Math.min(100, (lp.into / lp.need) * 100)}%`;
     const run = g.run;
     if (run) {
       const ws = run.waves;
-      this.timer.textContent = ws.phase === WAVE_PHASE.INTRO
-        ? T('hud.getReady', { t: clockText(ws.timeLeft(g.clock.time)) })
-        : T('hud.nextWave', { t: clockText(ws.timeLeft(g.clock.time)) });
+      this._setTimer(ws.phase === WAVE_PHASE.INTRO ? 'hud.getReady' : 'hud.nextWave', clockText(ws.timeLeft(g.clock.time)));
     }
     this.sub.replaceChildren();
     this.grid.replaceChildren();
@@ -134,6 +148,85 @@ export class ShopView {
     else if (this.tab === 'playerUpgrades') this._playerUpgrades();
     else if (this.tab === 'grenades') this._grenades();
     else this._defenses();
+    this._layout();
+  }
+
+  /** "NEXT WAVE IN" may be cut with an ellipsis on a narrow phone / long language, the time itself never is. */
+  _setTimer(key, clock) {
+    const full = T(key, { t: clock });
+    const i = full.lastIndexOf(clock);
+    const label = el('span', 'shop-timer-label');
+    const time = el('b', 'shop-timer-time');
+    label.textContent = i >= 0 ? full.slice(0, i).trimEnd() : full;
+    time.textContent = i >= 0 ? full.slice(i) : '';
+    this.timer.replaceChildren(label, time);
+  }
+
+  // ---------------- phone layout: tab labels fit, card pages ----------------
+  _layout() {
+    this._fitTabs();
+    this._paginate();
+    this._fitButtons();
+  }
+
+  /**
+   * Phones: a long label on a narrow card (German "AUSGERÜSTET", "DIENSTPISTOLE", "FULL INTEGRITY" …) shrinks down to
+   * 12 px instead of running into the padding / out of the card. Measures the text itself (overflow into the padding
+   * does not change scrollWidth).
+   */
+  _fitButtons() {
+    if (!this.phoneMQ.matches) return;
+    const range = document.createRange();
+    const fits = (n) => {
+      const cs = getComputedStyle(n);
+      range.selectNodeContents(n);
+      const room = n.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      return range.getBoundingClientRect().width <= room + 0.5 && n.scrollWidth <= n.clientWidth + 1;
+    };
+    for (const n of this.grid.querySelectorAll('.shop-card:not(.off) .shop-buy, .shop-card:not(.off) .shop-card-name')) {
+      n.style.fontSize = '';
+      let fs = parseFloat(getComputedStyle(n).fontSize);
+      while (fs > 12 && !fits(n)) { fs -= 1; n.style.fontSize = `${fs}px`; }
+    }
+  }
+
+  /** Long languages: shrink all tab labels to one common size (never wrap, never cut; H5 one role = one size). */
+  _fitTabs() {
+    for (const t of this.tabs) t.style.fontSize = '';
+    if (!this.phoneMQ.matches) return;
+    let fs = parseFloat(getComputedStyle(this.tabs[0]).fontSize);
+    const overflow = () => this.tabs.some((t) => t.scrollWidth > t.clientWidth + 1);
+    while (fs > 12 && overflow()) {
+      fs -= 1;
+      for (const t of this.tabs) t.style.fontSize = `${fs}px`;
+    }
+  }
+
+  _perPage() {
+    if (!this.phoneMQ.matches) return Infinity;
+    return parseInt(getComputedStyle(this.grid).getPropertyValue('--per'), 10) || 3;
+  }
+
+  _paginate() {
+    const cards = [...this.grid.querySelectorAll('.shop-card')];
+    const per = this._perPage();
+    const pages = per === Infinity ? 1 : Math.max(1, Math.ceil(cards.length / per));
+    this.page = Math.max(0, Math.min(this.page, pages - 1));
+    const from = per === Infinity ? 0 : this.page * per;
+    cards.forEach((c, i) => c.classList.toggle('off', i < from || i >= from + per));
+    const paged = pages > 1;
+    this.prevBtn.classList.toggle('idle', !paged); // keeps its place, so cards keep one width on every tab
+    this.nextBtn.classList.toggle('idle', !paged);
+    this.prevBtn.disabled = !paged || this.page === 0;
+    this.nextBtn.disabled = !paged || this.page >= pages - 1;
+  }
+
+  _turn(dir) {
+    const before = this.page;
+    this.page += dir;
+    this._paginate();
+    this._fitButtons();
+    if (this.page !== before) Sfx.play('click');
   }
 
   /** GRENADES (Phase 6, D15): one at a time, cap 3 per type for this map; stock is lost on a new map / retry. */
@@ -201,7 +294,9 @@ export class ShopView {
   _weaponUpgrades() {
     const eco = this.game.economy, p = eco.profile;
     if (!p.ownedWeapons.includes(this.upgradeWeaponId)) this.upgradeWeaponId = p.equippedWeaponId;
-    for (const id of p.ownedWeapons) {
+    // Phones: no chip row (it would push the cards off a low screen) — the first card of the row picks the weapon
+    if (this.phoneMQ.matches) this.grid.append(this._weaponPicker(p.ownedWeapons));
+    else for (const id of p.ownedWeapons) {
       const chip = el('button', `shop-chip${id === this.upgradeWeaponId ? ' active' : ''}`);
       chip.dataset.shopCmd = `pickWeapon:${id}`;
       chip.dataset.nosfx = '';
@@ -220,6 +315,25 @@ export class ShopView {
       else this._footer(card, { cmd: `upgrade:${wid}:${nodeId}`, price: o.cost, enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
       this.grid.append(card);
     }
+  }
+
+  /** Phone UPGRADES: the selected weapon + its level; ◀ ▶ switch between owned weapons (only when there are several). */
+  _weaponPicker(owned) {
+    const eco = this.game.economy, wid = this.upgradeWeaponId, n = owned.length, i = owned.indexOf(wid);
+    const card = this._card('weapon', T(WEAPONS[wid].nameKey), `<p class="shop-pick-lv">${T('shop.weaponLevel', { n: eco.weaponLevel(wid) })}</p>`, 'equipped shop-picker');
+    if (n > 1) {
+      const foot = el('div', 'shop-card-foot shop-pick-foot');
+      const arrow = (dir) => {
+        const b = el('button', 'shop-buy shop-pick-btn', `<svg class="ico" viewBox="0 0 24 24"><path d="${dir < 0 ? 'M15 4l-8 8 8 8' : 'M9 4l8 8-8 8'}"/></svg>`);
+        b.dataset.shopCmd = `pickWeapon:${owned[(i + dir + n) % n]}`;
+        b.dataset.nosfx = '';
+        b.setAttribute('aria-label', T(dir < 0 ? 'aria.prevPage' : 'aria.nextPage'));
+        return b;
+      };
+      foot.append(arrow(-1), arrow(1));
+      card.append(foot);
+    }
+    return card;
   }
 
   _playerUpgrades() {
@@ -258,7 +372,9 @@ export class ShopView {
       for (const id of Object.keys(DEFENSES)) {
         const d = DEFENSES[id];
         if (d.inMvp === false) continue;
-        const card = this._card(id, T(`defense.${id}`), `<p class="shop-fx">${T(`fx.${id}`)}</p>`, pad.device && pad.device.id === id ? 'equipped' : '');
+        // the pad tag is shown on phones only, where the pad columns become one paged row
+        const body = `<p class="shop-pad-tag">${title.textContent}</p><p class="shop-fx">${T(`fx.${id}`)}</p>`;
+        const card = this._card(id, T(`defense.${id}`), body, pad.device && pad.device.id === id ? 'equipped' : '');
         if (pad.device && pad.device.id === id) this._footer(card, { label: T('shop.installed'), enabled: false, done: true });
         else {
           const o = g.defenseOffer(i, id);

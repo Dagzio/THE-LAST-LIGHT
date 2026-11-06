@@ -6,7 +6,7 @@ export const DEBUG_ENABLED = false;
 /** Dev 3D asset viewer (H5 3D guide: asset-viewer-3d.md). TRUE while the user works with models — MUST be false in a release. */
 export const DEBUG_MODELS = true;
 
-export const BUILD_VERSION = '0.8.0-qa';
+export const BUILD_VERSION = '0.9.0-mobile';
 
 /** Prefix for every localStorage key of the game (H5 §9). */
 export const STORAGE_PREFIX = 'tll.';

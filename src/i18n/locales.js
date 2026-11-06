@@ -23,6 +23,8 @@ const ROWS = [
   ['aria.exit', 'Exit to menu', 'Вийти в меню', 'Выйти в меню', 'Zum Menü', 'Esci al menu', 'Retour au menu', 'Salir al menú', 'Sair para o menu', 'الخروج إلى القائمة', 'メニューへ戻る'],
   ['aria.close', 'Close', 'Закрити', 'Закрыть', 'Schließen', 'Chiudi', 'Fermer', 'Cerrar', 'Fechar', 'إغلاق', '閉じる'],
   ['aria.back', 'Back', 'Назад', 'Назад', 'Zurück', 'Indietro', 'Retour', 'Atrás', 'Voltar', 'رجوع', '戻る'],
+  ['aria.prevPage', 'Previous page', 'Попередня сторінка', 'Предыдущая страница', 'Vorherige Seite', 'Pagina precedente', 'Page précédente', 'Página anterior', 'Página anterior', 'الصفحة السابقة', '前のページ'],
+  ['aria.nextPage', 'Next page', 'Наступна сторінка', 'Следующая страница', 'Nächste Seite', 'Pagina successiva', 'Page suivante', 'Página siguiente', 'Próxima página', 'الصفحة التالية', '次のページ'],
 
   ['tab.game', 'GAME', 'ГРА', 'ИГРА', 'SPIEL', 'GIOCO', 'JEU', 'JUEGO', 'JOGO', 'اللعبة', 'ゲーム'],
   ['tab.video', 'VIDEO', 'ГРАФІКА', 'ГРАФИКА', 'GRAFIK', 'GRAFICA', 'GRAPHISMES', 'GRÁFICOS', 'GRÁFICOS', 'الرسومات', 'グラフィック'],

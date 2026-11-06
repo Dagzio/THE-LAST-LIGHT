@@ -216,11 +216,21 @@
       <div class="shop-bar">
         <span class="shop-level" id="shopLevel"></span>
         <i class="shop-xp"><i id="shopXpFill"></i></i>
+        <span class="shop-coins"><i class="coin-ico"></i><b id="shopCoinsBar">0</b></span>
         <span class="shop-timer" id="shopTimer"></span>
         <button class="brush-btn shop-start" data-action="startNextWave" data-nosfx data-i18n="hud.startNextWave"></button>
       </div>
       <div class="shop-sub" id="shopSub"></div>
-      <div class="shop-grid" id="shopGrid"></div>
+      <!-- Phones: one row of cards, paged with the arrows (no scrolling, 05-MOBILE-POLISH §1); desktop: a grid -->
+      <div class="shop-pager">
+        <button class="ring-btn shop-page" id="shopPrev" data-nosfx data-i18n-aria="aria.prevPage">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M15 4l-8 8 8 8"/></svg>
+        </button>
+        <div class="shop-grid" id="shopGrid"></div>
+        <button class="ring-btn shop-page" id="shopNext" data-nosfx data-i18n-aria="aria.nextPage">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M9 4l8 8-8 8"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 
