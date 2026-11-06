@@ -3,7 +3,7 @@
 /** H5 standard: debug tools only in a disabled state in the project. Set true locally to see the debug overlay. */
 export const DEBUG_ENABLED = false;
 
-export const BUILD_VERSION = '0.1.0-phase1';
+export const BUILD_VERSION = '0.2.0-phase2';
 
 /** Prefix for every localStorage key of the game (H5 §9). */
 export const STORAGE_PREFIX = 'tll.';
@@ -18,9 +18,6 @@ export const MAX_FRAME_DELTA = 0.1;
 
 /** Splash: delay before TAP TO PLAY becomes active (H5 §1, vanilla.md §2). UI timing, not gameplay. */
 export const SPLASH_TAP_DELAY_MS = 1500;
-
-/** Phase 1 runtime probe: a light marker moved by the abstract `move` action to verify input and fixed step. Removed in Phase 2. */
-export const PROBE_SPEED = 190;
 
 /** Music playlist (files provided by the user later, assets/audio/music/). Empty = no music, system still ready. */
 export const MUSIC_TRACKS = [];

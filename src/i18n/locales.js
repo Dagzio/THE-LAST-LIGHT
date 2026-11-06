@@ -97,6 +97,17 @@ const ROWS = [
   ['map.boss', 'Final wave: boss', 'Остання хвиля: бос', 'Последняя волна: босс', 'Letzte Welle: Boss', 'Ultima ondata: boss', 'Dernière vague : boss', 'Última oleada: jefe', 'Última onda: chefe', 'الموجة الأخيرة: زعيم', '最終ウェーブ：ボス'],
   ['map.begin', 'BEGIN', 'ПОЧАТИ', 'НАЧАТЬ', 'START', 'INIZIA', 'COMMENCER', 'COMENZAR', 'COMEÇAR', 'ابدأ', '開始'],
 
+  ['hud.keeper', 'KEEPER', 'ДОГЛЯДАЧ', 'СМОТРИТЕЛЬ', 'WÄRTER', 'GUARDIANO', 'GARDIEN', 'GUARDIÁN', 'GUARDIÃO', 'الحارس', '灯台守'],
+  ['hud.reloading', 'RELOADING', 'ПЕРЕЗАРЯДЖАННЯ', 'ПЕРЕЗАРЯДКА', 'NACHLADEN', 'RICARICA', 'RECHARGEMENT', 'RECARGANDO', 'RECARREGANDO', 'إعادة التلقيم', 'リロード中'],
+  ['aria.dash', 'Dash', 'Ривок', 'Рывок', 'Ausweichen', 'Scatto', 'Esquive', 'Esquivar', 'Esquiva', 'اندفاع', 'ダッシュ'],
+  ['aria.reload', 'Reload', 'Перезарядити', 'Перезарядить', 'Nachladen', 'Ricarica', 'Recharger', 'Recargar', 'Recarregar', 'إعادة التلقيم', 'リロード'],
+
+  ['weapon.pistol', 'SERVICE PISTOL', 'СЛУЖБОВИЙ ПІСТОЛЕТ', 'СЛУЖЕБНЫЙ ПИСТОЛЕТ', 'DIENSTPISTOLE', "PISTOLA D'ORDINANZA", 'PISTOLET DE SERVICE', 'PISTOLA REGLAMENTARIA', 'PISTOLA DE SERVIÇO', 'مسدس الخدمة', '制式拳銃'],
+  ['weapon.smg', 'COMPACT SMG', 'КОМПАКТНИЙ ПП', 'КОМПАКТНЫЙ ПП', 'KOMPAKT-MP', 'SMG COMPATTO', 'PM COMPACT', 'SUBFUSIL COMPACTO', 'SUBMETRALHADORA COMPACTA', 'رشاش صغير', '小型サブマシンガン'],
+  ['weapon.shotgun', 'PUMP SHOTGUN', 'ПОМПОВА РУШНИЦЯ', 'ПОМПОВЫЙ ДРОБОВИК', 'PUMPGUN', 'FUCILE A POMPA', 'FUSIL À POMPE', 'ESCOPETA DE CORREDERA', 'ESPINGARDA DE BOMBA', 'بندقية مضخية', 'ポンプショットガン'],
+  ['weapon.assault_rifle', 'ASSAULT RIFLE', 'ШТУРМОВА ГВИНТІВКА', 'ШТУРМОВАЯ ВИНТОВКА', 'STURMGEWEHR', "FUCILE D'ASSALTO", "FUSIL D'ASSAUT", 'FUSIL DE ASALTO', 'FUZIL DE ASSALTO', 'بندقية هجومية', 'アサルトライフル'],
+  ['weapon.machine_gun', 'HEAVY MACHINE GUN', 'ВАЖКИЙ КУЛЕМЕТ', 'ТЯЖЁЛЫЙ ПУЛЕМЁТ', 'SCHWERES MG', 'MITRAGLIATRICE PESANTE', 'MITRAILLEUSE LOURDE', 'AMETRALLADORA PESADA', 'METRALHADORA PESADA', 'رشاش ثقيل', '重機関銃'],
+
   ['hud.paused', 'GAME PAUSED', 'ГРУ ПРИЗУПИНЕНО', 'ИГРА НА ПАУЗЕ', 'PAUSIERT', 'GIOCO IN PAUSA', 'JEU EN PAUSE', 'JUEGO EN PAUSA', 'JOGO PAUSADO', 'اللعبة متوقفة', '一時停止中'],
 ];
 

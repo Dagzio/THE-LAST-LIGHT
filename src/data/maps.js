@@ -9,6 +9,7 @@ export const MAPS = [
     waveCount: 5,
     finalWaveBoss: true,
     artSeed: 7331, // cosmetic decoration layout of the arena ground
+    playerSpawn: { x: 640, y: 470 },
   },
 ];
 

@@ -20,7 +20,8 @@ export const Sfx = (() => {
     ctx,
     wake,
     alive: () => ac,
-    play(name) {
+    /** @param {number} [rate] playbackRate (pitch variation for repeated sounds, GDD §18) */
+    play(name, rate = 1) {
       const a = ctx();
       if (!on || muted.size > 0 || !a) return;
       const buf = bufs[name] ?? (bufs[name] = buildSfxBuffer(name, a));
@@ -29,6 +30,7 @@ export const Sfx = (() => {
       try {
         const s = a.createBufferSource(); // a new node per sound
         s.buffer = buf;
+        if (rate !== 1) s.playbackRate.value = rate;
         s.connect(a.destination);
         s.start();
       } catch (e) { /* SFX never throws */ }

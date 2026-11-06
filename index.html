@@ -80,6 +80,37 @@
       </button>
     </div>
     <div class="stamp paused-stamp" data-i18n="hud.paused"></div>
+
+    <!-- Bottom-right: weapon block + player plate (Underlords "LOCAL PLAYER" corner) -->
+    <div class="hud-player">
+      <div class="hud-weapon" id="hudWeapon">
+        <svg class="hud-gun" viewBox="0 0 48 24"><path d="M4 7h30l2-3h6v6h-4l-2 2H24l-2 9h-7l2-9H4z"/></svg>
+        <span class="hud-weapon-name" id="hudWeaponName"></span>
+        <span class="hud-ammo"><b id="hudAmmo">0</b><span class="hud-ammo-sep">/</span><span id="hudMag">0</span></span>
+        <span class="hud-reload"><span class="hud-reload-label" data-i18n="hud.reloading"></span><i class="hud-reload-bar"><i id="hudReloadFill"></i></i></span>
+      </div>
+      <div class="hud-plate">
+        <span class="hud-name" data-i18n="hud.keeper"></span>
+        <span class="hud-hp">
+          <svg class="hud-heart" viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11.2A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8 2.8C20 15.8 12 21 12 21z"/></svg>
+          <b id="hudHp">100</b>
+        </span>
+        <i class="hud-hpbar"><i id="hudHpFill"></i></i>
+      </div>
+    </div>
+
+    <!-- Touch controls (touch devices only, decision D12) -->
+    <div class="touch-controls" id="touchControls">
+      <div class="touch-stick" id="touchStick"><div class="touch-knob" id="touchKnob"></div></div>
+      <div class="touch-actions">
+        <button class="neon-btn neon-small" data-touch-action="reload" data-nosfx data-i18n-aria="aria.reload">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M19 3.5V8h-4.5"/><path d="M11 9h2v6h-2z" class="fill"/></svg>
+        </button>
+        <button class="neon-btn" data-touch-action="dash" data-nosfx data-i18n-aria="aria.dash">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M5 5l7 7-7 7"/><path d="M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
   </section>
 
   <!-- ===== Settings (= pause in the game scene) ===== -->

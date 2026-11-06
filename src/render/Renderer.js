@@ -5,6 +5,10 @@ import { WORLD_WIDTH as W, WORLD_HEIGHT as H } from '../config/constants.js';
 import {
   makeCanvas, makeGlowSprite, makeBeamSprite, drawBackdropStatic, drawArenaGround, BACKDROP_LANTERN,
 } from './ProceduralArt.js';
+import { createSprites } from './Sprites.js';
+import { ENEMY_FX } from '../data/balance.js';
+
+const CORNERS = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 
 export class Renderer {
   /** @param {HTMLCanvasElement} canvas @param {import('../platform/Viewport.js').Viewport} viewport */
@@ -20,8 +24,8 @@ export class Renderer {
       beam: makeBeamSprite(760, 120),
       lanternGlow: makeGlowSprite(90, 'rgba(255,200,120,0.9)'),
       fog: makeGlowSprite(220, 'rgba(150,170,200,0.10)'),
-      probe: makeGlowSprite(60, 'rgba(255,190,110,0.85)'),
     };
+    this.entitySprites = createSprites();
   }
 
   _layer(name, key, draw) {
@@ -109,17 +113,102 @@ export class Renderer {
       g.drawImage(fog, fx, fy - fog.height / 2, fog.width * 1.8, fog.height);
     }
 
-    // Phase 1 runtime probe (input + fixed step check). Replaced by the Player in Phase 2.
-    if (view.probe) {
-      const p = this.sprites.probe;
-      g.globalCompositeOperation = 'lighter';
-      g.drawImage(p, view.probe.x - p.width / 2, view.probe.y - p.height / 2);
-      g.globalCompositeOperation = 'source-over';
-      g.fillStyle = '#ffe2a8';
-      g.beginPath();
-      g.arc(view.probe.x, view.probe.y, 6, 0, Math.PI * 2);
-      g.fill();
+    if (view.run) this._renderRun(g, view.run, t, view.quality);
+  }
+
+  /** Entities of the current map run. Reads state only. Order: enemies → projectiles → player → fx → bars. */
+  _renderRun(g, run, t, quality) {
+    const S = this.entitySprites;
+    const player = run.player;
+
+    // Enemies (with death fade and hit flash).
+    for (const e of run.enemies) {
+      const dead = !e.alive;
+      const fade = dead ? Math.max(0, 1 - (t - e.deathAt) / ENEMY_FX.deathFade) : 1;
+      if (fade <= 0) continue;
+      const face = Math.atan2(player.y - e.y, player.x - e.x);
+      const flash = !dead && t - e.lastHitAt < ENEMY_FX.hitFlash;
+      g.globalAlpha = fade;
+      this._drawRotated(g, flash ? S.gruntFlash : S.grunt, e.x, e.y, face, dead ? 1 + (1 - fade) * 0.25 : 1);
     }
+    g.globalAlpha = 1;
+
+    // Target marker (gameplay signal: who the gun is shooting at).
+    const target = run.target;
+    if (target && target.alive) this._drawTargetMarker(g, target, t);
+
+    // Projectiles.
+    const bullet = S.bullet;
+    for (const p of run.projectiles.items) {
+      if (p.active) this._drawRotated(g, bullet, p.x, p.y, p.angle, 1);
+    }
+
+    // Player: dodge ghosts (decorative, off on LOW), i-frame flicker, muzzle flash.
+    if (player.alive) {
+      const aim = player.aimAngle;
+      if (player.dodging && quality !== 'low') {
+        for (let k = 1; k <= 2; k++) {
+          g.globalAlpha = 0.22 / k;
+          this._drawRotated(g, S.player, player.x - player.vx * 0.025 * k, player.y - player.vy * 0.025 * k, aim, 1);
+        }
+      }
+      g.globalAlpha = player.isInvulnerable(t) && Math.floor(t * 30) % 2 === 0 ? 0.55 : 1;
+      this._drawRotated(g, S.player, player.x, player.y, aim, 1);
+      g.globalAlpha = 1;
+      if (t - run.weapon.lastShotAt < 0.06) {
+        const mx = player.x + Math.cos(aim) * 30, my = player.y + Math.sin(aim) * 30;
+        this._drawRotated(g, S.muzzle, mx, my, aim, 1);
+      }
+      // Reload arc above the player.
+      if (run.weapon.reloading) {
+        const prog = run.weapon.reloadProgress(t);
+        g.lineWidth = 4;
+        g.strokeStyle = 'rgba(0,0,0,0.5)';
+        g.beginPath(); g.arc(player.x, player.y - 34, 9, 0, Math.PI * 2); g.stroke();
+        g.strokeStyle = '#ffd27a';
+        g.beginPath(); g.arc(player.x, player.y - 34, 9, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2); g.stroke();
+      }
+    }
+
+    // Particles (decorative).
+    for (const p of run.particles.items) {
+      if (!p.active) continue;
+      g.globalAlpha = p.life / p.maxLife;
+      g.fillStyle = p.color;
+      g.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    g.globalAlpha = 1;
+
+    // Enemy health bars (only when damaged).
+    for (const e of run.enemies) {
+      if (!e.alive || e.hp >= e.maxHp) continue;
+      const w = 34, h = 4, x = e.x - w / 2, y = e.y - e.radius - 12;
+      g.fillStyle = 'rgba(0,0,0,0.65)';
+      g.fillRect(x - 1, y - 1, w + 2, h + 2);
+      g.fillStyle = '#d2453a';
+      g.fillRect(x, y, w * (e.hp / e.maxHp), h);
+    }
+  }
+
+  _drawRotated(g, img, x, y, angle, scale) {
+    const c = Math.cos(angle) * scale, s = Math.sin(angle) * scale;
+    g.save();
+    g.transform(c, s, -s, c, x, y);
+    g.drawImage(img, -img.width / 2, -img.height / 2);
+    g.restore();
+  }
+
+  _drawTargetMarker(g, e, t) {
+    const r = e.radius + 8 + Math.sin(t * 8) * 1.5;
+    const k = 7;
+    g.strokeStyle = 'rgba(255,200,120,0.9)';
+    g.lineWidth = 2;
+    g.beginPath();
+    for (const [sx, sy] of CORNERS) {
+      const cx = e.x + sx * r, cy = e.y + sy * r;
+      g.moveTo(cx - sx * k, cy); g.lineTo(cx, cy); g.lineTo(cx, cy - sy * k);
+    }
+    g.stroke();
   }
 
   /** Small preview of a map for the map-select card (drawn once into its own canvas). */

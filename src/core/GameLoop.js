@@ -1,5 +1,7 @@
 import { FIXED_STEP, MAX_FRAME_DELTA } from '../config/constants.js';
 
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
 /**
  * requestAnimationFrame loop with a fixed simulation step and an accumulator (04_ARCH §5).
  * - update(dt) is called 0..N times per frame with dt = FIXED_STEP;
@@ -25,6 +27,8 @@ export class GameLoop {
     this.running = false;
     this.rafId = 0;
     this.frameDt = 0;
+    this.updateMs = 0;   // diagnostics: cost of the fixed updates in the last frame
+    this.renderMs = 0;   // diagnostics: cost of the last render
     this._frame = (ts) => {
       if (!this.running) return;
       this.tick(ts);
@@ -67,6 +71,7 @@ export class GameLoop {
     this.accumulator += frameDt;
 
     let steps = 0;
+    const t0 = now();
     // Small epsilon so 1/60 + 1/60 accumulations from 120 Hz don't lose a step to float error.
     while (this.accumulator + 1e-9 >= this.step) {
       this.update(this.step);
@@ -74,7 +79,10 @@ export class GameLoop {
       steps += 1;
     }
     if (this.accumulator < 0) this.accumulator = 0;
+    const t1 = now();
     this.render(this.accumulator / this.step, frameDt);
+    this.updateMs = t1 - t0;
+    this.renderMs = now() - t1;
     return steps;
   }
 }

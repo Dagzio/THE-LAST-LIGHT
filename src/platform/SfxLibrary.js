@@ -29,6 +29,43 @@ const RECIPES = {
       * Math.exp(-t * 4.5) * Math.min(1, t * 40) * 0.16;
     return swell + bell;
   }),
+  // Pistol shot: sharp crack + short low thump (pitch varied per shot by playbackRate).
+  shot: () => {
+    let lp = 0;
+    return render(0.22, (t) => {
+      lp += (noise() - lp) * 0.5;
+      const crack = lp * Math.exp(-t * 38) * 0.5;
+      const thump = Math.sin(2 * Math.PI * (140 - 260 * t) * t) * Math.exp(-t * 22) * 0.45;
+      return crack + thump;
+    });
+  },
+  // Bullet hits flesh: dull tick.
+  hit: () => render(0.07, (t) => (Math.sin(2 * Math.PI * 320 * t) * 0.3 + noise() * 0.15) * Math.exp(-t * 60)),
+  // Enemy dies: wet low crunch.
+  kill: () => {
+    let lp = 0;
+    return render(0.35, (t) => {
+      lp += (noise() - lp) * 0.12;
+      return (lp * 0.9 + Math.sin(2 * Math.PI * (90 - 120 * t) * t) * 0.35) * Math.exp(-t * 9);
+    });
+  },
+  // Reload start: magazine out — two mechanical clicks.
+  reload: () => render(0.32, (t) => {
+    const c1 = t < 0.04 ? Math.sin(2 * Math.PI * 1800 * t) * Math.exp(-t * 120) : 0;
+    const t2 = t - 0.2;
+    const c2 = t2 > 0 && t2 < 0.05 ? Math.sin(2 * Math.PI * 1400 * t2) * Math.exp(-t2 * 100) : 0;
+    return (c1 + c2) * 0.35 + noise() * 0.02 * Math.exp(-t * 20);
+  }),
+  // Reload done: slide racked.
+  reloadEnd: () => render(0.14, (t) => (Math.sin(2 * Math.PI * 900 * t) * 0.3 + noise() * 0.18) * Math.exp(-t * 45)),
+  // Dash: fast cloth whoosh.
+  dash: () => {
+    let lp = 0;
+    return render(0.25, (t) => {
+      lp += (noise() - lp) * 0.08;
+      return lp * Math.sin(Math.PI * (t / 0.25)) * 0.9;
+    });
+  },
   // Popup open: soft paper/cloth whoosh.
   open: () => {
     let lp = 0;

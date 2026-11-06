@@ -8,10 +8,11 @@ import { InputManager } from '../platform/InputManager.js';
 import { Storage } from '../platform/StorageService.js';
 import { Prefs } from '../platform/Prefs.js';
 import { Renderer } from '../render/Renderer.js';
+import { GameEvents } from './GameEvents.js';
+import { MapRun } from './MapRun.js';
+import { createRunSeed } from './SeededRandom.js';
 import { QUALITY_LEVELS, QUALITY_PRESETS, resolveAutoQuality } from '../config/settings.js';
-import { WORLD_WIDTH, WORLD_HEIGHT, PROBE_SPEED } from '../config/constants.js';
 import { getMap, MAPS } from '../data/maps.js';
-import { clamp } from '../utils/MathUtils.js';
 
 export class Game {
   /** @param {HTMLCanvasElement} canvas */
@@ -29,9 +30,9 @@ export class Game {
     this.presentationTime = 0;   // real time for menu decoration only (not simulation)
     this.selectedMapId = MAPS[0].id;
     this.mapId = null;
-    this.probe = { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 }; // Phase 1 runtime probe
-    this._move = { x: 0, y: 0 };
-    this._view = { scene: 'backdrop', realTime: 0, simTime: 0, quality: this.quality, mapSeed: 0, probe: null };
+    this.events = new GameEvents();  // presentation hooks: sound, particles, HUD
+    this.run = null;                 // MapRun of the current map attempt
+    this._view = { scene: 'backdrop', realTime: 0, simTime: 0, quality: this.quality, mapSeed: 0, run: null };
     this.frameListeners = new Set();
 
     this.sm.onChange((next) => {
@@ -52,9 +53,7 @@ export class Game {
   update(dt) {
     if (!this.sm.simulating) return;
     this.clock.advance(dt);
-    const m = this.input.getMove(this._move);
-    this.probe.x = clamp(this.probe.x + m.x * PROBE_SPEED * dt, 0, WORLD_WIDTH);
-    this.probe.y = clamp(this.probe.y + m.y * PROBE_SPEED * dt, 0, WORLD_HEIGHT);
+    if (this.run) this.run.update(this.input, dt, this.clock.time);
   }
 
   // ---------------- presentation (reads state only) ----------------
@@ -67,7 +66,7 @@ export class Game {
     v.simTime = this.clock.time;
     v.quality = this.quality;
     v.mapSeed = this.mapId ? getMap(this.mapId).artSeed : 0;
-    v.probe = this.sm.inMap ? this.probe : null;
+    v.run = this.sm.inMap ? this.run : null;
     this.renderer.render(v);
     for (const fn of this.frameListeners) fn(frameDt);
   }
@@ -84,6 +83,7 @@ export class Game {
     this.quality = this._resolveQuality();
     Prefs.setQuality(setting);
     this.viewport.invalidate();
+    if (this.run) this.run.particles.setQualityFactor(QUALITY_PRESETS[this.quality].particles);
   }
 
   // ---------------- commands (called by UI) ----------------
@@ -97,13 +97,14 @@ export class Game {
 
   selectMap(id) { if (getMap(id)) this.selectedMapId = id; }
 
-  /** Starts the selected map with a fresh run (Phase 1: empty arena). Guarded against double start. */
+  /** Starts the selected map with a fresh MapRun. Guarded against double start. */
   beginMap() {
     if (!this.sm.is(STATES.MAP_SELECT) || !getMap(this.selectedMapId)) return false;
     this.mapId = this.selectedMapId;
     this.clock.reset();
-    this.probe.x = WORLD_WIDTH / 2;
-    this.probe.y = WORLD_HEIGHT / 2;
+    this._disposeRun();
+    this.run = new MapRun(getMap(this.mapId), createRunSeed(), this.events);
+    this.run.particles.setQualityFactor(QUALITY_PRESETS[this.quality].particles);
     this.input.releaseAll();
     this.loop.resetTiming();
     return this.sm.set(STATES.RUNNING);
@@ -117,8 +118,14 @@ export class Game {
   exitToMenu() {
     if (!this.sm.inMap) return false;
     this.mapId = null;
+    this._disposeRun();
     this.clock.reset();
     return this.sm.set(STATES.MAIN_MENU);
+  }
+
+  _disposeRun() {
+    if (this.run) this.run.dispose();
+    this.run = null;
   }
 
   /** H5 §10: erase all game data (settings stay) and restart as a first launch (splash → TAP TO PLAY). */

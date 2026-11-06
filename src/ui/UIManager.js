@@ -131,7 +131,7 @@ export class UIManager {
   _onClick(e) {
     const btn = e.target.closest('button');
     if (!btn) return;
-    Sfx.play('click'); // every tap gives feedback (H5 §14); click is a user gesture
+    if (!('nosfx' in btn.dataset)) Sfx.play('click'); // every tap gives feedback (H5 §14); gameplay buttons have own sounds
     const action = btn.dataset.action;
     switch (action) {
       case 'newGame': this.game.openMapSelect(); break;

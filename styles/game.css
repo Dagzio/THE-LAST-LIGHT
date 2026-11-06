@@ -50,3 +50,123 @@ body.rotate-blocked #orientation-blocker { display: flex; }
   background: rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
+
+/* ===================== HUD: weapon + player plate (bottom-right, Underlords "LOCAL PLAYER") ===================== */
+.hud-player {
+  position: absolute;
+  right: var(--safe-r);
+  bottom: var(--safe-b);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: calc(8px * var(--fs));
+  pointer-events: none;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7), 0 0 10px rgba(0, 0, 0, 0.6);
+}
+body.touch .hud-player { right: calc(var(--safe-r) + var(--neon) + var(--neon-small) + var(--gap) * 2); }
+
+.hud-weapon {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas: "gun ammo" "name name" "reload reload";
+  align-items: center;
+  justify-items: end;
+  column-gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-stretch: condensed;
+  text-transform: uppercase;
+}
+.hud-gun { grid-area: gun; width: calc(46px * var(--fs)); height: auto; fill: #d7dde6; stroke: rgba(0, 0, 0, 0.6); stroke-width: 1; }
+.hud-ammo { grid-area: ammo; font-size: calc(34px * var(--fs)); line-height: 1; color: #fff; white-space: nowrap; }
+.hud-ammo b { color: #ffe2a8; }
+.hud-ammo-sep { margin: 0 2px; color: var(--c-muted); }
+.hud-weapon-name { grid-area: name; font-size: calc(15px * var(--fs)); letter-spacing: 0.08em; color: #c9cfe0; white-space: nowrap; }
+.hud-reload { grid-area: reload; display: none; align-items: center; gap: 8px; font-size: calc(14px * var(--fs)); letter-spacing: 0.1em; color: #ffd27a; white-space: nowrap; }
+.hud-weapon.reloading .hud-reload { display: flex; }
+.hud-weapon.reloading .hud-ammo b { color: var(--c-muted); }
+.hud-reload-bar { display: block; width: calc(90px * var(--fs)); height: 6px; background: rgba(0, 0, 0, 0.6); }
+.hud-reload-bar i { display: block; height: 100%; width: 0; background: #ffd27a; }
+
+.hud-plate {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-items: end;
+  column-gap: 12px;
+  row-gap: 4px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-stretch: condensed;
+  text-transform: uppercase;
+}
+.hud-name { font-size: calc(30px * var(--fs)); letter-spacing: 0.05em; color: #fff; white-space: nowrap; }
+.hud-hp { display: inline-flex; align-items: center; gap: 4px; font-size: calc(32px * var(--fs)); color: #8fe07a; }
+.hud-heart { width: 0.8em; height: 0.8em; fill: #8fe07a; }
+.hud-hpbar { grid-column: 1 / -1; display: block; width: calc(220px * var(--fs)); height: 6px; background: rgba(0, 0, 0, 0.6); }
+.hud-hpbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #5fbf4f, #8fe07a); transition: width 0.15s; }
+
+/* ===================== Touch controls ===================== */
+:root { --neon: 84px; --neon-small: 62px; --stick: 132px; }
+@media (max-height: 500px) { :root { --neon: 72px; --neon-small: 54px; --stick: 112px; } }
+@media (max-height: 359px) { :root { --neon: 66px; --neon-small: 50px; --stick: 100px; } }
+
+.touch-controls { display: none; position: absolute; inset: 0; pointer-events: none; }
+body.touch .touch-controls { display: block; }
+body.paused .touch-controls { opacity: 0.35; }
+
+.touch-stick {
+  position: absolute;
+  left: calc(var(--safe-l) + 30px);
+  bottom: calc(var(--safe-b) + 10px);
+  width: var(--stick);
+  height: var(--stick);
+  border-radius: 50%;
+  border: 2px solid rgba(190, 198, 255, 0.35);
+  background: radial-gradient(circle, rgba(46, 52, 112, 0.35), rgba(20, 22, 50, 0.15));
+  opacity: 0.55;
+}
+.stick-active .touch-stick {
+  left: 0;
+  top: 0;
+  bottom: auto;
+  margin: calc(var(--stick) / -2) 0 0 calc(var(--stick) / -2);
+  opacity: 0.9;
+}
+.touch-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46%;
+  height: 46%;
+  margin: -23% 0 0 -23%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #6a73d8, #353c8a);
+  border: 2px solid rgba(220, 225, 255, 0.85);
+  box-shadow: 0 0 12px rgba(120, 130, 255, 0.5);
+}
+
+.touch-actions {
+  position: absolute;
+  right: var(--safe-r);
+  bottom: var(--safe-b);
+  display: flex;
+  align-items: flex-end;
+  gap: var(--gap);
+}
+.neon-btn {
+  width: var(--neon);
+  height: var(--neon);
+  border-radius: 50%;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #e9ecff;
+  background: radial-gradient(circle at 50% 35%, rgba(80, 90, 200, 0.75), rgba(25, 28, 70, 0.85));
+  border: 3px solid #9aa6ff;
+  box-shadow: 0 0 14px rgba(120, 130, 255, 0.65), inset 0 0 14px rgba(140, 150, 255, 0.45);
+  touch-action: none;
+}
+.neon-btn.neon-small { width: var(--neon-small); height: var(--neon-small); margin-bottom: calc(var(--neon) * 0.6); }
+.neon-btn.pressed { transform: scale(0.94); filter: brightness(1.25); }
