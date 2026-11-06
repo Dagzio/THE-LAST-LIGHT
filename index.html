@@ -232,6 +232,21 @@
     </div>
   </div>
 
+  <!-- ===== Tutorial hint (D11 / D43): spotlight on the target, arrow, hint card (no narrator). Above the shop,
+       below Settings / confirmation popups. Closes only with its own buttons. ===== -->
+  <div class="tutorial" id="tutorial" hidden>
+    <div class="tut-spot" id="tutSpot"></div>
+    <div class="tut-arrow" id="tutArrow"><svg viewBox="0 0 24 24"><path d="M12 3v14M5 11l7 8 7-8"/></svg></div>
+    <div class="tut-card" id="tutCard" role="dialog" aria-modal="true">
+      <span class="tut-ico" id="tutIco"></span>
+      <p class="tut-text" id="tutText"></p>
+      <div class="tut-btns">
+        <button class="flat-btn tut-skip" data-action="skipTutorial" data-i18n="tut.skip"></button>
+        <button class="brush-btn tut-ok" data-action="tutorialOk" data-i18n="tut.ok"></button>
+      </div>
+    </div>
+  </div>
+
   <!-- Save notice (damaged save restored / reset) -->
   <div class="toast" id="toast" role="status"></div>
 

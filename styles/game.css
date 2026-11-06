@@ -431,6 +431,56 @@ body.map-over .wave-banner { display: none; }
   .result-panel .result-btns .flat-btn { font-size: 16px; min-height: 40px; }
 }
 
+/* ===================== Tutorial hint (D11 / D43): spotlight + arrow + card ===================== */
+.tutorial { position: fixed; inset: 0; z-index: 61; pointer-events: auto; }
+.tutorial[hidden] { display: none; }
+#popup-settings, #popup-confirm { z-index: 70; } /* pause / skip confirmation above the hint */
+.tut-spot {
+  position: fixed;
+  border-radius: 14px;
+  box-shadow: 0 0 0 200vmax rgba(2, 3, 8, 0.62);
+  pointer-events: none;
+}
+.tut-spot.on { outline: 3px solid #ffd27a; outline-offset: 2px; animation: tutPulse 1.1s ease-in-out infinite alternate; }
+@keyframes tutPulse { to { outline-color: rgba(255, 210, 122, 0.35); } }
+.tut-arrow { position: fixed; width: 40px; height: 40px; margin-left: -20px; translate: 0 -100%; pointer-events: none; animation: tutBob 0.8s ease-in-out infinite alternate; }
+.tut-arrow[hidden] { display: none; }
+.tut-arrow.up { translate: 0 0; rotate: 180deg; }
+.tut-arrow svg { width: 100%; height: 100%; fill: none; stroke: #ffd27a; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.8)); }
+@keyframes tutBob { to { margin-top: -8px; } }
+.tut-arrow.up { animation-name: tutBobUp; }
+@keyframes tutBobUp { to { margin-top: 8px; } }
+.tut-card {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-b) + 10px);
+  translate: -50% 0;
+  width: min(620px, calc(100vw - 2 * var(--safe-l)));
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "ico text" "btns btns";
+  gap: calc(10px * var(--fs)) calc(16px * var(--fs));
+  align-items: center;
+  padding: calc(16px * var(--fs)) calc(20px * var(--fs));
+  color: #2f2112;
+  background: radial-gradient(ellipse at 30% 20%, #f3e3c3, #e2c99a 70%, #c9a978);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.65), inset 0 0 30px rgba(120, 80, 30, 0.3);
+  animation: journalIn 0.25s ease-out;
+}
+.tut-card.top { bottom: auto; top: calc(var(--safe-t) + 10px); }
+.tut-ico { grid-area: ico; width: calc(52px * var(--fs)); height: calc(52px * var(--fs)); min-width: 40px; min-height: 40px; border-radius: 50%; display: grid; place-items: center; background: #2b2118; box-shadow: 0 0 0 3px #c98a2e; }
+.tut-ico svg { width: 58%; height: 58%; fill: none; stroke: #ffd27a; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tut-text { grid-area: text; font-size: calc(19px * var(--fs)); line-height: 1.4; }
+.tut-btns { grid-area: btns; display: flex; justify-content: flex-end; align-items: center; gap: calc(16px * var(--fs)); }
+.tut-btns .flat-btn { font-size: calc(16px * var(--fs)); min-height: 40px; }
+.tut-btns .brush-btn { font-size: calc(24px * var(--fs)); }
+@media (max-height: 500px) {
+  .tut-card { padding: 8px 12px; gap: 6px 10px; }
+  .tut-text { font-size: 13px; }
+  .tut-btns .brush-btn { font-size: 18px; min-height: 36px; }
+  .tut-btns .flat-btn { font-size: 12px; min-height: 34px; }
+}
+
 /* Map select: cleared badge + state line (Phase 7) */
 .map-card { position: relative; }
 .map-card-badge { position: absolute; top: 10px; right: 10px; padding: 3px 8px; font: 800 calc(14px * var(--fs)) / 1.2 var(--font-display); letter-spacing: 0.1em; color: #1a1206; background: #ffd27a; }

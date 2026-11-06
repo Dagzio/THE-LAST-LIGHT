@@ -21,6 +21,7 @@ import { getGrenade, GRENADE_RULES } from '../data/grenades.js';
 import { SaveManager } from './SaveManager.js';
 import { Economy, REASON } from '../systems/Economy.js';
 import { nextMapId, isLastMap, defaultMapSelection, campaignSummary } from '../systems/Campaign.js';
+import { TutorialSystem } from '../systems/TutorialSystem.js';
 
 export class Game {
   /** @param {HTMLCanvasElement} canvas2d menu backdrop @param {HTMLCanvasElement} canvas3d map run */
@@ -67,10 +68,12 @@ export class Game {
     this.events.on('killReward', (reward) => this.economy.grantKill(reward));
     this.events.on('coinReward', (amount) => this.economy.grantCoins(amount));
 
+    this.tutorial = new TutorialSystem(this); // hints for the first map (D11 / D43)
+
     this.sm.onChange((next) => {
       // Edge presses made while the world was frozen must not fire on resume.
       if (next === STATES.RUNNING) this.input.clearPressed();
-      if (next === STATES.PAUSED || next === STATES.SHOP_OPEN || next === STATES.CRATE_REWARD_OPEN) this.input.releaseAll();
+      if (next === STATES.PAUSED || next === STATES.SHOP_OPEN || next === STATES.CRATE_REWARD_OPEN || next === STATES.TUTORIAL) this.input.releaseAll();
       if (next !== STATES.RUNNING && this.run) this.run.cancelGrenadeAim(); // never thrown on resume
       if (this.renderer3d) this.renderer3d.pausedDrawn = false; // redraw once with the new overlay state
     });
@@ -212,17 +215,19 @@ export class Game {
     this.input.pointerMapper = (cx, cy, out) => this.renderer3d.screenToGround(cx, cy, out);
     this.input.releaseAll();
     this.loop.resetTiming();
-    return this.sm.set(STATES.RUNNING);
+    const ok = this.sm.set(STATES.RUNNING);
+    if (ok) this.events.emit('mapStarted', map.id); // tutorial: the first hint (beacon)
+    return ok;
   }
 
   /** Pause from the map or from the open shop; resume returns exactly there (02_SPEC §2, C3). */
   pause() {
-    if (this.sm.is(STATES.RUNNING) || this.sm.is(STATES.SHOP_OPEN) || this.sm.is(STATES.CRATE_REWARD_OPEN)) this.resumeState = this.sm.state;
+    if ([STATES.RUNNING, STATES.SHOP_OPEN, STATES.CRATE_REWARD_OPEN, STATES.TUTORIAL].includes(this.sm.state)) this.resumeState = this.sm.state;
     return this.sm.set(STATES.PAUSED);
   }
 
   resume() {
-    const back = this.resumeState === STATES.SHOP_OPEN || this.resumeState === STATES.CRATE_REWARD_OPEN ? this.resumeState : STATES.RUNNING;
+    const back = [STATES.SHOP_OPEN, STATES.CRATE_REWARD_OPEN, STATES.TUTORIAL].includes(this.resumeState) ? this.resumeState : STATES.RUNNING;
     return this.sm.set(back);
   }
 

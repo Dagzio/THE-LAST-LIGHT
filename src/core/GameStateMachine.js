@@ -14,6 +14,7 @@ export const STATES = Object.freeze({
   MAP_VICTORY: 'MAP_VICTORY',
   SHOP_OPEN: 'SHOP_OPEN',   // world + intermission timer frozen (02_SPEC §12)
   CRATE_REWARD_OPEN: 'CRATE_REWARD_OPEN', // perk choice: the world is frozen until a choice is made (02_SPEC §14)
+  TUTORIAL: 'TUTORIAL',                   // a tutorial hint is on screen: the world waits for GOT IT (D11)
 });
 
 const TRANSITIONS = {
@@ -21,10 +22,11 @@ const TRANSITIONS = {
   TAP_TO_PLAY: ['MAIN_MENU'],
   MAIN_MENU: ['MAP_SELECT'],
   MAP_SELECT: ['MAIN_MENU', 'RUNNING'],
-  RUNNING: ['PAUSED', 'MAIN_MENU', 'MAP_DEFEAT', 'MAP_VICTORY', 'SHOP_OPEN', 'CRATE_REWARD_OPEN'],
+  RUNNING: ['PAUSED', 'MAIN_MENU', 'MAP_DEFEAT', 'MAP_VICTORY', 'SHOP_OPEN', 'CRATE_REWARD_OPEN', 'TUTORIAL'],
   SHOP_OPEN: ['RUNNING', 'PAUSED', 'MAIN_MENU'],
   CRATE_REWARD_OPEN: ['RUNNING', 'PAUSED', 'MAIN_MENU'],
-  PAUSED: ['RUNNING', 'SHOP_OPEN', 'CRATE_REWARD_OPEN', 'MAIN_MENU'], // resume returns to where the pause started
+  TUTORIAL: ['RUNNING', 'PAUSED', 'MAIN_MENU'],
+  PAUSED: ['RUNNING', 'SHOP_OPEN', 'CRATE_REWARD_OPEN', 'TUTORIAL', 'MAIN_MENU'], // resume returns to where the pause started
   MAP_DEFEAT: ['RUNNING', 'MAIN_MENU'],  // RETRY → a fresh run; or back to the main menu
   MAP_VICTORY: ['RUNNING', 'MAIN_MENU'], // PLAY AGAIN → a fresh run; or back to the main menu
 };
@@ -33,7 +35,7 @@ const TRANSITIONS = {
 const SIMULATING = new Set([STATES.RUNNING]);
 
 /** In-map states: the game scene is on screen. */
-const IN_MAP = new Set([STATES.RUNNING, STATES.PAUSED, STATES.MAP_DEFEAT, STATES.MAP_VICTORY, STATES.SHOP_OPEN, STATES.CRATE_REWARD_OPEN]);
+const IN_MAP = new Set([STATES.RUNNING, STATES.PAUSED, STATES.MAP_DEFEAT, STATES.MAP_VICTORY, STATES.SHOP_OPEN, STATES.CRATE_REWARD_OPEN, STATES.TUTORIAL]);
 
 export class GameStateMachine {
   constructor(initial = STATES.BOOT) {

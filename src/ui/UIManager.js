@@ -13,6 +13,7 @@ import { SettingsView } from './SettingsView.js';
 import { ShopView } from './ShopView.js';
 import { CrateView } from './CrateView.js';
 import { ResultsView } from './ResultsView.js';
+import { TutorialView } from './TutorialView.js';
 
 const SCREEN_BY_STATE = {
   BOOT: 'splash',
@@ -25,7 +26,10 @@ const SCREEN_BY_STATE = {
   MAP_VICTORY: 'game',
   SHOP_OPEN: 'game',
   CRATE_REWARD_OPEN: 'game',
+  TUTORIAL: 'game',
 };
+
+const CONFIRM_TEXT = { reset: 'confirm.reset', exit: 'confirm.exit', skipTutorial: 'confirm.skipTutorial' };
 
 const SAVE_NOTICE = { 'restored-backup': 'save.restored', 'reset-corrupt': 'save.reset', repaired: 'save.repaired' };
 
@@ -41,6 +45,7 @@ export class UIManager {
     this.confirmKind = null;       // 'reset' | 'exit'
     this.confirmText = document.getElementById('confirmText');
     this.results = new ResultsView(game);
+    this.tutorialView = new TutorialView(game);
 
     document.addEventListener('click', (e) => this._onClick(e));
     document.getElementById('confirmYes').addEventListener('click', () => this._confirm(true));
@@ -133,7 +138,7 @@ export class UIManager {
   /** Page hidden / focus lost / phone rotated: a real pause, the same path as the Pause button (H5 §5, C3). */
   autoPause() {
     const sm = this.game.sm;
-    if (sm.is(STATES.RUNNING) || sm.is(STATES.SHOP_OPEN) || sm.is(STATES.CRATE_REWARD_OPEN)) this.openSettings();
+    if (sm.is(STATES.RUNNING) || sm.is(STATES.SHOP_OPEN) || sm.is(STATES.CRATE_REWARD_OPEN) || sm.is(STATES.TUTORIAL)) this.openSettings();
   }
 
   /** Short notice at the bottom (not a gameplay timer — presentation only). */
@@ -147,7 +152,7 @@ export class UIManager {
   _ask(kind) {
     this.confirmKind = kind;
     if (kind === 'exit' && this.game.sm.inMap) this.game.pause();
-    this.confirmText.textContent = T(kind === 'reset' ? 'confirm.reset' : 'confirm.exit');
+    this.confirmText.textContent = T(CONFIRM_TEXT[kind] || 'confirm.exit');
     this._open('confirm');
   }
 
@@ -161,6 +166,9 @@ export class UIManager {
     } else if (kind === 'exit') {
       this._closeAll();
       this.game.exitToMenu();
+    } else if (kind === 'skipTutorial') {
+      this._close('confirm');
+      this.game.tutorial.skip();
     }
   }
 
@@ -184,6 +192,8 @@ export class UIManager {
       case 'selectMap': this.game.selectMap(btn.dataset.mapId); this._refreshMapSelect(); break;
       case 'retryMap': this.game.retryMap(); break;
       case 'continueCampaign': this.game.continueCampaign(); break;
+      case 'tutorialOk': this.game.tutorial.dismiss(); break;
+      case 'skipTutorial': this._ask('skipTutorial'); break;
       case 'resultMenu': this.game.exitToMenu(); break; // the map is already over: nothing to lose, no confirmation
       case 'startNextWave': this.game.startNextWave(); break;
       case 'flare': this.game.useFlare(); break;
@@ -252,6 +262,6 @@ export class UIManager {
 
   _refreshDynamicText() {
     if (this.game.sm.is(STATES.MAP_SELECT)) this._rebuildMapCards(); else this._refreshMapSelect();
-    if (this.confirmKind) this.confirmText.textContent = T(this.confirmKind === 'reset' ? 'confirm.reset' : 'confirm.exit');
+    if (this.confirmKind) this.confirmText.textContent = T(CONFIRM_TEXT[this.confirmKind] || 'confirm.exit');
   }
 }

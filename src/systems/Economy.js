@@ -63,6 +63,21 @@ export class Economy {
     this._commit();
   }
 
+  // ---------------- tutorial flag (D11/D43): lives in the profile, cleared only by RESET PROGRESS ----------------
+  markTutorialSeen(id, allIds) {
+    const t = this.profile.tutorial;
+    if (t.done || t.seen.includes(id)) return;
+    t.seen.push(id);
+    if (allIds && allIds.every((s) => t.seen.includes(s))) t.done = true;
+    this._commit();
+  }
+
+  skipTutorial() {
+    if (this.profile.tutorial.done) return;
+    this.profile.tutorial.done = true;
+    this._commit();
+  }
+
   _addXp(xp) {
     if (!(xp > 0)) return;
     const p = this.profile;

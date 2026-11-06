@@ -7,8 +7,10 @@ import { WEAPONS } from '../data/weapons.js';
 import { WEAPON_NODES, UPGRADE_NODES, WEAPON_UPGRADE, PLAYER_UPGRADES } from '../data/upgrades.js';
 import { MAPS } from '../data/maps.js';
 import { levelForXp } from '../data/progression.js';
+import { TUTORIAL_STEP_IDS } from '../data/tutorial.js';
 
-export const SCHEMA_VERSION = 1;
+// v2 (Phase 7b): + tutorial { done, seen[] }
+export const SCHEMA_VERSION = 2;
 export const PROFILE_KEY = 'profile';
 export const BACKUP_KEY = 'profile.backup';
 const MAX_COINS = 1e9;
@@ -27,15 +29,20 @@ export function createDefaultProfile() {
     unlockedMaps: [MAPS[0].id],
     completedMaps: [],
     statistics: { totalKills: 0, mapsWon: 0, mapsFailed: 0 },
+    tutorial: { done: false, seen: [] },
   };
 }
 
 /** Brings older schemas up to the current one. Unknown (future) versions are rejected (null). */
 export function migrateProfile(data) {
   if (!data || typeof data !== 'object') return null;
-  const v = data.schemaVersion;
-  if (v === SCHEMA_VERSION) return data;
-  return null; // no older schemas exist yet; a future version is not understood
+  let d = data;
+  if (d.schemaVersion === 1) {
+    // v1 → v2: tutorial flag. A player who already played (has XP) is not sent through the tutorial again.
+    d = { ...d, schemaVersion: 2, tutorial: { done: (d.totalXp | 0) > 0, seen: [] } };
+  }
+  if (d.schemaVersion === SCHEMA_VERSION) return d;
+  return null; // a future version is not understood
 }
 
 const int = (v, min, max) => (Number.isFinite(v) ? Math.min(max, Math.max(min, Math.floor(v))) : null);
@@ -98,6 +105,11 @@ export function validateProfile(data) {
 
   const st = data.statistics && typeof data.statistics === 'object' ? data.statistics : {};
   for (const k of Object.keys(p.statistics)) p.statistics[k] = int(st[k], 0, MAX_COINS) ?? 0;
+
+  const tu = data.tutorial && typeof data.tutorial === 'object' ? data.tutorial : {};
+  fix(typeof tu.done === 'boolean');
+  p.tutorial.done = tu.done === true;
+  p.tutorial.seen = Array.isArray(tu.seen) ? [...new Set(tu.seen.filter((id) => TUTORIAL_STEP_IDS.includes(id)))] : [];
   return { profile: p, repaired };
 }
 
