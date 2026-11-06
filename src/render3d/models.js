@@ -121,6 +121,103 @@ export function muzzleGeometry() {
   return mergeParts([a, b]);
 }
 
+// ---------------- beacon & tower-defense devices ----------------
+const B = {
+  stone: '#4a4f58', stoneDark: '#33373e', tower: '#d9d4c8', band: '#8c2f2b', iron: '#2a2e35', roof: '#3a1f1c',
+  pad: '#3d424a', padRim: '#5a606a', metal: '#6b737d', metalDark: '#3a4048', brass: '#a87a3e',
+  coil: '#5d8fa8', coilDark: '#2c4656',
+};
+
+/** Lighthouse: octagonal plinth, tapered tower with two red bands, gallery, roof. Footprint radius ≈ 46, height ≈ 150. */
+export function beaconGeometry() {
+  const P = [];
+  P.push(part(new THREE.CylinderGeometry(58, 64, 10, 8), B.stoneDark, { y: 5 }));
+  P.push(part(new THREE.CylinderGeometry(48, 54, 10, 8), B.stone, { y: 15 }));
+  P.push(part(new THREE.CylinderGeometry(26, 40, 96, 16), B.tower, { y: 68 }));
+  P.push(part(new THREE.CylinderGeometry(35.6, 37.6, 14, 16), B.band, { y: 42 }));
+  P.push(part(new THREE.CylinderGeometry(30.2, 32.2, 14, 16), B.band, { y: 82 }));
+  P.push(part(new THREE.CylinderGeometry(34, 34, 4, 16), B.iron, { y: 118 }));       // gallery floor
+  for (let i = 0; i < 12; i++) {                                                      // gallery rail posts
+    const a = (i / 12) * Math.PI * 2;
+    P.push(part(new THREE.BoxGeometry(2, 9, 2), B.iron, { x: Math.cos(a) * 32, y: 124, z: Math.sin(a) * 32 }));
+  }
+  P.push(part(new THREE.CylinderGeometry(33, 33, 1.6, 16, 1, true), B.iron, { y: 128 }));
+  P.push(part(new THREE.CylinderGeometry(21, 21, 3, 12), B.iron, { y: 121 }));
+  P.push(part(new THREE.ConeGeometry(25, 20, 12), B.roof, { y: 150 }));
+  P.push(part(new THREE.SphereGeometry(3, 8, 6), B.brass, { y: 161 }));
+  return mergeParts(P);
+}
+
+/** Glass lantern room (separate, emissive-looking material). */
+export function beaconLanternGeometry() {
+  return mergeParts([part(new THREE.CylinderGeometry(19, 19, 18, 12), '#ffffff', { y: 131 })]);
+}
+
+/** Beam sector lying on the ground along +X: vertex colours fade from the beacon to the end of the range. */
+export function beamGeometry(range, halfAngle) {
+  const g = new THREE.CircleGeometry(range, 40, -halfAngle, halfAngle * 2);
+  g.rotateX(-Math.PI / 2); // XY → XZ (angles flip sign, the sector is symmetric so it does not matter)
+  const pos = g.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const d = Math.hypot(pos.getX(i), pos.getZ(i)) / range;
+    const k = Math.pow(Math.max(0, 1 - d), 1.4) * 0.55;
+    col[i * 3] = k; col[i * 3 + 1] = k * 0.78; col[i * 3 + 2] = k * 0.45;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+
+/** Build pad: low stone disc with a rim. */
+export function padGeometry() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(34, 37, 6, 16), B.pad, { y: 3 }),
+    part(new THREE.TorusGeometry(31, 2, 6, 24), B.padRim, { y: 6.2, rx: Math.PI / 2 }),
+  ]);
+}
+
+/** Guard Turret base (static). */
+export function turretBaseGeometry() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(20, 24, 10, 10), B.metalDark, { y: 11 }),
+    part(new THREE.CylinderGeometry(9, 12, 16, 10), B.metal, { y: 22 }),
+  ]);
+}
+
+/** Guard Turret head (rotates to its target, faces +X). */
+export function turretHeadGeometry() {
+  return mergeParts([
+    part(new THREE.BoxGeometry(22, 12, 18), B.metal, { y: 34 }),
+    part(new THREE.BoxGeometry(6, 9, 20), B.metalDark, { x: -10, y: 34 }),
+    part(new THREE.CylinderGeometry(2.6, 3, 22, 8), B.metalDark, { x: 20, y: 35, z: -4, rz: -Math.PI / 2 }),
+    part(new THREE.CylinderGeometry(2.6, 3, 22, 8), B.metalDark, { x: 20, y: 35, z: 4, rz: -Math.PI / 2 }),
+    part(new THREE.BoxGeometry(5, 3, 12), B.brass, { x: 2, y: 41 }),
+  ]);
+}
+
+/** Frost Coil: base + copper coil rings + a glowing crystal (crystal separate). */
+export function coilGeometry() {
+  const P = [part(new THREE.CylinderGeometry(18, 22, 10, 10), B.metalDark, { y: 11 })];
+  P.push(part(new THREE.CylinderGeometry(5, 6, 34, 8), B.coilDark, { y: 32 }));
+  for (let i = 0; i < 4; i++) P.push(part(new THREE.TorusGeometry(10 - i * 1.2, 2, 6, 16), B.coil, { y: 20 + i * 7, rx: Math.PI / 2 }));
+  return mergeParts(P);
+}
+
+export function coilCrystalGeometry() {
+  return mergeParts([part(new THREE.OctahedronGeometry(8, 0), '#ffffff', { y: 56, sy: 1.6 })]);
+}
+
+/** Aim reticle on the ground: ring + 4 ticks (like the reference screenshot). */
+export function reticleGeometry() {
+  const P = [part(new THREE.RingGeometry(9, 11.5, 28), '#ffffff', { rx: -Math.PI / 2 })];
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    P.push(part(new THREE.PlaneGeometry(7, 2.2), '#ffffff', { x: Math.cos(a) * 17, z: Math.sin(a) * 17, rx: -Math.PI / 2, rz: -a }));
+  }
+  P.push(part(new THREE.CircleGeometry(2.4, 12), '#ffffff', { rx: -Math.PI / 2 }));
+  return mergeParts(P);
+}
+
 // ---------------- environment props (decorative, never block movement in MVP) ----------------
 export const PROP_KINDS = ['rock', 'ruin', 'stump', 'post'];
 
@@ -167,6 +264,16 @@ export function buildShowcase(materials, rng) {
   out.set('grunt', tag(grunt, 'grunt'));
   out.set('bullet', tag(new THREE.Mesh(bulletGeometry(), materials.bullet), 'bullet'));
   out.set('muzzle', tag(new THREE.Mesh(muzzleGeometry(), materials.muzzle), 'muzzle'));
+  const beacon = new THREE.Group();
+  beacon.add(new THREE.Mesh(beaconGeometry(), materials.prop), new THREE.Mesh(beaconLanternGeometry(), materials.lanternGlass));
+  out.set('beacon', tag(beacon, 'beacon'));
+  out.set('build-pad', tag(new THREE.Mesh(padGeometry(), materials.prop), 'build-pad'));
+  const turret = new THREE.Group();
+  turret.add(new THREE.Mesh(turretBaseGeometry(), materials.character), new THREE.Mesh(turretHeadGeometry(), materials.character));
+  out.set('guard-turret', tag(turret, 'guard-turret'));
+  const coil = new THREE.Group();
+  coil.add(new THREE.Mesh(coilGeometry(), materials.character), new THREE.Mesh(coilCrystalGeometry(), materials.crystal));
+  out.set('frost-coil', tag(coil, 'frost-coil'));
   for (const kind of PROP_KINDS) out.set(`prop-${kind}`, tag(new THREE.Mesh(mergeParts(propParts(kind, rng, 0, 0)), materials.prop), `prop-${kind}`));
   return out;
 }

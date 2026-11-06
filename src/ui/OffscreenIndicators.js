@@ -21,6 +21,11 @@ export class OffscreenIndicators {
       this.root.appendChild(el);
       this.arrows.push({ el, on: false, x: 0, y: 0, a: 0 });
     }
+    const be = document.createElement('div');
+    be.className = 'offscreen-arrow beacon';
+    be.innerHTML = ARROW_SVG;
+    this.root.appendChild(be);
+    this.beaconArrow = { el: be, on: false, x: 0, y: 0, a: 0, alert: false };
     this.pick = new Array(MAX_ENEMY_ARROWS).fill(null);
     this.pickD = new Array(MAX_ENEMY_ARROWS).fill(Infinity);
     this.pt = { x: 0, y: 0 };
@@ -29,6 +34,23 @@ export class OffscreenIndicators {
 
   _hideAll() {
     for (const a of this.arrows) if (a.on) { a.on = false; a.el.classList.remove('on'); }
+    const b = this.beaconArrow;
+    if (b.on) { b.on = false; b.el.classList.remove('on'); }
+  }
+
+  /** Places arrow `a` on the screen edge towards the projected point; hides it when the point is on screen. */
+  _place(a, px, py, W, H) {
+    if (px >= 0 && px <= W && py >= 0 && py <= H) { if (a.on) { a.on = false; a.el.classList.remove('on'); } return; }
+    const cx = W / 2, cy = H / 2;
+    const dx = px - cx, dy = py - cy;
+    const ang = Math.atan2(dy, dx);
+    const k = Math.min((cx - EDGE) / Math.max(1e-6, Math.abs(dx)), (cy - EDGE) / Math.max(1e-6, Math.abs(dy)));
+    const x = cx + dx * k, y = cy + dy * k;
+    if (!a.on) { a.on = true; a.el.classList.add('on'); }
+    if (Math.abs(x - a.x) > 0.5 || Math.abs(y - a.y) > 0.5 || Math.abs(ang - a.a) > 0.01) {
+      a.x = x; a.y = y; a.a = ang;
+      a.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${ang.toFixed(3)}rad)`;
+    }
   }
 
   update() {
@@ -51,6 +73,13 @@ export class OffscreenIndicators {
       for (let i = 1; i < pick.length; i++) if (pickD[i] > pickD[worst]) worst = i;
       if (d < pickD[worst]) { pick[worst] = e; pickD[worst] = d; }
     }
+
+    // Beacon: shown when off-screen, blinking while it is being attacked.
+    const bc = g.run.beacon;
+    r3.projectToScreen(bc.x, bc.y, 60, this.pt);
+    this._place(this.beaconArrow, this.pt.x, this.pt.y, W, H);
+    const alert = !bc.destroyed && g.clock.time - bc.lastHitAt < 1.5;
+    if (alert !== this.beaconArrow.alert) { this.beaconArrow.alert = alert; this.beaconArrow.el.classList.toggle('alert', alert); }
 
     const cx = W / 2, cy = H / 2;
     for (let i = 0; i < this.arrows.length; i++) {

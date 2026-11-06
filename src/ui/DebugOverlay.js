@@ -26,13 +26,13 @@ export function initDebugOverlay(game) {
     }
     const run = game.run;
     if (run) {
-      const p = run.player, w = run.weapon, t = run.target;
+      const p = run.player, w = run.weapon, b = run.beacon;
       const alive = run.enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0);
       lines.push(
         `map ${run.mapId}  seed ${run.runSeed}`,
         `HP ${Math.ceil(p.hp)}/${p.maxHp}  dodge ${p.dodging ? 'ON' : Math.max(0, p.dodgeReadyAt - game.clock.time).toFixed(1) + 's'}`,
         `ammo ${w.ammo}/${w.stats.magazineSize}  reload ${w.reloading ? (w.reloadProgress(game.clock.time) * 100).toFixed(0) + '%' : '-'}`,
-        `target ${t ? `#${t.id} ${t.typeId} ${Math.ceil(t.hp)}hp` : '-'}`,
+        `beacon ${Math.ceil(b.integrity)}/${b.maxIntegrity}  beam ${run.light.angle.toFixed(2)}rad  devices ${run.defenses.pads.map((d) => (d.device ? d.device.id : '-')).join(',')}`,
         `enemies ${alive}/${run.enemies.length}  projectiles ${run.projectiles.activeCount}  particles ${run.particles.activeCount}`,
         `kills ${run.stats.kills}  shots ${run.stats.shotsFired}`,
       );

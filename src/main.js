@@ -27,6 +27,10 @@ function wireCombatSounds(events) {
   events.on('reloadStart', () => Sfx.play('reload'));
   events.on('reloadEnd', () => Sfx.play('reloadEnd'));
   events.on('dash', () => Sfx.play('dash'));
+  events.on('beaconHit', () => Sfx.play('beaconHit', 0.9 + Math.random() * 0.2));
+  events.on('turretShot', () => Sfx.play('turretShot', 0.92 + Math.random() * 0.16));
+  events.on('frostPulse', () => Sfx.play('frostPulse'));
+  events.on('mapDefeat', () => Sfx.play('defeat'));
 }
 
 /** @param {{loaded: Promise<void>, shownAt: number}} boot */

@@ -24,13 +24,35 @@ export class Enemy {
     this.maxHp = type.maxHp;
     this.hp = type.maxHp;
     this.armor = type.armor || 0;
-    this.state = ENEMY_STATES.IDLE;
+    this.state = ENEMY_STATES.MOVE_TO_BEACON;
     this.deathAt = 0;
     this.lastHitAt = -Infinity;
     // Flags used by targeting priorities; filled by later phases (beacon, light).
     this.attackingBeacon = false;
     this.beaconThreat = 0;
     this.illuminated = false;
+    this.illuminatedUntil = -Infinity;
+    this.faceAngle = 0;          // presentation: where the enemy looks (set by EnemyAISystem)
+    // Slow (Frost Coil, Cryo): never stacks — the strongest active slow wins, a new pulse refreshes the duration.
+    this.slowAmount = 0;
+    this.slowUntil = -Infinity;
+    // Beacon attack timing (game clock)
+    this.nextAttackAt = 0;
+    this.lastAttackAt = -Infinity;
+  }
+
+  /** Current speed multiplier from slows (1 = no slow). */
+  slowFactor(time) {
+    return time < this.slowUntil ? 1 - this.slowAmount : 1;
+  }
+
+  /** Applies a slow without stacking: max(amount), duration refreshed to at least time + duration. */
+  applySlow(amount, duration, time) {
+    if (!this.alive || !(amount > 0) || !(duration > 0)) return;
+    const a = Math.min(0.9, amount * (this.type.bossSlowFactor ?? 1));
+    if (time >= this.slowUntil) this.slowAmount = a;
+    else this.slowAmount = Math.max(this.slowAmount, a);
+    this.slowUntil = Math.max(this.slowUntil, time + duration);
   }
 
   get alive() { return this.state !== ENEMY_STATES.DEAD; }

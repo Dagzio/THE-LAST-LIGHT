@@ -24,7 +24,16 @@ export function createMaterials() {
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     }),
     ghost: new THREE.MeshBasicMaterial({ color: 0x9fb0d8, transparent: true, opacity: 0.22, depthWrite: false }),
-    marker: new THREE.MeshBasicMaterial({ color: 0xffc878, transparent: true, opacity: 0.9, depthWrite: false }),
+    reticle: new THREE.MeshBasicMaterial({ color: 0xffe2b0, vertexColors: true, transparent: true, opacity: 0.85, depthWrite: false }),
+    lanternGlass: new THREE.MeshBasicMaterial({ color: 0xffc46a, vertexColors: true }),
+    beam: new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    }),
+    crystal: new THREE.MeshBasicMaterial({ color: 0x9fe4ff, vertexColors: true }),
+    frostRing: new THREE.MeshBasicMaterial({
+      color: 0x8fd4ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    }),
+    padRune: new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.35, depthWrite: false }),
     reload: new THREE.MeshBasicMaterial({ color: 0xffd27a, depthWrite: false, transparent: true }),
     hpBack: new THREE.MeshBasicMaterial({ color: 0x0b0c0f, transparent: true, opacity: 0.75, depthWrite: false }),
     hpFill: new THREE.MeshBasicMaterial({ color: 0xd2453a, depthWrite: false, transparent: true }),

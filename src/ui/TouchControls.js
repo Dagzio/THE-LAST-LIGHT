@@ -1,5 +1,6 @@
-// Touch adapter (decision D12, 04_ARCH §15): a floating virtual stick in the left part of the screen and
-// neon action buttons (DASH, RELOAD) bottom-right. It only feeds InputManager sources — gameplay code is the
+// Touch adapter (decision D12, 04_ARCH §15): a floating virtual stick in the left part of the screen, manual aim
+// in the right part (user decision 2026-11-06: the keeper turns to the point under the finger and fires while the
+// finger is down; dragging moves the aim point) and neon action buttons (DASH, RELOAD) bottom-right. It only feeds InputManager sources — gameplay code is the
 // same for keyboard and touch. Shown only on touch devices. Multi-touch: each pointer is tracked by id.
 import { STATES } from '../core/GameStateMachine.js';
 
@@ -17,6 +18,7 @@ export class TouchControls {
     this.stick = document.getElementById('touchStick');
     this.knob = document.getElementById('touchKnob');
     this.stickPointer = null;
+    this.aimPointer = null;
     this.baseX = 0;
     this.baseY = 0;
 
@@ -54,9 +56,10 @@ export class TouchControls {
   }
 
   _stickDown(e) {
-    if (e.pointerType === 'mouse' || this.stickPointer !== null) return;
+    if (e.pointerType === 'mouse') return;
     if (!this.game.sm.is(STATES.RUNNING)) return;
-    if (e.clientX > window.innerWidth * STICK_ZONE) return;
+    if (e.clientX > window.innerWidth * STICK_ZONE) { this._aimDown(e); return; }
+    if (this.stickPointer !== null) return;
     this.stickPointer = e.pointerId;
     this.baseX = e.clientX;
     this.baseY = e.clientY;
@@ -65,7 +68,15 @@ export class TouchControls {
     this.root.classList.add('stick-active');
   }
 
+  _aimDown(e) {
+    if (this.aimPointer !== null) return;
+    this.aimPointer = e.pointerId;
+    this.input.setAimClient(e.clientX, e.clientY);
+    this.input.setSourceAction(SOURCE, 'fire', true);
+  }
+
   _stickMove(e) {
+    if (e.pointerId === this.aimPointer) { this.input.setAimClient(e.clientX, e.clientY); return; }
     if (e.pointerId !== this.stickPointer) return;
     let dx = e.clientX - this.baseX;
     let dy = e.clientY - this.baseY;
@@ -78,6 +89,12 @@ export class TouchControls {
   }
 
   _stickUp(e) {
+    if (e.pointerId === this.aimPointer) {
+      this.aimPointer = null;
+      this.input.setSourceAction(SOURCE, 'fire', false);
+      this.input.clearAim(); // the keeper keeps facing the last direction
+      return;
+    }
     if (e.pointerId !== this.stickPointer) return;
     this.stickPointer = null;
     this.input.setSourceAxis(SOURCE, 0, 0);
@@ -88,6 +105,8 @@ export class TouchControls {
 
   reset() {
     this.stickPointer = null;
+    if (this.aimPointer !== null) { this.aimPointer = null; this.input.clearAim(); }
+    this.input.setSourceAction(SOURCE, 'fire', false);
     this.input.setSourceAxis(SOURCE, 0, 0);
     this.root.classList.remove('stick-active');
     this.knob.style.transform = 'translate(0px, 0px)';

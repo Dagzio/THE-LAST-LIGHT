@@ -43,6 +43,8 @@ export class Game {
     this.run = null;                 // MapRun of the current map attempt
     this._view = { scene: 'backdrop', realTime: 0, simTime: 0, quality: this.quality };
     this.frameListeners = new Set();
+    // Defeat is reported once by the MapRun; the state machine ignores repeats.
+    this.events.on('mapDefeat', () => this.sm.set(STATES.MAP_DEFEAT));
 
     this.sm.onChange((next) => {
       // Edge presses made while the world was frozen must not fire on resume.
@@ -74,7 +76,7 @@ export class Game {
   render(alpha, frameDt) {
     this.presentationTime += frameDt;
     if (this.sm.inMap && this.run && this.renderer3d) {
-      this.renderer3d.render(this.run, frameDt, this.clock.time, this.sm.is(STATES.PAUSED));
+      this.renderer3d.render(this.run, frameDt, this.clock.time, !this.sm.is(STATES.RUNNING));
     } else {
       this.viewport.ensure();
       const v = this._view;
@@ -119,6 +121,17 @@ export class Game {
   beginMap() {
     const map = getMap(this.selectedMapId);
     if (!this.sm.is(STATES.MAP_SELECT) || !map || !this.renderer3d) return false;
+    return this._startRun(map);
+  }
+
+  /** RETRY after a defeat: a completely fresh run of the same map (temporary data reset, 01_GDD §15). */
+  retryMap() {
+    const map = getMap(this.mapId);
+    if (!this.sm.is(STATES.MAP_DEFEAT) || !map) return false;
+    return this._startRun(map);
+  }
+
+  _startRun(map) {
     this.mapId = map.id;
     this.clock.reset();
     this._disposeRun();

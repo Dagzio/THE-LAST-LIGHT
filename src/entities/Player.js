@@ -15,7 +15,10 @@ export class Player {
     this.facingX = 1;          // last non-zero movement direction (dodge fallback)
     this.facingY = 0;
     this.hasMoved = false;     // until the first move, a standing dodge goes towards the cursor
-    this.aimAngle = 0;         // presentation: where the pistol points
+    this.aimAngle = 0;         // where the keeper looks and shoots (manual aim)
+    this.aimX = x;             // aim point on the ground (reticle), valid while hasAim
+    this.aimY = y;
+    this.hasAim = false;
 
     this.dodging = false;
     this.dodgeEndsAt = 0;

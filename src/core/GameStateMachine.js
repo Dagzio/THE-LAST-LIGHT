@@ -8,6 +8,7 @@ export const STATES = Object.freeze({
   MAP_SELECT: 'MAP_SELECT',
   RUNNING: 'RUNNING',
   PAUSED: 'PAUSED',
+  MAP_DEFEAT: 'MAP_DEFEAT',
 });
 
 const TRANSITIONS = {
@@ -15,8 +16,9 @@ const TRANSITIONS = {
   TAP_TO_PLAY: ['MAIN_MENU'],
   MAIN_MENU: ['MAP_SELECT'],
   MAP_SELECT: ['MAIN_MENU', 'RUNNING'],
-  RUNNING: ['PAUSED', 'MAIN_MENU'],
+  RUNNING: ['PAUSED', 'MAIN_MENU', 'MAP_DEFEAT'],
   PAUSED: ['RUNNING', 'MAIN_MENU'],
+  MAP_DEFEAT: ['RUNNING', 'MAIN_MENU'], // RETRY → a fresh run; or back to the main menu
 };
 
 /** States in which the world simulation (GameClock) advances. */
@@ -45,7 +47,7 @@ export class GameStateMachine {
   get simulating() { return SIMULATING.has(this.state); }
 
   /** In-map states: the game scene is on screen. */
-  get inMap() { return this.state === STATES.RUNNING || this.state === STATES.PAUSED; }
+  get inMap() { return this.state === STATES.RUNNING || this.state === STATES.PAUSED || this.state === STATES.MAP_DEFEAT; }
 
   onChange(fn) {
     this.listeners.add(fn);

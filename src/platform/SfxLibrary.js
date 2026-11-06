@@ -66,6 +66,22 @@ const RECIPES = {
       return lp * Math.sin(Math.PI * (t / 0.25)) * 0.9;
     });
   },
+  // Claws on the beacon stone: dull heavy knock + grit.
+  beaconHit: () => render(0.3, (t) => (Math.sin(2 * Math.PI * (70 - 60 * t) * t) * 0.6 + noise() * 0.25 * Math.exp(-t * 30)) * Math.exp(-t * 12)),
+  // Guard turret: short metallic pop.
+  turretShot: () => render(0.12, (t) => (Math.sin(2 * Math.PI * 520 * t) * 0.25 + noise() * 0.35) * Math.exp(-t * 55)),
+  // Frost coil pulse: icy chime + airy hiss.
+  frostPulse: () => {
+    let lp = 0;
+    return render(0.6, (t) => {
+      lp += (noise() - lp) * 0.3;
+      const chime = (Math.sin(2 * Math.PI * 1320 * t) + 0.6 * Math.sin(2 * Math.PI * 1980 * t)) * Math.exp(-t * 7) * 0.12;
+      return chime + lp * 0.12 * Math.exp(-t * 5);
+    });
+  },
+  // Defeat: low falling drone.
+  defeat: () => render(1.6, (t) => (Math.sin(2 * Math.PI * (130 - 50 * t) * t) * 0.35 + Math.sin(2 * Math.PI * (97 - 40 * t) * t) * 0.25)
+    * Math.min(1, t * 8) * Math.exp(-t * 1.6)),
   // Popup open: soft paper/cloth whoosh.
   open: () => {
     let lp = 0;

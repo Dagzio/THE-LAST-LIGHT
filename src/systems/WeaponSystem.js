@@ -1,6 +1,6 @@
-// Main firearm loop (02_SPEC §5): auto-fire at the current target, magazine, reload.
-// A shot happens only when: the simulation runs (caller), not reloading, the fire cooldown is over,
-// ammo > 0 and the target is valid in range. Without a target no ammo is spent.
+// Main firearm loop: MANUAL fire towards the aim point (user decision 2026-11-06, replaces the auto-fire of 02_SPEC §5),
+// magazine, reload. A shot happens only when: the simulation runs (caller), the trigger is held, not reloading,
+// the fire cooldown is over and ammo > 0.
 // One trigger pull = one round from the magazine; pelletsPerShot projectiles per pull (shotgun).
 // All timers are game-clock timestamps: they freeze with the simulation.
 import { PROJECTILES } from '../data/balance.js';
@@ -52,12 +52,14 @@ export class WeaponSystem {
   }
 
   /**
+   * Manual fire (user decision 2026-11-06): shoots while the trigger ("fire": mouse button / touch) is held,
+   * in the direction the keeper aims (player.aimAngle). Every shot spends one round, target or not.
    * @param {WeaponState} w
    * @param {import('../entities/Player.js').Player} player
-   * @param {object|null} target current valid target from TargetingSystem
+   * @param {boolean} fireHeld trigger held this step
    * @param {boolean} manualReload R / touch RELOAD pressed this step
    */
-  update(w, player, target, manualReload, time) {
+  update(w, player, fireHeld, manualReload, time) {
     if (w.reloading && time >= w.reloadEndsAt) {
       w.reloading = false;
       w.ammo = w.stats.magazineSize;
@@ -65,16 +67,8 @@ export class WeaponSystem {
     }
     if (manualReload) this.startReload(w, time);
     if (!player.alive) return false;
-
-    if (target) player.aimAngle = Math.atan2(target.y - player.y, target.x - player.x);
-
-    if (w.reloading || !target || w.ammo <= 0 || time < w.nextShotAt) {
-      if (w.ammo <= 0 && !w.reloading) this.startReload(w, time); // auto reload once
-      return false;
-    }
-    const dx = target.x - player.x, dy = target.y - player.y;
-    if (dx * dx + dy * dy > w.stats.range * w.stats.range) return false;
-
+    if (w.ammo <= 0 && !w.reloading) this.startReload(w, time); // auto reload once on an empty magazine
+    if (!fireHeld || w.reloading || w.ammo <= 0 || time < w.nextShotAt) return false;
     this._fire(w, player, time);
     if (w.ammo <= 0) this.startReload(w, time);
     return true;

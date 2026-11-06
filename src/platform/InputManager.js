@@ -1,6 +1,8 @@
 // Device-independent input (02_SPEC §3, 04_ARCH §15). Sources (keyboard/mouse now, a touch adapter
 // in Phase 2) feed abstract actions and a movement axis; gameplay reads only:
-//   getMove(out), isDown(action), consumePressed(action), pointer.world
+//   getMove(out), isDown(action), consumePressed(action), getAimWorld(out), pointer.world
+// Aim (manual shooting, user decision 2026-11-06): desktop — the mouse cursor, left button = "fire" (hold = auto);
+// touch — the point under the finger in the right part of the screen (TouchControls sets it), touching = fire.
 // Listeners are attached once. Keyup, blur and tab hiding release everything (no stuck keys).
 import { KEY_BINDINGS, ACTIONS } from '../config/controls.js';
 
@@ -20,6 +22,7 @@ export class InputManager {
     this.pressedQueue = new Set();      // edge-triggered presses not yet consumed by a fixed update
     this.pointer = { clientX: 0, clientY: 0, inside: false, world: { x: 0, y: 0 } };
     this.pointerMapper = null;          // (clientX, clientY, out) → world point; set by the 3D renderer in a map
+    this.aim = { active: false, clientX: 0, clientY: 0 }; // screen point the keeper looks/shoots at
     this._attached = false;
   }
 
@@ -34,7 +37,13 @@ export class InputManager {
       canvas.addEventListener('pointermove', (e) => this._onPointer(e, true));
       canvas.addEventListener('pointerdown', (e) => this._onPointer(e, true));
       canvas.addEventListener('pointerleave', (e) => this._onPointer(e, false));
+      canvas.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse' && e.button === 0) this.setSourceAction('mouse', 'fire', true);
+      });
     }
+    window.addEventListener('pointerup', (e) => {
+      if (e.pointerType === 'mouse' && e.button === 0) this.setSourceAction('mouse', 'fire', false);
+    });
   }
 
   _onKey(e, down) {
@@ -56,6 +65,24 @@ export class InputManager {
     this.pointer.clientX = e.clientX;
     this.pointer.clientY = e.clientY;
     this.pointer.inside = inside;
+    if (e.pointerType === 'mouse') this.setAimClient(e.clientX, e.clientY); // the keeper always follows the cursor
+  }
+
+  // ---- aim ----
+  setAimClient(clientX, clientY) {
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
+    this.aim.active = true;
+    this.aim.clientX = clientX;
+    this.aim.clientY = clientY;
+  }
+
+  /** Touch released: keep the current facing, no aim point. */
+  clearAim() { this.aim.active = false; }
+
+  /** Aim point on the ground in world units, or null when there is none (the keeper keeps his facing). */
+  getAimWorld(out) {
+    if (!this.aim.active || !this.pointerMapper) return null;
+    return this.pointerMapper(this.aim.clientX, this.aim.clientY, out);
   }
 
   // ---- source API for adapters (touch controls) ----

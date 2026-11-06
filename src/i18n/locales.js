@@ -108,6 +108,13 @@ const ROWS = [
   ['weapon.assault_rifle', 'ASSAULT RIFLE', 'ШТУРМОВА ГВИНТІВКА', 'ШТУРМОВАЯ ВИНТОВКА', 'STURMGEWEHR', "FUCILE D'ASSALTO", "FUSIL D'ASSAUT", 'FUSIL DE ASALTO', 'FUZIL DE ASSALTO', 'بندقية هجومية', 'アサルトライフル'],
   ['weapon.machine_gun', 'HEAVY MACHINE GUN', 'ВАЖКИЙ КУЛЕМЕТ', 'ТЯЖЁЛЫЙ ПУЛЕМЁТ', 'SCHWERES MG', 'MITRAGLIATRICE PESANTE', 'MITRAILLEUSE LOURDE', 'AMETRALLADORA PESADA', 'METRALHADORA PESADA', 'رشاش ثقيل', '重機関銃'],
 
+  ['defense.guard_turret', 'GUARD TURRET', 'ВАРТОВА ТУРЕЛЬ', 'СТОРОЖЕВАЯ ТУРЕЛЬ', 'WACHGESCHÜTZ', 'TORRETTA DI GUARDIA', 'TOURELLE DE GARDE', 'TORRETA GUARDIANA', 'TORRE DE GUARDA', 'برج الحراسة', 'ガードタレット'],
+  ['defense.frost_coil', 'FROST COIL', 'МОРОЗНА КОТУШКА', 'МОРОЗНАЯ КАТУШКА', 'FROSTSPULE', 'BOBINA DI GELO', 'BOBINE DE GIVRE', 'BOBINA DE ESCARCHA', 'BOBINA DE GELO', 'ملف الصقيع', 'フロストコイル'],
+  ['defeat.beacon', 'THE BEACON HAS FALLEN', 'МАЯК ЗГАС', 'МАЯК ПОГАС', 'DAS LEUCHTFEUER IST ERLOSCHEN', 'IL FARO SI È SPENTO', "LE PHARE S'EST ÉTEINT", 'EL FARO SE HA APAGADO', 'O FAROL SE APAGOU', 'انطفأت المنارة', '灯台の光が消えた'],
+  ['defeat.player', 'THE KEEPER HAS FALLEN', 'ДОГЛЯДАЧ ЗАГИНУВ', 'СМОТРИТЕЛЬ ПАЛ', 'DER WÄRTER IST GEFALLEN', 'IL GUARDIANO È CADUTO', 'LE GARDIEN EST TOMBÉ', 'EL GUARDIÁN HA CAÍDO', 'O GUARDIÃO CAIU', 'سقط الحارس', '灯台守は倒れた'],
+  ['defeat.retry', 'RETRY', 'ЩЕ РАЗ', 'ЕЩЁ РАЗ', 'NOCHMAL', 'RIPROVA', 'REJOUER', 'REINTENTAR', 'TENTAR DE NOVO', 'أعد المحاولة', 'リトライ'],
+  ['defeat.menu', 'MAIN MENU', 'ГОЛОВНЕ МЕНЮ', 'ГЛАВНОЕ МЕНЮ', 'HAUPTMENÜ', 'MENU PRINCIPALE', 'MENU PRINCIPAL', 'MENÚ PRINCIPAL', 'MENU PRINCIPAL', 'القائمة الرئيسية', 'メインメニュー'],
+
   ['hud.paused', 'GAME PAUSED', 'ГРУ ПРИЗУПИНЕНО', 'ИГРА НА ПАУЗЕ', 'PAUSIERT', 'GIOCO IN PAUSA', 'JEU EN PAUSE', 'JUEGO EN PAUSA', 'JOGO PAUSADO', 'اللعبة متوقفة', '一時停止中'],
 ];
 

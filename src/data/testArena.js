@@ -1,13 +1,18 @@
-// PHASE 2 TEST HARNESS — static test Grunts to verify targeting and combat without waves.
-// Replaced by the WaveSystem in Phase 4 (delete this file then).
+// TEST HARNESS (Phases 2–3) — until waves (Phase 4) and the shop (Phase 5) exist:
+// - Grunts keep coming from the map edges towards the beacon at a fixed interval (capped);
+// - both build pads get a device through the SAME placement command the shop will use (no debug keys/flags).
+// Replaced by the WaveSystem in Phase 4 and the shop in Phase 5 (delete this file then).
 
 export const TEST_ARENA = {
-  dummies: [
-    { enemyId: 'grunt', x: 760, y: 640 },
-    { enemyId: 'grunt', x: 1260, y: 700 },
-    { enemyId: 'grunt', x: 1150, y: 1010 },
-    { enemyId: 'grunt', x: 380, y: 300 },   // far away: off-screen indicator check
-    { enemyId: 'grunt', x: 1720, y: 1120 }, // far away: off-screen indicator check
+  spawn: {
+    enemyId: 'grunt',
+    firstDelay: 2.0,     // s of game time after the map start
+    interval: 3.5,       // s between spawns
+    maxAlive: 7,         // never more alive test enemies than this
+    groups: ['north', 'east', 'south', 'west'], // cycles through the map's spawn groups
+  },
+  devices: [
+    { padIndex: 0, defenseId: 'guard_turret' },
+    { padIndex: 1, defenseId: 'frost_coil' },
   ],
-  respawnDelay: 2.0, // s of game time after the last dummy dies
 };

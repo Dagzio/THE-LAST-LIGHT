@@ -14,8 +14,11 @@ export class HUD {
       weaponName: document.getElementById('hudWeaponName'),
       weapon: document.getElementById('hudWeapon'),
       reloadFill: document.getElementById('hudReloadFill'),
+      beacon: document.getElementById('hudBeacon'),
+      beaconFill: document.getElementById('hudBeaconFill'),
+      beaconVal: document.getElementById('hudBeaconVal'),
     };
-    this.cache = { hp: -1, maxHp: -1, ammo: -1, mag: -1, weaponId: '', reloading: null, reloadPct: -1 };
+    this.cache = { hp: -1, maxHp: -1, ammo: -1, mag: -1, weaponId: '', reloading: null, reloadPct: -1, integrity: -1, hit: null, low: null };
     onLanguageChange(() => { this.cache.weaponId = ''; });
     game.onFrame(() => this.update());
   }
@@ -46,5 +49,18 @@ export class HUD {
       const pct = Math.round(w.reloadProgress(this.game.clock.time) * 100);
       if (pct !== c.reloadPct) { c.reloadPct = pct; el.reloadFill.style.width = `${pct}%`; }
     }
+
+    // Beacon Integrity
+    const b = run.beacon;
+    const integ = Math.ceil(b.integrity);
+    if (integ !== c.integrity) {
+      c.integrity = integ;
+      el.beaconVal.textContent = String(integ);
+      el.beaconFill.style.width = `${Math.max(0, Math.min(100, (b.integrity / b.maxIntegrity) * 100))}%`;
+    }
+    const hit = this.game.clock.time - b.lastHitAt < 0.35;
+    if (hit !== c.hit) { c.hit = hit; el.beacon.classList.toggle('hit', hit); }
+    const low = b.integrity / b.maxIntegrity <= 0.3;
+    if (low !== c.low) { c.low = low; el.beacon.classList.toggle('low', low); }
   }
 }

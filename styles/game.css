@@ -208,3 +208,52 @@ body[data-screen="game"] #world { display: none; }
 .offscreen-arrow.alert svg { animation: arrowAlert 0.5s steps(2) infinite; }
 @keyframes arrowAlert { 50% { opacity: 0.35; } }
 body.paused .offscreen-arrow.alert svg { animation-play-state: paused; }
+
+/* Manual aim on desktop: precise crosshair over the 3D map (the 3D reticle marks the ground point) */
+@media (hover: hover) and (pointer: fine) { #world3d { cursor: crosshair; } }
+
+/* ===================== Beacon Integrity (top centre) ===================== */
+.hud-beacon {
+  position: absolute;
+  top: var(--safe-t);
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-stretch: condensed;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
+}
+.hud-beacon-ico { width: calc(28px * var(--fs)); height: calc(28px * var(--fs)); fill: #ffd27a; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8)); }
+.hud-beacon-bar { display: block; width: calc(260px * var(--fs)); height: calc(12px * var(--fs)); background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 210, 122, 0.35); }
+.hud-beacon-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #d9862b, #ffd27a); transition: width 0.2s; }
+.hud-beacon-val { min-width: 2.6em; font-size: calc(24px * var(--fs)); color: #ffe2a8; }
+.hud-beacon.low .hud-beacon-bar i { background: linear-gradient(90deg, #a8443b, #e06a4a); }
+.hud-beacon.hit .hud-beacon-bar { border-color: #ff6a4a; }
+body.paused .paused-stamp { top: calc(var(--safe-t) + 48px * var(--fs)); }
+
+/* ===================== Defeat ===================== */
+.defeat-panel {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(34px * var(--fs));
+  background: radial-gradient(ellipse at center, rgba(40, 6, 8, 0.45), rgba(2, 3, 8, 0.78));
+  pointer-events: auto;
+}
+body.defeat .defeat-panel { display: flex; }
+body.defeat #screen-game [data-action="askExit"],
+body.defeat #screen-game [data-action="openSettings"],
+body.defeat .touch-controls,
+body.defeat .hud-player { display: none; }
+.defeat-stamp { font-size: calc(54px * var(--fs)); padding: 0.25em 0.9em; color: #f4d8cc; background: #4a0d10; }
+.defeat-btns { display: flex; gap: clamp(26px, 6vw, 70px); align-items: center; }
+.defeat-btns .brush-btn { font-size: calc(40px * var(--fs)); }
+.defeat-btns .flat-btn { font-size: calc(26px * var(--fs)); min-height: 52px; }

@@ -4,6 +4,7 @@ import { PLAYER } from '../data/player.js';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../config/constants.js';
 
 const move = { x: 0, y: 0 }; // reused
+const aim = { x: 0, y: 0 };
 
 export class PlayerController {
   /**
@@ -20,7 +21,7 @@ export class PlayerController {
 
   /**
    * @param {import('../entities/Player.js').Player} player
-   * @param {{getMove:Function, consumePressed:Function, pointerWorld?:Function, pointer?:{inside:boolean}}} input
+   * @param {{getMove:Function, consumePressed:Function, getAimWorld?:Function}} input
    */
   update(player, input, dt, time) {
     if (!player.alive) { player.vx = 0; player.vy = 0; return; }
@@ -31,6 +32,16 @@ export class PlayerController {
       player.facingX = move.x / len;
       player.facingY = move.y / len;
       player.hasMoved = true;
+    }
+
+    // The keeper always faces the aim point (cursor / finger); without one he keeps his facing.
+    const a = input.getAimWorld ? input.getAimWorld(aim) : null;
+    player.hasAim = !!a;
+    if (a) {
+      const dx = a.x - player.x, dy = a.y - player.y;
+      if (dx * dx + dy * dy > 4) player.aimAngle = Math.atan2(dy, dx);
+      player.aimX = a.x;
+      player.aimY = a.y;
     }
 
     if (input.consumePressed('dash')) this._tryDodge(player, input, moving, time);
@@ -53,12 +64,8 @@ export class PlayerController {
   _tryDodge(player, input, moving, time) {
     if (player.dodging || time < player.dodgeReadyAt) return false; // cooldown / already dashing
     let dx = player.facingX, dy = player.facingY;
-    // Standing: last movement direction; if the player never moved — towards the cursor (GDD §8.3).
-    if (!moving && !player.hasMoved && input.pointer && input.pointer.inside && input.pointerWorld) {
-      const p = input.pointerWorld();
-      const len = Math.hypot(p.x - player.x, p.y - player.y);
-      if (len > 1) { dx = (p.x - player.x) / len; dy = (p.y - player.y) / len; }
-    }
+    // Standing: last movement direction; if the player never moved — where he aims (GDD §8.3: towards the cursor).
+    if (!moving && !player.hasMoved) { dx = Math.cos(player.aimAngle); dy = Math.sin(player.aimAngle); }
     player.dodging = true;
     player.dodgeDirX = dx;
     player.dodgeDirY = dy;

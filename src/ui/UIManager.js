@@ -18,6 +18,7 @@ const SCREEN_BY_STATE = {
   MAP_SELECT: 'mapSelect',
   RUNNING: 'game',
   PAUSED: 'game',
+  MAP_DEFEAT: 'game',
 };
 
 export class UIManager {
@@ -28,6 +29,7 @@ export class UIManager {
     this.openPopups = [];          // stack of open popup names (top = last)
     this.confirmKind = null;       // 'reset' | 'exit'
     this.confirmText = document.getElementById('confirmText');
+    this.defeatTitle = document.getElementById('defeatTitle');
 
     document.addEventListener('click', (e) => this._onClick(e));
     document.getElementById('confirmYes').addEventListener('click', () => this._confirm(true));
@@ -75,6 +77,12 @@ export class UIManager {
       document.body.dataset.screen = id;
     }
     document.body.classList.toggle('paused', state === STATES.PAUSED);
+    document.body.classList.toggle('defeat', state === STATES.MAP_DEFEAT);
+    if (state === STATES.MAP_DEFEAT) {
+      this._closeAll();
+      const reason = this.game.run && this.game.run.defeat;
+      this.defeatTitle.textContent = T(reason === 'player' ? 'defeat.player' : 'defeat.beacon');
+    }
   }
 
   // ---------------- popups (close only with their own button, H5 §4) ----------------
@@ -149,6 +157,8 @@ export class UIManager {
       case 'askExit': this._ask('exit'); break;
       case 'fullscreen': toggleFullscreen(); break;
       case 'selectMap': this.game.selectMap(btn.dataset.mapId); this._refreshMapSelect(); break;
+      case 'retryMap': this.game.retryMap(); break;
+      case 'defeatMenu': this.game.exitToMenu(); break; // the map is already over: nothing to lose, no confirmation
       default: break;
     }
   }

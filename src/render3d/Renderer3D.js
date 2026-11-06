@@ -6,7 +6,13 @@ import * as THREE from '../../lib/three.module.js';
 import { createRenderGuard } from './render-guard.js';
 import { createMaterials } from './materials.js';
 import { buildEnvironment } from './Environment.js';
-import { playerGeometry, gruntGeometry, gruntEyesGeometry, bulletGeometry, muzzleGeometry, tag } from './models.js';
+import {
+  playerGeometry, gruntGeometry, gruntEyesGeometry, bulletGeometry, muzzleGeometry, tag,
+  beaconGeometry, beaconLanternGeometry, beamGeometry, padGeometry, turretBaseGeometry, turretHeadGeometry,
+  coilGeometry, coilCrystalGeometry, reticleGeometry,
+} from './models.js';
+import { beamAngle } from '../systems/LightSystem.js';
+import { BEACON } from '../data/beacon.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { CAMERA } from '../config/camera.js';
 import { QUALITY_PRESETS, antialiasFor } from '../config/settings.js';
@@ -28,6 +34,11 @@ const UP = new THREE.Vector3(0, 1, 0);
 const FLAT_X = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 const WHITE = new THREE.Color(1, 1, 1);
 const FLASH = new THREE.Color(2.6, 2.4, 2.2);
+const LIT = new THREE.Color(1.55, 1.32, 0.95);    // Illuminated: warm highlight, never a white silhouette
+const SLOWED = new THREE.Color(0.72, 0.92, 1.45); // slowed: frosty blue
+const LIT_SLOWED = new THREE.Color(1.2, 1.25, 1.4);
+const LANTERN_OK = new THREE.Color(0xffc46a);
+const LANTERN_HIT = new THREE.Color(0xff5a3a);
 const V = new THREE.Vector3();
 const NDC = new THREE.Vector2();
 const colorCache = new Map();
@@ -113,14 +124,14 @@ export class Renderer3D {
     this.gruntEyes.frustumCulled = false;
     this.scene.add(tag(this.grunts, 'grunt'), this.gruntEyes);
 
-    // Bullets (instanced), muzzle flash, target marker, HP bars, reload arc, blob shadows, particles.
+    // Bullets (instanced), muzzle flash, aim reticle, HP bars, reload arc, blob shadows, particles.
     this.bullets = new THREE.InstancedMesh(bulletGeometry(), m.bullet, MAX_BULLETS);
     this.bullets.frustumCulled = false;
     this.muzzle = new THREE.Mesh(muzzleGeometry(), m.muzzle);
     this.muzzle.visible = false;
-    this.marker = new THREE.Mesh(new THREE.RingGeometry(23, 26, 40), m.marker);
-    this.marker.rotation.x = -Math.PI / 2;
-    this.marker.visible = false;
+    this.reticle = new THREE.Mesh(reticleGeometry(), m.reticle);
+    this.reticle.visible = false;
+    this.reticle.renderOrder = 12;
     this.hpBack = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), m.hpBack, MAX_ENEMIES);
     this.hpFill = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), m.hpFill, MAX_ENEMIES);
     this.hpBack.frustumCulled = this.hpFill.frustumCulled = false;
@@ -132,7 +143,7 @@ export class Renderer3D {
     this.blobs = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), m.blob, MAX_ENEMIES + 1);
     this.blobs.frustumCulled = false;
     this.blobs.renderOrder = 1;
-    this.scene.add(this.bullets, this.muzzle, this.marker, this.hpBack, this.hpFill, this.reloadArc, this.blobs);
+    this.scene.add(this.bullets, this.muzzle, this.reticle, this.hpBack, this.hpFill, this.reloadArc, this.blobs);
 
     this.particleGeo = new THREE.BufferGeometry();
     this.particlePos = null;
@@ -158,6 +169,7 @@ export class Renderer3D {
     this.env = buildEnvironment(map, this.mats);
     this.env.groundTexture.anisotropy = QUALITY_PRESETS[this.quality].aniso;
     this.scene.add(this.env.group);
+    this._buildMapObjects(map);
     this._resize(true);
     this.rig.snap(spawnX, spawnY, map.width, map.height);
     this._placeCamera();
@@ -169,6 +181,9 @@ export class Renderer3D {
     if (!this.env) return;
     this.scene.remove(this.env.group);
     this.env.dispose();
+    if (this.mapObjects) { this.scene.remove(this.mapObjects); this.mapObjects = null; }
+    if (this.mapGeos) { for (const geo of this.mapGeos) geo.dispose(); this.mapGeos = null; }
+    if (this.beam) { this.beam.geometry.dispose(); this.beam = null; }
     this.env = null;
     this.map = null;
   }
@@ -313,14 +328,20 @@ export class Renderer3D {
         scale = 1 - f * 0.6;
         sink = -f * 14;
       }
-      const face = Math.atan2(p.y - e.y, p.x - e.x);
+      const face = e.faceAngle;
       Q.setFromAxisAngle(UP, -face);
       S.setScalar(scale);
-      P.set(e.x, sink, e.y);
+      const lunge = e.alive && time - e.lastAttackAt < 0.22 ? Math.sin(((time - e.lastAttackAt) / 0.22) * Math.PI) * 7 : 0;
+      P.set(e.x + Math.cos(face) * lunge, sink, e.y + Math.sin(face) * lunge);
       M.compose(P, Q, S);
       this.grunts.setMatrixAt(n, M);
       this.gruntEyes.setMatrixAt(n, M);
-      this.grunts.setColorAt(n, e.alive && time - e.lastHitAt < ENEMY_FX.hitFlash ? FLASH : WHITE);
+      const slowed = e.alive && time < e.slowUntil;
+      let tint = WHITE;
+      if (e.alive && time - e.lastHitAt < ENEMY_FX.hitFlash) tint = FLASH;
+      else if (e.alive && e.illuminated) tint = slowed ? LIT_SLOWED : LIT;
+      else if (slowed) tint = SLOWED;
+      this.grunts.setColorAt(n, tint);
       if (e.alive && e.hp < e.maxHp) {
         const w = 34, fill = Math.max(0, e.hp / e.maxHp);
         P.set(e.x, 46, e.y - 24); S.set(w + 2, 6, 1); M.compose(P, FLAT_X, S); this.hpBack.setMatrixAt(bars, M);
@@ -338,13 +359,11 @@ export class Renderer3D {
     for (const im of [this.grunts, this.gruntEyes, this.hpBack, this.hpFill, this.blobs]) im.instanceMatrix.needsUpdate = true;
     if (this.grunts.instanceColor) this.grunts.instanceColor.needsUpdate = true;
 
-    // Target marker
-    const t = run.target;
-    this.marker.visible = !!(t && t.alive);
-    if (this.marker.visible) {
-      this.marker.position.set(t.x, 1.2, t.y);
-      this.marker.scale.setScalar(1 + Math.sin(time * 8) * 0.05);
-    }
+    // Aim reticle on the ground (cursor / finger) — where the keeper shoots
+    this.reticle.visible = p.alive && p.hasAim;
+    if (this.reticle.visible) this.reticle.position.set(p.aimX, 1.4, p.aimY);
+
+    this._syncMapObjects(run, time);
 
     // Bullets
     let b = 0;
@@ -395,6 +414,117 @@ export class Renderer3D {
     this.particleGeo.setDrawRange(0, k);
     this.particleGeo.attributes.position.needsUpdate = true;
     this.particleGeo.attributes.color.needsUpdate = true;
+  }
+
+  // ---------------- beacon, beam, pads, devices ----------------
+  _buildMapObjects(map) {
+    const m = this.mats;
+    const g = new THREE.Group();
+    const geos = [];
+    const mk = (geo, mat, name) => { geos.push(geo); const mesh = new THREE.Mesh(geo, mat); return name ? tag(mesh, name) : mesh; };
+    const bx = map.beacon.x, bz = map.beacon.y;
+
+    this.beaconMesh = mk(beaconGeometry(), m.prop, 'beacon');
+    this.beaconMesh.castShadow = true;
+    this.beaconMesh.receiveShadow = true;
+    this.beaconMesh.position.set(bx, 0, bz);
+    if (!this.lanternMat) this.lanternMat = new THREE.MeshBasicMaterial({ color: LANTERN_OK, vertexColors: true });
+    this.beaconLantern = mk(beaconLanternGeometry(), this.lanternMat);
+    this.beaconLantern.position.set(bx, 0, bz);
+    this.beaconLight = new THREE.PointLight(0xffb060, 2200, 560, 1.25);
+    this.beaconLight.position.set(bx, 140, bz);
+    g.add(this.beaconMesh, this.beaconLantern, this.beaconLight);
+
+    // Beam: same angle/width/range as LightSystem (visual = detection)
+    this.beamPivot = new THREE.Group();
+    this.beamPivot.position.set(bx, 2.2, bz);
+    this.beamHalf = -1;
+    this.beam = new THREE.Mesh(new THREE.BufferGeometry(), m.beam);
+    this.beam.renderOrder = 2;
+    this.beamPivot.add(this.beam);
+    g.add(this.beamPivot);
+
+    // Build pads + one model of each device per pad (shown when that device is placed)
+    this.padViews = map.buildPads.map((pad) => {
+      const padMesh = mk(padGeometry(), m.prop, 'build-pad');
+      padMesh.position.set(pad.x, 0, pad.y);
+      padMesh.receiveShadow = true;
+      const rune = mk(new THREE.RingGeometry(20, 24, 32), m.padRune);
+      rune.rotation.x = -Math.PI / 2;
+      rune.position.set(pad.x, 6.6, pad.y);
+      const turret = new THREE.Group();
+      const head = mk(turretHeadGeometry(), m.character);
+      turret.add(mk(turretBaseGeometry(), m.character), head);
+      turret.position.set(pad.x, 6, pad.y);
+      turret.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      tag(turret, 'guard-turret');
+      const coil = new THREE.Group();
+      const crystal = mk(coilCrystalGeometry(), m.crystal);
+      coil.add(mk(coilGeometry(), m.character), crystal);
+      coil.position.set(pad.x, 6, pad.y);
+      coil.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      tag(coil, 'frost-coil');
+      const ring = mk(new THREE.RingGeometry(0.86, 1, 48), m.frostRing);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(pad.x, 3, pad.y);
+      turret.visible = coil.visible = ring.visible = false;
+      g.add(padMesh, rune, turret, coil, ring);
+      return { rune, turret, head, coil, crystal, ring };
+    });
+
+    this.mapObjects = g;
+    this.mapGeos = geos;
+    this.scene.add(g);
+  }
+
+  _syncMapObjects(run, time) {
+    // Beam
+    const half = run.light.halfAngle;
+    if (half !== this.beamHalf) {
+      this.beamHalf = half;
+      this.beam.geometry.dispose();
+      this.beam.geometry = beamGeometry(BEACON.light.range, half);
+    }
+    this.beamPivot.rotation.y = -run.light.angle;
+    this.beamPivot.visible = !run.beacon.destroyed;
+
+    // Beacon lantern: red flash on hit, dark when fallen
+    const b = run.beacon;
+    if (b.destroyed) {
+      this.lanternMat.color.setRGB(0.12, 0.1, 0.1);
+      this.beaconLight.visible = false;
+    } else {
+      const k = Math.max(0, 1 - (time - b.lastHitAt) / 0.3);
+      this.lanternMat.color.copy(LANTERN_OK).lerp(LANTERN_HIT, k);
+      this.beaconLight.visible = true;
+      this.beaconLight.intensity = 2200 * (0.9 + 0.1 * Math.sin(time * 2.7));
+    }
+
+    // Pads & devices
+    const pads = run.defenses.pads;
+    for (let i = 0; i < this.padViews.length; i++) {
+      const v = this.padViews[i];
+      const d = pads[i] ? pads[i].device : null;
+      v.rune.visible = !d;
+      v.turret.visible = !!d && d.id === 'guard_turret';
+      v.coil.visible = !!d && d.id === 'frost_coil';
+      v.ring.visible = false;
+      if (!d) continue;
+      if (d.id === 'guard_turret') {
+        v.head.rotation.y = -d.aimAngle;
+        const recoil = time - d.lastActionAt < 0.1 ? (1 - (time - d.lastActionAt) / 0.1) * 3 : 0;
+        v.head.position.set(-Math.cos(d.aimAngle) * recoil, 0, -Math.sin(d.aimAngle) * recoil);
+      } else {
+        v.crystal.rotation.y = time * 1.6;
+        v.crystal.position.y = Math.sin(time * 2.2) * 2;
+        const k = (time - d.lastActionAt) / 0.45;
+        if (k >= 0 && k < 1) {
+          v.ring.visible = true;
+          v.ring.scale.setScalar(Math.max(1, d.stats.radius * (0.25 + 0.75 * k)));
+          v.ring.material.opacity = 0.6 * (1 - k);
+        }
+      }
+    }
   }
 
   /** Diagnostics for the debug overlay. */
