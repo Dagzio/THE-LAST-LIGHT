@@ -12,6 +12,7 @@ import { SPLASH_TAP_DELAY_MS } from '../config/constants.js';
 import { SettingsView } from './SettingsView.js';
 import { ShopView } from './ShopView.js';
 import { CrateView } from './CrateView.js';
+import { ResultsView } from './ResultsView.js';
 
 const SCREEN_BY_STATE = {
   BOOT: 'splash',
@@ -39,8 +40,7 @@ export class UIManager {
     this.openPopups = [];          // stack of open popup names (top = last)
     this.confirmKind = null;       // 'reset' | 'exit'
     this.confirmText = document.getElementById('confirmText');
-    this.resultTitle = document.getElementById('resultTitle');
-    this.resultRetry = document.getElementById('resultRetry');
+    this.results = new ResultsView(game);
 
     document.addEventListener('click', (e) => this._onClick(e));
     document.getElementById('confirmYes').addEventListener('click', () => this._confirm(true));
@@ -96,17 +96,9 @@ export class UIManager {
     document.body.classList.toggle('map-over', over);
     if (over) {
       this._closeAll();
-      this._refreshResultText();
-    }
-  }
-
-  _refreshResultText() {
-    const sm = this.game.sm;
-    if (!sm.mapOver) return;
-    const victory = sm.is(STATES.MAP_VICTORY);
-    const reason = this.game.run && this.game.run.defeat;
-    this.resultTitle.textContent = T(victory ? 'victory.title' : reason === 'player' ? 'defeat.player' : 'defeat.beacon');
-    this.resultRetry.textContent = T(victory ? 'victory.again' : 'defeat.retry');
+      this.results.show();
+    } else this.results.hide();
+    if (state === STATES.MAP_SELECT) { this._rebuildMapCards(); this._refreshMapSelect(); }
   }
 
   // ---------------- popups (close only with their own button, H5 §4) ----------------
@@ -191,6 +183,7 @@ export class UIManager {
       case 'fullscreen': toggleFullscreen(); break;
       case 'selectMap': this.game.selectMap(btn.dataset.mapId); this._refreshMapSelect(); break;
       case 'retryMap': this.game.retryMap(); break;
+      case 'continueCampaign': this.game.continueCampaign(); break;
       case 'resultMenu': this.game.exitToMenu(); break; // the map is already over: nothing to lose, no confirmation
       case 'startNextWave': this.game.startNextWave(); break;
       case 'flare': this.game.useFlare(); break;
@@ -202,22 +195,41 @@ export class UIManager {
     }
   }
 
-  // ---------------- map select ----------------
+  // ---------------- map select (Phase 7: only unlocked maps, cleared badge) ----------------
   _buildMapCards() {
+    this.thumbs = new Map(); // map id → painted thumbnail canvas (painted once)
+    this._rebuildMapCards();
+  }
+
+  /** Cards for the unlocked maps (H5: locked / non-existing maps are not shown); rebuilt when map select opens. */
+  _rebuildMapCards() {
     const grid = document.getElementById('mapGrid');
+    const profile = this.game.economy.profile;
+    grid.replaceChildren();
     for (const map of MAPS) {
+      if (!profile.unlockedMaps.includes(map.id)) continue;
       const card = document.createElement('button');
       card.className = 'map-card';
       card.dataset.action = 'selectMap';
       card.dataset.mapId = map.id;
-      const thumb = document.createElement('canvas');
-      thumb.width = 320;
-      thumb.height = 320;
-      Renderer.drawMapThumb(thumb, map.artSeed);
+      let thumb = this.thumbs.get(map.id);
+      if (!thumb) {
+        thumb = document.createElement('canvas');
+        thumb.width = 320;
+        thumb.height = 320;
+        Renderer.drawMapThumb(thumb, map.artSeed);
+        this.thumbs.set(map.id, thumb);
+      }
       const name = document.createElement('span');
       name.className = 'map-card-name';
-      name.dataset.i18n = map.nameKey;
+      name.textContent = T(map.nameKey);
       card.append(thumb, name);
+      if (profile.completedMaps.includes(map.id)) {
+        const badge = document.createElement('span');
+        badge.className = 'map-card-badge';
+        badge.textContent = T('map.cleared');
+        card.append(badge);
+      }
       grid.appendChild(card);
     }
     this._refreshMapSelect();
@@ -225,7 +237,12 @@ export class UIManager {
 
   _refreshMapSelect() {
     const map = getMap(this.game.selectedMapId);
+    if (!map) return;
     document.querySelectorAll('.map-card').forEach((c) => c.classList.toggle('selected', c.dataset.mapId === map.id));
+    const cleared = this.game.economy.profile.completedMaps.includes(map.id);
+    const state = document.getElementById('mapState');
+    state.textContent = T(cleared ? 'map.stateCleared' : 'map.stateNew');
+    state.classList.toggle('cleared', cleared);
     document.getElementById('mapName').textContent = T(map.nameKey);
     document.getElementById('mapDesc').textContent = T(map.descKey);
     document.getElementById('mapWaves').textContent = T('map.waves', { n: map.waveCount });
@@ -234,8 +251,7 @@ export class UIManager {
   }
 
   _refreshDynamicText() {
-    this._refreshMapSelect();
-    this._refreshResultText();
+    if (this.game.sm.is(STATES.MAP_SELECT)) this._rebuildMapCards(); else this._refreshMapSelect();
     if (this.confirmKind) this.confirmText.textContent = T(this.confirmKind === 'reset' ? 'confirm.reset' : 'confirm.exit');
   }
 }

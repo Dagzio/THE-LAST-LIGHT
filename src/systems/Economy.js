@@ -6,6 +6,7 @@ import { WEAPONS, getWeapon } from '../data/weapons.js';
 import { WEAPON_UPGRADE, UPGRADE_NODES, WEAPON_NODES, PLAYER_UPGRADES, PLAYER_UPGRADE_COST_GROWTH, shopPrice } from '../data/upgrades.js';
 import { levelForXp } from '../data/progression.js';
 import { effectiveWeaponStats, playerModifiers } from './Loadout.js';
+import { nextMapId } from './Campaign.js';
 
 /** Reasons an offer cannot be bought (i18n keys `shop.reason.*`). */
 export const REASON = Object.freeze({
@@ -47,11 +48,17 @@ export class Economy {
     this._commit();
   }
 
+  /** Map result (Phase 7): a win marks the map completed and unlocks the next one from the campaign data. */
   recordMapResult(mapId, won) {
     const p = this.profile;
     if (won) {
       p.statistics.mapsWon += 1;
       if (!p.completedMaps.includes(mapId)) p.completedMaps.push(mapId);
+      const next = nextMapId(mapId);
+      if (next && !p.unlockedMaps.includes(next)) {
+        p.unlockedMaps.push(next);
+        this.events.emit('mapUnlocked', next);
+      }
     } else p.statistics.mapsFailed += 1;
     this._commit();
   }

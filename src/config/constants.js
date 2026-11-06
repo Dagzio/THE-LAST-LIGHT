@@ -6,7 +6,7 @@ export const DEBUG_ENABLED = false;
 /** Dev 3D asset viewer (H5 3D guide: asset-viewer-3d.md). TRUE while the user works with models — MUST be false in a release. */
 export const DEBUG_MODELS = true;
 
-export const BUILD_VERSION = '0.6.0-grenades';
+export const BUILD_VERSION = '0.7.0-campaign';
 
 /** Prefix for every localStorage key of the game (H5 §9). */
 export const STORAGE_PREFIX = 'tll.';

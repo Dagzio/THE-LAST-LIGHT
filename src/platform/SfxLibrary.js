@@ -191,6 +191,8 @@ const RECIPES = {
   }),
   // Perk chosen: warm rising swell.
   perk: () => render(0.8, (t) => (Math.sin(2 * Math.PI * (440 + 330 * t) * t) * 0.18 + Math.sin(2 * Math.PI * 880 * t) * 0.06) * Math.min(1, t * 20) * Math.exp(-t * 3.5)),
+  // Results stamp landing on paper: dull thud + paper slap.
+  stamp: () => render(0.3, (t) => (Math.sin(2 * Math.PI * (95 - 70 * t) * t) * 0.55 + noise() * 0.3 * Math.exp(-t * 40)) * Math.exp(-t * 14)),
   // Popup open: soft paper/cloth whoosh.
   open: () => {
     let lp = 0;

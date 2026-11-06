@@ -59,6 +59,7 @@
           <ul class="map-info-facts">
             <li id="mapWaves"></li>
             <li id="mapBoss"></li>
+            <li id="mapState" class="map-state"></li>
           </ul>
         </aside>
         <button class="brush-btn brush-cta" data-action="beginMap" data-i18n="map.begin"></button>
@@ -120,10 +121,18 @@
     <!-- Bottom centre (desktop), intermission only: START NEXT WAVE (double-press safe in the domain) -->
     <button class="brush-btn next-wave-btn next-wave-bottom" id="btnNextWave" data-action="startNextWave" data-nosfx data-i18n="hud.startNextWave"></button>
 
-    <!-- Map result (Phase 3–4: stamp + RETRY / MAIN MENU; results screen in Phase 7) -->
+    <!-- Map result (Phase 7, D42): the keeper's journal page — lines count up one by one, then the stamp.
+         After the last map of the campaign the same page is the Congrats screen (D19). Tap the page to skip. -->
     <div class="result-panel" id="resultPanel">
-      <div class="stamp result-stamp" id="resultTitle"></div>
+      <article class="journal" id="journal">
+        <p class="journal-kicker" id="jKicker"></p>
+        <h2 class="journal-title" id="resultTitle"></h2>
+        <p class="journal-sub" id="jSub"></p>
+        <ul class="journal-lines" id="jLines"></ul>
+        <div class="journal-stamp" id="jStamp"></div>
+      </article>
       <div class="result-btns">
+        <button class="brush-btn" data-action="continueCampaign" id="resultContinue" data-i18n="result.continue" hidden></button>
         <button class="brush-btn" data-action="retryMap" id="resultRetry"></button>
         <button class="flat-btn" data-action="resultMenu" data-i18n="defeat.menu"></button>
       </div>

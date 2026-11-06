@@ -20,6 +20,7 @@ import { shopPrice } from '../data/upgrades.js';
 import { getGrenade, GRENADE_RULES } from '../data/grenades.js';
 import { SaveManager } from './SaveManager.js';
 import { Economy, REASON } from '../systems/Economy.js';
+import { nextMapId, isLastMap, defaultMapSelection, campaignSummary } from '../systems/Campaign.js';
 
 export class Game {
   /** @param {HTMLCanvasElement} canvas2d menu backdrop @param {HTMLCanvasElement} canvas3d map run */
@@ -53,13 +54,14 @@ export class Game {
     this.resumeState = STATES.RUNNING; // where PAUSED returns to (RUNNING or SHOP_OPEN)
 
     // Defeat / victory are reported once by the MapRun; the state machine ignores repeats.
+    // The profile is updated first, so the results / Congrats screen shown on the state change reads final numbers.
     this.events.on('mapDefeat', () => {
-      this.sm.set(STATES.MAP_DEFEAT);
       if (this.run) this.economy.recordMapResult(this.run.mapId, false);
+      this.sm.set(STATES.MAP_DEFEAT);
     });
     this.events.on('mapVictory', (mapId) => {
-      this.sm.set(STATES.MAP_VICTORY);
       this.economy.recordMapResult(mapId, true);
+      this.sm.set(STATES.MAP_VICTORY);
     });
     // Rewards: the MapRun reports each kill / wave / map completion exactly once.
     this.events.on('killReward', (reward) => this.economy.grantKill(reward));
@@ -136,17 +138,47 @@ export class Game {
 
   showTapToPlay() { return this.sm.set(STATES.TAP_TO_PLAY); }
 
-  openMapSelect() { return this.sm.set(STATES.MAP_SELECT); }
+  /** Map select opens on the newest unlocked, not yet cleared map (H5 §11). */
+  openMapSelect() {
+    this.selectedMapId = defaultMapSelection(this.economy.profile);
+    return this.sm.set(STATES.MAP_SELECT);
+  }
 
   backToMenu() { return this.sm.set(STATES.MAIN_MENU); }
 
-  selectMap(id) { if (getMap(id)) this.selectedMapId = id; }
+  isMapUnlocked(id) { return this.economy.profile.unlockedMaps.includes(id); }
 
-  /** Starts the selected map with a fresh MapRun. Guarded against double start. */
+  selectMap(id) { if (getMap(id) && this.isMapUnlocked(id)) this.selectedMapId = id; }
+
+  /** Starts the selected (unlocked) map with a fresh MapRun. Guarded against double start. */
   beginMap() {
     const map = getMap(this.selectedMapId);
-    if (!this.sm.is(STATES.MAP_SELECT) || !map || !this.renderer3d) return false;
+    if (!this.sm.is(STATES.MAP_SELECT) || !map || !this.renderer3d || !this.isMapUnlocked(map.id)) return false;
     return this._startRun(map);
+  }
+
+  /** CONTINUE after a victory (not the last map): back to map select with the next map selected. */
+  continueCampaign() {
+    if (!this.sm.is(STATES.MAP_VICTORY) || !this.run) return false;
+    const next = nextMapId(this.run.mapId);
+    this.exitToMenu();
+    this.selectedMapId = next && this.isMapUnlocked(next) ? next : defaultMapSelection(this.economy.profile);
+    return this.sm.set(STATES.MAP_SELECT);
+  }
+
+  /**
+   * Read-only summary of the finished map run for the results / Congrats screen. Rewards were already booked once
+   * during the run — showing (or re-opening) this screen never grants anything.
+   */
+  resultSummary() {
+    const r = this.run;
+    if (!r || !r.over) return null;
+    return {
+      won: r.victory, reason: r.defeat, mapId: r.mapId, mapNameKey: r.map.nameKey,
+      waves: r.stats.wavesCleared, wavesTotal: r.waves.total, kills: r.stats.kills,
+      coins: r.rewards.coins, xp: r.rewards.xp, last: r.victory && isLastMap(r.mapId),
+      campaign: campaignSummary(this.economy.profile),
+    };
   }
 
   /** RETRY / PLAY AGAIN after the map is over: a completely fresh run of the same map (01_GDD §15). */
