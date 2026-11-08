@@ -14,7 +14,9 @@ import {
   telegraphDiscGeometry, telegraphRingGeometry, kioskGeometry, kioskLanternGeometry,
   crateGeometry, crateGlowGeometry, grenadeGeometry,
   spitterGeometry, spitterEyesGeometry, huskGeometry, huskEyesGeometry, motherGeometry, motherEyesGeometry, globGeometry,
+  bootGeometry,
 } from './models.js';
+import { ENEMY_STATES } from '../entities/Enemy.js';
 import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
 import { BEACON } from '../data/beacon.js';
 import { getBossPattern } from '../data/boss.js';
@@ -39,6 +41,22 @@ const ENEMY_MODELS = {
 };
 const MAX_GLOBS = 24;
 const SUMMON_MARKS = 3;
+// Procedural gait per enemy type (D45, presentation only): step frequency (rad/s at full speed), body lift, roll
+// (side to side), forward pitch, squash & stretch; float = hovering bosses. All on the instance transform → no
+// extra draw calls, no skinning.
+const GAIT = {
+  grunt: { freq: 9, bob: 2.2, roll: 0.13, pitch: 0.06, squash: 0.05 },
+  runner: { freq: 16, bob: 3.2, roll: 0.05, pitch: 0.14, squash: 0.07 },
+  brute: { freq: 5.5, bob: 3.8, roll: 0.09, pitch: 0.05, squash: 0.06 },
+  spitter: { freq: 8, bob: 1.6, roll: 0.1, pitch: 0.03, squash: 0.08 },
+  husk: { freq: 6, bob: 1.4, roll: 0.07, pitch: 0.03, squash: 0.03 },
+  gloam_warden: { freq: 3, bob: 2.5, roll: 0.04, pitch: 0.02, squash: 0.02, float: 3 },
+  fog_mother: { freq: 2.2, bob: 3, roll: 0.05, pitch: 0.02, squash: 0.03, float: 6 },
+};
+const E = new THREE.Euler();
+const ASH = new THREE.Color(0.06, 0.055, 0.065); // dead bodies darken to ash before they crumble
+const TINT = new THREE.Color();
+const ZERO = new THREE.Vector3(0, 0, 0);
 const CASTING = new THREE.Color(1.35, 1.0, 1.7); // boss tint while an attack is telegraphed
 const MAX_BULLETS = 192;
 const RELOAD_SEGMENTS = 16;
@@ -97,6 +115,11 @@ export class Renderer3D {
     this.scene.add(this.hemi, this.moon, this.moon.target);
 
     this._buildDynamic();
+    this.yaws = new Map();     // enemy id → smoothed facing (presentation)
+    this.lastSyncTime = 0;
+    this.shakeUntil = 0;
+    this.shakeAmp = 0;
+    this.shakeDur = 1;
     this.env = null;
     this.map = null;
     this.pausedDrawn = false;
@@ -120,8 +143,20 @@ export class Renderer3D {
     const m = this.mats;
     // Player: merged body + lantern + point light; two ghost copies for the dodge trail.
     this.player = new THREE.Group();
-    this.playerBody = tag(new THREE.Mesh(playerGeometry(), m.character), 'keeper');
+    this.playerBody = tag(new THREE.Mesh(playerGeometry(false), m.character), 'keeper');
     this.playerBody.castShadow = true;
+    // Legs (D45 walk cycle): two boots swinging from hip pivots; the body bobs and leans above them
+    const bootGeo = bootGeometry();
+    this.legs = [-1, 1].map((s) => {
+      const hip = new THREE.Group();
+      hip.position.set(0, 12, s * 5);
+      const boot = new THREE.Mesh(bootGeo, m.character);
+      boot.castShadow = true;
+      hip.add(boot);
+      this.player.add(hip);
+      return hip;
+    });
+    this.walk = { phase: 0, blend: 0, lastTime: 0 };
     this.lanternMesh = new THREE.Mesh(new THREE.SphereGeometry(2.6, 10, 8), m.lantern);
     this.lanternMesh.position.set(-5, 17, -12);
     this.lanternLight = new THREE.PointLight(0xffb36a, 900, 300, 1.6);
@@ -335,9 +370,14 @@ export class Renderer3D {
     sc.updateProjectionMatrix();
   }
 
-  _placeCamera() {
+  _placeCamera(time = -1) {
     const d = distanceFor(this.rig.view.h);
-    const x = this.rig.x, z = this.rig.y;
+    let x = this.rig.x, z = this.rig.y;
+    if (time >= 0 && time < this.shakeUntil) { // decaying shake (presentation only)
+      const k = (this.shakeUntil - time) / this.shakeDur;
+      x += Math.sin(time * 73) * this.shakeAmp * k;
+      z += Math.cos(time * 61) * this.shakeAmp * k;
+    }
     this.camera.position.set(x, d * Math.cos(TILT), z + d * Math.sin(TILT));
     this.camera.lookAt(x, 0, z);
     this.moon.position.set(x - 320, 900, z + 380);
@@ -376,7 +416,7 @@ export class Renderer3D {
     if (paused && this.pausedDrawn) return false; // the paused frame does not change: draw it once
     this._sync(run, time);
     if (!paused) this.rig.follow(run.player.x, run.player.y, frameDt, this.map.width, this.map.height);
-    this._placeCamera();
+    this._placeCamera(time);
     this.renderer.render(this.scene, this.camera);
     this.pausedDrawn = paused;
     if (!paused) this._adapt(frameDt);
@@ -410,6 +450,8 @@ export class Renderer3D {
     this.player.rotation.y = -aim;
     const flicker = p.isInvulnerable(time) && Math.floor(time * 30) % 2 === 0;
     this.playerBody.visible = !flicker;
+    for (const leg of this.legs) leg.visible = !flicker;
+    this._animateKeeper(p, aim, time);
     const trail = p.dodging && preset.trails !== 'off';
     for (let k = 0; k < this.ghosts.length; k++) {
       const g = this.ghosts[k];
@@ -420,34 +462,60 @@ export class Renderer3D {
       }
     }
 
-    // Enemies (per type) + HP bars + blob shadows
+    // Enemies (per type) + HP bars + blob shadows. Walk / hit / death animation is procedural on the instance
+    // transform (D45): gait per type, a short squash on every hit, a fall onto the side and a crumble into ash.
     const views = this.enemyViews;
     for (const id in views) views[id].n = 0;
     let bars = 0, blobs = 0;
+    const fdt = Math.min(0.1, Math.max(0, time - this.lastSyncTime));
+    this.lastSyncTime = time;
     for (const e of run.enemies) {
       const v = views[e.typeId] || views.grunt;
       if (v.n >= v.cap) continue;
-      let scale = 1, sink = 0;
-      if (!e.alive) {
-        const f = Math.min(1, (time - e.deathAt) / ENEMY_FX.deathFade);
-        scale = 1 - f * 0.6;
-        sink = -f * 14;
-      }
+      const A = GAIT[e.typeId] || GAIT.grunt;
       const stunned = e.alive && e.isStunned(time);
-      const face = e.faceAngle + (stunned ? Math.sin(time * 22 + e.id) * 0.35 : 0); // flare stun: dazed wobble
-      Q.setFromAxisAngle(UP, -face);
-      S.setScalar(scale);
+      const yaw = this._yaw(e, e.faceAngle, fdt) + (stunned ? Math.sin(time * 22 + e.id) * 0.35 : 0); // stun: dazed wobble
+      let roll = 0, pitch = 0, lift = 0, sy = 1, sxz = 1, scale = 1;
+      if (e.alive) {
+        const moving = !stunned && !e.casting && (e.state === ENEMY_STATES.MOVE_TO_BEACON || e.state === ENEMY_STATES.ATTACK_PLAYER);
+        if (moving) {
+          const ph = time * A.freq * e.slowFactor(time) + e.id * 1.7;
+          lift = Math.abs(Math.sin(ph)) * A.bob;
+          roll = Math.sin(ph) * A.roll;
+          pitch = -A.pitch;
+          const s = Math.sin(ph * 2) * A.squash;
+          sy = 1 + s; sxz = 1 - s * 0.5;
+        } else { // idle / attacking: slow breathing
+          const s = Math.sin(time * 2.6 + e.id) * 0.025;
+          sy = 1 + s; sxz = 1 - s * 0.5;
+        }
+        if (A.float) lift += A.float + Math.sin(time * 1.3 + e.id) * A.float * 0.5;
+        const hk = (time - e.lastHitAt) / 0.14; // hit punch: squashes down and widens, then springs back
+        if (hk >= 0 && hk < 1) { const k = (1 - hk) * 0.14; sy *= 1 - k * 0.7; sxz *= 1 + k; }
+      } else {
+        const f = Math.min(1, (time - e.deathAt) / ENEMY_FX.deathFade);
+        const fall = Math.min(1, f / 0.35);
+        roll = (1 - (1 - fall) ** 3) * (e.type.boss ? 0.5 : 1.3) * ((e.id & 1) ? 1 : -1); // tips over sideways
+        const sinkK = Math.max(0, (f - 0.35) / 0.65);
+        lift = -sinkK * e.radius * 0.9;              // crumbles into the ground
+        scale = 1 - sinkK * 0.35;
+      }
+      E.set(roll, -yaw, pitch, 'YXZ');
+      Q.setFromEuler(E);
+      S.set(sxz * scale, sy * scale, sxz * scale);
       const reach = e.radius * 0.4;
       const lunge = e.alive && time - e.lastAttackAt < 0.22 ? Math.sin(((time - e.lastAttackAt) / 0.22) * Math.PI) * reach : 0;
-      P.set(e.x + Math.cos(face) * lunge, sink, e.y + Math.sin(face) * lunge);
+      P.set(e.x + Math.cos(yaw) * lunge, lift, e.y + Math.sin(yaw) * lunge);
       M.compose(P, Q, S);
       v.body.setMatrixAt(v.n, M);
+      if (!e.alive) M.compose(P, Q, ZERO); // the eyes go out at the moment of death
       v.eyes.setMatrixAt(v.n, M);
       const slowed = e.alive && time < e.slowUntil;
       let tint = WHITE;
-      if (e.alive && time - e.lastHitAt < ENEMY_FX.hitFlash) tint = FLASH;
-      else if (e.alive && e.casting) tint = CASTING;
-      else if (e.alive && e.illuminated) tint = slowed ? LIT_SLOWED : LIT;
+      if (!e.alive) tint = TINT.copy(WHITE).lerp(ASH, Math.min(1, (time - e.deathAt) / (ENEMY_FX.deathFade * 0.5)));
+      else if (time - e.lastHitAt < ENEMY_FX.hitFlash) tint = FLASH;
+      else if (e.casting) tint = CASTING;
+      else if (e.illuminated) tint = slowed ? LIT_SLOWED : LIT;
       else if (slowed) tint = SLOWED;
       v.body.setColorAt(v.n, tint);
       v.n++;
@@ -536,6 +604,48 @@ export class Renderer3D {
     this.particleGeo.setDrawRange(0, k);
     this.particleGeo.attributes.position.needsUpdate = true;
     this.particleGeo.attributes.color.needsUpdate = true;
+  }
+
+  // ---------------- D45 animation helpers (presentation state lives here, never in the simulation) ----------------
+  /** Keeper walk cycle: steps follow the distance walked (no foot sliding), the body bobs and leans into the move. */
+  _animateKeeper(p, aim, time) {
+    const w = this.walk;
+    const dt = Math.min(0.1, Math.max(0, time - w.lastTime));
+    w.lastTime = time;
+    const speed = p.alive ? Math.hypot(p.vx, p.vy) : 0;
+    const target = p.dodging ? 0 : Math.min(1, speed / PLAYER.moveSpeed);
+    w.blend += (target - w.blend) * Math.min(1, dt * 12);
+    if (!p.dodging) w.phase += ((speed * dt) / 62) * Math.PI * 2; // one full stride ≈ 62 world units
+    const b = w.blend;
+    const body = this.playerBody;
+    const rel = Math.atan2(p.vy, p.vx) - aim;           // movement direction in the keeper's own frame
+    const swing = Math.sin(w.phase);
+    body.position.y = Math.abs(swing) * 2.2 * b;
+    body.rotation.z = -0.1 * Math.cos(rel) * b;          // leans forward / back with the move
+    body.rotation.x = -0.07 * Math.sin(rel) * b + swing * 0.035 * b; // leans sideways + a light sway
+    body.scale.set(1, 1, 1);
+    if (p.dodging) { body.rotation.z = -0.3 * Math.cos(rel); body.rotation.x = -0.3 * Math.sin(rel); body.scale.set(1.04, 0.92, 1.04); }
+    this.legs[0].rotation.z = swing * 0.6 * b;
+    this.legs[1].rotation.z = -swing * 0.6 * b;
+  }
+
+  /** Smoothed facing per enemy (turns take ~0.1 s instead of snapping). Keyed by the enemy id, pruned on growth. */
+  _yaw(e, target, dt) {
+    let y = this.yaws.get(e.id);
+    if (y === undefined) y = target;
+    else { const d = Math.atan2(Math.sin(target - y), Math.cos(target - y)); y += d * Math.min(1, dt * 14); }
+    this.yaws.set(e.id, y);
+    if (this.yaws.size > 220) this.yaws.clear(); // dead ids accumulate over a long map: cheap reset
+    return y;
+  }
+
+  /** Light camera shake (D45): explosions, boss impacts, hits on the keeper. On the game clock — pause freezes it. */
+  shake(amount, duration) {
+    const t = this.lastSyncTime || 0;
+    if (t + duration < this.shakeUntil && amount <= this.shakeAmp) return; // a stronger shake is already running
+    this.shakeAmp = amount;
+    this.shakeDur = duration;
+    this.shakeUntil = t + duration;
   }
 
   // ---------------- boss telegraphs (same circle/ring as the damage test in BossSystem) ----------------

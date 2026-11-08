@@ -275,18 +275,24 @@
 }
 .popup.show { display: flex; }
 
-/* Settings: dark panel with tabs, like Underlords */
+/* Popup spacing grid (D45 polish): 8 / 16 / 24 / 32 px. --row = tab row height, --close = close button (H5: one
+   size for every close button); the close button sits centred in the tab row with equal margins. */
+:root { --row: 64px; --close: 52px; --pad: 32px; }
+@media (max-height: 500px) { :root { --row: 52px; --close: 48px; --pad: 24px; } }
+@media (max-height: 359px) { :root { --row: 50px; --close: 48px; --pad: 16px; } }
+
+/* Settings: dark panel with tabs, like Underlords — sized to its tallest page (no big empty area) */
 .settings-panel {
-  width: min(1120px, 100%);
-  height: min(640px, 100%);
+  width: min(960px, 100%);
+  height: min(calc(var(--row) + 260px * var(--fs) + 2 * var(--pad)), 100%);
   display: flex;
   flex-direction: column;
 }
-.tabs-row { display: flex; align-items: stretch; background: var(--c-bg); background: rgba(5, 6, 9, 0.85); }
-.tabs { display: flex; gap: 10px; flex: 1; min-width: 0; overflow: hidden; } /* ≥ 8 px between tap zones */
+.tabs-row { display: flex; align-items: stretch; height: var(--row); flex: none; background: rgba(5, 6, 9, 0.85); }
+.tabs { display: flex; gap: 8px; flex: 1; min-width: 0; overflow: hidden; } /* ≥ 8 px between tap zones */
 .tab {
-  min-height: 48px;
-  height: calc(60px * var(--fs));
+  min-height: 44px;
+  height: var(--row);
   padding: 0 0.75em;
   font-family: var(--font-display);
   font-weight: 800;
@@ -309,9 +315,9 @@
   color: var(--c-muted);
   white-space: nowrap;
 }
-.ring-close { align-self: center; margin: 6px 6px 6px 0; }
-.tab-body { flex: 1; min-height: 0; padding: 35px; overflow: hidden; }
-.tab-page { display: none; flex-direction: column; align-items: flex-start; gap: calc(12px * var(--fs)); }
+.ring-close { width: var(--close); height: var(--close); align-self: center; margin: 0 calc((var(--row) - var(--close)) / 2) 0 8px; }
+.tab-body { flex: 1; min-height: 0; padding: var(--pad); overflow: hidden; }
+.tab-page { display: none; flex-direction: column; align-items: flex-start; gap: 16px; }
 .tab-page.active { display: flex; }
 .section-title {
   font-family: var(--font-display);
@@ -321,9 +327,11 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #fff;
-  margin-bottom: calc(6px * var(--fs));
+  line-height: 1.1;
 }
 .hint { max-width: 46em; font-size: calc(18px * var(--fs)); line-height: 1.4; color: #b5bdc5; }
+/* GAME page: the danger button keeps its natural width, a little air above it */
+.tab-page[data-page="game"] .flat-btn.danger { margin-top: 8px; }
 
 .check-row {
   min-height: 48px;
@@ -341,13 +349,20 @@
 .check-row:active .check { transform: scale(0.92); }
 
 /* Quality slider (3 steps: LOW / MEDIUM / HIGH) */
-.qslider { position: relative; width: min(760px, 100%); height: 52px; margin-top: 4px; touch-action: none; cursor: pointer; --p: 100%; }
+/* The track is inset by half a thumb, so the thumb never leaves the slider box (and lines up with the labels). */
+.qslider { position: relative; width: min(640px, 100%); height: 48px; touch-action: none; cursor: pointer; --p: 100%; --k: 1; --half: 15px; }
 .qslider.disabled { opacity: 0.4; }
-.qslider-track { position: absolute; left: 0; right: 0; top: 50%; height: 6px; margin-top: -3px; background: #2b2f34; }
+.qslider-track { position: absolute; left: var(--half); right: var(--half); top: 50%; height: 6px; margin-top: -3px; background: #2b2f34; }
 .qslider-fill { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p); background: var(--c-orange); }
 .qslider-notch { position: absolute; top: calc(50% + 10px); width: 12px; height: 8px; margin-left: -6px; background: #3a3f45; }
-.qslider-thumb { position: absolute; top: 0; left: var(--p); width: 30px; height: 52px; margin-left: -15px; background: #8a959d; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
-.qslider-labels { width: min(760px, 100%); display: flex; justify-content: space-between; font-size: calc(18px * var(--fs)); letter-spacing: 0.06em; color: var(--c-muted); }
+.qslider-notch.n0 { left: var(--half); }
+.qslider-notch.n1 { left: 50%; }
+.qslider-notch.n2 { left: calc(100% - var(--half)); }
+.qslider-thumb { position: absolute; top: 0; left: calc(var(--half) + (100% - 2 * var(--half)) * var(--k)); width: calc(2 * var(--half)); height: 48px; margin-left: calc(-1 * var(--half)); background: #8a959d; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+.qslider-labels { width: min(640px, 100%); display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: calc(18px * var(--fs)); letter-spacing: 0.06em; color: var(--c-muted); }
+.qslider-labels > span { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qslider-labels > span:nth-child(2) { text-align: center; }
+.qslider-labels > span:nth-child(3) { text-align: right; }
 .qslider-value { color: #fff; font-family: var(--font-display); font-weight: 800; text-transform: uppercase; }
 
 /* Language list (H5 §8: text only, no flags) */
@@ -371,24 +386,24 @@
   position: relative;
   width: min(640px, 100%);
   max-height: 100%;
-  padding: 35px;
-  padding-top: calc(35px + var(--ring) * 0.5);
+  padding: var(--pad);
+  padding-top: calc(var(--pad) + var(--close) * 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.credits-panel .ring-close { position: absolute; top: 14px; right: 14px; margin: 0; }
+.credits-panel .ring-close { position: absolute; top: 16px; right: 16px; margin: 0; }
 .credits-logo { width: min(440px, 70%); max-height: 50vh; object-fit: contain; }
 
 /* Confirmation */
 .confirm-panel {
   width: min(700px, 100%);
   max-height: 100%;
-  padding: 35px;
+  padding: var(--pad);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: calc(28px * var(--fs));
+  gap: 24px;
 }
 .confirm-text { text-align: center; font-size: calc(24px * var(--fs)); line-height: 1.4; color: #fff; }
 .confirm-btns { display: flex; justify-content: center; gap: clamp(26px, 8vw, 90px); }
@@ -398,9 +413,10 @@
 
 /* ---------- Phone steps: compact paddings, rows instead of columns ---------- */
 @media (max-height: 500px) {
+  #popup-settings { padding-top: 10px; padding-bottom: 10px; } /* landscape: the 30 px safe margin is on the sides */
   .build-label { display: none; } /* tabs need the whole row on phones */
   .tab { padding: 0 0.55em; }
-  .tab-body { padding: 24px 35px; }
+  .tab-page { gap: 12px; }
   .map-info { gap: 8px; padding: 16px 20px; }
   .map-info-name { font-size: 26px; }
   .map-info-desc { font-size: 14px; line-height: 1.3; }
@@ -409,7 +425,6 @@
   .map-side { gap: 10px; }
 }
 @media (max-height: 359px) {
-  .tab-body { padding: 18px 35px; }
   .tab-page { gap: 8px; }
   /* H5 minimums on the very low step (--fs 0.72 would give 13–15 px) */
   .check-row, .lang-item { font-size: 16px; }

@@ -61,7 +61,9 @@ export class SettingsView {
     const auto = this.game.qualitySetting === 'auto';
     this.autoBtn.setAttribute('aria-checked', auto ? 'true' : 'false');
     const idx = QUALITY_LEVELS.indexOf(this.game.quality);
-    this.slider.style.setProperty('--p', `${(idx / (QUALITY_LEVELS.length - 1)) * 100}%`);
+    const k = idx / (QUALITY_LEVELS.length - 1);
+    this.slider.style.setProperty('--p', `${k * 100}%`); // fill (share of the track)
+    this.slider.style.setProperty('--k', String(k));     // thumb (kept inside the slider box)
     this.slider.setAttribute('aria-valuenow', String(idx));
     this.slider.classList.toggle('disabled', auto);
     this.qualityName.textContent = T(`quality.${this.game.quality}`);
@@ -86,7 +88,8 @@ export class SettingsView {
   _bindSlider() {
     const pick = (clientX) => {
       const r = this.slider.getBoundingClientRect();
-      const t = Math.min(1, Math.max(0, (clientX - r.left) / Math.max(1, r.width)));
+      const half = 15; // track inset (styles/ui.css --half)
+      const t = Math.min(1, Math.max(0, (clientX - r.left - half) / Math.max(1, r.width - 2 * half)));
       const idx = Math.round(t * (QUALITY_LEVELS.length - 1));
       const level = QUALITY_LEVELS[idx];
       if (this.game.qualitySetting !== level) { this.game.setQuality(level); this.refresh(); }

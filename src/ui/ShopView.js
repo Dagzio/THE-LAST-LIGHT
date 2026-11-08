@@ -46,6 +46,15 @@ function el(tag, cls, html) {
   return n;
 }
 
+const fitRange = document.createRange();
+/** True when the element's text stays inside its content box (overflow into the padding does not count as fitting). */
+function textFits(n) {
+  const cs = getComputedStyle(n);
+  fitRange.selectNodeContents(n);
+  const room = n.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  return fitRange.getBoundingClientRect().width <= room + 0.5 && n.scrollWidth <= n.clientWidth + 1;
+}
+
 function clockText(seconds) {
   const s = Math.max(0, Math.ceil(seconds));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -156,6 +165,7 @@ export class ShopView {
     const full = T(key, { t: clock });
     const i = full.lastIndexOf(clock);
     const label = el('span', 'shop-timer-label');
+    label.dir = 'auto'; // Arabic: the colon stays on the reading side
     const time = el('b', 'shop-timer-time');
     label.textContent = i >= 0 ? full.slice(0, i).trimEnd() : full;
     time.textContent = i >= 0 ? full.slice(i) : '';
@@ -175,18 +185,13 @@ export class ShopView {
    * does not change scrollWidth).
    */
   _fitButtons() {
-    if (!this.phoneMQ.matches) return;
-    const range = document.createRange();
-    const fits = (n) => {
-      const cs = getComputedStyle(n);
-      range.selectNodeContents(n);
-      const room = n.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      return range.getBoundingClientRect().width <= room + 0.5 && n.scrollWidth <= n.clientWidth + 1;
-    };
+    // every size: a single long word must not leave its card (desktop cards are narrow for German / Russian too)
     for (const n of this.grid.querySelectorAll('.shop-card:not(.off) .shop-buy, .shop-card:not(.off) .shop-card-name')) {
       n.style.fontSize = '';
+      n.style.overflowWrap = '';
       let fs = parseFloat(getComputedStyle(n).fontSize);
-      while (fs > 12 && !fits(n)) { fs -= 1; n.style.fontSize = `${fs}px`; }
+      while (fs > 12 && !textFits(n)) { fs -= 1; n.style.fontSize = `${fs}px`; }
+      if (!textFits(n)) n.style.overflowWrap = 'anywhere'; // last resort: break the word rather than leave the card
     }
   }
 
@@ -195,7 +200,7 @@ export class ShopView {
     for (const t of this.tabs) t.style.fontSize = '';
     if (!this.phoneMQ.matches) return;
     let fs = parseFloat(getComputedStyle(this.tabs[0]).fontSize);
-    const overflow = () => this.tabs.some((t) => t.scrollWidth > t.clientWidth + 1);
+    const overflow = () => this.tabs.some((t) => !textFits(t));
     while (fs > 12 && overflow()) {
       fs -= 1;
       for (const t of this.tabs) t.style.fontSize = `${fs}px`;

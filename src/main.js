@@ -51,6 +51,18 @@ function wireCombatSounds(events) {
   events.on('playerHit', () => Sfx.play('playerHurt', 0.95 + Math.random() * 0.1));
   events.on('bossTelegraph', () => Sfx.play('bossWarn'));
   events.on('bossImpact', (kind) => Sfx.play(kind === 'slam' ? 'bossSlam' : 'bossTide'));
+  events.on('bossSummon', () => Sfx.play('bossSlam', 0.7)); // D45: Fog Mother summon
+  events.on('glob', () => Sfx.play('throw', 0.62 + Math.random() * 0.1)); // D45: Spitter
+}
+
+/** D45: light camera shake for heavy impacts (presentation only, on the game clock). */
+function wireCameraShake(game) {
+  const ev = game.events;
+  const shake = (a, d) => { if (game.renderer3d) game.renderer3d.shake(a, d); };
+  ev.on('grenadeBlast', (type) => shake(type === 'frag' ? 7 : 3, type === 'frag' ? 0.28 : 0.2));
+  ev.on('bossImpact', (kind) => shake(kind === 'slam' ? 8 : 11, kind === 'slam' ? 0.3 : 0.42));
+  ev.on('bossSummon', () => shake(5, 0.3));
+  ev.on('playerHit', () => shake(3, 0.15));
 }
 
 /** @param {{loaded: Promise<void>, shownAt: number}} boot */
@@ -64,6 +76,7 @@ export function startGame(boot) {
   new TouchControls(game);
   new OffscreenIndicators(game);
   wireCombatSounds(game.events);
+  wireCameraShake(game);
 
   // Hidden tab / lost focus / wrong orientation → real pause (same path as the pause button).
   initAudioLifecycle({ onSuspend: () => ui.autoPause() });

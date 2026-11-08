@@ -54,11 +54,14 @@ const C = {
   gruntBody: '#5a1c26', gruntHump: '#6e2531', gruntHead: '#4a1620', gruntBone: '#2a0e14', gruntBelly: '#3e121a',
 };
 
-/** The keeper: long oilskin coat, wide-brim hat, pistol arm forward. Height ≈ 52, footprint radius ≈ 18. */
-export function playerGeometry() {
+/**
+ * The keeper: long oilskin coat, wide-brim hat, pistol arm forward. Height ≈ 52, footprint radius ≈ 18.
+ * withBoots = false: the game animates the legs separately (bootGeometry, D45 walk cycle).
+ */
+export function playerGeometry(withBoots = true) {
   const P = [];
   // boots / legs
-  for (const s of [-1, 1]) P.push(part(new THREE.CylinderGeometry(3.6, 4.2, 12, 8), C.boots, { y: 6, z: s * 5 }));
+  if (withBoots) for (const s of [-1, 1]) P.push(part(new THREE.CylinderGeometry(3.6, 4.2, 12, 8), C.boots, { y: 6, z: s * 5 }));
   // long coat (flared), back tails a bit longer
   P.push(part(new THREE.CylinderGeometry(10.5, 16, 24, 12), C.coat, { y: 22 }));
   P.push(part(new THREE.CylinderGeometry(11, 11, 1.5, 12), C.coatDark, { y: 10.6, sx: 1.42, sz: 1.42 }));
@@ -79,6 +82,14 @@ export function playerGeometry() {
   // off-hand near the chest
   P.push(part(new THREE.BoxGeometry(11, 5, 5), C.coat, { x: 5, y: 31, z: -8, ry: 0.5 }));
   return mergeParts(P);
+}
+
+/** One boot of the keeper, hanging from its hip pivot (origin = hip, 12 units above the ground). */
+export function bootGeometry() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(3.6, 4.2, 12, 8), C.boots, { y: -6 }),
+    part(new THREE.BoxGeometry(7, 3, 5), C.boots, { x: 1.5, y: -10.5 }), // toe, so the step reads from above
+  ]);
 }
 
 /** Hunched fog creature: wide humped back with bone spines, clawed forearms forward. Height ≈ 32. */

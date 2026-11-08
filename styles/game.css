@@ -745,8 +745,8 @@ body.map-over .kiosk-prompt { display: none; }
 .shop-bar {
   display: flex;
   align-items: center;
-  gap: calc(14px * var(--fs));
-  padding: calc(10px * var(--fs)) calc(20px * var(--fs));
+  gap: 16px;
+  padding: 12px var(--pad);
   background: rgba(0, 0, 0, 0.28);
 }
 .shop-level { font: 800 calc(20px * var(--fs)) / 1 var(--font-display); letter-spacing: 0.08em; color: #ffd27a; white-space: nowrap; }
@@ -755,11 +755,11 @@ body.map-over .kiosk-prompt { display: none; }
 .shop-timer { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 0.35em; font: 800 calc(18px * var(--fs)) / 1 var(--font-display); letter-spacing: 0.06em; color: #c9cfe0; white-space: nowrap; }
 .shop-timer-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .shop-timer-time { flex: none; color: #fff; }
-.shop-start { font-size: calc(22px * var(--fs)); min-height: 40px; }
-.shop-sub { display: flex; gap: 8px; flex-wrap: wrap; padding: calc(10px * var(--fs)) calc(20px * var(--fs)) 0; }
+.shop-start { font-size: calc(22px * var(--fs)); min-height: 48px; }
+.shop-sub { display: flex; gap: 8px; flex-wrap: wrap; padding: 16px var(--pad) 0; }
 .shop-sub:empty { display: none; }
 .shop-chip {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   font: 800 calc(17px * var(--fs)) / 1 var(--font-display);
   letter-spacing: 0.05em;
@@ -777,10 +777,10 @@ body.map-over .kiosk-prompt { display: none; }
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  padding: calc(16px * var(--fs)) calc(20px * var(--fs)) calc(20px * var(--fs));
+  padding: 16px var(--pad) var(--pad);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(calc(200px * var(--fs)), 1fr));
-  gap: calc(14px * var(--fs));
+  gap: 16px;
   align-content: start;
   touch-action: pan-y;
 }
@@ -806,7 +806,7 @@ body.map-over .kiosk-prompt { display: none; }
 .pips i.on { background: #ffd27a; }
 .shop-card-foot { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 0 10px 10px; }
 .shop-buy {
-  min-height: 42px;
+  min-height: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -831,14 +831,13 @@ body.map-over .kiosk-prompt { display: none; }
   .shop-panel { height: 100%; }
   .shop-panel .tabs-row { align-items: center; }
   .shop-panel .tabs { align-self: stretch; align-items: center; }
-  .shop-panel .tab { flex: 1 1 0; min-width: 0; height: 44px; min-height: 44px; padding: 0 4px; font-size: 16px; overflow: hidden; }
+  .shop-panel .tab { flex: 1 1 0; min-width: 0; padding: 0 4px; font-size: 16px; overflow: hidden; }
   /* coins move from the tab row to the level row: the 5 tabs get the whole width (long languages) */
   .tabs-row .shop-coins { display: none; }
   .shop-bar .shop-coins { display: inline-flex; font-size: 18px; margin: 0; }
-  .shop-panel .ring-close { margin: 4px 4px 4px 10px; }
   .shop-bar { padding: 4px 12px; gap: 12px; }
   .shop-level { font-size: 16px; }
-  .shop-xp { width: 70px; }
+  .shop-xp { display: none; } /* the HUD shows XP; the row needs the room for the timer in long languages */
   .shop-timer { font-size: 16px; }
   .shop-start { min-height: 44px; font-size: 17px; }
   .shop-pager { gap: 8px; padding: 8px; }

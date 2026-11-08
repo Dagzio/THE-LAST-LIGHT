@@ -56,6 +56,6 @@ export const COLLIDERS = {
 };
 
 export const ENEMY_FX = {
-  deathFade: 0.45,             // s — dead body fades out, then the entity is removed
+  deathFade: 0.7,              // s — dead body tips over and crumbles to ash (D45 animation), then it is removed
   hitFlash: 0.08,              // s
 };

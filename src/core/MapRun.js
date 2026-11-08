@@ -116,10 +116,14 @@ export class MapRun {
       events.on('hit', (x, y, amount) => {
         this.stats.damageDealt += amount;
         this.particles.burst(x, y, 6, 160, 0.22, 2, '#ffb8a0');
+        this.particles.burst(x, y, 2, 300, 0.12, 2.6, '#fff1cf', 10); // D45: a short white impact spark
       }),
       events.on('shot', (x, y, angle) => {
         this.stats.shotsFired += 1;
         this.particles.cone(x, y, angle, 0.7, 5, 260, 0.12, 2.2, '#ffd27a');
+        // D45: a brass casing kicked out to the right of the gun (decorative; the quality preset limits particles)
+        const p = this.player;
+        this.particles.cone(p.x, p.y, angle + Math.PI / 2, 0.5, 1, 110, 0.45, 2.2, '#c99a3e');
       }),
       events.on('turretShot', (x, y, angle) => this.particles.cone(x, y, angle, 0.6, 3, 220, 0.1, 2, '#ffe0a0')),
       events.on('beaconHit', (x, y, amount) => {
@@ -354,7 +358,11 @@ export class MapRun {
     if (r) { this.rewards.coins += r.coins | 0; this.rewards.xp += r.xp | 0; }
     this.flare.addKill(e);
     if (r) this.events.emit('killReward', r, e); // → Economy (profile coins + XP), exactly once per enemy
-    this.particles.burst(e.x, e.y, e.type.boss ? 40 : 16, e.type.boss ? 320 : 190, 0.5, 3, '#7a2333');
+    // D45 death: a dark burst, ash that drifts out slowly and a few embers
+    const big = e.type.boss ? 2.5 : e.radius / 17;
+    this.particles.burst(e.x, e.y, Math.round(10 * big), 190 * big, 0.45, 3, '#7a2333');
+    this.particles.burst(e.x, e.y, Math.round(10 * big), 70 * big, 0.9, 3.2, '#4d4855', 2);
+    this.particles.burst(e.x, e.y, Math.round(4 * big), 230 * big, 0.35, 2.2, '#ff9a4a', 6);
   }
 
   /** Wave bonus once per wave (WaveSystem reports each clear once); the final clear wins the map. */
