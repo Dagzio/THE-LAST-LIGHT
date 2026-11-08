@@ -6,6 +6,8 @@
 import { GRENADES, GRENADE_ORDER, GRENADE_RULES } from '../data/grenades.js';
 import { computeDamage, NEUTRAL_MODIFIERS } from './DamageCalculator.js';
 
+const NO_ARMOR = { illuminated: false, armor: 0 }; // reused target view for grenade damage
+
 export class GrenadeSystem {
   /**
    * @param {{next:()=>number}} rng
@@ -135,7 +137,9 @@ export class GrenadeSystem {
   }
 
   _hit(e, base, src, time) {
-    const res = computeDamage(base, src, e, NEUTRAL_MODIFIERS, this.rng);
+    // Grenades ignore armour (Husk, D45): the calculator sees the target without its armour.
+    NO_ARMOR.illuminated = e.illuminated;
+    const res = computeDamage(base, src, NO_ARMOR, NEUTRAL_MODIFIERS, this.rng);
     const killed = e.applyDamage(res.amount, time);
     this.events.emit('hit', e.x, e.y, res.amount, false);
     if (killed) this.events.emit('kill', e, time);

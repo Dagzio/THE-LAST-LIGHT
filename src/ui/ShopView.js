@@ -364,10 +364,12 @@ export class ShopView {
       else this._footer(card, { cmd: 'repair', price: o.cost, enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
       this.grid.append(card);
     }
+    this.grid.style.setProperty('--pads', String(Math.max(1, pads.length))); // desktop: one column per pad
+    const padNames = g.run ? g.run.map.buildPads.map((p) => p.name) : [];
     pads.forEach((pad, i) => {
       const col = el('div', 'shop-pad');
       const title = el('h4', 'shop-pad-title');
-      title.textContent = T(i === 0 ? 'shop.padWest' : 'shop.padEast');
+      title.textContent = T(`shop.pad.${padNames[i] || (i === 0 ? 'west' : 'east')}`);
       col.append(title);
       for (const id of Object.keys(DEFENSES)) {
         const d = DEFENSES[id];

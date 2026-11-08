@@ -2,6 +2,7 @@
 // never keys or DOM — keyboard and touch drive it the same way.
 import { PLAYER } from '../data/player.js';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../config/constants.js';
+import { terrainSpeed } from '../data/maps.js';
 
 const move = { x: 0, y: 0 }; // reused
 const aim = { x: 0, y: 0 };
@@ -19,6 +20,8 @@ export class PlayerController {
     this.dodgeCooldownMult = 1;
     /** @type {import('./Collision.js').CollisionWorld|null} static obstacles (D40) */
     this.world = null;
+    /** @type {object|null} map data (slow zones) */
+    this.map = null;
   }
 
   /**
@@ -53,7 +56,9 @@ export class PlayerController {
       player.vx = player.dodgeDirX * PLAYER.dodge.speed;
       player.vy = player.dodgeDirY * PLAYER.dodge.speed;
     } else {
-      const speed = PLAYER.moveSpeed * this.speedMult;
+      // Salt Marsh pools slow the keeper too (D45); the dodge ignores the terrain (an escape tool).
+      const terrain = this.map && this.map.slowZones ? terrainSpeed(this.map, player.x, player.y) : 1;
+      const speed = PLAYER.moveSpeed * this.speedMult * terrain;
       player.vx = move.x * speed; // |move| ≤ 1 → diagonal is never faster
       player.vy = move.y * speed;
     }

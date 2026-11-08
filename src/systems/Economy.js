@@ -72,6 +72,14 @@ export class Economy {
     this._commit();
   }
 
+  /** One-time intro card shown (D45): stored once, saved. */
+  markIntroSeen(id) {
+    const list = this.profile.intros;
+    if (!Array.isArray(list) || list.includes(id)) return;
+    list.push(id);
+    this._commit();
+  }
+
   skipTutorial() {
     if (this.profile.tutorial.done) return;
     this.profile.tutorial.done = true;

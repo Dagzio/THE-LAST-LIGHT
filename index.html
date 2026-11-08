@@ -51,7 +51,19 @@
       </button>
     </div>
     <div class="map-layout">
-      <div class="map-grid" id="mapGrid"></div>
+      <!-- Carousel (D45): one card, ◀ ▶, a dot per campaign map (gold = cleared, white = open, dim = locked) -->
+      <div class="map-carousel">
+        <div class="map-carousel-row">
+          <button class="ring-btn map-arrow" data-action="mapPrev" data-i18n-aria="aria.prevPage">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M15 4l-8 8 8 8"/></svg>
+          </button>
+          <div class="map-grid" id="mapGrid"></div>
+          <button class="ring-btn map-arrow" data-action="mapNext" data-i18n-aria="aria.nextPage">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M9 4l8 8-8 8"/></svg>
+          </button>
+        </div>
+        <div class="map-dots" id="mapDots" aria-hidden="true"></div>
+      </div>
       <div class="map-side">
         <aside class="panel map-info">
           <h2 class="map-info-name" id="mapName"></h2>
@@ -107,7 +119,7 @@
         <span class="hud-wave-sub" id="hudWaveSub"></span>
       </div>
       <div class="hud-boss" id="hudBoss" hidden>
-        <span class="hud-boss-name" data-i18n="boss.gloam_warden"></span>
+        <span class="hud-boss-name" id="hudBossName"></span>
         <i class="hud-boss-bar"><i id="hudBossFill"></i></i>
       </div>
       <!-- touch layout: under the timer (the bottom centre holds the player plate next to the touch buttons) -->
@@ -117,6 +129,16 @@
 
     <!-- Wave banner: WAVE N / FINAL WAVE / WAVE CLEARED -->
     <div class="wave-banner" id="waveBanner"><span class="stamp" id="waveBannerText"></span></div>
+
+    <!-- One-time intro card (D45): a new enemy / the map's feature. Never pauses, never takes taps. -->
+    <div class="intro-card" id="introCard" aria-live="polite">
+      <span class="intro-ico" id="introIco"></span>
+      <span class="intro-body">
+        <span class="intro-kicker" id="introKicker"></span>
+        <b class="intro-title" id="introTitle"></b>
+        <span class="intro-text" id="introText"></span>
+      </span>
+    </div>
 
     <!-- Bottom centre (desktop), intermission only: START NEXT WAVE (double-press safe in the domain) -->
     <button class="brush-btn next-wave-btn next-wave-bottom" id="btnNextWave" data-action="startNextWave" data-nosfx data-i18n="hud.startNextWave"></button>

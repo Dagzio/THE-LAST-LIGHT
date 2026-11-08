@@ -8,6 +8,7 @@ import { WEAPON_NODES, UPGRADE_NODES, WEAPON_UPGRADE, PLAYER_UPGRADES } from '..
 import { MAPS } from '../data/maps.js';
 import { levelForXp } from '../data/progression.js';
 import { TUTORIAL_STEP_IDS } from '../data/tutorial.js';
+import { INTRO_IDS } from '../data/intros.js';
 
 // v2 (Phase 7b): + tutorial { done, seen[] }
 export const SCHEMA_VERSION = 2;
@@ -30,6 +31,7 @@ export function createDefaultProfile() {
     completedMaps: [],
     statistics: { totalKills: 0, mapsWon: 0, mapsFailed: 0 },
     tutorial: { done: false, seen: [] },
+    intros: [], // D45: one-time new enemy / map feature cards already shown (missing in older saves → [])
   };
 }
 
@@ -110,6 +112,7 @@ export function validateProfile(data) {
   fix(typeof tu.done === 'boolean');
   p.tutorial.done = tu.done === true;
   p.tutorial.seen = Array.isArray(tu.seen) ? [...new Set(tu.seen.filter((id) => TUTORIAL_STEP_IDS.includes(id)))] : [];
+  p.intros = Array.isArray(data.intros) ? [...new Set(data.intros.filter((id) => INTRO_IDS.includes(id)))] : [];
   return { profile: p, repaired };
 }
 

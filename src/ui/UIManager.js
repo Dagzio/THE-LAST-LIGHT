@@ -3,7 +3,8 @@
 import { STATES } from '../core/GameStateMachine.js';
 import { T, applyTranslations, onLanguageChange } from '../i18n/i18n.js';
 import { MAPS, getMap } from '../data/maps.js';
-import { Renderer } from '../render/Renderer.js';
+import { drawMapPreview } from '../render/MapPainter.js';
+import { layoutProps } from '../systems/Props.js';
 import { Sfx } from '../platform/Sfx.js';
 import { Music } from '../platform/Music.js';
 import { AC } from '../platform/AudioUnlock.js';
@@ -190,6 +191,8 @@ export class UIManager {
       case 'askExit': this._ask('exit'); break;
       case 'fullscreen': toggleFullscreen(); break;
       case 'selectMap': this.game.selectMap(btn.dataset.mapId); this._refreshMapSelect(); break;
+      case 'mapPrev': this._turnMap(-1); break;
+      case 'mapNext': this._turnMap(1); break;
       case 'retryMap': this.game.retryMap(); break;
       case 'continueCampaign': this.game.continueCampaign(); break;
       case 'tutorialOk': this.game.tutorial.dismiss(); break;
@@ -205,63 +208,122 @@ export class UIManager {
     }
   }
 
-  // ---------------- map select (Phase 7: only unlocked maps, cleared badge) ----------------
+  // ---------------- map select: carousel (user decision D45) ----------------
+  // One big card at a time, ◀ ▶ arrows, dots for the whole campaign. Unlocked maps can be chosen; the NEXT locked map
+  // is shown as a dark card with a lock (the goal); later maps stay hidden (H5 §11: no list of locked content).
   _buildMapCards() {
-    this.thumbs = new Map(); // map id → painted thumbnail canvas (painted once)
+    this.thumbs = new Map(); // map id → painted preview canvas (painted once)
+    this.viewIndex = 0;      // index in MAPS of the card on screen
     this._rebuildMapCards();
   }
 
-  /** Cards for the unlocked maps (H5: locked / non-existing maps are not shown); rebuilt when map select opens. */
-  _rebuildMapCards() {
-    const grid = document.getElementById('mapGrid');
-    const profile = this.game.economy.profile;
-    grid.replaceChildren();
-    for (const map of MAPS) {
-      if (!profile.unlockedMaps.includes(map.id)) continue;
-      const card = document.createElement('button');
-      card.className = 'map-card';
-      card.dataset.action = 'selectMap';
-      card.dataset.mapId = map.id;
-      let thumb = this.thumbs.get(map.id);
-      if (!thumb) {
-        thumb = document.createElement('canvas');
-        thumb.width = 320;
-        thumb.height = 320;
-        Renderer.drawMapThumb(thumb, map.artSeed);
-        this.thumbs.set(map.id, thumb);
-      }
-      const name = document.createElement('span');
-      name.className = 'map-card-name';
-      name.textContent = T(map.nameKey);
-      card.append(thumb, name);
-      if (profile.completedMaps.includes(map.id)) {
-        const badge = document.createElement('span');
-        badge.className = 'map-card-badge';
-        badge.textContent = T('map.cleared');
-        card.append(badge);
-      }
-      grid.appendChild(card);
+  /** Maps the carousel can show: every unlocked map + the first locked one. */
+  _visibleMaps() {
+    const unlocked = this.game.economy.profile.unlockedMaps;
+    const out = [];
+    for (const m of MAPS) {
+      out.push(m);
+      if (!unlocked.includes(m.id)) break;
     }
-    this._refreshMapSelect();
+    return out;
   }
 
-  _refreshMapSelect() {
-    const map = getMap(this.game.selectedMapId);
-    if (!map) return;
-    document.querySelectorAll('.map-card').forEach((c) => c.classList.toggle('selected', c.dataset.mapId === map.id));
-    const cleared = this.game.economy.profile.completedMaps.includes(map.id);
+  _thumb(map) {
+    let c = this.thumbs.get(map.id);
+    if (!c) {
+      c = document.createElement('canvas');
+      c.width = 320;
+      c.height = 320;
+      drawMapPreview(c, map, layoutProps(map));
+      this.thumbs.set(map.id, c);
+    }
+    return c;
+  }
+
+  /** Rebuilt when map select opens / the language changes: starts on the game's selected (unlocked) map. */
+  _rebuildMapCards() {
+    const sel = MAPS.findIndex((m) => m.id === this.game.selectedMapId);
+    if (sel >= 0) this.viewIndex = sel;
+    const dots = document.getElementById('mapDots');
+    dots.replaceChildren();
+    for (let i = 0; i < MAPS.length; i++) dots.appendChild(document.createElement('i'));
+    this._showMapCard();
+  }
+
+  _turnMap(dir) {
+    const vis = this._visibleMaps();
+    const next = Math.max(0, Math.min(vis.length - 1, this.viewIndex + dir));
+    if (next === this.viewIndex) return;
+    this.viewIndex = next;
+    const map = MAPS[next];
+    if (this.game.isMapUnlocked(map.id)) this.game.selectMap(map.id);
+    this._showMapCard();
+  }
+
+  _showMapCard() {
+    const vis = this._visibleMaps();
+    this.viewIndex = Math.max(0, Math.min(vis.length - 1, this.viewIndex));
+    const map = MAPS[this.viewIndex];
+    const profile = this.game.economy.profile;
+    const locked = !profile.unlockedMaps.includes(map.id);
+    const cleared = profile.completedMaps.includes(map.id);
+
+    const grid = document.getElementById('mapGrid');
+    const card = document.createElement('div');
+    card.className = `map-card selected${locked ? ' locked' : ''}`;
+    const name = document.createElement('span');
+    name.className = 'map-card-name';
+    name.textContent = T(map.nameKey);
+    const num = document.createElement('span');
+    num.className = 'map-card-num';
+    num.textContent = String(this.viewIndex + 1);
+    card.append(this._thumb(map), num, name);
+    if (locked) {
+      const lock = document.createElement('span');
+      lock.className = 'map-card-lock';
+      lock.innerHTML = '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+      card.append(lock);
+    } else if (cleared) {
+      const badge = document.createElement('span');
+      badge.className = 'map-card-badge';
+      badge.textContent = T('map.cleared');
+      card.append(badge);
+    }
+    grid.replaceChildren(card);
+    // the name stays on one line: long names / languages shrink (H5: shrink, never wrap a label)
+    name.style.fontSize = '';
+    let fs = parseFloat(getComputedStyle(name).fontSize);
+    while (fs > 13 && name.scrollWidth > name.clientWidth + 1) { fs -= 1; name.style.fontSize = `${fs}px`; }
+
+    // arrows + dots
+    document.querySelector('[data-action="mapPrev"]').disabled = this.viewIndex <= 0;
+    document.querySelector('[data-action="mapNext"]').disabled = this.viewIndex >= vis.length - 1;
+    const dots = document.getElementById('mapDots').children;
+    for (let i = 0; i < dots.length; i++) {
+      const m = MAPS[i];
+      dots[i].className = [
+        i === this.viewIndex ? 'on' : '',
+        profile.completedMaps.includes(m.id) ? 'cleared' : profile.unlockedMaps.includes(m.id) ? 'open' : '',
+      ].join(' ');
+    }
+
+    // info panel + BEGIN
     const state = document.getElementById('mapState');
-    state.textContent = T(cleared ? 'map.stateCleared' : 'map.stateNew');
+    const prev = MAPS[this.viewIndex - 1];
+    state.textContent = locked ? T('map.stateLocked', { map: prev ? T(prev.nameKey) : '' }) : T(cleared ? 'map.stateCleared' : 'map.stateNew');
     state.classList.toggle('cleared', cleared);
+    state.classList.toggle('locked', locked);
     document.getElementById('mapName').textContent = T(map.nameKey);
     document.getElementById('mapDesc').textContent = T(map.descKey);
     document.getElementById('mapWaves').textContent = T('map.waves', { n: map.waveCount });
-    document.getElementById('mapBoss').textContent = map.finalWaveBoss ? T('map.boss') : '';
-    document.getElementById('mapBoss').hidden = !map.finalWaveBoss;
+    document.getElementById('mapBoss').textContent = T(map.finalWaveBoss ? 'map.boss' : 'map.elite');
+    document.querySelector('[data-action="beginMap"]').disabled = locked;
   }
 
+  _refreshMapSelect() { this._showMapCard(); }
+
   _refreshDynamicText() {
-    if (this.game.sm.is(STATES.MAP_SELECT)) this._rebuildMapCards(); else this._refreshMapSelect();
+    this._showMapCard(); // keeps the card on screen (also a locked one) — only its texts change
     if (this.confirmKind) this.confirmText.textContent = T(CONFIRM_TEXT[this.confirmKind] || 'confirm.exit');
   }
 }

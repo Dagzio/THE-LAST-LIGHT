@@ -6,8 +6,20 @@ import { T, onLanguageChange } from '../i18n/i18n.js';
 import { WAVE_PHASE } from '../systems/WaveSystem.js';
 import { levelProgress } from '../data/progression.js';
 import { STATES } from '../core/GameStateMachine.js';
+import { INTROS, INTRO_SECONDS } from '../data/intros.js';
 
 const KIOSK_LABEL_HEIGHT = 74; // world height above the kiosk where its label sits
+
+// Intro card glyphs (24×24 stroke, same line style as the shop icons)
+const INTRO_ICONS = {
+  spit: '<circle cx="9" cy="14" r="5"/><path d="M14 11c3-3 6-2 7 1M18 6l1.5-1.5M20 9.5l2-.5"/>',
+  shell: '<path d="M3 15c0-5 4-9 9-9s9 4 9 9z"/><path d="M8 15c0-3 2-6 4-7M16 15c0-3-2-6-4-7M3 15h18v2H3z"/>',
+  boss: '<path d="M12 3l2 4 4-2-1 5 4 2-4 2 1 5-4-2-2 4-2-4-4 2 1-5-4-2 4-2-1-5 4 2z"/>',
+  sides: '<path d="M12 4v6M4 12h6M14 12h6M12 14v6"/><circle cx="12" cy="12" r="2"/>',
+  tree: '<path d="M12 3l5 7h-3l4 6H6l4-6H7z"/><path d="M12 16v5"/>',
+  pool: '<ellipse cx="12" cy="14" rx="9" ry="5"/><path d="M7 13c2-1 3 1 5 0s3-1 5 0"/>',
+  pad: '<circle cx="12" cy="7" r="3"/><circle cx="6" cy="16" r="3"/><circle cx="18" cy="16" r="3"/>',
+};
 
 const BANNER_CLASS = 'show';
 
@@ -37,6 +49,12 @@ export class HUD {
       waveSub: $('hudWaveSub'),
       boss: $('hudBoss'),
       bossFill: $('hudBossFill'),
+      bossName: $('hudBossName'),
+      intro: $('introCard'),
+      introIco: $('introIco'),
+      introKicker: $('introKicker'),
+      introTitle: $('introTitle'),
+      introText: $('introText'),
       nextWave: [...document.querySelectorAll('.next-wave-btn')], // desktop (bottom) + touch (top) variants
       banner: $('waveBanner'),
       screen: $('screen-game'),   // carries --flare (0–100) and .flare-full / .flare-ready for both flare buttons
@@ -68,10 +86,18 @@ export class HUD {
     onLanguageChange(() => {
       this._resetCache();
       if (this.banner) this.el.bannerText.textContent = T(this.banner.key, this.banner.params);
+      if (this.introId) this._fillIntro(this.introId);
     });
-    game.events.on('waveStart', (index, total, boss) => {
-      this._showBanner(boss ? 'banner.finalWave' : 'banner.wave', { n: index + 1 });
+    game.events.on('waveStart', (index, total, final) => {
+      this._showBanner(final ? 'banner.finalWave' : 'banner.wave', { n: index + 1 });
     });
+    // One-time intro cards (D45): a new enemy on its first appearance, the map's feature on its first start
+    this.introId = null;
+    this.introUntil = 0;
+    this.introQueue = [];
+    game.events.on('enemySpawn', (e) => this._intro(e.typeId));
+    game.events.on('mapStarted', (mapId) => this._intro(mapId));
+    game.sm.onChange(() => { if (!game.sm.inMap) { this.introQueue = []; this._hideIntro(); } });
     game.events.on('waveCleared', (index, reward, final) => { if (!final) this._showBanner('banner.waveCleared', null); });
     game.events.on('levelUp', (level) => { if (game.sm.inMap) this._showBanner('banner.levelUp', { n: level }); });
     game.events.on('crateSpawn', () => this._showBanner('banner.crate', null));
@@ -161,6 +187,40 @@ export class HUD {
     this.el.banner.classList.remove(BANNER_CLASS);
   }
 
+  /** Queues the intro card `id` if it exists and was never shown on this profile. */
+  _intro(id) {
+    const p = this.game.economy.profile;
+    if (!INTROS[id] || !Array.isArray(p.intros) || p.intros.includes(id) || this.introId === id || this.introQueue.includes(id)) return;
+    this.introQueue.push(id);
+  }
+
+  _fillIntro(id) {
+    const I = INTROS[id];
+    this.el.introKicker.textContent = T(`intro.kind.${I.kind}`);
+    this.el.introTitle.textContent = T(I.titleKey);
+    this.el.introText.textContent = T(I.textKey);
+    this.el.introIco.innerHTML = `<svg viewBox="0 0 24 24">${INTRO_ICONS[I.icon] || ''}</svg>`;
+  }
+
+  /** Shows queued cards one by one while the map runs (game clock: pause / shop / tutorial freeze them). */
+  _updateIntro(time, running) {
+    if (this.introId && time >= this.introUntil) this._hideIntro();
+    if (this.introId || !running || !this.introQueue.length || this.game.tutorial.active) return;
+    const id = this.introQueue.shift();
+    this.introId = id;
+    this.introUntil = time + INTRO_SECONDS;
+    this._fillIntro(id);
+    const top = document.querySelector('#screen-game .hud-top'); // under the wave header (one layout read per card)
+    this.el.intro.style.top = `${Math.round((top ? top.getBoundingClientRect().bottom : 120) + 10)}px`;
+    this.el.intro.classList.add('show');
+    this.game.economy.markIntroSeen(id); // stored on show: it never repeats, even after a retry
+  }
+
+  _hideIntro() {
+    this.introId = null;
+    this.el.intro.classList.remove('show');
+  }
+
   update() {
     const run = this.game.run;
     if (!run || !this.game.sm.inMap) return;
@@ -233,6 +293,7 @@ export class HUD {
     if (canShop !== c.canShop) { c.canShop = canShop; el.shop.classList.toggle('can-shop', canShop); }
     this._kioskLabel(run, running);
     this._crateLabel(run, running, time);
+    this._updateIntro(time, running);
 
     // Grenade slots (counts, selected) + the touch grenade button (selected type icon + count)
     const gs = run.grenades;
@@ -259,7 +320,11 @@ export class HUD {
     if (flareReady !== c.flareReady) { c.flareReady = flareReady; el.screen.classList.toggle('flare-ready', flareReady); }
 
     // Boss bar
-    if (bossOn !== c.bossOn) { c.bossOn = bossOn; el.boss.hidden = !bossOn; }
+    if (bossOn !== c.bossOn) {
+      c.bossOn = bossOn;
+      el.boss.hidden = !bossOn;
+      if (bossOn) el.bossName.textContent = T(boss.type.nameKey); // Gloam Warden / Fog Mother (reset on language change)
+    }
     if (bossOn) {
       const pct = Math.round((boss.hp / boss.maxHp) * 1000) / 10;
       if (pct !== c.bossPct) { c.bossPct = pct; el.bossFill.style.width = `${Math.max(0, pct)}%`; }

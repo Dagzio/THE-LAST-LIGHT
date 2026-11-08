@@ -331,6 +331,40 @@ body.paused .offscreen-arrow.alert svg { animation-play-state: paused; }
 }
 body.paused .wave-banner.show { animation-play-state: paused; }
 
+/* One-time intro card (D45): new enemy / map feature — parchment like the tutorial card, smaller, never blocks */
+.intro-card {
+  position: absolute;
+  left: 50%;
+  top: 120px;
+  translate: -50% 0;
+  display: none;
+  align-items: center;
+  gap: calc(12px * var(--fs));
+  width: min(calc(460px * var(--fs)), calc(100vw - 2 * (var(--safe-l) + var(--ring) + 12px)));
+  padding: calc(10px * var(--fs)) calc(16px * var(--fs));
+  color: #2f2112;
+  background: radial-gradient(ellipse at 30% 20%, #f3e3c3, #e2c99a 70%, #c9a978);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.6), inset 0 0 24px rgba(120, 80, 30, 0.3);
+  pointer-events: none;
+  z-index: 2;
+}
+.intro-card.show { display: flex; animation: introIn 0.3s ease-out; }
+@keyframes introIn { from { opacity: 0; translate: -50% -10px; } to { opacity: 1; translate: -50% 0; } }
+.intro-ico { flex: none; width: calc(44px * var(--fs)); height: calc(44px * var(--fs)); min-width: 36px; min-height: 36px; border-radius: 50%; display: grid; place-items: center; background: #2b2118; box-shadow: 0 0 0 3px #c98a2e; }
+.intro-ico svg { width: 60%; height: 60%; fill: none; stroke: #ffd27a; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.intro-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.intro-kicker { font: 800 calc(13px * var(--fs)) / 1.2 var(--font-display); letter-spacing: 0.16em; color: #8a5a2b; text-transform: uppercase; }
+.intro-title { font: 800 calc(22px * var(--fs)) / 1.1 var(--font-display); letter-spacing: 0.04em; color: #3b1d10; text-transform: uppercase; }
+.intro-text { font-size: calc(17px * var(--fs)); line-height: 1.3; }
+/* Phones: narrower, so it never covers the grenade row / touch buttons on the right (row = 3 × 48 + 2 × 8 px) */
+@media (max-height: 500px) {
+  .intro-card { width: min(440px, calc(100vw - 2 * (var(--safe-r) + 172px))); padding: 8px 10px; gap: 8px; }
+  .intro-ico { width: 36px; height: 36px; }
+  .intro-kicker { font-size: 12px; }
+  .intro-title { font-size: 16px; }
+  .intro-text { font-size: 14px; line-height: 1.25; }
+}
+
 /* START NEXT WAVE — intermission only. Desktop: bottom centre (user choice). Touch: under the wave timer, because
    the bottom centre holds the player plate next to the neon buttons. */
 .next-wave-btn { display: none; font-size: calc(26px * var(--fs)); pointer-events: auto; white-space: nowrap; }
@@ -363,7 +397,8 @@ body.map-over .hud-player,
 body.map-over .hud-wave,
 body.map-over .hud-boss,
 body.map-over .next-wave-btn,
-body.map-over .wave-banner { display: none; }
+body.map-over .wave-banner,
+body.map-over .intro-card { display: none; }
 /* Equal-width pair (H5: Replay / Next): every column = the widest label */
 .result-btns { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: clamp(18px, 4vw, 48px); align-items: center; }
 .result-btns > button { min-width: calc(220px * var(--fs)); }
@@ -749,7 +784,7 @@ body.map-over .kiosk-prompt { display: none; }
   align-content: start;
   touch-action: pan-y;
 }
-.shop-grid[data-tab="defenses"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.shop-grid[data-tab="defenses"] { grid-template-columns: repeat(var(--pads, 2), minmax(0, 1fr)); }
 .shop-pad { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(10px * var(--fs)); align-content: start; }
 .shop-pad-title { grid-column: 1 / -1; font: 800 calc(20px * var(--fs)) / 1 var(--font-display); letter-spacing: 0.1em; color: #fff; text-transform: uppercase; }
 

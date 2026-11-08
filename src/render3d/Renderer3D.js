@@ -13,10 +13,12 @@ import {
   runnerGeometry, runnerEyesGeometry, bruteGeometry, bruteEyesGeometry, wardenGeometry, wardenEyesGeometry,
   telegraphDiscGeometry, telegraphRingGeometry, kioskGeometry, kioskLanternGeometry,
   crateGeometry, crateGlowGeometry, grenadeGeometry,
+  spitterGeometry, spitterEyesGeometry, huskGeometry, huskEyesGeometry, motherGeometry, motherEyesGeometry, globGeometry,
 } from './models.js';
 import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
 import { BEACON } from '../data/beacon.js';
-import { GLOAM_WARDEN } from '../data/boss.js';
+import { getBossPattern } from '../data/boss.js';
+import { getTheme } from '../data/themes.js';
 import { FLARE } from '../data/balance.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { CAMERA } from '../config/camera.js';
@@ -31,7 +33,12 @@ const ENEMY_MODELS = {
   runner: { body: runnerGeometry, eyes: runnerEyesGeometry, eyesMat: 'eyes', cap: 48, tag: 'runner' },
   brute: { body: bruteGeometry, eyes: bruteEyesGeometry, eyesMat: 'eyes', cap: 16, tag: 'brute' },
   gloam_warden: { body: wardenGeometry, eyes: wardenEyesGeometry, eyesMat: 'eyesBoss', cap: 2, tag: 'gloam-warden' },
+  spitter: { body: spitterGeometry, eyes: spitterEyesGeometry, eyesMat: 'eyesSpitter', cap: 24, tag: 'spitter' },
+  husk: { body: huskGeometry, eyes: huskEyesGeometry, eyesMat: 'eyes', cap: 24, tag: 'husk' },
+  fog_mother: { body: motherGeometry, eyes: motherEyesGeometry, eyesMat: 'eyesMother', cap: 2, tag: 'fog-mother' },
 };
+const MAX_GLOBS = 24;
+const SUMMON_MARKS = 3;
 const CASTING = new THREE.Color(1.35, 1.0, 1.7); // boss tint while an attack is telegraphed
 const MAX_BULLETS = 192;
 const RELOAD_SEGMENTS = 16;
@@ -157,6 +164,16 @@ export class Renderer3D {
       tideWave: tele(telegraphRingGeometry(0.8), m.telegraphFill, 3),
       impact: tele(telegraphRingGeometry(0.72), m.impact, 5),
     };
+    // Fog Mother summon marks (violet discs + edges, one per rising enemy)
+    this.summonMarks = [];
+    for (let i = 0; i < SUMMON_MARKS; i++) {
+      this.summonMarks.push({ fill: tele(telegraphDiscGeometry(), m.summonFill, 3), edge: tele(telegraphRingGeometry(0.88), m.impact, 4) });
+    }
+    // Spitter globs in flight (instanced, unlit green)
+    this.globMesh = new THREE.InstancedMesh(globGeometry(), m.glob, MAX_GLOBS);
+    this.globMesh.frustumCulled = false;
+    this.globMesh.visible = false;
+    this.scene.add(tag(this.globMesh, 'glob'));
     // Shop kiosk (moves to the run's random spot) + its interact-radius ring (between waves)
     this.kiosk = new THREE.Group();
     const kb = new THREE.Mesh(kioskGeometry(), m.prop);
@@ -236,6 +253,7 @@ export class Renderer3D {
   loadMap(map, spawnX, spawnY) {
     this.unloadMap();
     this.map = map;
+    this._applyTheme(getTheme(map.theme));
     this.env = buildEnvironment(map, this.mats);
     this.env.groundTexture.anisotropy = QUALITY_PRESETS[this.quality].aniso;
     this.scene.add(this.env.group);
@@ -245,6 +263,19 @@ export class Renderer3D {
     this._placeCamera();
     this.pausedDrawn = false;
     return this.guard.warmUp();
+  }
+
+  /** Sky, fog and the two scene lights of the map's theme (D45). No light is added or removed (no shader rebuild). */
+  _applyTheme(T) {
+    this.scene.background.set(T.sky);
+    this.scene.fog.color.set(T.sky);
+    this.scene.fog.near = T.fog[0];
+    this.scene.fog.far = T.fog[1];
+    this.hemi.color.set(T.hemi[0]);
+    this.hemi.groundColor.set(T.hemi[1]);
+    this.hemi.intensity = T.hemi[2];
+    this.moon.color.set(T.moon[0]);
+    this.moon.intensity = T.moon[1];
   }
 
   unloadMap() {
@@ -511,13 +542,20 @@ export class Renderer3D {
   _syncBoss(run, time) {
     const t = this.tele;
     for (const k in t) t[k].visible = false;
+    for (const s of this.summonMarks) s.fill.visible = s.edge.visible = false;
     const bs = run.bossSystem;
     if (!bs || !bs.boss) return;
     const a = bs.attack;
     const pulse = 0.5 + 0.5 * Math.sin(time * 18);
     if (a) {
       const k = bs.progress(time);
-      if (a.kind === 'slam') {
+      if (a.kind === 'summon') {
+        for (let i = 0; i < a.points.length && i < SUMMON_MARKS; i++) {
+          const pt = a.points[i], s = this.summonMarks[i];
+          this._flat(s.edge, pt.x, pt.y, a.radius, 1.3, 0.5 + 0.4 * pulse);
+          this._flat(s.fill, pt.x, pt.y, Math.max(0.01, a.radius * k), 1.2, 0.25 + 0.35 * k);
+        }
+      } else if (a.kind === 'slam') {
         this._flat(t.slamEdge, a.x, a.y, a.radius, 1.3, 0.55 + 0.4 * pulse);
         this._flat(t.slamFill, a.x, a.y, Math.max(0.01, a.radius * k), 1.2, 0.18 + 0.3 * k);
       } else {
@@ -526,8 +564,9 @@ export class Renderer3D {
       }
     }
     const imp = bs.lastImpact;
-    if (imp && time - imp.at < GLOAM_WARDEN.impactFx && time >= imp.at) {
-      const f = (time - imp.at) / GLOAM_WARDEN.impactFx;
+    const fx = getBossPattern(bs.boss.typeId).impactFx;
+    if (imp && time - imp.at < fx && time >= imp.at) {
+      const f = (time - imp.at) / fx;
       this._flat(t.impact, imp.x, imp.y, imp.radius * (0.92 + 0.25 * f), 1.4, 0.85 * (1 - f));
     }
   }
@@ -586,6 +625,22 @@ export class Renderer3D {
       this.grenadeMesh.instanceMatrix.needsUpdate = true;
       if (this.grenadeMesh.instanceColor) this.grenadeMesh.instanceColor.needsUpdate = true;
     }
+
+    // Spitter globs: a high lob from the spitter's mouth to the beacon (same timing as the simulation)
+    let gn = 0;
+    for (const gl of run.globs) {
+      if (gn >= MAX_GLOBS) break;
+      const t = Math.min(1, Math.max(0, (time - gl.t0) / (gl.t1 - gl.t0)));
+      const H = 60 + Math.hypot(gl.x1 - gl.x0, gl.y1 - gl.y0) * 0.25;
+      P.set(gl.x0 + (gl.x1 - gl.x0) * t, 26 + 4 * H * t * (1 - t) + 40 * t, gl.y0 + (gl.y1 - gl.y0) * t);
+      Q.setFromAxisAngle(UP, -Math.atan2(gl.y1 - gl.y0, gl.x1 - gl.x0));
+      S.setScalar(1 + 0.15 * Math.sin(time * 20 + gn));
+      M.compose(P, Q, S);
+      this.globMesh.setMatrixAt(gn++, M);
+    }
+    this.globMesh.count = gn;
+    this.globMesh.visible = gn > 0;
+    if (gn > 0) this.globMesh.instanceMatrix.needsUpdate = true;
 
     // blasts (short expanding ring) and molotov fire zones (flickering disc for their duration)
     for (const r of this.blastRings) r.visible = false;

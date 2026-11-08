@@ -9,6 +9,7 @@
 import { ENEMY_STATES } from '../entities/Enemy.js';
 import { BEACON } from '../data/beacon.js';
 import { AI } from '../data/balance.js';
+import { terrainSpeed } from '../data/maps.js';
 
 const CONTACT_PAD = AI.contactPad;
 const SEPARATION = AI.separation;
@@ -19,10 +20,15 @@ export class EnemyAISystem {
     this.events = events;
     /** @type {import('./Collision.js').CollisionWorld|null} static obstacles (D40): walkers slide around them */
     this.world = null;
+    /** @type {object|null} map data: slow zones (Salt Marsh, D45) */
+    this.map = null;
+    /** @type {((e:object, beacon:object, time:number)=>void)|null} ranged attack (Spitter glob), set by the map run */
+    this.onRanged = null;
   }
 
   /** Moves an enemy; with a collision world it slides around obstacles (side preference from its id). */
   _step(e, dx, dy) {
+    if (this.map && this.map.slowZones) { const k = terrainSpeed(this.map, e.x, e.y); dx *= k; dy *= k; }
     if (this.world) this.world.move(e, dx, dy, (e.id & 1) ? 1 : -1);
     else { e.x += dx; e.y += dy; }
   }
@@ -95,6 +101,7 @@ export class EnemyAISystem {
         if (time >= e.nextAttackAt) {
           e.nextAttackAt = time + t.attackInterval;
           e.lastAttackAt = time;
+          if (t.ranged && this.onRanged) { this.onRanged(e, beacon, time); continue; } // Spitter: damage on landing
           if (beacon.applyDamage(t.beaconDamage, time)) fell = true;
           this.events.emit('beaconHit', e.x + (dx / dist) * e.radius, e.y + (dy / dist) * e.radius, t.beaconDamage);
         }

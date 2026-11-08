@@ -49,6 +49,38 @@ export const ENEMIES = {
     barHeight: 62,
     reward: { coins: 5, xp: 12 },
   },
+  // Spitter (D45, from map 3): stops far from the beacon and lobs glowing globs at it (visible flight, damage on
+  // landing). It never closes in — the keeper has to hunt it down.
+  spitter: {
+    id: 'spitter',
+    radius: 15,
+    maxHp: 34,
+    moveSpeed: 50,
+    beaconDamage: 8,         // per glob
+    attackInterval: 2.6,
+    attackReach: 230,        // stands this far from the beacon edge
+    contactDamage: 6,
+    armor: 0,
+    bossSlowFactor: 1,
+    barHeight: 44,
+    ranged: { globSpeed: 260, globRadius: 7 }, // world units / s; travel time = distance / speed
+    reward: { coins: 3, xp: 8 },
+  },
+  // Husk (D45, from map 4): armoured shell — every bullet hit loses 3 damage; grenades ignore armour.
+  husk: {
+    id: 'husk',
+    radius: 22,
+    maxHp: 110,
+    moveSpeed: 42,
+    beaconDamage: 12,
+    attackInterval: 1.8,
+    attackReach: 30,
+    contactDamage: 14,
+    armor: 3,
+    bossSlowFactor: 1,
+    barHeight: 52,
+    reward: { coins: 4, xp: 10 },
+  },
   gloam_warden: {
     id: 'gloam_warden',
     boss: true,              // one per map, final wave only; attacks in data/boss.js
@@ -65,6 +97,40 @@ export const ENEMIES = {
     barHeight: 0,            // no world bar: the boss bar is in the HUD
     reward: { coins: 36, xp: 92 }, // 30 / 80 +20% / +15% (user decision D40)
   },
+  // Fog Mother (D45): final boss of map 6. Slam + tide like the Warden, plus a telegraphed summon (data/boss.js).
+  fog_mother: {
+    id: 'fog_mother',
+    boss: true,
+    nameKey: 'boss.fog_mother',
+    radius: 52,
+    maxHp: 3200,
+    moveSpeed: 24,
+    beaconDamage: 30,
+    attackInterval: 2.5,
+    attackReach: 44,
+    contactDamage: 22,
+    armor: 0,
+    bossSlowFactor: 0.5,
+    barHeight: 0,
+    reward: { coins: 60, xp: 150 },
+  },
 };
+
+/**
+ * Enemy type scaled for a map (D45): HP and every damage × enemyMult, kill reward × rewardMult (rounded). Returns the
+ * base entry for a neutral map, so map 1 keeps the exact original objects.
+ */
+export function scaledEnemyType(type, enemyMult = 1, rewardMult = 1) {
+  if (!type || (enemyMult === 1 && rewardMult === 1)) return type;
+  const r = type.reward || { coins: 0, xp: 0 };
+  return {
+    ...type,
+    maxHp: Math.round(type.maxHp * enemyMult),
+    beaconDamage: Math.round(type.beaconDamage * enemyMult),
+    contactDamage: Math.round(type.contactDamage * enemyMult),
+    damageMult: enemyMult, // boss attacks (data/boss.js numbers) read it
+    reward: { coins: Math.round(r.coins * rewardMult), xp: Math.round(r.xp * rewardMult) },
+  };
+}
 
 export const getEnemyType = (id) => ENEMIES[id] || null;

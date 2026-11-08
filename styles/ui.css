@@ -167,12 +167,25 @@
   justify-content: center;
   gap: calc(28px * var(--fs));
 }
-.map-grid { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; justify-content: center; gap: calc(22px * var(--fs)); }
+/* Carousel (D45): the arrows sit on the card's edges (half over it) so the card stays big on a 640 px phone */
+.map-carousel { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(14px * var(--fs)); }
+.map-carousel-row { position: relative; max-width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 calc(var(--ring) / 2 + 4px); }
+.map-arrow { position: absolute; top: 50%; translate: 0 -50%; z-index: 2; }
+.map-arrow[data-action="mapPrev"] { left: 0; }
+.map-arrow[data-action="mapNext"] { right: 0; }
+.map-arrow:disabled { opacity: 0.3; pointer-events: none; }
+.map-dots { display: flex; gap: 12px; align-items: center; }
+.map-dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); transition: transform 0.15s; }
+.map-dots i.open { background: #e3e6ff; }
+.map-dots i.cleared { background: #ffd27a; }
+.map-dots i.on { transform: scale(1.5); box-shadow: 0 0 0 2px rgba(110, 120, 255, 0.7); }
+.map-grid { min-width: 0; display: flex; align-items: center; justify-content: center; }
 .map-card {
   position: relative;
-  width: min(calc(300px * var(--fs)), 100%);
+  /* square: never taller than the screen allows (dots + safe margins), never wider than the carousel */
+  width: min(calc(300px * var(--fs)), calc(100dvh - var(--safe-t) - var(--safe-b) - 36px));
+  max-width: 100%;
   aspect-ratio: 1 / 1;
-  max-height: 100%;
   overflow: hidden;
   background: #0d1016;
   border: 2px solid rgba(255, 255, 255, 0.08);
@@ -182,7 +195,7 @@
 .map-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.85)); }
 .map-card-name {
   position: absolute;
-  left: 0; right: 0; bottom: 0.55em;
+  left: 10px; right: 10px; bottom: 0.55em;
   z-index: 1;
   text-align: center;
   font-family: var(--font-display);
@@ -190,11 +203,26 @@
   font-stretch: condensed;
   font-size: calc(30px * var(--fs));
   letter-spacing: 0.03em;
+  white-space: nowrap; /* one line; UIManager shrinks long names */
+  overflow: hidden;
   color: #fff;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
 }
 .map-card.selected { border-color: #aab2ff; box-shadow: 0 0 0 3px rgba(80, 90, 200, 0.45), 0 0 26px rgba(110, 120, 255, 0.4); }
-.map-card:active { transform: translateY(2px); }
+.map-card-num {
+  position: absolute; z-index: 1; top: 10px; left: 10px;
+  min-width: 30px; height: 30px; padding: 0 6px; border-radius: 15px; display: grid; place-items: center;
+  font: 800 calc(18px * var(--fs)) / 1 var(--font-display); color: #fff; background: rgba(10, 12, 30, 0.75); border: 2px solid rgba(190, 198, 255, 0.7);
+}
+/* the next locked map: dark preview + lock (the goal), no BEGIN */
+.map-card.locked { border-color: rgba(255, 255, 255, 0.12); box-shadow: none; }
+.map-card.locked canvas { filter: grayscale(0.85) brightness(0.32); }
+.map-card.locked .map-card-name { color: #9aa0b4; }
+.map-card-lock { position: absolute; z-index: 1; left: 50%; top: 42%; translate: -50% -50%; width: 30%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: rgba(10, 12, 20, 0.7); border: 2px solid rgba(255, 210, 122, 0.55); }
+.map-card-lock svg { width: 52%; height: 52%; fill: none; stroke: #ffd27a; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.map-state.locked { color: #f0a08a; }
+.map-info-facts li.map-state { white-space: normal; line-height: 1.2; } /* "Clear … to unlock" may wrap in long languages */
+.brush-cta:disabled { filter: grayscale(0.9) brightness(0.6); pointer-events: none; }
 
 /* Right column, like the Underlords difficulty panel + BEGIN MATCH below it */
 .map-side {

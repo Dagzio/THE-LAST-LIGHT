@@ -188,6 +188,86 @@ export function wardenEyesGeometry() {
   return mergeParts(P);
 }
 
+const N = { // D45 enemy palette
+  spitSkin: '#3e4a2c', spitSac: '#5c7a33', spitDark: '#26301b', spitBone: '#1d2214',
+  huskShell: '#5a5148', huskPlate: '#6f665b', huskSkin: '#2c2420', huskBone: '#1c1612',
+  motherVeil: '#1b1d2a', motherVeilDark: '#10111a', motherBody: '#2b2d40', motherBone: '#9a93a8', motherTendril: '#24263a',
+};
+
+/** Spitter: squat body with a swollen glowing sac on its back and a long neck that aims at the beacon. Height ≈ 34. */
+export function spitterGeometry() {
+  const P = [];
+  for (const [x, z] of [[-7, -7], [-7, 7], [5, -8], [5, 8]]) P.push(part(new THREE.CylinderGeometry(1.8, 2.4, 10, 5), N.spitBone, { x, y: 5, z, rz: x < 0 ? 0.2 : -0.2 }));
+  P.push(part(new THREE.SphereGeometry(10, 12, 8), N.spitSkin, { y: 13, sx: 1.25, sy: 0.75 }));
+  P.push(part(new THREE.SphereGeometry(9, 12, 9), N.spitSac, { x: -6, y: 22, sx: 1.1, sy: 0.95 }));          // venom sac
+  for (let i = 0; i < 4; i++) P.push(part(new THREE.SphereGeometry(2.2, 6, 5), N.spitDark, { x: -10 + i * 3, y: 28 - Math.abs(i - 1.5), z: (i % 2 ? 4 : -4) }));
+  P.push(part(new THREE.CylinderGeometry(2.6, 3.6, 14, 7), N.spitSkin, { x: 10, y: 21, rz: -0.9 }));       // neck
+  P.push(part(new THREE.SphereGeometry(5, 10, 8), N.spitSkin, { x: 16, y: 27, sx: 1.3, sy: 0.9 }));         // head
+  P.push(part(new THREE.CylinderGeometry(3.2, 2.2, 6, 8), N.spitDark, { x: 21.5, y: 27, rz: -Math.PI / 2 })); // mouth tube
+  return mergeParts(P);
+}
+
+/** Spitter eyes + the glowing mouth and sac spots (unlit green glow). */
+export function spitterEyesGeometry() {
+  const P = [-1, 1].map((s) => part(new THREE.SphereGeometry(1.4, 8, 6), '#ffffff', { x: 19, y: 30, z: s * 2.6 }));
+  P.push(part(new THREE.CircleGeometry(2.2, 10), '#ffffff', { x: 24.7, y: 27, ry: Math.PI / 2 }));
+  return mergeParts(P);
+}
+
+/** Husk: hunched beast under a heavy segmented shell (the armour), short thick legs. Height ≈ 40, radius 22. */
+export function huskGeometry() {
+  const P = [];
+  for (const [x, z] of [[-10, -12], [-10, 12], [8, -13], [8, 13]]) P.push(part(new THREE.CylinderGeometry(3.6, 4.4, 12, 6), N.huskSkin, { x, y: 6, z }));
+  P.push(part(new THREE.SphereGeometry(17, 12, 9), N.huskSkin, { y: 17, sx: 1.15, sy: 0.7 }));
+  for (let i = 0; i < 4; i++) {                                                                         // shell plates
+    P.push(part(new THREE.SphereGeometry(16 - i * 1.5, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), i % 2 ? N.huskPlate : N.huskShell,
+      { x: -12 + i * 7, y: 22 - Math.abs(i - 1.5) * 1.2, sx: 0.5, sy: 0.9, sz: 1.05 }));
+  }
+  P.push(part(new THREE.SphereGeometry(7, 10, 8), N.huskPlate, { x: 18, y: 15, sx: 1.1, sy: 0.85 }));    // armoured head
+  for (const s of [-1, 1]) P.push(part(new THREE.ConeGeometry(2, 9, 5), N.huskBone, { x: 25, y: 13, z: s * 4, rz: -Math.PI / 2 + 0.2 })); // mandibles
+  for (let i = 0; i < 3; i++) P.push(part(new THREE.ConeGeometry(2.4, 7, 5), N.huskBone, { x: -9 + i * 7, y: 33 - Math.abs(i - 1), rz: 0.3 }));
+  return mergeParts(P);
+}
+
+export function huskEyesGeometry() {
+  return mergeParts([-1, 1].map((s) => part(new THREE.SphereGeometry(1.6, 8, 6), '#ffffff', { x: 24.5, y: 18, z: s * 3.4 })));
+}
+
+/** Fog Mother (final boss): tall veiled figure with a long train of tendrils and a cracked bone halo. Height ≈ 130. */
+export function motherGeometry() {
+  const P = [];
+  P.push(part(new THREE.CylinderGeometry(18, 50, 76, 16), N.motherVeil, { y: 38 }));                      // veil
+  for (let i = 0; i < 10; i++) {                                                                          // tendrils
+    const a = (i / 10) * Math.PI * 2;
+    P.push(part(new THREE.ConeGeometry(5, 34, 5), N.motherTendril, { x: Math.cos(a) * 48, y: 6, z: Math.sin(a) * 48, rx: Math.sin(a) * 1.35, rz: -Math.cos(a) * 1.35 }));
+  }
+  P.push(part(new THREE.TorusGeometry(48, 3.4, 6, 22), N.motherVeilDark, { y: 3, rx: Math.PI / 2 }));
+  P.push(part(new THREE.SphereGeometry(20, 14, 10), N.motherBody, { y: 86, sx: 0.85, sy: 0.9, sz: 1.1 }));   // body
+  for (const s of [-1, 1]) {
+    P.push(part(new THREE.BoxGeometry(40, 7, 7), N.motherBody, { x: 14, y: 82, z: s * 26, rz: -0.75, ry: s * 0.4 })); // long arms
+    for (const k of [-2.5, 0, 2.5]) P.push(part(new THREE.ConeGeometry(1.6, 13, 5), N.motherBone, { x: 30, y: 62, z: s * 34 + k, rz: -Math.PI / 2 - 0.75 }));
+  }
+  P.push(part(new THREE.ConeGeometry(14, 34, 10), N.motherVeilDark, { x: -3, y: 112, rz: 0.18 }));         // hood
+  P.push(part(new THREE.SphereGeometry(8, 12, 9), N.motherBone, { x: 7, y: 104, sx: 0.85 }));              // face
+  for (let i = 0; i < 9; i++) {                                                                           // halo of bone shards
+    const a = (i / 9) * Math.PI * 2;
+    P.push(part(new THREE.ConeGeometry(1.8, 11, 4), N.motherBone, { x: -8 + Math.cos(a) * 2, y: 112 + Math.sin(a) * 20, z: Math.cos(a) * 20, rx: a + Math.PI / 2 }));
+  }
+  return mergeParts(P);
+}
+
+/** Fog Mother eyes + the cold core in her chest (unlit glow). */
+export function motherEyesGeometry() {
+  const P = [-1, 1].map((s) => part(new THREE.SphereGeometry(2.2, 8, 6), '#ffffff', { x: 13.5, y: 106, z: s * 3.6 }));
+  P.push(part(new THREE.IcosahedronGeometry(6, 1), '#ffffff', { x: 14, y: 86 }));
+  return mergeParts(P);
+}
+
+/** Spitter glob in flight (unlit glow, instanced). */
+export function globGeometry() {
+  return mergeParts([part(new THREE.IcosahedronGeometry(5, 1), '#ffffff', {}), part(new THREE.IcosahedronGeometry(3, 0), '#ffffff', { x: -5, sy: 0.8 })]);
+}
+
 /** Flat telegraph shapes for boss attacks (unit size, scaled by the renderer). */
 export function telegraphDiscGeometry() { return new THREE.CircleGeometry(1, 48).rotateX(-Math.PI / 2); }
 export function telegraphRingGeometry(inner = 0.95) { return new THREE.RingGeometry(inner, 1, 72).rotateX(-Math.PI / 2); }
@@ -403,11 +483,107 @@ export function propParts(p) {
   } else if (p.kind === 'stump') {
     P.push(part(new THREE.CylinderGeometry(5, 8, p.h, 7), '#2b241e', { x, y: p.h / 2, z }));
     P.push(part(new THREE.CylinderGeometry(1.6, 2.4, 18, 5), '#2b241e', { x: x + 6, y: p.h + 4, z, rz: -0.9 }));
-  } else {
+  } else if (p.kind === 'post') {
     P.push(part(new THREE.BoxGeometry(4, p.h, 4), '#3a2f25', { x, y: p.h / 2, z, rz: p.rz }));
     P.push(part(new THREE.BoxGeometry(26, 2.5, 2), '#3a2f25', { x: x + 12, y: p.h * 0.7, z, rz: -0.25 }));
-  }
+  } else themedPropParts(p, P);
   return P;
+}
+
+const PR = { // D45 decor palette
+  wood: '#5e4430', woodDark: '#3e2c1f', woodPale: '#7a5f45', iron: '#2c3036', rope: '#8a7a5c',
+  pine: '#1f3a28', pineDark: '#162c1e', pineLight: '#2b4a33', bark: '#3a2a1e', deadBark: '#4a3d33',
+  reed: '#6c7348', reedTip: '#8a6f45', salt: '#b9b6a2', saltDark: '#8e8b7a',
+  ice: '#9fc4e4', iceDeep: '#6e95bd', snow: '#d9e2ec', snowRock: '#56606e',
+  basalt: '#1d1a1c', basaltTop: '#2b2729', ember: '#a8391c', emberRock: '#2a2224',
+};
+
+/** Decor of maps 2–6 (same descriptor → same colliders, systems/Props.js). Low-poly, merged into one draw call. */
+function themedPropParts(p, P) {
+  const x = p.x, z = p.y;
+  switch (p.kind) {
+    case 'saltrock': case 'snowrock': case 'ember': {
+      const s = p.s;
+      const body = p.kind === 'saltrock' ? (p.dark ? PR.saltDark : PR.salt) : p.kind === 'snowrock' ? PR.snowRock : PR.emberRock;
+      P.push(part(new THREE.DodecahedronGeometry(s, 0), body, { x, y: s * 0.35, z, rx: p.rx, ry: p.ry, sy: p.sy }));
+      if (p.kind === 'snowrock') P.push(part(new THREE.DodecahedronGeometry(s * 0.8, 0), PR.snow, { x, y: s * 0.62, z, ry: p.ry, sy: 0.35 }));
+      if (p.kind === 'ember') P.push(part(new THREE.DodecahedronGeometry(s * 0.35, 0), PR.ember, { x: x + s * 0.3, y: s * 0.55, z, ry: p.rx }));
+      if (p.twin) P.push(part(new THREE.DodecahedronGeometry(s * 0.45, 0), p.kind === 'snowrock' ? PR.snow : body, { x: x + s * 0.8, y: s * 0.2, z: z + s * 0.3, ry: p.twinRy, sy: 0.6 }));
+      break;
+    }
+    case 'crate': {
+      const s = p.s;
+      P.push(part(new THREE.BoxGeometry(s * 2, s * 2, s * 2), PR.wood, { x, y: s, z, ry: p.ry }));
+      P.push(part(new THREE.BoxGeometry(s * 2.06, s * 0.3, s * 2.06), PR.woodDark, { x, y: s * 1.4, z, ry: p.ry }));
+      if (p.stack) P.push(part(new THREE.BoxGeometry(s * 1.4, s * 1.4, s * 1.4), PR.woodPale, { x, y: s * 2.7, z, ry: p.ry + p.topRy }));
+      break;
+    }
+    case 'barrel': {
+      const one = (bx, bz) => {
+        P.push(part(new THREE.CylinderGeometry(p.r, p.r * 0.9, p.h, 9), PR.wood, { x: bx, y: p.h / 2, z: bz }));
+        for (const k of [0.25, 0.75]) P.push(part(new THREE.CylinderGeometry(p.r + 0.4, p.r + 0.4, 1.4, 9), PR.iron, { x: bx, y: p.h * k, z: bz }));
+      };
+      one(x, z);
+      if (p.pair) one(x + Math.cos(p.pairA) * p.r * 2.1, z + Math.sin(p.pairA) * p.r * 2.1);
+      break;
+    }
+    case 'bollard':
+      P.push(part(new THREE.CylinderGeometry(4.2, 5, p.h, 8), PR.woodDark, { x, y: p.h / 2, z }));
+      P.push(part(new THREE.CylinderGeometry(5.4, 5.4, 2, 8), PR.iron, { x, y: p.h, z }));
+      if (p.rope) P.push(part(new THREE.TorusGeometry(5.6, 1, 4, 10), PR.rope, { x, y: p.h * 0.6, z, rx: Math.PI / 2 }));
+      break;
+    case 'planks':
+      for (let i = 0; i < p.n; i++) {
+        P.push(part(new THREE.BoxGeometry(p.w, 2.4, 7), i % 2 ? PR.woodPale : PR.wood, { x, y: 1.4 + i * 2.5, z: z + (i - p.n / 2) * 2, ry: p.ry + i * 0.06 }));
+      }
+      break;
+    case 'pine': {
+      const h = p.h, cr = p.cr;
+      const shade = p.shade < 0.33 ? PR.pineDark : p.shade < 0.66 ? PR.pine : PR.pineLight;
+      P.push(part(new THREE.CylinderGeometry(2.4, 3.6, h * 0.35, 6), PR.bark, { x, y: h * 0.17, z }));
+      for (let i = 0; i < 3; i++) {
+        const k = 1 - i * 0.27;
+        P.push(part(new THREE.ConeGeometry(cr * k, h * 0.42, 7), i === 1 ? PR.pine : shade, { x, y: h * (0.36 + i * 0.2), z, rz: p.tilt, ry: i }));
+      }
+      break;
+    }
+    case 'deadtree': {
+      const h = p.h;
+      P.push(part(new THREE.CylinderGeometry(1.6, 3.6, h, 6), PR.deadBark, { x, y: h / 2, z, rz: p.lean }));
+      for (let i = 0; i < 3; i++) {
+        const a = p.ry + i * 2.1;
+        P.push(part(new THREE.CylinderGeometry(0.8, 1.5, h * 0.4, 5), PR.deadBark, {
+          x: x + Math.cos(a) * 6, y: h * (0.55 + i * 0.12), z: z + Math.sin(a) * 6, rx: Math.sin(a) * 0.9, rz: Math.cos(a) * 0.9,
+        }));
+      }
+      break;
+    }
+    case 'reeds':
+      for (let i = 0; i < p.n; i++) {
+        const a = p.seed * 6.28 + i * 2.4, d = (i / p.n) * p.s * 0.6;
+        const h = p.s * (1.3 + ((i * 37) % 7) / 10);
+        P.push(part(new THREE.CylinderGeometry(0.6, 1, h, 4), PR.reed, { x: x + Math.cos(a) * d, y: h / 2, z: z + Math.sin(a) * d, rx: Math.sin(a) * 0.15, rz: Math.cos(a) * 0.15 }));
+        if (i % 2 === 0) P.push(part(new THREE.CylinderGeometry(1.4, 1.4, 5, 5), PR.reedTip, { x: x + Math.cos(a) * d, y: h - 1, z: z + Math.sin(a) * d }));
+      }
+      break;
+    case 'icespike': case 'basalt': {
+      const ice = p.kind === 'icespike';
+      for (let i = 0; i < p.n; i++) {
+        const a = p.ry + (i / p.n) * Math.PI * 2, d = i === 0 ? 0 : p.w * 1.1;
+        const h = p.h * (1 - i * 0.22);
+        const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+        if (ice) {
+          P.push(part(new THREE.ConeGeometry(p.w * (1 - i * 0.15), h, 5), i === 0 ? PR.ice : PR.iceDeep, { x: px, y: h / 2, z: pz, rx: Math.sin(a) * 0.12 * i, rz: Math.cos(a) * 0.12 * i }));
+        } else {
+          P.push(part(new THREE.CylinderGeometry(p.w, p.w * 1.05, h, 6), PR.basalt, { x: px, y: h / 2, z: pz }));
+          P.push(part(new THREE.CylinderGeometry(p.w * 0.98, p.w * 0.98, 1.6, 6), PR.basaltTop, { x: px, y: h + 0.4, z: pz }));
+        }
+      }
+      break;
+    }
+    default:
+      P.push(part(new THREE.DodecahedronGeometry(12, 0), '#3a4049', { x, y: 4, z }));
+  }
 }
 
 /** Tags an object for the asset viewer. */
@@ -431,11 +607,15 @@ export function buildShowcase(materials, rng) {
     ['runner', runnerGeometry, runnerEyesGeometry, 'eyes'],
     ['brute', bruteGeometry, bruteEyesGeometry, 'eyes'],
     ['gloam-warden', wardenGeometry, wardenEyesGeometry, 'eyesBoss'],
+    ['spitter', spitterGeometry, spitterEyesGeometry, 'eyesSpitter'],
+    ['husk', huskGeometry, huskEyesGeometry, 'eyes'],
+    ['fog-mother', motherGeometry, motherEyesGeometry, 'eyesMother'],
   ]) {
     const g = new THREE.Group();
     g.add(new THREE.Mesh(body(), materials.character), new THREE.Mesh(eyes(), materials[eyesMat]));
     out.set(name, tag(g, name));
   }
+  out.set('glob', tag(new THREE.Mesh(globGeometry(), materials.glob), 'glob'));
   out.set('bullet', tag(new THREE.Mesh(bulletGeometry(), materials.bullet), 'bullet'));
   out.set('muzzle', tag(new THREE.Mesh(muzzleGeometry(), materials.muzzle), 'muzzle'));
   const beacon = new THREE.Group();

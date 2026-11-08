@@ -21,7 +21,7 @@ import { SeededRandom } from './SeededRandom.js';
 import { Particles } from '../render/Particles.js';
 import { getWeapon } from '../data/weapons.js';
 import { getDefense } from '../data/defenses.js';
-import { getEnemyType } from '../data/enemies.js';
+import { getEnemyType, scaledEnemyType } from '../data/enemies.js';
 import { getWaves } from '../data/waves.js';
 import { CAPS, ENEMY_FX } from '../data/balance.js';
 import { KIOSK } from '../data/kiosk.js';
@@ -29,6 +29,7 @@ import { WAVE_TIMING } from '../data/waves.js';
 import { BEACON } from '../data/beacon.js';
 import { defaultLoadout } from '../systems/Loadout.js';
 import { buildCollisionWorld } from '../systems/Collision.js';
+import { mapColliders } from '../systems/Props.js';
 import { GrenadeSystem } from '../systems/GrenadeSystem.js';
 import { CrateSystem } from '../systems/CrateSystem.js';
 import { GRENADE_RULES } from '../data/grenades.js';
@@ -101,6 +102,14 @@ export class MapRun {
     this.lastTime = 0;
     this.waves = new WaveSystem(getWaves(map.id) || [], map.spawnPoints, this.rng, events,
       (id, x, y, time) => this._spawnEnemy(id, x, y, time));
+    // D45: enemy types scaled for this map (HP / damage × enemyMult, rewards × rewardMult), built once per type.
+    this.enemyTypes = new Map();
+    // Spitter globs in flight: { x0, y0, x1, y1, t0, t1, damage } — damage on landing, on the game clock
+    this.globs = [];
+    this.ai.map = map;
+    this.controller.map = map;
+    this.ai.onRanged = (e, beacon, time) => this._launchGlob(e, beacon, time);
+    this.bossSystem.summonFn = (points, enemyId, time) => this._summon(points, enemyId, time);
 
     this._unsub = [
       events.on('kill', (e) => this._onKill(e)),
@@ -280,8 +289,51 @@ export class MapRun {
     return getWeapon(id) || getDefense(id);
   }
 
+  _typeFor(enemyId) {
+    let t = this.enemyTypes.get(enemyId);
+    if (t === undefined) {
+      t = scaledEnemyType(getEnemyType(enemyId), this.map.enemyMult || 1, this.map.rewardMult || 1);
+      this.enemyTypes.set(enemyId, t);
+    }
+    return t;
+  }
+
+  /** Spitter attack: a glob flies from the spitter to the beacon edge; it lands after distance / globSpeed. */
+  _launchGlob(e, beacon, time) {
+    const dx = beacon.x - e.x, dy = beacon.y - e.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const x1 = beacon.x - (dx / d) * beacon.radius * 0.6, y1 = beacon.y - (dy / d) * beacon.radius * 0.6;
+    const t1 = time + Math.max(0.3, (d - beacon.radius) / e.type.ranged.globSpeed);
+    this.globs.push({ x0: e.x, y0: e.y, x1, y1, t0: time, t1, damage: e.type.beaconDamage });
+    this.events.emit('glob', e.x, e.y);
+  }
+
+  _updateGlobs(time) {
+    for (let i = this.globs.length - 1; i >= 0; i--) {
+      const g = this.globs[i];
+      if (time < g.t1) continue;
+      this.globs.splice(i, 1);
+      const b = this.beacon;
+      if (b.destroyed) continue;
+      if (b.applyDamage(g.damage, time)) this._setDefeat('beacon');
+      this.events.emit('beaconHit', g.x1, g.y1, g.damage);
+      this.particles.burst(g.x1, g.y1, 10, 150, 0.35, 2.5, '#9be86a');
+    }
+  }
+
+  /** Fog Mother summon: enemies rise from the marked circles (respecting the add cap; no reward for them). */
+  _summon(points, enemyId, time) {
+    let adds = 0;
+    for (const e of this.enemies) if (e.alive && !e.type.boss) adds++;
+    for (const p of points) {
+      if (adds >= WAVE_TIMING.maxAliveAdds) break;
+      const e = this._spawnEnemy(enemyId, p.x, p.y, time);
+      if (e) { e.noReward = true; adds++; }
+    }
+  }
+
   _spawnEnemy(enemyId, x, y, time) {
-    const type = getEnemyType(enemyId);
+    const type = this._typeFor(enemyId);
     if (!type || this.enemies.length >= MAX_ENEMIES) return null;
     const cx = Math.min(this.map.width - type.radius, Math.max(type.radius, x));
     const cy = Math.min(this.map.height - type.radius, Math.max(type.radius, y));
@@ -298,10 +350,10 @@ export class MapRun {
     if (!e || e.rewarded) return;
     e.rewarded = true;
     this.stats.kills += 1;
-    const r = e.type.reward;
+    const r = e.noReward ? null : e.type.reward; // summoned adds give nothing (the boss fight cannot be farmed)
     if (r) { this.rewards.coins += r.coins | 0; this.rewards.xp += r.xp | 0; }
     this.flare.addKill(e);
-    this.events.emit('killReward', r, e); // → Economy (profile coins + XP), exactly once per enemy
+    if (r) this.events.emit('killReward', r, e); // → Economy (profile coins + XP), exactly once per enemy
     this.particles.burst(e.x, e.y, e.type.boss ? 40 : 16, e.type.boss ? 320 : 190, 0.5, 3, '#7a2333');
   }
 
@@ -359,6 +411,7 @@ export class MapRun {
     this.defenses.update(this.enemies, time);
     this.projectileSystem.update(this.enemies, dt, time);
     this.grenades.update(this.enemies, time);
+    this._updateGlobs(time);
     if (!p.alive) this._setDefeat('player');
     if (!this.defeat) this.waves.update(this.enemies, time);
     this.crates.update(p, this.kiosk, time);
@@ -398,6 +451,7 @@ export class MapRun {
     this.defenses.clear();
     this.grenades.clear();      // temporary map data is gone with the run (02_SPEC §13–14)
     this.crates.clear();
+    this.globs.length = 0;
     this.temporaryPerks.length = 0;
     this.crateChoices = null;
   }
@@ -412,9 +466,12 @@ export { WAVE_PHASE };
 export function placeKiosk(map, runSeed) {
   const rng = new SeededRandom((runSeed ^ 0x6b5f1a3d) >>> 0);
   const b = map.beacon;
+  const decor = mapColliders(map); // maps 2–6 may have decor inside the kiosk ring (forest groves)
   const ok = (x, y) => {
     if (x < 60 || y < 60 || x > map.width - 60 || y > map.height - 60) return false;
     for (const pad of map.buildPads) if (Math.hypot(x - pad.x, y - pad.y) < KIOSK.minDistFromPads) return false;
+    for (const c of decor) if (Math.hypot(x - c.x, y - c.y) < c.r + KIOSK.radius + 20) return false;
+    if (map.slowZones && map.slowZones.some((z) => Math.hypot(x - z.x, y - z.y) < z.r + KIOSK.radius + 30)) return false;
     return Math.hypot(x - map.playerSpawn.x, y - map.playerSpawn.y) >= KIOSK.minDistFromSpawn;
   };
   for (let i = 0; i < KIOSK.placementTries; i++) {

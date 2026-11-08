@@ -138,7 +138,8 @@ export class WaveSystem {
     this.phase = WAVE_PHASE.ACTIVE;
     this.phaseEndsAt = 0;
     this.waveStartedAt = time;
-    this.events.emit('waveStart', this.waveIndex, this.total, !!cfg.boss);
+    // (index, total, final, boss): `final` also covers the elite last wave of maps without a boss (D45)
+    this.events.emit('waveStart', this.waveIndex, this.total, !!cfg.boss || !!cfg.elite, !!cfg.boss);
   }
 
   _completeWave(time) {

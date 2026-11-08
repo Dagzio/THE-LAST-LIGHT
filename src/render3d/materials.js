@@ -18,6 +18,10 @@ export function createMaterials() {
     prop: new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }),
     eyes: new THREE.MeshBasicMaterial({ color: 0xff7a4a }),
     eyesBoss: new THREE.MeshBasicMaterial({ color: 0xc69cff }),
+    eyesSpitter: new THREE.MeshBasicMaterial({ color: 0xb6ff6a }),   // D45: venom green
+    eyesMother: new THREE.MeshBasicMaterial({ color: 0x8fe8ff }),    // D45: cold cyan
+    glob: new THREE.MeshBasicMaterial({ color: 0xa6f05a }),
+    summonFill: new THREE.MeshBasicMaterial({ color: 0x6a3cff, transparent: true, opacity: 0.3, depthWrite: false }),
     // Boss telegraphs: red danger zone (normal blending — readable on any ground), violet impact flash.
     telegraphFill: new THREE.MeshBasicMaterial({ color: 0xff3b2f, transparent: true, opacity: 0.3, depthWrite: false }),
     telegraphEdge: new THREE.MeshBasicMaterial({ color: 0xff6a4a, transparent: true, opacity: 0.85, depthWrite: false }),

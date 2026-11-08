@@ -60,6 +60,70 @@ export const WAVES = {
       ],
     },
   ],
+
+  // ---------------- D45: maps 2–6 (`elite` = final wave without a boss: shown as FINAL WAVE) ----------------
+  // Shorthand: g(enemy, count, interval, side, delay, bossHpBelow?)
+  drowned_pier: [ // three sides only (no south)
+    { reward: 16, groups: [g('grunt', 4, 2.0, 'north', 1), g('grunt', 4, 2.0, 'west', 5)] },
+    { reward: 20, groups: [g('grunt', 3, 1.8, 'east', 1), g('grunt', 3, 1.8, 'north', 3), g('runner', 3, 2.2, 'west', 6)] },
+    { reward: 24, groups: [g('grunt', 3, 1.6, 'west', 1), g('grunt', 3, 1.6, 'east', 2.5), g('runner', 4, 1.8, 'north', 5), g('brute', 1, 1, 'north', 9)] },
+    { reward: 28, groups: [g('grunt', 6, 1.4, 'north', 1), g('runner', 2, 1.6, 'east', 4), g('runner', 2, 1.6, 'west', 6), g('brute', 1, 1, 'east', 8)] },
+    { reward: 32, groups: [g('grunt', 4, 1.4, 'west', 1), g('runner', 5, 1.5, 'north', 3), g('brute', 1, 1, 'east', 6), g('brute', 1, 1, 'west', 12)] },
+    { reward: 45, elite: true, groups: [ // elite: two Brutes press from both flanks, Runners cut through the middle
+      g('brute', 1, 1, 'west', 1), g('brute', 1, 1, 'east', 1), g('runner', 4, 1.2, 'north', 4), g('grunt', 4, 1.4, 'north', 7)] },
+  ],
+  pine_hollow: [ // the forest hides Runners; Spitter debuts in wave 2
+    { reward: 18, groups: [g('grunt', 3, 1.8, 'north', 1), g('grunt', 3, 1.8, 'south', 3), g('runner', 2, 2.0, 'east', 6)] },
+    { reward: 22, groups: [g('grunt', 4, 1.7, 'west', 1), g('runner', 3, 1.8, 'north', 3), g('spitter', 2, 3.0, 'east', 6)] },
+    { reward: 26, groups: [g('grunt', 5, 1.6, 'south', 1), g('runner', 3, 1.6, 'west', 3), g('brute', 1, 1, 'north', 8)] },
+    { reward: 30, groups: [g('grunt', 4, 1.5, 'east', 1), g('runner', 4, 1.5, 'south', 3), g('spitter', 3, 2.4, 'north', 5)] },
+    { reward: 34, groups: [g('grunt', 4, 1.5, 'north', 1), g('runner', 3, 1.5, 'east', 3), g('spitter', 2, 2.4, 'west', 5), g('brute', 1, 1, 'south', 9)] },
+    { reward: 60, boss: true, groups: [
+      g('gloam_warden', 1, 1, 'north', 2), g('grunt', 4, 1.5, 'south', 4),
+      g('runner', 2, 1.5, 'east', 0, 0.66), g('spitter', 2, 2.0, 'west', 0, 0.33)] },
+  ],
+  salt_marsh: [ // pools on every approach; Husk debuts in wave 2
+    { reward: 20, groups: [g('grunt', 3, 1.8, 'north', 1), g('grunt', 3, 1.8, 'west', 3), g('runner', 2, 2.0, 'east', 6)] },
+    { reward: 24, groups: [g('grunt', 4, 1.7, 'south', 1), g('runner', 2, 1.8, 'north', 4), g('husk', 2, 4.0, 'east', 6)] },
+    { reward: 28, groups: [g('grunt', 4, 1.6, 'east', 1), g('runner', 3, 1.6, 'south', 3), g('spitter', 2, 2.6, 'west', 5), g('brute', 1, 1, 'north', 9)] },
+    { reward: 32, groups: [g('grunt', 3, 1.6, 'west', 1), g('husk', 2, 3.0, 'north', 3), g('spitter', 3, 2.4, 'south', 6)] },
+    { reward: 36, groups: [g('grunt', 4, 1.5, 'north', 1), g('runner', 4, 1.5, 'east', 3), g('husk', 2, 3.0, 'west', 5), g('brute', 1, 1, 'south', 10)] },
+    { reward: 40, groups: [g('grunt', 4, 1.4, 'south', 1), g('runner', 3, 1.5, 'west', 3), g('spitter', 2, 2.2, 'east', 4), g('brute', 1, 1, 'north', 8)] },
+    { reward: 55, elite: true, groups: [ // elite: an armoured line with Brutes behind it
+      g('husk', 3, 2.0, 'north', 1), g('brute', 1, 1, 'east', 4), g('brute', 1, 1, 'west', 4), g('runner', 4, 1.2, 'south', 7)] },
+  ],
+  frost_ridge: [ // three pads — mixed waves from every side
+    { reward: 22, groups: [g('grunt', 3, 1.8, 'north', 1), g('grunt', 3, 1.8, 'east', 3), g('runner', 3, 2.0, 'west', 6)] },
+    { reward: 26, groups: [g('grunt', 5, 1.6, 'south', 1), g('runner', 3, 1.7, 'north', 3), g('spitter', 2, 2.6, 'east', 6)] },
+    { reward: 30, groups: [g('grunt', 4, 1.6, 'west', 1), g('husk', 2, 3.0, 'north', 3), g('spitter', 2, 2.4, 'south', 5), g('brute', 1, 1, 'east', 9)] },
+    { reward: 34, groups: [g('grunt', 5, 1.5, 'east', 1), g('runner', 4, 1.5, 'west', 3), g('husk', 2, 3.0, 'south', 6)] },
+    { reward: 38, groups: [g('grunt', 4, 1.5, 'north', 1), g('runner', 3, 1.5, 'south', 3), g('spitter', 3, 2.2, 'west', 5), g('brute', 1, 1, 'east', 9)] },
+    { reward: 42, groups: [g('grunt', 4, 1.4, 'south', 1), g('runner', 3, 1.4, 'north', 3), g('husk', 2, 2.6, 'east', 5), g('spitter', 2, 2.2, 'west', 7)] },
+    { reward: 60, elite: true, groups: [ // elite: everyone at once, from four sides
+      g('grunt', 3, 1.4, 'north', 1), g('runner', 4, 1.2, 'east', 2), g('husk', 2, 2.4, 'west', 3),
+      g('spitter', 2, 2.4, 'south', 4), g('brute', 1, 1, 'north', 7), g('brute', 1, 1, 'south', 9)] },
+  ],
+  black_lighthouse: [ // the finale: four sides, the Fog Mother in wave 8
+    { reward: 24, groups: [g('grunt', 3, 1.7, 'north', 1), g('grunt', 2, 1.7, 'south', 3), g('runner', 2, 1.8, 'east', 5)] },
+    { reward: 28, groups: [g('grunt', 3, 1.6, 'west', 1), g('runner', 3, 1.6, 'east', 3), g('spitter', 1, 1, 'north', 6)] },
+    { reward: 32, groups: [g('grunt', 3, 1.6, 'south', 1), g('husk', 1, 1, 'north', 3), g('spitter', 2, 2.4, 'east', 5), g('brute', 1, 1, 'west', 9)] },
+    { reward: 36, groups: [g('grunt', 3, 1.5, 'east', 1), g('runner', 3, 1.5, 'west', 3), g('husk', 2, 3.0, 'south', 5)] },
+    { reward: 40, groups: [g('grunt', 2, 1.5, 'north', 1), g('runner', 3, 1.4, 'south', 2), g('spitter', 2, 2.2, 'west', 4), g('brute', 1, 1, 'east', 8)] },
+    { reward: 44, groups: [g('grunt', 3, 1.4, 'west', 1), g('runner', 2, 1.4, 'north', 3), g('husk', 2, 2.6, 'east', 4), g('brute', 1, 1, 'south', 9)] },
+    { reward: 48, groups: [
+      g('grunt', 2, 1.4, 'south', 1), g('runner', 3, 1.3, 'east', 2), g('husk', 2, 2.4, 'north', 4),
+      g('spitter', 2, 2.2, 'west', 5)] },
+    { reward: 80, boss: true, groups: [
+      g('fog_mother', 1, 1, 'north', 2), g('runner', 2, 1.4, 'south', 5),
+      g('husk', 1, 1, 'east', 0, 0.66), g('spitter', 1, 1, 'west', 0, 0.4)] },
+  ],
 };
+
+/** Wave group shorthand (data only). */
+function g(enemyId, count, spawnInterval, spawnPointGroup, initialDelay, bossHpBelow) {
+  const o = { enemyId, count, spawnInterval, spawnPointGroup, initialDelay };
+  if (bossHpBelow > 0) o.bossHpBelow = bossHpBelow;
+  return o;
+}
 
 export const getWaves = (mapId) => WAVES[mapId] || null;
