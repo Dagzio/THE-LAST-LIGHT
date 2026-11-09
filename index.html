@@ -26,7 +26,7 @@
 
   <!-- ===== Main menu (decision D5) ===== -->
   <section class="screen" id="screen-menu">
-    <div class="menu-logo" aria-hidden="true"><span class="logo-the">THE</span><span class="logo-main">LAST LIGHT</span></div>
+    <div class="menu-logo" aria-hidden="true" data-cheat="maps"><span class="logo-the">THE</span><span class="logo-main">LAST LIGHT</span></div>
     <nav class="menu-list">
       <button class="menu-item" data-action="newGame" data-i18n="menu.newGame"></button>
       <button class="menu-item" data-action="openSettings" data-i18n="menu.settings"></button>
@@ -92,7 +92,7 @@
       <!-- Shop (Underlords layout: left of the gear): glows only between waves inside the kiosk radius; coins badge -->
       <button class="ring-btn shop-btn" id="hudShop" data-action="openShop" data-nosfx data-i18n-aria="aria.shop">
         <svg class="ico" viewBox="0 0 24 24"><path d="M3 4h2.5l2.2 11h10.6L21 7H7"/><circle cx="9.5" cy="19" r="1.6" class="fill"/><circle cx="17" cy="19" r="1.6" class="fill"/></svg>
-        <span class="coin-badge"><i class="coin-ico"></i><b id="hudCoins">0</b></span>
+        <span class="coin-badge" data-cheat="coins"><i class="coin-ico"></i><b id="hudCoins">0</b></span>
       </button>
       <span class="coin-pop" id="coinPop"></span>
       <!-- Grenade slots under the shop (Underlords layout §6.4): tap / 1-2-3 selects a type in stock -->
@@ -233,7 +233,7 @@
           <button class="tab" role="tab" data-shop-tab="grenades" data-i18n="shop.tab.grenades"></button>
           <button class="tab" role="tab" data-shop-tab="defenses" data-i18n="shop.tab.defenses"></button>
         </div>
-        <span class="shop-coins"><i class="coin-ico"></i><b id="shopCoins">0</b></span>
+        <span class="shop-coins" data-cheat="coins"><i class="coin-ico"></i><b id="shopCoins">0</b></span>
         <button class="ring-btn ring-close" data-action="closeShop" data-i18n-aria="aria.close">
           <svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
@@ -241,7 +241,7 @@
       <div class="shop-bar">
         <span class="shop-level" id="shopLevel"></span>
         <i class="shop-xp"><i id="shopXpFill"></i></i>
-        <span class="shop-coins"><i class="coin-ico"></i><b id="shopCoinsBar">0</b></span>
+        <span class="shop-coins" data-cheat="coins"><i class="coin-ico"></i><b id="shopCoinsBar">0</b></span>
         <span class="shop-timer" id="shopTimer"></span>
         <button class="brush-btn shop-start" data-action="startNextWave" data-nosfx><span data-i18n="hud.startNextWave"></span><span class="wave-bonus"><b>+25</b><i class="coin-ico"></i></span></button>
       </div>

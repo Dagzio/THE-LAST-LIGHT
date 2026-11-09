@@ -7,6 +7,7 @@ import { WEAPON_UPGRADE, UPGRADE_NODES, WEAPON_NODES, PLAYER_UPGRADES, PLAYER_UP
 import { levelForXp } from '../data/progression.js';
 import { effectiveWeaponStats, playerModifiers } from './Loadout.js';
 import { nextMapId } from './Campaign.js';
+import { MAPS } from '../data/maps.js';
 
 /** Reasons an offer cannot be bought (i18n keys `shop.reason.*`). */
 export const REASON = Object.freeze({
@@ -61,6 +62,17 @@ export class Economy {
       }
     } else p.statistics.mapsFailed += 1;
     this._commit();
+  }
+
+  // ---------------- test cheats (constants.js → CHEATS; the UI checks the flag) ----------------
+  /** Opens every map of the campaign (cleared state is not touched). @returns {number} maps newly unlocked */
+  cheatUnlockAllMaps() {
+    const p = this.profile;
+    const added = MAPS.filter((m) => !p.unlockedMaps.includes(m.id)).map((m) => m.id);
+    if (added.length === 0) return 0;
+    p.unlockedMaps.push(...added);
+    this._commit();
+    return added.length;
   }
 
   // ---------------- tutorial flag (D11/D43): lives in the profile, cleared only by RESET PROGRESS ----------------

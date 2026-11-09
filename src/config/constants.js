@@ -6,6 +6,13 @@ export const DEBUG_ENABLED = false;
 /** Dev 3D asset viewer (H5 3D guide: asset-viewer-3d.md). TRUE while the user works with models — MUST be false in a release. */
 export const DEBUG_MODELS = true;
 
+/**
+ * Test cheats (user request 2026-11-09): tap the menu logo → all maps unlocked; tap the coin balance (HUD / shop) →
+ * +CHEAT_COINS. TRUE while the game is being tested — MUST be false in a release.
+ */
+export const CHEATS = true;
+export const CHEAT_COINS = 1000;
+
 export const BUILD_VERSION = '0.11.0-polish';
 
 /** Prefix for every localStorage key of the game (H5 §9). */

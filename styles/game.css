@@ -605,6 +605,8 @@ body.paused .shop-btn.can-shop { animation-play-state: paused; }
   pointer-events: none;
 }
 body.map-over .shop-btn { display: none; }
+/* Test cheats (constants.js → CHEATS): logo / coin balance take taps */
+body.cheats [data-cheat] { pointer-events: auto; cursor: pointer; }
 /* "+25" for an early wave start (D40): floats up left of the shop button */
 .coin-pop {
   position: absolute;

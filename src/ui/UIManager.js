@@ -9,7 +9,7 @@ import { Sfx } from '../platform/Sfx.js';
 import { Music } from '../platform/Music.js';
 import { AC } from '../platform/AudioUnlock.js';
 import { toggleFullscreen, initFullscreenButtons } from '../platform/Fullscreen.js';
-import { SPLASH_TAP_DELAY_MS } from '../config/constants.js';
+import { SPLASH_TAP_DELAY_MS, CHEATS } from '../config/constants.js';
 import { SettingsView } from './SettingsView.js';
 import { ShopView } from './ShopView.js';
 import { CrateView } from './CrateView.js';
@@ -49,6 +49,7 @@ export class UIManager {
     this.tutorialView = new TutorialView(game);
 
     document.addEventListener('click', (e) => this._onClick(e));
+    document.body.classList.toggle('cheats', CHEATS); // makes the cheat taps reachable (styles/game.css)
     document.getElementById('confirmYes').addEventListener('click', () => this._confirm(true));
     document.getElementById('confirmNo').addEventListener('click', () => this._confirm(false));
     initFullscreenButtons([...document.querySelectorAll('[data-fs]')]);
@@ -175,6 +176,9 @@ export class UIManager {
 
   // ---------------- actions ----------------
   _onClick(e) {
+    // Test cheats (constants.js → CHEATS): handled before the button below (the HUD coin badge sits inside the shop button)
+    const cheat = CHEATS && e.target.closest('[data-cheat]');
+    if (cheat) { this._cheat(cheat.dataset.cheat); return; }
     const btn = e.target.closest('button');
     if (!btn) return;
     if (!('nosfx' in btn.dataset)) Sfx.play('click'); // every tap gives feedback (H5 §14); gameplay buttons have own sounds
@@ -207,6 +211,11 @@ export class UIManager {
       case 'selectGrenade': if (this.game.selectGrenade(btn.dataset.type)) Sfx.play('click'); else Sfx.play('deny'); break;
       default: break;
     }
+  }
+
+  _cheat(kind) {
+    if (kind === 'maps' && this.game.sm.is(STATES.MAIN_MENU)) Sfx.play(this.game.cheatUnlockAllMaps() ? 'buy' : 'click');
+    else if (kind === 'coins') Sfx.play(this.game.cheatCoins() ? 'buy' : 'deny');
   }
 
   // ---------------- map select: carousel (user decision D45) ----------------

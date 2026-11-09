@@ -22,6 +22,7 @@ import { SaveManager } from './SaveManager.js';
 import { Economy, REASON } from '../systems/Economy.js';
 import { nextMapId, isLastMap, defaultMapSelection, campaignSummary } from '../systems/Campaign.js';
 import { TutorialSystem } from '../systems/TutorialSystem.js';
+import { CHEATS, CHEAT_COINS } from '../config/constants.js';
 
 export class Game {
   /** @param {HTMLCanvasElement} canvas2d menu backdrop @param {HTMLCanvasElement} canvas3d map run */
@@ -154,6 +155,18 @@ export class Game {
   backToMenu() { return this.sm.set(STATES.MAIN_MENU); }
 
   isMapUnlocked(id) { return this.economy.profile.unlockedMaps.includes(id); }
+
+  // ---------------- test cheats (constants.js → CHEATS = false in a release) ----------------
+  /** Main menu logo tap: every map opens. @returns {boolean} something changed */
+  cheatUnlockAllMaps() { return CHEATS && this.economy.cheatUnlockAllMaps() > 0; }
+
+  /** Coin balance tap (HUD / shop): +CHEAT_COINS; the HUD shows the "+N" pop. */
+  cheatCoins() {
+    if (!CHEATS) return false;
+    this.economy.grantCoins(CHEAT_COINS);
+    this.events.emit('cheatCoins', CHEAT_COINS);
+    return true;
+  }
 
   selectMap(id) { if (getMap(id) && this.isMapUnlocked(id)) this.selectedMapId = id; }
 

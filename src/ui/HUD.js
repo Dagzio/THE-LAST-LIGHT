@@ -108,13 +108,15 @@ export class HUD {
     game.events.on('crateSpawn', () => this._showBanner('banner.crate', null));
     // Early wave start bonus (D40): "+25" floats up from the coin badge
     const pop = document.getElementById('coinPop');
-    game.events.on('coinReward', (amount, reason) => {
-      if (reason !== 'earlyStart' || !pop) return;
+    const popCoins = (amount) => {
+      if (!pop) return;
       pop.textContent = `+${amount}`;
       pop.classList.remove('show');
       void pop.offsetWidth;
       pop.classList.add('show');
-    });
+    };
+    game.events.on('coinReward', (amount, reason) => { if (reason === 'earlyStart') popCoins(amount); });
+    game.events.on('cheatCoins', popCoins); // test cheat (CHEATS): tap on the coin balance
     pop.addEventListener('animationend', () => pop.classList.remove('show'));
     game.sm.onChange(() => { if (!game.sm.inMap) this._hideBanner(); });
     this.el.banner.addEventListener('animationend', () => this._hideBanner());
