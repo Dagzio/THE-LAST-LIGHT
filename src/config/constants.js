@@ -28,6 +28,3 @@ export const MAX_FRAME_DELTA = 0.1;
 
 /** Splash: delay before TAP TO PLAY becomes active (H5 §1, vanilla.md §2). UI timing, not gameplay. */
 export const SPLASH_TAP_DELAY_MS = 1500;
-
-/** Music playlist (files provided by the user later, assets/audio/music/). Empty = no music, system still ready. */
-export const MUSIC_TRACKS = [];

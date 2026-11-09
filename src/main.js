@@ -1,6 +1,8 @@
 // Game start (imported by boot.js after the preload): wires platform services, the runtime and the UI.
 // No globals are created (except window.__game while the dev asset viewer flag is on).
-import { DEBUG_ENABLED, DEBUG_MODELS, MUSIC_TRACKS } from './config/constants.js';
+import { DEBUG_ENABLED, DEBUG_MODELS } from './config/constants.js';
+import { MUSIC_FILES, SFX_FILES, AUDIO_DIR } from './data/sounds.js';
+import { WeaponAudio } from './platform/WeaponAudio.js';
 import { installBrowserHygiene } from './platform/BrowserHygiene.js';
 import { initAudioLifecycle } from './platform/AudioLifecycle.js';
 import { initOrientationGuard } from './platform/OrientationGuard.js';
@@ -16,7 +18,7 @@ import { initDebugOverlay } from './ui/DebugOverlay.js';
 /** Gameplay facts → sounds. Repeated shots get a small cosmetic pitch variation (GDD §18). */
 function wireCombatSounds(events) {
   let lastHitSoundAt = 0;
-  events.on('shot', () => Sfx.play('shot', 0.92 + Math.random() * 0.16));
+  // Shots and reloads: platform/WeaponAudio.js (recorded files + reload cues on the sim clock)
   events.on('hit', () => {
     const now = performance.now();
     if (now - lastHitSoundAt < 40) return; // avoid sound mush on multi-pellet hits
@@ -24,8 +26,6 @@ function wireCombatSounds(events) {
     Sfx.play('hit', 0.9 + Math.random() * 0.2);
   });
   events.on('kill', () => Sfx.play('kill', 0.9 + Math.random() * 0.2));
-  events.on('reloadStart', () => Sfx.play('reload'));
-  events.on('reloadEnd', () => Sfx.play('reloadEnd'));
   events.on('dash', () => Sfx.play('dash'));
   events.on('beaconHit', () => Sfx.play('beaconHit', 0.9 + Math.random() * 0.2));
   events.on('turretShot', () => Sfx.play('turretShot', 0.92 + Math.random() * 0.16));
@@ -68,7 +68,8 @@ function wireCameraShake(game) {
 /** @param {{loaded: Promise<void>, shownAt: number}} boot */
 export function startGame(boot) {
   installBrowserHygiene();
-  Music.init(MUSIC_TRACKS);
+  Music.init(MUSIC_FILES);
+  Sfx.loadFiles(SFX_FILES, AUDIO_DIR); // recorded SFX (~120 KB) decode in the background; synth until then
 
   const game = new Game(document.getElementById('world'), document.getElementById('world3d'));
   const ui = new UIManager(game);
@@ -76,6 +77,8 @@ export function startGame(boot) {
   new TouchControls(game);
   new OffscreenIndicators(game);
   wireCombatSounds(game.events);
+  const weaponAudio = new WeaponAudio(game.events);
+  game.onSimStep = (run, time) => weaponAudio.update(run, time);
   wireCameraShake(game);
 
   // Hidden tab / lost focus / wrong orientation → real pause (same path as the pause button).

@@ -8,7 +8,8 @@ import { AC } from './AudioUnlock.js';
 export const Music = (() => {
   let ac = null, gain = null, list = [], i = 0, started = false, on = Prefs.getMusicOn();
   let src = null, cur = null, pend = null, busy = false, retry = false;
-  const cache = {};
+  // Only the current track stays decoded (a 3.5-min stereo track is ~77 MB of PCM — two would be too much for phones).
+  let cacheUrl = null, cacheBuf = null, last = null;
   const LIFE = ['hidden', 'blur'];
   const Life = new Set(); // page hidden / unfocused → suspend() (only these two reasons!)
   const Hush = new Set(); // 'orientation', 'exitPopup' … → volume 0, context keeps running
@@ -37,9 +38,18 @@ export const Music = (() => {
     const a = ctx();
     if (!a || busy || list.length === 0) return; // no tracks yet (D10) — nothing to fetch
     busy = true;
-    if (i >= list.length) { shuffle(list); i = 0; }
+    if (i >= list.length) {
+      shuffle(list); i = 0;
+      if (list.length > 1 && list[0] === last) [list[0], list[1]] = [list[1], list[0]]; // never the same track twice in a row
+    }
     const url = list[i];
-    const buf = cache[url] ?? (cache[url] = await loadBuf(a, url));
+    let buf = cacheUrl === url ? cacheBuf : null;
+    if (!buf) {
+      cacheUrl = null; cacheBuf = null; // release the previous track before decoding the next
+      buf = await loadBuf(a, url);
+      if (buf) { cacheUrl = url; cacheBuf = buf; }
+    }
+    last = url;
     busy = false;
     i++;
     if (!buf || src || a !== ac) return;

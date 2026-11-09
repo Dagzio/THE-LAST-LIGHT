@@ -46,6 +46,8 @@ export class Game {
     this.loop.fpsCap = QUALITY_PRESETS[this.quality].fpsCap;
 
     this.presentationTime = 0;   // real time for menu decoration only (not simulation)
+    /** @type {((run: MapRun, time: number) => void) | null} set by main.js: called after every simulation step */
+    this.onSimStep = null;
     this.selectedMapId = MAPS[0].id;
     this.mapId = null;
     this.events = new GameEvents();  // presentation hooks: sound, particles, HUD
@@ -101,7 +103,10 @@ export class Game {
       if (this.run.canOpenCrate) { this.openCrate(); return; }
       if (this.run.canShop) { this.openShop(); return; }
     }
-    if (this.run) this.run.update(this.input, dt, this.clock.time);
+    if (this.run) {
+      this.run.update(this.input, dt, this.clock.time);
+      if (this.onSimStep) this.onSimStep(this.run, this.clock.time); // presentation on the sim clock (weapon audio)
+    }
   }
 
   // ---------------- presentation (reads state only) ----------------
