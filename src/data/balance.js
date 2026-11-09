@@ -46,6 +46,15 @@ export const FLARE = {
 export const AI = {
   contactPad: 2,            // world units of extra reach for contact damage
   separation: 0.5,          // share of an overlap between two bodies resolved per step
+  // Steering around decor (no pathfinding, rule 14): a short look-ahead ray; when it is blocked, side headings are
+  // tried (radians, the last chosen side first). Re-checked on a timer, not every step (weak phones).
+  steerLook: 60,            // look-ahead = 2 × radius + this (world units)
+  steerAngles: [0.35, 0.7, 1.05, 1.4, 1.75],
+  steerInterval: 0.15,      // s between re-checks
+  // Last resort: no progress towards the beacon for progressWindow → squeeze past decor for phaseTime.
+  progressWindow: 1.6,      // s
+  progressMin: 12,          // world units the enemy must gain per window
+  phaseTime: 1.0,           // s
 };
 
 // Static collision circles (D40, systems/Collision.js); decor circles come from systems/Props.js.

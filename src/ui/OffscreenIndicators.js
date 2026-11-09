@@ -67,14 +67,17 @@ export class OffscreenIndicators {
     const r3 = g.renderer3d;
     if (!g.sm.inMap || !g.run || !r3) { this._hideAll(); return; }
     if (!g.sm.is(STATES.RUNNING) && r3.pausedDrawn) return; // frozen frame — arrows stay
-    const W = r3.canvas.clientWidth, H = r3.canvas.clientHeight;
+    const W = r3.viewW, H = r3.viewH; // cached size: no layout read between the arrow style writes
     const p = g.run.player;
 
     // Nearest off-screen alive enemies (selection without sorting/allocations).
     const pick = this.pick, pickD = this.pickD;
     for (let i = 0; i < pick.length; i++) { pick[i] = null; pickD[i] = Infinity; }
+    // perf: an enemy well inside the camera's view box is on screen for sure — no projection needed
+    const view = r3.rig.view, inX = view.w * 0.38, inY = view.h * 0.3, camX = r3.rig.x, camY = r3.rig.y;
     for (const e of g.run.enemies) {
       if (!e.alive) continue;
+      if (Math.abs(e.x - camX) < inX && Math.abs(e.y - camY) < inY) continue;
       r3.projectToScreen(e.x, e.y, 16, this.pt);
       if (this.pt.x >= 0 && this.pt.x <= W && this.pt.y >= 0 && this.pt.y <= H) continue; // on screen
       const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;

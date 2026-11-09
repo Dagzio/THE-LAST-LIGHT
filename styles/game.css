@@ -224,6 +224,16 @@ body.touch .flare-hud { display: none; }
 body.paused #screen-game.flare-ready .flare-hud,
 body.paused #screen-game.flare-ready .flare-neon { animation-play-state: paused; }
 
+/* DASH cooldown (2026-11-09): --dash (0–100) set by the HUD; while cooling the button dims and the ring fills */
+.dash-neon { position: relative; }
+.dash-neon .dash-ring { inset: 3px; width: calc(100% - 6px); height: calc(100% - 6px); opacity: 0; transition: opacity 0.15s; }
+.dash-fill { fill: none; stroke: #ffd27a; stroke-width: 4; stroke-linecap: butt; stroke-dasharray: 100; stroke-dashoffset: calc(100 - var(--dash, 100)); }
+#screen-game.dash-cooling .dash-neon { filter: brightness(0.55) saturate(0.6); }
+#screen-game.dash-cooling .dash-neon .dash-ring { opacity: 1; }
+#screen-game.dash-cooling .dash-neon .ico { opacity: 0.6; }
+#screen-game.dash-ready-pop .dash-neon { animation: dashReady 0.3s ease-out; }
+@keyframes dashReady { 50% { transform: scale(1.08); } }
+
 /* ===================== 3D canvas switching ===================== */
 #world3d { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: none; z-index: 0; touch-action: none; }
 body[data-screen="game"] #world3d { display: block; }
@@ -902,6 +912,12 @@ body.map-over .kiosk-prompt { display: none; }
   .shop-fx { margin-top: 4px; }
   .shop-pad-tag { display: block; font: 800 12px / 1.2 var(--font-display); letter-spacing: 0.1em; color: #ffd27a; text-transform: uppercase; }
   .shop-pad-tag + .shop-fx { margin-top: 2px; }
+  /* D50: level pips share the pad-tag line (one line less — the card fits a 300 px high phone) */
+  .shop-pad-line { font: 800 12px / 1.2 var(--font-display); } /* the line box of the tag, not of the body text */
+  .shop-pad-line .shop-pad-tag { display: inline; }
+  .shop-pad-line .pips { display: inline-flex; vertical-align: 1px; margin-right: 6px; }
+  .shop-pad-line .pips i { width: 10px; height: 5px; }
+  .shop-pad-line + .shop-fx { margin-top: 2px; }
   .shop-card-foot { padding: 0 8px 6px; gap: 2px; }
   .shop-buy { min-height: 44px; padding: 0 8px; font-size: 18px; }
   .shop-reason { font-size: 12px; }

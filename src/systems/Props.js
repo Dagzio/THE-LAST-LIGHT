@@ -98,7 +98,25 @@ function buildLayout(map) {
       out.push(rollProp('pine', rng, gr.x + Math.cos(a) * d, gr.y + Math.sin(a) * d));
     }
   }
-  return out;
+  // Entry lanes (2026-11-09, all maps): from every spawn point towards the beacon the first stretch stays free of
+  // scattered decor, wide enough for the biggest boss — enemies used to wedge between a prop and the border rocks
+  // right where they enter. Filtering after the rolls keeps every other prop exactly where it was.
+  const lanes = Object.values(map.spawnPoints).flat().map((s) => {
+    const dx = cx - s.x, dy = cy - s.y, d = Math.hypot(dx, dy) || 1;
+    return { x: s.x, y: s.y, ux: dx / d, uy: dy / d };
+  });
+  const borderCount = out.length - placed - (D.groves || []).reduce((n, g) => n + g.n, 0);
+  return out.filter((p, i) => i < borderCount || !propColliders(p).some((c) => lanes.some((l) => inLane(l, c))));
+}
+
+const LANE = { length: 220, half: 60 }; // world units: half-width ≥ the biggest boss radius (52) + margin
+
+function inLane(l, c) {
+  const rx = c.x - l.x, ry = c.y - l.y;
+  const along = rx * l.ux + ry * l.uy;
+  if (along < -c.r - LANE.half || along > LANE.length + c.r) return false;
+  const side = Math.abs(rx * -l.uy + ry * l.ux);
+  return side < LANE.half + c.r;
 }
 
 /** Collision circles of a prop, in map coordinates (x, y on the ground). */

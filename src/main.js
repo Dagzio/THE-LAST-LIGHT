@@ -25,11 +25,23 @@ function wireCombatSounds(events) {
     lastHitSoundAt = now;
     Sfx.play('hit', 0.9 + Math.random() * 0.2);
   });
-  events.on('kill', () => Sfx.play('kill', 0.9 + Math.random() * 0.2));
+  let lastKillSoundAt = 0;
+  events.on('kill', () => { // a shotgun blast / grenade kills several at once: one crunch, not a stack of them
+    const now = performance.now();
+    if (now - lastKillSoundAt < 30) return;
+    lastKillSoundAt = now;
+    Sfx.play('kill', 0.9 + Math.random() * 0.2);
+  });
   events.on('dash', () => Sfx.play('dash'));
   events.on('beaconHit', () => Sfx.play('beaconHit', 0.9 + Math.random() * 0.2));
-  events.on('turretShot', () => Sfx.play('turretShot', 0.92 + Math.random() * 0.16));
-  events.on('frostPulse', () => Sfx.play('frostPulse'));
+  // Turrets (D50): one sound per volley (a double barrel fires two rounds in the same step); Frost Coil — icy zap
+  let lastTurretSound = 0;
+  events.on('turretShot', (x, y, a, id) => {
+    const now = performance.now();
+    if (now - lastTurretSound < 30) return;
+    lastTurretSound = now;
+    Sfx.play(id === 'frost_coil' ? 'frostShot' : 'turretShot', 0.92 + Math.random() * 0.16);
+  });
   events.on('mapDefeat', () => Sfx.play('defeat'));
   events.on('mapVictory', () => Sfx.play('victory'));
   events.on('flare', () => Sfx.play('flare'));
@@ -70,6 +82,7 @@ export function startGame(boot) {
   installBrowserHygiene();
   Music.init(MUSIC_FILES);
   Sfx.loadFiles(SFX_FILES, AUDIO_DIR); // recorded SFX (~120 KB) decode in the background; synth until then
+  Sfx.prewarm(); // synthesize the rest in idle time (no first-use hitch in a fight)
 
   const game = new Game(document.getElementById('world'), document.getElementById('world3d'));
   const ui = new UIManager(game);

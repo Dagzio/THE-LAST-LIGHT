@@ -15,7 +15,7 @@ import { MapRun } from './MapRun.js';
 import { createRunSeed } from './SeededRandom.js';
 import { QUALITY_LEVELS, QUALITY_PRESETS, resolveAutoQuality } from '../config/settings.js';
 import { getMap, MAPS } from '../data/maps.js';
-import { getDefense } from '../data/defenses.js';
+import { getDefense, upgradeBasePrice, MAX_DEVICE_LEVEL } from '../data/defenses.js';
 import { shopPrice } from '../data/upgrades.js';
 import { getGrenade, GRENADE_RULES } from '../data/grenades.js';
 import { SaveManager } from './SaveManager.js';
@@ -319,15 +319,46 @@ export class Game {
 
   shopBuyPlayerUpgrade(id) { return this.shopOpen ? this._afterProfileChange(this.economy.buyPlayerUpgrade(id)) : { ok: false, reason: REASON.CLOSED }; }
 
-  /** Defense device on a free pad for this map run: validate → debit (profile coins) → place. */
+  /**
+   * Defense device on a pad for this map run (D50): a device already bought on this pad is installed for free;
+   * a new one is validate → debit (profile coins) → place (the installed one goes to the pad's storage).
+   */
   shopBuyDefense(padIndex, defenseId) {
     const offer = this.defenseOffer(padIndex, defenseId);
     if (!offer.canBuy) return { ok: false, reason: offer.reason };
+    const ds = this.run.defenses;
+    if (offer.owned) return { ok: ds.equip(padIndex, defenseId, this.clock.time), equip: true };
     if (!this.economy.spend(offer.price)) return { ok: false, reason: REASON.COINS };
-    const placed = this.run.defenses.place(padIndex, defenseId, this.clock.time);
-    if (!placed) { this.economy.grantCoins(offer.price); return { ok: false, reason: REASON.PAD_BUSY }; } // never lose coins
+    const placed = ds.place(padIndex, defenseId, this.clock.time);
+    if (!placed) { this.economy.grantCoins(offer.price); return { ok: false, reason: REASON.UNKNOWN }; } // never lose coins
     this.events.emit('purchase', 'defense', defenseId, padIndex);
     return { ok: true };
+  }
+
+  /** UPGRADE of the installed device (D50): validate → debit → level + 1 (stats and model change). */
+  shopUpgradeDefense(padIndex) {
+    const o = this.defenseUpgradeOffer(padIndex);
+    if (!o.canBuy) return { ok: false, reason: o.reason };
+    if (!this.economy.spend(o.price)) return { ok: false, reason: REASON.COINS };
+    if (!this.run.defenses.upgrade(padIndex, this.clock.time)) { this.economy.grantCoins(o.price); return { ok: false, reason: REASON.UNKNOWN }; }
+    this.events.emit('purchase', 'defenseUpgrade', o.defenseId, padIndex);
+    return { ok: true };
+  }
+
+  /** @returns {{padIndex, defenseId, level, max, price, canBuy, reason}} upgrade of the device installed on a pad */
+  defenseUpgradeOffer(padIndex) {
+    const pad = this.run && this.run.defenses.pads[padIndex];
+    const d = pad && pad.device;
+    const o = { padIndex, defenseId: d ? d.id : null, level: d ? d.level : 0, max: MAX_DEVICE_LEVEL, price: 0, canBuy: false, reason: null };
+    if (!this.shopOpen || !this.run || !this.run.betweenWaves) o.reason = REASON.CLOSED;
+    else if (!d) o.reason = REASON.UNKNOWN;
+    else if (d.level >= MAX_DEVICE_LEVEL) o.reason = REASON.MAX;
+    else {
+      o.price = shopPrice(upgradeBasePrice(d.id, d.level));
+      if (this.economy.coins < o.price) o.reason = REASON.COINS;
+      else o.canBuy = true;
+    }
+    return o;
   }
 
   /** Beacon repair to full (D40): validate → debit → repair. Not discounted (its price is set directly). */
@@ -377,14 +408,20 @@ export class Game {
     return { ok: true };
   }
 
+  /**
+   * @returns {{padIndex, defenseId, price, owned, level, installed, canBuy, reason}} buy (new on this pad) or a free
+   * install (already bought on this pad, D50). `installed` — it is the pad's active device (nothing to do).
+   */
   defenseOffer(padIndex, defenseId) {
     const d = getDefense(defenseId);
     const pad = this.run && this.run.defenses.pads[padIndex];
-    const o = { padIndex, defenseId, price: d ? shopPrice(d.price) : 0, canBuy: false, reason: null };
+    const level = pad ? pad.owned[defenseId] | 0 : 0;
+    const installed = !!(pad && pad.device && pad.device.id === defenseId);
+    const o = { padIndex, defenseId, price: d && !level ? shopPrice(d.price) : 0, owned: level > 0, level, installed, canBuy: false, reason: null };
     if (!this.shopOpen || !this.run || !this.run.betweenWaves) o.reason = REASON.CLOSED;
     else if (!d || !pad) o.reason = REASON.UNKNOWN;
-    else if (pad.device) o.reason = REASON.PAD_BUSY;
-    else if (this.economy.coins < d.price) o.reason = REASON.COINS;
+    else if (installed) o.reason = REASON.OWNED;
+    else if (!o.owned && this.economy.coins < o.price) o.reason = REASON.COINS;
     else o.canBuy = true;
     return o;
   }

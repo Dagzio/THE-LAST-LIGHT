@@ -126,7 +126,7 @@ export class HUD {
   _resetCache() {
     this.cache = {
       hp: -1, maxHp: -1, ammo: -1, mag: -1, weaponId: '', reloading: null, reloadPct: -1, integrity: -1, hit: null, low: null,
-      waveLabel: '', waveSub: '', nextWave: null, bossOn: null, bossPct: -1, flarePct: -1, flareFull: null, flareReady: null,
+      waveLabel: '', waveSub: '', nextWave: null, bossOn: null, bossPct: -1, flarePct: -1, flareFull: null, flareReady: null, dashPct: -1, dashCooling: false,
       coins: -1, lv: '', xpPct: -1, canShop: null, kioskOn: null, kioskNear: null, kx: -1, ky: -1,
       gKey: '', crateOn: null, crateNear: null, crateSec: -1, cx: -1, cy: -1,
     };
@@ -138,7 +138,7 @@ export class HUD {
     let on = running && run.betweenWaves && !!r3;
     let below = false;
     if (on) {
-      const W = r3.canvas.clientWidth, H = r3.canvas.clientHeight;
+      const W = r3.viewW, H = r3.viewH;
       r3.projectToScreen(run.kiosk.x, run.kiosk.y, KIOSK_LABEL_HEIGHT, this.pt);
       // Under the wave header (beacon bar / timer / START button)? → put the label under the kiosk instead.
       if (this.hudTopDirty) {
@@ -167,7 +167,7 @@ export class HUD {
     let on = running && !!cr && !!r3;
     if (on) {
       r3.projectToScreen(cr.x, cr.y, 56, this.pt);
-      const W = r3.canvas.clientWidth, H = r3.canvas.clientHeight;
+      const W = r3.viewW, H = r3.viewH;
       on = this.pt.x > 0 && this.pt.x < W && this.pt.y > 0 && this.pt.y < H;
     }
     if (on !== c.crateOn) { c.crateOn = on; el.classList.toggle('on', on); }
@@ -334,6 +334,22 @@ export class HUD {
     if (fl.ready !== c.flareFull) { c.flareFull = fl.ready; el.screen.classList.toggle('flare-full', fl.ready); }
     const flareReady = fl.ready && phase === WAVE_PHASE.ACTIVE && !run.over;
     if (flareReady !== c.flareReady) { c.flareReady = flareReady; el.screen.classList.toggle('flare-ready', flareReady); }
+
+    // DASH cooldown (touch button): dims + a progress ring; a short pop when it is ready again
+    const pl = run.player;
+    const cdLeft = pl.dodgeReadyAt - time;
+    const cooling = pl.alive && cdLeft > 0 && pl.dodgeCooldown > 0;
+    const dashPct = cooling ? Math.round((1 - cdLeft / pl.dodgeCooldown) * 100) : 100;
+    if (dashPct !== c.dashPct) { c.dashPct = dashPct; el.screen.style.setProperty('--dash', String(dashPct)); }
+    if (cooling !== c.dashCooling) {
+      if (c.dashCooling && !cooling) { // just recharged
+        el.screen.classList.remove('dash-ready-pop');
+        void el.screen.offsetWidth;
+        el.screen.classList.add('dash-ready-pop');
+      }
+      c.dashCooling = cooling;
+      el.screen.classList.toggle('dash-cooling', cooling);
+    }
 
     // Boss bar
     if (bossOn !== c.bossOn) {

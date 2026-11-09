@@ -81,7 +81,8 @@ export class PlayerController {
     player.dodgeDirX = dx;
     player.dodgeDirY = dy;
     player.dodgeEndsAt = time + PLAYER.dodge.duration;
-    player.dodgeReadyAt = time + PLAYER.dodge.cooldown * this.dodgeCooldownMult;
+    player.dodgeCooldown = PLAYER.dodge.cooldown * this.dodgeCooldownMult; // presentation: DASH button progress ring
+    player.dodgeReadyAt = time + player.dodgeCooldown;
     player.invulnerableUntil = Math.max(player.invulnerableUntil, time + PLAYER.dodge.invulnerability);
     this.events.emit('dash', player.x, player.y);
     return true;

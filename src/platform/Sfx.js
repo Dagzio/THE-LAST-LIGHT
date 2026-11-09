@@ -96,6 +96,21 @@ export const Sfx = (() => {
         } catch (e) { /* keep the synth fallback */ }
       }));
     },
+    /**
+     * Synthesizes every recipe ahead of time, one per idle slice (perf 2026-11-09): a sound used for the first time
+     * (first hit, first kill, a boss slam…) was synthesized in the middle of the fight — a visible hitch.
+     */
+    prewarm() {
+      const todo = SFX_NAMES.filter((n) => !bufs[n]);
+      const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 16));
+      const next = () => {
+        const name = todo.shift();
+        if (!name) return;
+        if (!bufs[name]) bufs[name] = buildSfxBuffer(name, null) || undefined;
+        idle(next);
+      };
+      idle(next);
+    },
     /** Rebuild: close the context; buffers stay (AudioBuffer plays in any context). */
     reset() { closeCtx(ac); ac = null; for (const k in voices) voices[k].length = 0; },
     setMuted(reason, value) { if (value) muted.add(reason); else muted.delete(reason); },

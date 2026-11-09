@@ -50,9 +50,10 @@ export class CollisionWorld {
     }
   }
 
-  _deepest(x, y, r) {
+  _deepest(x, y, r, filter = null) {
     let best = null, bestPen = 0;
     this._query(x - r, y - r, x + r, y + r, (c) => {
+      if (filter && !filter(c)) return false;
       const dx = x - c.x, dy = y - c.y, R = c.r + r;
       const d2 = dx * dx + dy * dy;
       if (d2 >= R * R) return false;
@@ -63,11 +64,14 @@ export class CollisionWorld {
     return best;
   }
 
-  /** Pushes a body {x, y, radius} out of every circle it overlaps. Returns true if it was moved. */
-  pushOut(ent) {
+  /**
+   * Pushes a body {x, y, radius} out of every circle it overlaps. Returns true if it was moved.
+   * filter(circle) → false skips a circle (an enemy squeezing past decor still respects the beacon / pads / kiosk).
+   */
+  pushOut(ent, filter = null) {
     let moved = false;
     for (let i = 0; i < 4; i++) {
-      const c = this._deepest(ent.x, ent.y, ent.radius);
+      const c = this._deepest(ent.x, ent.y, ent.radius, filter);
       if (!c) break;
       let nx = ent.x - c.x, ny = ent.y - c.y;
       let d = Math.hypot(nx, ny);
@@ -80,16 +84,19 @@ export class CollisionWorld {
     return moved;
   }
 
+  /** True if the body overlaps any circle (filter(circle) → false skips it). */
+  overlaps(ent, filter = null) { return !!this._deepest(ent.x, ent.y, ent.radius, filter); }
+
   /**
    * Moves a walker by (dx, dy) and resolves collisions. Head-on hits get a sideways slide so enemies that walk in
    * straight lines go around obstacles (side: +1 / −1 preferred direction when the hit is dead centre).
    */
-  move(ent, dx, dy, side = 1) {
+  move(ent, dx, dy, side = 1, filter = null) {
     ent.x += dx;
     ent.y += dy;
     const len = Math.hypot(dx, dy);
     for (let i = 0; i < 4; i++) {
-      const c = this._deepest(ent.x, ent.y, ent.radius);
+      const c = this._deepest(ent.x, ent.y, ent.radius, filter);
       if (!c) return;
       let nx = ent.x - c.x, ny = ent.y - c.y;
       let d = Math.hypot(nx, ny);
@@ -114,13 +121,14 @@ export class CollisionWorld {
    * First static hit along a segment (circles inflated by `radius`). Circles that contain the start point are
    * ignored (a bullet leaving its own turret pad / a muzzle inside a rock). Returns t in [0, 1] or Infinity.
    */
-  segmentHit(x0, y0, x1, y1, radius = 0) {
+  segmentHit(x0, y0, x1, y1, radius = 0, filter = null) {
     const dx = x1 - x0, dy = y1 - y0;
     const a = dx * dx + dy * dy;
     let best = Infinity;
     if (a < 1e-12) return best;
     const pad = radius;
     this._query(Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, (c) => {
+      if (filter && !filter(c)) return false;
       const R = c.r + radius;
       const fx = x0 - c.x, fy = y0 - c.y;
       const cc = fx * fx + fy * fy - R * R;
@@ -140,6 +148,10 @@ export class CollisionWorld {
 }
 
 export const COLLIDER = COLLIDERS; // sizes live in data/balance.js
+
+/** Circles that always block (an enemy squeezing past decor never walks through these). */
+const STRUCTURES = new Set(['beacon', 'pad', 'kiosk']);
+export const isStructure = (c) => STRUCTURES.has(c.kind);
 
 /** Builds the static world of a map run: beacon, pads, kiosk (this run's spot) and every decor prop. */
 export function buildCollisionWorld(map, kiosk) {

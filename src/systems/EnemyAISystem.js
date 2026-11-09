@@ -10,9 +10,13 @@ import { ENEMY_STATES } from '../entities/Enemy.js';
 import { BEACON } from '../data/beacon.js';
 import { AI } from '../data/balance.js';
 import { terrainSpeed } from '../data/maps.js';
+import { isStructure } from './Collision.js';
+
+const isDecor = (c) => !isStructure(c);
 
 const CONTACT_PAD = AI.contactPad;
 const SEPARATION = AI.separation;
+const ARRIVE_EPS = 0.5; // world units
 
 export class EnemyAISystem {
   /** @param {import('../core/GameEvents.js').GameEvents} events */
@@ -26,11 +30,58 @@ export class EnemyAISystem {
     this.onRanged = null;
   }
 
-  /** Moves an enemy; with a collision world it slides around obstacles (side preference from its id). */
-  _step(e, dx, dy) {
+  /**
+   * Moves an enemy; with a collision world it slides around obstacles (side preference from its id). While it is
+   * squeezing past decor (stuck fallback) only the beacon / pads / kiosk block it.
+   */
+  _step(e, dx, dy, time) {
     if (this.map && this.map.slowZones) { const k = terrainSpeed(this.map, e.x, e.y); dx *= k; dy *= k; }
-    if (this.world) this.world.move(e, dx, dy, (e.id & 1) ? 1 : -1);
+    if (this.world && time < e.phaseUntil) {
+      this.world.move(e, dx, dy, (e.id & 1) ? 1 : -1, isStructure); // still slides around the beacon / pads / kiosk
+      // never end the squeeze inside a rock (it would pop back where it got stuck)
+      if (e.phaseUntil - time < 0.1 && this.world.overlaps(e, isDecor)) e.phaseUntil = time + 0.2;
+    }
+    else if (this.world) this.world.move(e, dx, dy, (e.id & 1) ? 1 : -1);
     else { e.x += dx; e.y += dy; }
+  }
+
+  /**
+   * Heading towards (ux, uy) around decor (2026-11-09, no pathfinding): a short look-ahead ray; if it is blocked the
+   * side headings are tried, the last chosen side first (no zig-zag). `reach` caps the ray (it never tests the
+   * beacon the enemy is walking to). Re-checked on a timer, staggered by id. Returns the angle offset to use.
+   */
+  _steer(e, ux, uy, reach, time) {
+    if (time < e.steerCheckAt) return e.steerOffset;
+    e.steerCheckAt = time + AI.steerInterval + (e.id % 7) * 0.01;
+    const only = time < e.phaseUntil ? isStructure : null; // squeezing past decor: steer around structures only
+    const look = Math.min(reach, e.radius * 2 + AI.steerLook);
+    if (look <= 1 || this._clear(e, ux, uy, look, only)) { e.steerOffset = 0; return 0; }
+    const side = e.steerSide || ((e.id & 1) ? 1 : -1);
+    for (const a of AI.steerAngles) {
+      for (const s of [side, -side]) {
+        const ang = a * s, c = Math.cos(ang), sn = Math.sin(ang);
+        if (this._clear(e, ux * c - uy * sn, ux * sn + uy * c, look, only)) { e.steerOffset = ang; e.steerSide = s; return ang; }
+      }
+    }
+    e.steerOffset = side * Math.PI / 2; // boxed in: hug sideways along the obstacle
+    e.steerSide = side;
+    return e.steerOffset;
+  }
+
+  /** A body of this enemy (slightly slimmer, so a touching obstacle still counts) can walk `look` along (dx, dy). */
+  _clear(e, dx, dy, look, filter = null) {
+    return this.world.segmentHit(e.x, e.y, e.x + dx * look, e.y + dy * look, e.radius * 0.9, filter) === Infinity;
+  }
+
+  /** Stuck fallback: no real progress towards the beacon in a window → squeeze past decor for a moment. */
+  _watchProgress(e, dist, time) {
+    if (time < e.progressAt) return;
+    if (dist > e.progressDist - AI.progressMin && e.progressDist !== Infinity) {
+      e.phaseUntil = time + AI.phaseTime;
+      e.steerCheckAt = time; // re-plan at once around the structures only
+    }
+    e.progressDist = dist;
+    e.progressAt = time + AI.progressWindow;
   }
 
   /**
@@ -43,6 +94,7 @@ export class EnemyAISystem {
    */
   update(enemies, beacon, dt, time, player = null) {
     let fell = false;
+    this._time = time;
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
       if (!e.alive) { e.attackingBeacon = false; continue; }
@@ -82,18 +134,27 @@ export class EnemyAISystem {
         }
         const touch = e.radius + player.radius;
         const step = Math.min(Math.max(0, pd - touch), t.moveSpeed * e.slowFactor(time) * dt);
-        if (pd > 1e-6 && step > 0) this._step(e, (px / pd) * step, (py / pd) * step);
+        if (pd > 1e-6 && step > 0) this._step(e, (px / pd) * step, (py / pd) * step, time);
         e.faceAngle = Math.atan2(py, px);
       } else if (e.state === ENEMY_STATES.MOVE_TO_BEACON) {
         e.attackingBeacon = false;
-        if (dist <= stopAt) {
+        // + ARRIVE_EPS: the last step lands exactly on the ring; float rounding could leave it 1e-13 short forever
+        if (dist <= stopAt + ARRIVE_EPS) {
           e.state = ENEMY_STATES.ATTACK_BEACON;
           e.nextAttackAt = time + t.attackInterval;
           continue;
         }
         const step = Math.min(dist - stopAt, t.moveSpeed * e.slowFactor(time) * dt);
-        if (dist > 1e-6 && step > 0) this._step(e, (dx / dist) * step, (dy / dist) * step);
-        e.faceAngle = Math.atan2(dy, dx);
+        if (dist > 1e-6 && step > 0) {
+          let ux = dx / dist, uy = dy / dist;
+          if (this.world) {
+            this._watchProgress(e, dist, time);
+            const off = this._steer(e, ux, uy, dist - stopAt, time);
+            if (off !== 0) { const c = Math.cos(off), s = Math.sin(off); const rx = ux * c - uy * s; uy = ux * s + uy * c; ux = rx; }
+          }
+          this._step(e, ux * step, uy * step, time);
+          e.faceAngle = Math.atan2(uy, ux);
+        } else e.faceAngle = Math.atan2(dy, dx);
       } else if (e.state === ENEMY_STATES.ATTACK_BEACON) {
         e.attackingBeacon = !beacon.destroyed;
         e.faceAngle = Math.atan2(dy, dx);
@@ -148,7 +209,13 @@ export class EnemyAISystem {
       e.y = beacon.y + (dy / d) * r;
     }
     // Static obstacles win over crowd separation (nobody is pushed into a rock or a pad).
-    if (this.world) for (let i = 0; i < n; i++) if (enemies[i].alive) this.world.pushOut(enemies[i]);
+    // (an enemy squeezing past decor — stuck fallback — is only kept out of the beacon / pads / kiosk)
+    if (this.world) {
+      for (let i = 0; i < n; i++) {
+        const e = enemies[i];
+        if (e.alive) this.world.pushOut(e, this._time < e.phaseUntil ? isStructure : null);
+      }
+    }
   }
 
   /** Contact damage: the first touching enemy hurts the keeper; his hit invulnerability blocks the rest. */

@@ -9,12 +9,12 @@ import { PROP_KINDS, rollProp } from '../systems/Props.js';
 const tmpColor = new THREE.Color();
 
 /** Bakes a primitive's transform + colour into a non-indexed geometry with a `color` attribute. */
-function part(geo, color, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1 } = {}) {
+function part(geo, color, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1, q = null } = {}) {
   const g = geo.index ? geo.toNonIndexed() : geo;
   if (g !== geo) geo.dispose();
   const m = new THREE.Matrix4().compose(
     new THREE.Vector3(x, y, z),
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)),
+    q || new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)),
     new THREE.Vector3(sx, sy, sz),
   );
   g.applyMatrix4(m);
@@ -54,11 +54,86 @@ const C = {
   gruntBody: '#5a1c26', gruntHump: '#6e2531', gruntHead: '#4a1620', gruntBone: '#2a0e14', gruntBelly: '#3e121a',
 };
 
+/** A box from point a to point b (an arm, a stock bar): length along the segment, square section t. */
+function limb(a, b, t, color) {
+  const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  const len = d.length();
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), d.normalize());
+  return part(new THREE.BoxGeometry(len, t, t), color, { x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, z: (a[2] + b[2]) / 2, q });
+}
+
+// ---------------- weapons in the keeper's hands (2026-11-09): arms + gun per weapon, child of the body ----------------
+// Keeper frame: faces +X, right = +Z. Shoulders at x 3, y 33, z ±8.5. One-handed pistol; SMG / shotgun / rifle are
+// held with both hands (off hand on the fore-grip). WEAPON_TIPS — the muzzle point (the flash sits there exactly).
+const W = { dark: '#2f343a', metal: '#8d96a0', steel: '#5d646c', wood: '#6b4a2f', woodDark: '#4a3220', brass: '#b08a43' };
+const SH_R = [3, 33, 8.5], SH_L = [3, 33, -8.5];
+const glove = (x, y, z) => part(new THREE.BoxGeometry(5, 5, 5), C.glove, { x, y, z });
+const gbox = (w, h, d, color, o) => part(new THREE.BoxGeometry(w, h, d), color, o);
+const gcyl = (len, r, color, x, y, z) => part(new THREE.CylinderGeometry(r, r, len, 10), color, { x, y, z, rz: -Math.PI / 2 });
+
+export const WEAPON_TIPS = {
+  pistol: { x: 32.4, y: 34.2, z: 7, flash: 1 },
+  smg: { x: 40.6, y: 33.8, z: 4, flash: 0.95 },
+  shotgun: { x: 52.6, y: 34.4, z: 4, flash: 1.5 },
+  assault_rifle: { x: 52.4, y: 34, z: 4, flash: 1.15 },
+};
+export const WEAPON_MODEL_IDS = Object.keys(WEAPON_TIPS);
+
+function weaponParts(id) {
+  const P = [];
+  if (id === 'smg') {
+    P.push(limb(SH_R, [19, 31.6, 5.6], 5, C.coat), glove(19.5, 31.4, 5.6));
+    P.push(limb(SH_L, [30.5, 32.2, 2.6], 5, C.coat), glove(31, 32, 2.8));
+    P.push(gbox(15, 4.6, 3.4, W.dark, { x: 24, y: 33.6, z: 4 }));
+    P.push(gbox(13, 1.2, 2.6, W.metal, { x: 24, y: 36.5, z: 4 }));
+    P.push(gcyl(7, 1.6, W.steel, 35, 33.8, 4), gcyl(2.2, 0.9, W.dark, 39.5, 33.8, 4));
+    P.push(gbox(2.8, 9, 2.4, W.dark, { x: 26.5, y: 28, z: 4, rz: 0.12 }));
+    P.push(gbox(3, 5.8, 2.6, W.dark, { x: 19.5, y: 30, z: 4, rz: 0.3 }));
+    P.push(limb([16.5, 34.2, 4], [8, 33, 4], 1.3, W.metal), gbox(1.6, 4.6, 2.6, W.dark, { x: 7.6, y: 32.6, z: 4 }));
+  } else if (id === 'shotgun') {
+    P.push(limb(SH_R, [17, 31.8, 5.6], 5, C.coat), glove(17.5, 31.4, 5.6));
+    P.push(limb(SH_L, [35, 31.4, 2.6], 5, C.coat), glove(35, 31.2, 2.8));
+    P.push(gbox(13, 4.8, 3.6, W.dark, { x: 22, y: 33.6, z: 4 }));
+    P.push(gcyl(24, 1.5, W.metal, 40.5, 34.4, 4), gcyl(18, 1.2, W.dark, 37, 32, 4));
+    P.push(gbox(8, 3.4, 4.2, W.wood, { x: 35, y: 32, z: 4 }));
+    for (const x of [32.5, 37.5]) P.push(gbox(0.8, 3.6, 4.4, W.woodDark, { x, y: 32, z: 4 })); // pump grooves
+    P.push(gbox(15, 4.4, 3.2, W.wood, { x: 8.5, y: 32.6, z: 4, rz: -0.1 }), gbox(3.4, 5, 3, W.wood, { x: 16.5, y: 30.6, z: 4, rz: 0.35 }));
+    P.push(part(new THREE.SphereGeometry(0.7, 6, 4), W.brass, { x: 51.5, y: 36.1, z: 4 }));
+  } else if (id === 'assault_rifle' || id === 'machine_gun') {
+    P.push(limb(SH_R, [20, 31.6, 5.6], 5, C.coat), glove(20.5, 31.4, 5.6));
+    P.push(limb(SH_L, [36, 32, 2.6], 5, C.coat), glove(36, 31.8, 2.8));
+    P.push(gbox(17, 5, 3.6, W.dark, { x: 24, y: 33.8, z: 4 }));
+    P.push(gbox(11, 4.2, 3.8, W.steel, { x: 37, y: 33.8, z: 4 }));
+    P.push(gcyl(8, 1, W.dark, 46.5, 34, 4), gcyl(2.6, 1.5, W.dark, 51, 34, 4));
+    P.push(gbox(3.2, 6, 2.6, W.dark, { x: 27, y: 29, z: 4, rz: 0.1 }), gbox(3.2, 5, 2.6, W.dark, { x: 28, y: 24.8, z: 4, rz: 0.32 }));
+    P.push(gbox(3, 5.6, 2.6, W.dark, { x: 20, y: 30.2, z: 4, rz: 0.3 }));
+    P.push(gbox(11, 4.6, 3, W.dark, { x: 11, y: 33.2, z: 4 }), gbox(2, 6, 3.2, W.steel, { x: 5.4, y: 32.8, z: 4 }));
+    P.push(gcyl(8, 1.6, W.steel, 25, 38.4, 4), gbox(3, 2, 2.2, W.dark, { x: 25, y: 36.8, z: 4 }));
+    P.push(part(new THREE.CylinderGeometry(1.5, 1.5, 0.4, 10), '#7fc7ff', { x: 29.1, y: 38.4, z: 4, rz: -Math.PI / 2 })); // lens
+  } else { // pistol (one hand forward, the off hand near the chest)
+    P.push(limb(SH_R, [18, 32.5, 7], 5, C.coat), glove(18.5, 32, 7));
+    P.push(limb(SH_L, [9, 30, -4], 5, C.coat), glove(10, 30, -3.6));
+    P.push(gbox(13, 3.4, 3.2, W.metal, { x: 25, y: 34.2, z: 7 }));
+    P.push(gbox(10, 2.2, 2.8, W.dark, { x: 24.5, y: 32.4, z: 7 }));
+    P.push(gbox(3.2, 6.4, 2.8, W.dark, { x: 20.5, y: 29.8, z: 7, rz: 0.25 }));
+    P.push(gcyl(1.6, 1, W.dark, 31.6, 34.2, 7));
+    P.push(gbox(1, 1, 2, W.dark, { x: 19.2, y: 36.3, z: 7 }), gbox(0.8, 1, 0.8, W.dark, { x: 30.6, y: 36.2, z: 7 }));
+  }
+  return P;
+}
+
+/** Arms + gun of a weapon (one merged geometry, the keeper's material). */
+export function weaponGeometry(id) { return mergeParts(weaponParts(id)); }
+
+/** Muzzle point of a weapon model (unknown ids: the rifle pose for the machine gun, else the pistol). */
+export const weaponTip = (id) => WEAPON_TIPS[id] || (id === 'machine_gun' ? WEAPON_TIPS.assault_rifle : WEAPON_TIPS.pistol);
+
 /**
- * The keeper: long oilskin coat, wide-brim hat, pistol arm forward. Height ≈ 52, footprint radius ≈ 18.
+ * The keeper: long oilskin coat, wide-brim hat. Height ≈ 52, footprint radius ≈ 18.
  * withBoots = false: the game animates the legs separately (bootGeometry, D45 walk cycle).
+ * withArms = false: the game shows the arms + gun of the equipped weapon separately (weaponGeometry).
  */
-export function playerGeometry(withBoots = true) {
+export function playerGeometry(withBoots = true, withArms = true) {
   const P = [];
   // boots / legs
   if (withBoots) for (const s of [-1, 1]) P.push(part(new THREE.CylinderGeometry(3.6, 4.2, 12, 8), C.boots, { y: 6, z: s * 5 }));
@@ -74,13 +149,8 @@ export function playerGeometry(withBoots = true) {
   P.push(part(new THREE.CylinderGeometry(13.5, 13.5, 1.6, 18), C.hatBrim, { x: 1, y: 46.5 }));
   P.push(part(new THREE.CylinderGeometry(6.6, 7.4, 7, 14), C.hatCrown, { x: 1, y: 50.5 }));
   P.push(part(new THREE.CylinderGeometry(7.5, 7.5, 1.6, 14), C.hatBand, { x: 1, y: 48 }));
-  // pistol arm (right side = +Z) reaching forward (+X)
-  P.push(part(new THREE.BoxGeometry(17, 5, 5), C.coat, { x: 9, y: 32, z: 7 }));
-  P.push(part(new THREE.BoxGeometry(5, 5, 5), C.glove, { x: 18.5, y: 32, z: 7 }));
-  P.push(part(new THREE.BoxGeometry(13, 3.6, 3.2), C.gunMetal, { x: 25, y: 34, z: 7 }));
-  P.push(part(new THREE.BoxGeometry(3.4, 6, 3), C.gunDark, { x: 20.5, y: 30.5, z: 7, rz: 0.25 }));
-  // off-hand near the chest
-  P.push(part(new THREE.BoxGeometry(11, 5, 5), C.coat, { x: 5, y: 31, z: -8, ry: 0.5 }));
+  // arms + the pistol (the asset viewer / dodge ghosts); in the game they come from weaponGeometry()
+  if (withArms) P.push(...weaponParts('pistol'));
   return mergeParts(P);
 }
 
@@ -371,35 +441,94 @@ export function padGeometry() {
   ]);
 }
 
-/** Guard Turret base (static). */
-export function turretBaseGeometry() {
-  return mergeParts([
-    part(new THREE.CylinderGeometry(20, 24, 10, 10), B.metalDark, { y: 11 }),
+// ---------------- defense devices: 3 levels each (D50) — every level is its own model ----------------
+// Base = static, head = rotates to the target (faces +X), crystal = Frost Coil glow (emissive material, spins).
+// Barrel tips: L1 single centred barrel; L2+ twin barrels ±4 (the sim fires two rounds from them).
+const T3 = { gold: '#e2b04a', red: '#c0392b', glass: '#9fd8ff', ice: '#cfe9f7', iceDark: '#6aa6c4' };
+const barrel = (len, r, x, y, z, color) => part(new THREE.CylinderGeometry(r, r * 1.12, len, 10), color, { x, y, z, rz: -Math.PI / 2 });
+
+/** Guard Turret base (static) for a level: L2 armour skirt, L3 reinforced plinth with struts and a gold band. */
+export function turretBaseGeometry(level = 1) {
+  const P = [
+    part(new THREE.CylinderGeometry(20, 24, 10, level >= 3 ? 8 : 10), B.metalDark, { y: 11 }),
     part(new THREE.CylinderGeometry(9, 12, 16, 10), B.metal, { y: 22 }),
-  ]);
-}
-
-/** Guard Turret head (rotates to its target, faces +X). */
-export function turretHeadGeometry() {
-  return mergeParts([
-    part(new THREE.BoxGeometry(22, 12, 18), B.metal, { y: 34 }),
-    part(new THREE.BoxGeometry(6, 9, 20), B.metalDark, { x: -10, y: 34 }),
-    part(new THREE.CylinderGeometry(2.6, 3, 22, 8), B.metalDark, { x: 20, y: 35, z: -4, rz: -Math.PI / 2 }),
-    part(new THREE.CylinderGeometry(2.6, 3, 22, 8), B.metalDark, { x: 20, y: 35, z: 4, rz: -Math.PI / 2 }),
-    part(new THREE.BoxGeometry(5, 3, 12), B.brass, { x: 2, y: 41 }),
-  ]);
-}
-
-/** Frost Coil: base + copper coil rings + a glowing crystal (crystal separate). */
-export function coilGeometry() {
-  const P = [part(new THREE.CylinderGeometry(18, 22, 10, 10), B.metalDark, { y: 11 })];
-  P.push(part(new THREE.CylinderGeometry(5, 6, 34, 8), B.coilDark, { y: 32 }));
-  for (let i = 0; i < 4; i++) P.push(part(new THREE.TorusGeometry(10 - i * 1.2, 2, 6, 16), B.coil, { y: 20 + i * 7, rx: Math.PI / 2 }));
+  ];
+  if (level >= 2) P.push(part(new THREE.CylinderGeometry(15, 17, 4, 10), B.metalDark, { y: 17 }));
+  if (level >= 3) {
+    P.push(part(new THREE.TorusGeometry(21.6, 1.3, 5, 16), T3.gold, { y: 15.8, rx: Math.PI / 2 })); // thin gold band
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      P.push(part(new THREE.BoxGeometry(4, 14, 4), B.metal, { x: Math.cos(a) * 13, y: 21, z: Math.sin(a) * 13, rx: Math.sin(a) * 0.35, rz: -Math.cos(a) * 0.35 }));
+    }
+  }
   return mergeParts(P);
 }
 
-export function coilCrystalGeometry() {
-  return mergeParts([part(new THREE.OctahedronGeometry(8, 0), '#ffffff', { y: 56, sy: 1.6 })]);
+/** Guard Turret head for a level (rotates; faces +X): L1 one gun · L2 twin guns + ammo drum · L3 long twin guns, shield, sight. */
+export function turretHeadGeometry(level = 1) {
+  const P = [];
+  const w = level >= 2 ? 22 : 18;
+  P.push(part(new THREE.BoxGeometry(22, 12, w), B.metal, { y: 34 }));
+  P.push(part(new THREE.BoxGeometry(6, 9, w + 2), B.metalDark, { x: -10, y: 34 }));
+  P.push(part(new THREE.BoxGeometry(5, 3, 12), B.brass, { x: 2, y: 41 }));
+  if (level === 1) {
+    P.push(barrel(22, 2.8, 20, 35, 0, B.metalDark));
+    P.push(barrel(4, 3.6, 30, 35, 0, B.iron));                        // muzzle brake
+  } else {
+    const len = level >= 3 ? 28 : 22;
+    for (const z of [-4, 4]) {
+      P.push(barrel(len, 2.6, 11 + len / 2, 35, z, B.metalDark));
+      P.push(barrel(4, 3.4, 9 + len, 35, z, B.iron));
+      if (level >= 3) for (const x of [14, 20]) P.push(part(new THREE.TorusGeometry(3.4, 0.9, 5, 10), B.iron, { x, y: 35, z, ry: Math.PI / 2 })); // cooling rings
+    }
+    P.push(part(new THREE.CylinderGeometry(5.5, 5.5, 6, 12), B.brass, { x: -2, y: 34, z: w / 2 + 3, rx: Math.PI / 2 })); // ammo drum
+  }
+  if (level >= 3) {
+    P.push(part(new THREE.BoxGeometry(3, 15, w + 8), B.metalDark, { x: 8, y: 34 }));       // front shield
+    P.push(part(new THREE.CylinderGeometry(1.8, 1.8, 9, 8), B.iron, { x: 2, y: 43.5, rz: -Math.PI / 2 })); // sight
+    P.push(part(new THREE.SphereGeometry(1.4, 8, 6), T3.red, { x: 6.8, y: 43.5 }));
+    for (const s of [-1, 1]) P.push(part(new THREE.BoxGeometry(22.4, 1.4, 1.6), T3.gold, { y: 40.4, z: s * (w / 2 - 0.4) })); // gold edge trim
+  }
+  return mergeParts(P);
+}
+
+/** Frost Coil base (static): copper coils round the post — one more coil and frost vents per level. */
+export function coilGeometry(level = 1) {
+  const P = [part(new THREE.CylinderGeometry(18, 22, 10, 10), B.metalDark, { y: 11 })];
+  P.push(part(new THREE.CylinderGeometry(5, 6, 22, 8), B.coilDark, { y: 26 }));
+  for (let i = 0; i < 1 + level; i++) P.push(part(new THREE.TorusGeometry(10 - i * 1.4, 2, 6, 16), B.coil, { y: 18 + i * 5.5, rx: Math.PI / 2 }));
+  if (level >= 3) {
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      P.push(part(new THREE.ConeGeometry(3.2, 12, 6), T3.ice, { x: Math.cos(a) * 17, y: 20, z: Math.sin(a) * 17, rx: Math.sin(a) * 0.4, rz: -Math.cos(a) * 0.4 }));
+    }
+    P.push(part(new THREE.TorusGeometry(20.5, 1.4, 5, 16), T3.iceDark, { y: 15.8, rx: Math.PI / 2 })); // frosted band
+  }
+  return mergeParts(P);
+}
+
+/** Frost Coil head (rotates; faces +X): a frost emitter — one barrel at L1, twin at L2, long finned twin at L3. */
+export function coilHeadGeometry(level = 1) {
+  const P = [];
+  P.push(part(new THREE.CylinderGeometry(9, 10, 9, 12), B.coilDark, { y: 42 }));
+  P.push(part(new THREE.BoxGeometry(14, 7, level >= 2 ? 20 : 14), B.metal, { x: 2, y: 42 }));
+  const zs = level >= 2 ? [-5, 5] : [0];
+  const len = level >= 3 ? 24 : 18;
+  for (const z of zs) {
+    P.push(barrel(len, 2.4, 6 + len / 2, 43, z, B.coilDark));
+    for (let k = 0; k < (level >= 3 ? 3 : 2); k++) P.push(part(new THREE.TorusGeometry(3.6, 1, 5, 10), B.coil, { x: 10 + k * 5, y: 43, z, ry: Math.PI / 2 }));
+    P.push(part(new THREE.OctahedronGeometry(2.6, 0), T3.glass, { x: 7 + len, y: 43, z, sx: 1.5 })); // ice tip
+    if (level >= 3) for (const s of [-1, 1]) P.push(part(new THREE.BoxGeometry(10, 0.8, 4), T3.ice, { x: 12, y: 43 + s * 3, z, rx: s * 0.5 })); // fins
+  }
+  return mergeParts(P);
+}
+
+/** Frost Coil crystal (emissive, spins above the head): bigger with the level, a cluster of three at L3. */
+export function coilCrystalGeometry(level = 1) {
+  const s = level >= 2 ? 1.15 : 1;
+  const P = [part(new THREE.OctahedronGeometry(6 * s, 0), '#ffffff', { y: 56, sy: 1.6 })];
+  if (level >= 3) for (const [x, z] of [[-5, 4], [4, -5]]) P.push(part(new THREE.OctahedronGeometry(3.4, 0), '#ffffff', { x, y: 53, z, sy: 1.7 }));
+  return mergeParts(P);
 }
 
 const K = { wood: '#5a3f2a', woodDark: '#3a281b', awningA: '#c98a2e', awningB: '#3b2b3f', metal: '#5b616b', gold: '#e2b04a', crate: '#6b4a2f' };
@@ -633,12 +762,16 @@ export function buildShowcase(materials, rng) {
   beacon.add(new THREE.Mesh(beaconGeometry(), materials.prop), new THREE.Mesh(beaconLanternGeometry(), materials.lanternGlass));
   out.set('beacon', tag(beacon, 'beacon'));
   out.set('build-pad', tag(new THREE.Mesh(padGeometry(), materials.prop), 'build-pad'));
-  const turret = new THREE.Group();
-  turret.add(new THREE.Mesh(turretBaseGeometry(), materials.character), new THREE.Mesh(turretHeadGeometry(), materials.character));
-  out.set('guard-turret', tag(turret, 'guard-turret'));
-  const coil = new THREE.Group();
-  coil.add(new THREE.Mesh(coilGeometry(), materials.character), new THREE.Mesh(coilCrystalGeometry(), materials.crystal));
-  out.set('frost-coil', tag(coil, 'frost-coil'));
+  for (let lv = 1; lv <= 3; lv++) { // D50: every device level is its own model
+    const turret = new THREE.Group();
+    turret.add(new THREE.Mesh(turretBaseGeometry(lv), materials.character), new THREE.Mesh(turretHeadGeometry(lv), materials.character));
+    out.set(`guard-turret-lv${lv}`, tag(turret, `guard-turret-lv${lv}`));
+    const coil = new THREE.Group();
+    coil.add(new THREE.Mesh(coilGeometry(lv), materials.character), new THREE.Mesh(coilHeadGeometry(lv), materials.character),
+      new THREE.Mesh(coilCrystalGeometry(lv), materials.crystal));
+    out.set(`frost-coil-lv${lv}`, tag(coil, `frost-coil-lv${lv}`));
+  }
+  for (const id of WEAPON_MODEL_IDS) out.set(`weapon-${id}`, tag(new THREE.Mesh(weaponGeometry(id), materials.character), `weapon-${id}`));
   const crate = new THREE.Group();
   crate.add(new THREE.Mesh(crateGeometry(), materials.prop), new THREE.Mesh(crateGlowGeometry(), materials.crateGlow));
   out.set('crate', tag(crate, 'crate'));

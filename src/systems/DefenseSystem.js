@@ -1,10 +1,13 @@
-// Tower-defense layer (01_GDD §10, 02_SPEC §10): fixed build pads, each holds null or ONE device.
-// place() is the single placement command (Phase 3: called by the test harness; Phase 5: by the shop between waves).
-// Guard Turret: own TargetingSystem (same priority rules as the spec), fires pooled projectiles through the shared
-// projectile/damage pipeline. Frost Coil: periodic AoE pulse applying a non-stacking slow.
+// Tower-defense layer (01_GDD §10, 02_SPEC §10): fixed build pads, each with ONE active device.
+// D50 (2026-11-09): devices have 3 levels; a pad keeps every device bought on it during the map run (`owned`:
+// id → level), so buying another type on an occupied pad swaps it in and the old one waits in the pad's storage —
+// switching back is free. Both devices are shooting turrets with their own TargetingSystem (same priority rules as
+// the spec) and fire pooled projectiles through the shared projectile/damage pipeline; L2+ fire from two barrels.
+// The Frost Coil's rounds slow what they hit (ProjectileSystem reads stats.slowOnHit).
 // All timers are game-clock timestamps — nothing advances while the simulation is paused.
+// Coins and the "only between waves" rule are validated by the shop (Game) before these commands are called.
 import { TargetingSystem } from './TargetingSystem.js';
-import { getDefense } from '../data/defenses.js';
+import { getDefense, defenseStats, MAX_DEVICE_LEVEL } from '../data/defenses.js';
 import { PROJECTILES } from '../data/balance.js';
 
 export class DefenseSystem {
@@ -15,7 +18,7 @@ export class DefenseSystem {
    * @param {import('../core/GameEvents.js').GameEvents} events
    */
   constructor(padPositions, pool, rng, events) {
-    this.pads = padPositions.map((p, index) => ({ index, x: p.x, y: p.y, device: null }));
+    this.pads = padPositions.map((p, index) => ({ index, x: p.x, y: p.y, device: null, owned: {} }));
     this.pool = pool;
     this.rng = rng;
     this.events = events;
@@ -23,27 +26,60 @@ export class DefenseSystem {
     this.world = null;
   }
 
+  /** Level of `id` bought on this pad (0 = not bought). */
+  ownedLevel(padIndex, id) {
+    const pad = this.pads[padIndex];
+    return pad ? pad.owned[id] | 0 : 0;
+  }
+
   /**
-   * Places a device on a free pad. Invalid pad / unknown device / occupied pad → false, nothing changes.
-   * (Coins and the "only between waves" rule are validated by the shop in Phase 5 before calling this.)
+   * Buys a NEW device type for a pad (level 1) and installs it; an installed one goes to the pad's storage.
+   * Invalid pad / unknown device / already bought on this pad → false, nothing changes.
    */
   place(padIndex, defenseId, time) {
     const pad = this.pads[padIndex];
-    const stats = getDefense(defenseId);
-    if (!pad || !stats || pad.device) return false;
+    if (!pad || !getDefense(defenseId) || pad.owned[defenseId]) return false;
+    pad.owned[defenseId] = 1;
+    this._install(pad, defenseId, time);
+    return true;
+  }
+
+  /** Installs a device already bought on this pad (free swap). False if not bought or already installed. */
+  equip(padIndex, defenseId, time) {
+    const pad = this.pads[padIndex];
+    if (!pad || !pad.owned[defenseId] || (pad.device && pad.device.id === defenseId)) return false;
+    this._install(pad, defenseId, time);
+    return true;
+  }
+
+  /** Upgrades the installed device one level (max 3). Returns the new level, or 0 if not possible. */
+  upgrade(padIndex, time) {
+    const pad = this.pads[padIndex];
+    const d = pad && pad.device;
+    if (!d || d.level >= MAX_DEVICE_LEVEL) return 0;
+    pad.owned[d.id] = d.level + 1;
+    this._install(pad, d.id, time, d.aimAngle);
+    this.events.emit('deviceUpgraded', padIndex, d.id, pad.owned[d.id]);
+    return pad.owned[d.id];
+  }
+
+  _install(pad, id, time, aimAngle = -Math.PI / 2) {
+    const level = pad.owned[id];
+    const stats = defenseStats(id, level);
     pad.device = {
-      id: defenseId,
+      id,
+      level,
       stats,
       x: pad.x,
       y: pad.y,
-      padIndex,
-      nextActionAt: time + (stats.pulseInterval || stats.fireInterval || 0),
-      aimAngle: -Math.PI / 2,
+      padIndex: pad.index,
+      nextActionAt: time + stats.fireInterval,
+      aimAngle,
       lastActionAt: -Infinity,
-      targeting: defenseId === 'guard_turret' ? new TargetingSystem() : null,
+      installedAt: time, // presentation: the model pops in on install / level-up
+      targeting: new TargetingSystem(),
     };
-    this.events.emit('devicePlaced', padIndex, defenseId);
-    return true;
+    this.events.emit('devicePlaced', pad.index, id, level);
   }
 
   get devices() {
@@ -53,9 +89,7 @@ export class DefenseSystem {
   update(enemies, time) {
     for (let i = 0; i < this.pads.length; i++) {
       const d = this.pads[i].device;
-      if (!d) continue;
-      if (d.id === 'guard_turret') this._turret(d, enemies, time);
-      else if (d.id === 'frost_coil') this._coil(d, enemies, time);
+      if (d) this._turret(d, enemies, time);
     }
   }
 
@@ -67,34 +101,25 @@ export class DefenseSystem {
     if (!target || time < d.nextActionAt) return;
     d.nextActionAt = time + s.fireInterval;
     d.lastActionAt = time;
-    const a = d.aimAngle + (this.rng.next() - 0.5) * ((s.spreadAngle * Math.PI) / 180);
-    const p = this.pool.spawn();
-    p.x = p.prevX = d.x + Math.cos(a) * 20;
-    p.y = p.prevY = d.y + Math.sin(a) * 20;
-    p.vx = Math.cos(a) * s.projectileSpeed;
-    p.vy = Math.sin(a) * s.projectileSpeed;
-    p.angle = a;
-    p.maxDistance = s.range * PROJECTILES.rangeSlack;
-    p.hitsLeft = 1 + (s.penetrationCount | 0);
-    p.weaponId = s.id;
-    p.spawnedAt = time;
-    this.events.emit('turretShot', p.x, p.y, a);
-  }
-
-  _coil(d, enemies, time) {
-    const s = d.stats;
-    if (time < d.nextActionAt) return;
-    d.nextActionAt = time + s.pulseInterval;
-    d.lastActionAt = time;
-    const r2 = s.radius * s.radius;
-    for (let i = 0; i < enemies.length; i++) {
-      const e = enemies[i];
-      if (!e.alive) continue;
-      const dx = e.x - d.x, dy = e.y - d.y;
-      if (dx * dx + dy * dy <= (s.radius + e.radius) ** 2 || dx * dx + dy * dy <= r2) e.applySlow(s.slow, s.slowDuration, time);
+    const barrels = Math.max(1, s.barrels | 0);
+    const nx = -Math.sin(d.aimAngle), ny = Math.cos(d.aimAngle); // across the barrels
+    for (let b = 0; b < barrels; b++) {
+      const side = barrels === 1 ? 0 : (b === 0 ? -0.5 : 0.5) * s.barrelGap;
+      const a = d.aimAngle + (this.rng.next() - 0.5) * ((s.spreadAngle * Math.PI) / 180);
+      const p = this.pool.spawn();
+      p.x = p.prevX = d.x + Math.cos(a) * s.muzzleOffset + nx * side;
+      p.y = p.prevY = d.y + Math.sin(a) * s.muzzleOffset + ny * side;
+      p.vx = Math.cos(a) * s.projectileSpeed;
+      p.vy = Math.sin(a) * s.projectileSpeed;
+      p.angle = a;
+      p.maxDistance = s.range * PROJECTILES.rangeSlack;
+      p.hitsLeft = 1 + (s.penetrationCount | 0);
+      p.weaponId = s.id;
+      p.stats = s; // this device's level (two pads may hold different levels of the same device)
+      p.spawnedAt = time;
+      this.events.emit('turretShot', p.x, p.y, a, s.id);
     }
-    this.events.emit('frostPulse', d.x, d.y, s.radius);
   }
 
-  clear() { for (const p of this.pads) p.device = null; }
+  clear() { for (const p of this.pads) { p.device = null; p.owned = {}; } }
 }

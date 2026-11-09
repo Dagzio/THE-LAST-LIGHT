@@ -55,12 +55,13 @@ export class ProjectileSystem {
       }
       if (!hit) break;
       p.markHit(hit.id);
-      const stats = this.getWeaponStats(p.weaponId);
+      const stats = p.stats || this.getWeaponStats(p.weaponId);
       const r = computeDamage(stats.damage, stats, hit, this.modifiers, this.rng);
       const killed = hit.applyDamage(r.amount, time);
       const hx = sx + ex * hitT, hy = sy + ey * hitT;
       this.events.emit('hit', hx, hy, r.amount, r.crit);
       if (killed) this.events.emit('kill', hit, time);
+      else if (stats.slowOnHit > 0) hit.applySlow(stats.slowOnHit, stats.slowDuration, time); // Frost Coil rounds (D50)
       else if (stats.knockback > 0 && !hit.type.boss) { // HEAVY_IMPACT perk: a small shove along the bullet
         const v = Math.hypot(p.vx, p.vy) || 1;
         hit.pushVX = (p.vx / v) * (stats.knockback / 0.12);

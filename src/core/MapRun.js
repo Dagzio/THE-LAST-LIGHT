@@ -125,7 +125,7 @@ export class MapRun {
         const p = this.player;
         this.particles.cone(p.x, p.y, angle + Math.PI / 2, 0.5, 1, 110, 0.45, 2.2, '#c99a3e');
       }),
-      events.on('turretShot', (x, y, angle) => this.particles.cone(x, y, angle, 0.6, 3, 220, 0.1, 2, '#ffe0a0')),
+      events.on('turretShot', (x, y, angle, id) => this.particles.cone(x, y, angle, 0.6, 2, 220, 0.1, 2, id === 'frost_coil' ? '#bfe9ff' : '#ffe0a0')),
       events.on('beaconHit', (x, y, amount) => {
         this.stats.beaconDamageTaken += amount;
         this.particles.burst(x, y, 8, 140, 0.35, 2.5, '#ff9a60');
@@ -135,7 +135,6 @@ export class MapRun {
         this.particles.burst(x, y, 10, 170, 0.3, 2.5, '#ff4a3a');
       }),
       events.on('bossImpact', (kind, x, y, r) => this.particles.burst(x, y, kind === 'slam' ? 22 : 30, r * 2.2, 0.45, 3, '#b48cff')),
-      events.on('frostPulse', (x, y) => this.particles.burst(x, y, 14, 210, 0.45, 2.5, '#9fd8ff')),
       events.on('bulletBlocked', (x, y) => this.particles.burst(x, y, 5, 130, 0.18, 2, '#c9c3b5')), // stone chips
       events.on('waveCleared', (index, reward, final) => this._onWaveCleared(index, reward, final)),
       events.on('waveStart', (index) => this.crates.onWaveStart(index, this.lastTime)),

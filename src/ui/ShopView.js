@@ -7,7 +7,7 @@ import { STATES } from '../core/GameStateMachine.js';
 import { T, onLanguageChange } from '../i18n/i18n.js';
 import { WEAPONS } from '../data/weapons.js';
 import { WEAPON_NODES, UPGRADE_NODES, NODE_NAME_OVERRIDES, PLAYER_UPGRADES, PLAYER_UPGRADE_ORDER } from '../data/upgrades.js';
-import { DEFENSES } from '../data/defenses.js';
+import { DEFENSES, MAX_DEVICE_LEVEL } from '../data/defenses.js';
 import { GRENADES, GRENADE_ORDER } from '../data/grenades.js';
 import { levelProgress } from '../data/progression.js';
 import { effectiveWeaponStats } from '../systems/Loadout.js';
@@ -127,11 +127,12 @@ export class ShopView {
     else if (cmd === 'upgrade') r = g.shopBuyWeaponUpgrade(a, c);
     else if (cmd === 'player') r = g.shopBuyPlayerUpgrade(a);
     else if (cmd === 'defense') r = g.shopBuyDefense(Number(a), c);
+    else if (cmd === 'dupgrade') r = g.shopUpgradeDefense(Number(a));
     else if (cmd === 'repair') r = g.shopRepairBeacon();
     else if (cmd === 'grenade') r = g.shopBuyGrenade(a);
     else if (cmd === 'pickWeapon') { this.upgradeWeaponId = a; this.refresh(); return; }
     if (!r) return;
-    Sfx.play(r.ok ? (cmd === 'equip' ? 'click' : 'buy') : 'deny');
+    Sfx.play(r.ok ? (cmd === 'equip' || r.equip ? 'click' : 'buy') : 'deny');
     this.refresh();
   }
 
@@ -263,8 +264,10 @@ export class ShopView {
     btn.dataset.nosfx = '';
     if (cmd) btn.dataset.shopCmd = cmd;
     btn.disabled = !enabled;
-    btn.innerHTML = price !== undefined && price !== null ? `${COIN}<b>${price}</b>` : '';
-    if (label) btn.append(document.createTextNode(label));
+    const priced = price !== undefined && price !== null;
+    btn.innerHTML = priced ? `${COIN}<b>${price}</b>` : '';
+    if (label && priced) btn.prepend(document.createTextNode(label)); // "UPGRADE 🪙60": the action, then its price
+    else if (label) btn.append(document.createTextNode(label));
     foot.append(btn);
     if (reason) { const r = el('span', 'shop-reason'); r.textContent = T(`shop.reason.${reason}`, reasonParams); foot.append(r); }
     card.append(foot);
@@ -379,14 +382,20 @@ export class ShopView {
       for (const id of Object.keys(DEFENSES)) {
         const d = DEFENSES[id];
         if (d.inMvp === false) continue;
+        // D50: bought on this pad → level pips; installed → UPGRADE (to MAX); in the pad's storage → free INSTALL.
+        const o = g.defenseOffer(i, id);
         // the pad tag is shown on phones only, where the pad columns become one paged row
-        const body = `<p class="shop-pad-tag">${title.textContent}</p><p class="shop-fx">${T(`fx.${id}`)}</p>`;
-        const card = this._card(id, T(`defense.${id}`), body, pad.device && pad.device.id === id ? 'equipped' : '');
-        if (pad.device && pad.device.id === id) this._footer(card, { label: T('shop.installed'), enabled: false, done: true });
-        else {
-          const o = g.defenseOffer(i, id);
-          this._footer(card, { cmd: `defense:${i}:${id}`, price: o.price, enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
-        }
+        const pips = o.level ? this._pips(o.level, MAX_DEVICE_LEVEL) : '';
+        // phones: pips + pad tag on one line (the tag is hidden on desktop, the pips stay)
+        const body = `<p class="shop-pad-line">${pips}<span class="shop-pad-tag">${title.textContent}</span></p><p class="shop-fx">${T(`fx.${id}`)}</p>`;
+        const maxed = o.installed && o.level >= MAX_DEVICE_LEVEL;
+        const card = this._card(id, T(`defense.${id}`), body, o.installed ? `equipped${maxed ? ' maxed' : ''}` : o.owned ? 'owned' : '');
+        if (o.installed) {
+          const u = g.defenseUpgradeOffer(i);
+          if (u.reason === REASON.MAX) this._footer(card, { label: T('shop.max'), enabled: false, done: true });
+          else this._footer(card, { cmd: `dupgrade:${i}`, label: T('shop.upgrade'), price: u.price, enabled: u.canBuy, reason: u.canBuy ? null : u.reason });
+        } else if (o.owned) this._footer(card, { cmd: `defense:${i}:${id}`, label: T('shop.install'), enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
+        else this._footer(card, { cmd: `defense:${i}:${id}`, price: o.price, enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
         col.append(card);
       }
       this.grid.append(col);

@@ -16,6 +16,7 @@ class Projectile {
     this.hitIds = new Array(PROJECTILES.maxHitsCap).fill(0);
     this.hitCount = 0;
     this.weaponId = '';
+    this.stats = null;       // a device's level stats (turrets); weapons use weaponId → MapRun stats
     this.spawnedAt = 0;
   }
 
@@ -64,6 +65,7 @@ export class ProjectilePool {
     p.active = true;
     p.hitCount = 0;
     p.travelled = 0;
+    p.stats = null;
     return p;
   }
 }

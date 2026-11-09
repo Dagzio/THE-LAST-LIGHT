@@ -49,6 +49,14 @@ export class Enemy {
     this.pushVX = 0;
     this.pushVY = 0;
     this.pushUntil = 0;
+    // Steering around decor (EnemyAISystem, 2026-11-09): heading offset from the straight line + its re-check time,
+    // progress watch (best distance to the beacon so far) and the last-resort "squeeze past decor" window.
+    this.steerOffset = 0;
+    this.steerSide = 0;
+    this.steerCheckAt = 0;
+    this.progressAt = 0;
+    this.progressDist = Infinity;
+    this.phaseUntil = -Infinity;
   }
 
   isStunned(time) { return time < this.stunUntil; }

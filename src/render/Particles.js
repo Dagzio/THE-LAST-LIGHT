@@ -15,6 +15,7 @@ export class Particles {
     this.items = Array.from({ length: capacity }, () => new Particle());
     this.limit = capacity;      // scaled by the quality preset
     this.activeCount = 0;
+    this.cursor = 0;
   }
 
   setQualityFactor(f) { this.limit = Math.max(8, Math.floor(this.items.length * f)); }
@@ -65,8 +66,13 @@ export class Particles {
 
   clear() { for (const p of this.items) p.active = false; this.activeCount = 0; }
 
+  /** Next free particle, searched from a moving cursor (a burst of 50 used to rescan the pool from 0 each time). */
   _free() {
-    for (const p of this.items) if (!p.active) return p;
+    const items = this.items, n = items.length;
+    for (let k = 0; k < n; k++) {
+      const i = (this.cursor + k) % n;
+      if (!items[i].active) { this.cursor = (i + 1) % n; return items[i]; }
+    }
     return null;
   }
 }

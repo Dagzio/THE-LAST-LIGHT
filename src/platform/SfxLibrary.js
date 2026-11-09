@@ -70,6 +70,15 @@ const RECIPES = {
   beaconHit: () => render(0.3, (t) => (Math.sin(2 * Math.PI * (70 - 60 * t) * t) * 0.6 + noise() * 0.25 * Math.exp(-t * 30)) * Math.exp(-t * 12)),
   // Guard turret: short metallic pop.
   turretShot: () => render(0.12, (t) => (Math.sin(2 * Math.PI * 520 * t) * 0.25 + noise() * 0.35) * Math.exp(-t * 55)),
+  // Frost Coil round (D50): short glassy zap with a cold hiss.
+  frostShot: () => {
+    let lp = 0;
+    return render(0.16, (t) => {
+      lp += (noise() - lp) * 0.35;
+      const zap = Math.sin(2 * Math.PI * (2400 - 6000 * t) * t) * Math.exp(-t * 40) * 0.16;
+      return zap + lp * 0.18 * Math.exp(-t * 28);
+    });
+  },
   // Frost coil pulse: icy chime + airy hiss.
   frostPulse: () => {
     let lp = 0;

@@ -23,6 +23,7 @@ export class Player {
     this.dodging = false;
     this.dodgeEndsAt = 0;
     this.dodgeReadyAt = 0;     // game-clock time when dodge is available again
+    this.dodgeCooldown = 0;    // length of the current cooldown (s) — the DASH button fills its ring over it
     this.dodgeDirX = 1;
     this.dodgeDirY = 0;
     this.invulnerableUntil = 0;

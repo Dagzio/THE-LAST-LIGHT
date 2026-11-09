@@ -130,6 +130,9 @@ const SEA_VERT = /* glsl */`
              + wave(q + vec2(0.0, e), normalize(vec2(-0.4, 1.0)), 0.021, 1.3, 1.6)
              + wave(q + vec2(0.0, e), normalize(vec2(0.8, -0.6)), 0.05, 2.1, 0.55);
     vNormal = normalize(vec3(h - hx, e, h - hz));
+    // Gerstner-style chop: points slide towards the crests, so crests get sharper and troughs wider
+    vec2 d1 = normalize(vec2(1.0, 0.35)), d2 = normalize(vec2(-0.4, 1.0));
+    p.xz -= d1 * (2.6 * cos(dot(q, d1) * 0.012 + uTime * 0.9)) + d2 * (1.2 * cos(dot(q, d2) * 0.021 + uTime * 1.3));
     p.y += h;
     vH = h;
     vec4 w = modelMatrix * vec4(p, 1.0);
@@ -137,31 +140,75 @@ const SEA_VERT = /* glsl */`
     gl_Position = projectionMatrix * viewMatrix * w;
   }`;
 
+// 2026-11-09: per-pixel ripples (fade with distance → no shimmer far away), a glittering moon path, a warm lantern
+// reflection, whitecaps on the crests and surf + foam around the headland rocks (elliptic shore lines in uRocks).
+// One draw call; ALU only (no textures). LOW: 2 ripple waves, no foam speckle.
 const SEA_FRAG = /* glsl */`
+  uniform float uTime;
   uniform vec3 uMoonDir;
   uniform vec3 uHorizon;
   uniform vec3 uLantern;
   uniform float uFog;
+  uniform vec4 uRocks[ROCKS];   // shore ellipses at the water line: centre x, z + half axes
   varying vec3 vWorld;
   varying vec3 vNormal;
   varying float vH;
+  // gradient of a ripple a·sin(dot(p, d)·f + t·s)
+  vec2 rip(vec2 p, vec2 d, float f, float s, float a) { return d * (a * f * cos(dot(p, d) * f + uTime * s)); }
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
   void main() {
-    vec3 n = normalize(vNormal);
+    float dist = length(cameraPosition - vWorld);
+    vec2 p = vWorld.xz;
+    vec2 g = rip(p, vec2(0.83, 0.56), 0.11, 2.6, 0.32) + rip(p, vec2(-0.6, 0.8), 0.17, 3.4, 0.2);
+    #ifndef LOW
+    g += rip(p, vec2(0.98, -0.2), 0.29, 4.6, 0.11) + rip(p, vec2(-0.25, -0.97), 0.43, 5.8, 0.07);
+    #endif
+    float near = exp(-dist * 0.0006);                  // ripples only where they are big enough to read
+    vec3 n = normalize(vec3(vNormal.x - g.x * near, vNormal.y, vNormal.z - g.y * near));
     vec3 v = normalize(cameraPosition - vWorld);
-    vec3 deep = vec3(0.012, 0.035, 0.06);
-    vec3 crest = vec3(0.05, 0.11, 0.16);
-    vec3 col = mix(deep, crest, clamp(vH * 0.12 + 0.45, 0.0, 1.0));
-    float fres = pow(1.0 - max(dot(n, v), 0.0), 3.0);
-    col = mix(col, uHorizon * 0.9, fres * 0.65);
+
+    vec3 deep = vec3(0.010, 0.030, 0.055);
+    vec3 crest = vec3(0.045, 0.115, 0.15);
+    float hk = clamp(vH * 0.12 + 0.45, 0.0, 1.0);
+    vec3 col = mix(deep, crest, hk);
+    col += vec3(0.0, 0.03, 0.035) * smoothstep(0.55, 1.0, hk);   // light through the crests (moonlit teal)
+    float fres = pow(1.0 - max(dot(n, v), 0.0), 4.0);
+    col = mix(col, uHorizon * 0.95, fres * 0.7);
     vec3 r = reflect(-v, n);
-    col += vec3(0.75, 0.82, 1.0) * pow(max(dot(r, uMoonDir), 0.0), 160.0) * 1.6;   // moon path
-    col += vec3(1.0, 0.72, 0.4) * pow(max(dot(r, normalize(uLantern - vWorld)), 0.0), 260.0) * 0.12; // faint lantern glints
-    float d = length(cameraPosition - vWorld);
-    col = mix(col, uHorizon, 1.0 - exp(-d * uFog));
+    float m = max(dot(r, uMoonDir), 0.0);
+    col += vec3(0.62, 0.7, 0.9) * pow(m, 42.0) * 0.22;          // soft moon path
+    col += vec3(0.85, 0.9, 1.0) * pow(m, 700.0) * 5.0 * near;   // glitter on the ripples
+    float l = max(dot(r, normalize(uLantern - vWorld)), 0.0);
+    col += vec3(1.0, 0.68, 0.36) * (pow(l, 70.0) * 0.18 + pow(l, 600.0) * 1.4 * near); // warm lantern reflection
+
+    // surf: the nearest shore line of the headland rocks
+    float shore = 1e5;
+    for (int i = 0; i < ROCKS; i++) {
+      vec4 rk = uRocks[i];
+      vec2 q = (p - rk.xy) / rk.zw;
+      shore = min(shore, (length(q) - 1.0) * min(rk.z, rk.w));
+    }
+    float band = smoothstep(34.0, 0.0, shore);
+    float swell = 0.5 + 0.5 * sin(shore * 0.2 - uTime * 2.0 + sin(p.x * 0.04 + uTime * 0.7) * 1.6);
+    #ifdef LOW
+    float speck = 0.5;
+    #else
+    float speck = hash(floor(p * 0.35 + vec2(uTime * 0.6, 0.0)));
+    #endif
+    float foam = band * smoothstep(0.55, 1.0, swell * 0.75 + speck * 0.45) + smoothstep(7.0, 0.0, shore) * 0.85;
+    foam += smoothstep(3.6, 5.0, vH + (g.x + g.y) * 6.0) * 0.22 * near; // whitecaps on the highest crests
+    col = mix(col, vec3(0.42, 0.5, 0.6), clamp(foam, 0.0, 1.0) * 0.55);
+
+    col = mix(col, uHorizon, 1.0 - exp(-dist * uFog));
     gl_FragColor = vec4(col, 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }`;
+
+// Headland rocks at the water line (from rockParts below: x, z, half axes × the cut at y = 0 × ~0.94 for the noise)
+const SHORE = [
+  [330, -440, 205, 151], [470, -380, 159, 140], [190, -470, 137, 110], [120, -300, 36, 31], [205, -250, 21, 18], [560, -230, 39, 34],
+];
 
 export class MenuScene {
   /** @param {string} quality resolved preset @param {object} mats shared materials (models use vertex colours) */
@@ -190,7 +237,9 @@ export class MenuScene {
       uniforms: {
         uTime: { value: 0 }, uMoonDir: { value: MOON_DIR.clone() }, uHorizon: { value: HORIZON.clone() },
         uLantern: { value: this.lanternPos.clone() }, uFog: { value: 0.00045 },
+        uRocks: { value: SHORE.map(([x, z, a, b]) => new THREE.Vector4(x, z, a, b)) },
       },
+      defines: low ? { LOW: 1, ROCKS: SHORE.length } : { ROCKS: SHORE.length },
       vertexShader: SEA_VERT, fragmentShader: SEA_FRAG,
     });
     const sea = new THREE.Mesh(seaGeo, this.seaMat);

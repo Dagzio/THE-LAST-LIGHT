@@ -9,12 +9,12 @@ import { buildEnvironment } from './Environment.js';
 import {
   playerGeometry, gruntGeometry, gruntEyesGeometry, bulletGeometry, muzzleGeometry, tag,
   beaconGeometry, beaconLanternGeometry, beamGeometry, padGeometry, turretBaseGeometry, turretHeadGeometry,
-  coilGeometry, coilCrystalGeometry, reticleGeometry,
+  coilGeometry, coilHeadGeometry, coilCrystalGeometry, reticleGeometry,
   runnerGeometry, runnerEyesGeometry, bruteGeometry, bruteEyesGeometry, wardenGeometry, wardenEyesGeometry,
   telegraphDiscGeometry, telegraphRingGeometry, kioskGeometry, kioskLanternGeometry,
   crateGeometry, crateGlowGeometry, grenadeGeometry,
   spitterGeometry, spitterEyesGeometry, huskGeometry, huskEyesGeometry, motherGeometry, motherEyesGeometry, globGeometry,
-  bootGeometry,
+  bootGeometry, weaponGeometry, weaponTip, WEAPON_MODEL_IDS,
 } from './models.js';
 import { ENEMY_STATES } from '../entities/Enemy.js';
 import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
@@ -74,6 +74,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 const FLAT_X = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 const WHITE = new THREE.Color(1, 1, 1);
 const FLASH = new THREE.Color(2.6, 2.4, 2.2);
+const ICE_BOLT = new THREE.Color(0.45, 0.85, 1.6);
 const LIT = new THREE.Color(1.55, 1.32, 0.95);    // Illuminated: warm highlight, never a white silhouette
 const SLOWED = new THREE.Color(0.72, 0.92, 1.45); // slowed: frosty blue
 const LIT_SLOWED = new THREE.Color(1.2, 1.25, 1.4);
@@ -82,6 +83,13 @@ const LANTERN_HIT = new THREE.Color(0xff5a3a);
 const V = new THREE.Vector3();
 const NDC = new THREE.Vector2();
 const colorCache = new Map();
+
+/** Shows / hides a device model; hidden ones also stop their per-frame matrix updates (perf). */
+function showModel(root, on) {
+  root.visible = on;
+  root.traverse((o) => { o.matrixAutoUpdate = on; });
+  if (on) root.updateMatrixWorld(true);
+}
 
 function rgbOf(hex) {
   let c = colorCache.get(hex);
@@ -126,6 +134,13 @@ export class Renderer3D {
     this.map = null;
     this.pausedDrawn = false;
     this.sizeDirty = true;
+    this.sizeObserved = false;
+    if (typeof ResizeObserver !== 'undefined') {
+      this.sizeObserver = new ResizeObserver(() => { this.sizeDirty = true; });
+      this.sizeObserver.observe(canvas);
+      this.sizeObserved = true;
+    }
+    window.addEventListener('resize', () => { this.sizeDirty = true; }); // created once (not in the frame loop)
     this.pixelRatio = 1;
     this.fpsAcc = 0;
     this.fpsFrames = 0;
@@ -145,8 +160,16 @@ export class Renderer3D {
     const m = this.mats;
     // Player: merged body + lantern + point light; two ghost copies for the dodge trail.
     this.player = new THREE.Group();
-    this.playerBody = tag(new THREE.Mesh(playerGeometry(false), m.character), 'keeper');
+    this.playerBody = tag(new THREE.Mesh(playerGeometry(false, false), m.character), 'keeper');
     this.playerBody.castShadow = true;
+    // Arms + gun of the equipped weapon (2026-11-09): a child of the body, so it bobs and leans with it; the muzzle
+    // flash is a child of the gun at its barrel tip — it can never drift off the weapon.
+    this.weaponGeos = {};
+    for (const id of WEAPON_MODEL_IDS) this.weaponGeos[id] = weaponGeometry(id);
+    this.weaponMesh = new THREE.Mesh(this.weaponGeos.pistol, m.character);
+    this.weaponMesh.castShadow = true;
+    this.weaponShown = 'pistol';
+    this.playerBody.add(this.weaponMesh);
     // Legs (D45 walk cycle): two boots swinging from hip pivots; the body bobs and leans above them
     const bootGeo = bootGeometry();
     this.legs = [-1, 1].map((s) => {
@@ -164,8 +187,9 @@ export class Renderer3D {
     this.lanternLight = new THREE.PointLight(0xffb36a, 900, 300, 1.6);
     this.lanternLight.position.set(-5, 24, -12);
     this.player.add(this.playerBody, this.lanternMesh, this.lanternLight);
+    const ghostGeo = playerGeometry(false, true); // dodge trail: the silhouette with arms
     this.ghosts = [0, 1].map(() => {
-      const g = new THREE.Mesh(this.playerBody.geometry, m.ghost);
+      const g = new THREE.Mesh(ghostGeo, m.ghost);
       g.visible = false;
       this.scene.add(g);
       return g;
@@ -251,8 +275,12 @@ export class Renderer3D {
     // Bullets (instanced), muzzle flash, aim reticle, HP bars, reload arc, blob shadows, particles.
     this.bullets = new THREE.InstancedMesh(bulletGeometry(), m.bullet, MAX_BULLETS);
     this.bullets.frustumCulled = false;
+    this.bullets.setColorAt(0, WHITE); // creates instanceColor before the shader warm-up (no recompile on the first ice round)
     this.muzzle = new THREE.Mesh(muzzleGeometry(), m.muzzle);
     this.muzzle.visible = false;
+    this.muzzle.renderOrder = 7;
+    this._placeMuzzle('pistol');
+    this.weaponMesh.add(this.muzzle); // fixed to the barrel tip (moves with every bob / lean / turn of the keeper)
     this.reticle = new THREE.Mesh(reticleGeometry(), m.reticle);
     this.reticle.visible = false;
     this.reticle.renderOrder = 12;
@@ -267,7 +295,7 @@ export class Renderer3D {
     this.blobs = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), m.blob, MAX_ENEMIES + 1);
     this.blobs.frustumCulled = false;
     this.blobs.renderOrder = 1;
-    this.scene.add(this.bullets, this.muzzle, this.reticle, this.hpBack, this.hpFill, this.reloadArc, this.blobs);
+    this.scene.add(this.bullets, this.reticle, this.hpBack, this.hpFill, this.reloadArc, this.blobs);
 
     this.particleGeo = new THREE.BufferGeometry();
     this.particlePos = null;
@@ -429,11 +457,19 @@ export class Renderer3D {
 
   // ---------------- sizing & camera ----------------
   _resize(force) {
+    // perf 2026-11-09: reading clientWidth every frame (after the HUD's DOM writes) forced a style + layout pass per
+    // frame — the top JS cost on a throttled CPU. A ResizeObserver flags real size changes (window resize, rotation,
+    // the canvas shown / hidden); without it the size is still polled every frame.
+    if (!this.sizeDirty && !force && this.sizeObserved) return;
     const w = Math.max(1, this.canvas.clientWidth), h = Math.max(1, this.canvas.clientHeight);
     // The canvas is display:none outside a map, so its CSS size can change without a resize event.
     if (!this.sizeDirty && !force && w === this.cssW && h === this.cssH) return;
     this.cssW = w;
     this.cssH = h;
+    // cached for the per-frame projections (no layout reads per enemy / per pointer move — perf 2026-11-09)
+    const r = this.canvas.getBoundingClientRect();
+    this.viewLeft = r.left;
+    this.viewTop = r.top;
     this.sizeDirty = false;
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.setSize(w, h, false);
@@ -463,8 +499,8 @@ export class Renderer3D {
 
   /** Client (CSS px) → ground point in world units (dodge-towards-cursor fallback). */
   screenToGround(clientX, clientY, out = {}) {
-    const r = this.canvas.getBoundingClientRect();
-    NDC.set(((clientX - r.left) / Math.max(1, r.width)) * 2 - 1, -((clientY - r.top) / Math.max(1, r.height)) * 2 + 1);
+    if (!(this.cssW > 0)) this._resize(true);
+    NDC.set(((clientX - this.viewLeft) / Math.max(1, this.cssW)) * 2 - 1, -((clientY - this.viewTop) / Math.max(1, this.cssH)) * 2 + 1);
     V.set(NDC.x, NDC.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
     const t = -this.camera.position.y / (V.y || -1e-6);
     out.x = this.camera.position.x + V.x * t;
@@ -475,10 +511,14 @@ export class Renderer3D {
   /** World point (x, y on the ground, height h) → CSS px of the canvas (for off-screen indicators). */
   projectToScreen(x, y, h, out = {}) {
     V.set(x, h, y).project(this.camera);
-    out.x = ((V.x + 1) / 2) * this.canvas.clientWidth;
-    out.y = ((1 - V.y) / 2) * this.canvas.clientHeight;
+    out.x = ((V.x + 1) / 2) * this.viewW;
+    out.y = ((1 - V.y) / 2) * this.viewH;
     return out;
   }
+
+  /** Canvas size in CSS px as of this frame (cached in _resize — reading clientWidth after DOM writes forces layout). */
+  get viewW() { return this.cssW > 0 ? this.cssW : this.canvas.clientWidth; }
+  get viewH() { return this.cssH > 0 ? this.cssH : this.canvas.clientHeight; }
 
   // ---------------- frame ----------------
   /**
@@ -652,17 +692,27 @@ export class Renderer3D {
       Q.setFromAxisAngle(UP, -pr.angle);
       P.set(pr.x, GUN_HEIGHT, pr.y); S.setScalar(1);
       M.compose(P, Q, S);
+      this.bullets.setColorAt(b, pr.weaponId === 'frost_coil' ? ICE_BOLT : WHITE); // D50: icy Frost Coil rounds
       this.bullets.setMatrixAt(b++, M);
     }
     this.bullets.count = b;
     this.bullets.instanceMatrix.needsUpdate = true;
+    if (b > 0 && this.bullets.instanceColor) this.bullets.instanceColor.needsUpdate = true;
 
-    // Muzzle flash
+    // Weapon in the hands (changes with the equipped weapon) + muzzle flash at its barrel tip
     const w = run.weapon;
-    this.muzzle.visible = p.alive && time - w.lastShotAt < 0.06;
-    if (this.muzzle.visible) {
-      this.muzzle.position.set(ppx + Math.cos(aim) * (PLAYER.muzzleOffset + 8), GUN_HEIGHT, ppy + Math.sin(aim) * (PLAYER.muzzleOffset + 8));
-      this.muzzle.rotation.y = -aim;
+    if (w.weaponId !== this.weaponShown) {
+      const id = this.weaponGeos[w.weaponId] ? w.weaponId : (w.weaponId === 'machine_gun' ? 'assault_rifle' : 'pistol');
+      this.weaponMesh.geometry = this.weaponGeos[id];
+      this.weaponShown = w.weaponId;
+      this._placeMuzzle(id);
+    }
+    const since = time - w.lastShotAt;
+    this.muzzle.visible = p.alive && since >= 0 && since < 0.06;
+    if (this.muzzle.visible) { // a fresh star each shot: random roll + a quick shrink
+      const k = 1 - since / 0.06;
+      this.muzzle.rotation.x = (w.lastShotAt * 97.3) % (Math.PI * 2);
+      this.muzzle.scale.setScalar(this.muzzleScale * (0.7 + 0.3 * k));
     }
 
     // Reload arc above the keeper (progress = number of lit segments)
@@ -694,6 +744,14 @@ export class Renderer3D {
     this.particleGeo.setDrawRange(0, k);
     this.particleGeo.attributes.position.needsUpdate = true;
     this.particleGeo.attributes.color.needsUpdate = true;
+  }
+
+  /** Puts the muzzle flash on the barrel tip of a weapon model (local to the gun; size per weapon). */
+  _placeMuzzle(id) {
+    const tip = weaponTip(id);
+    this.muzzle.position.set(tip.x - 1, tip.y, tip.z); // the star starts 2 units behind its origin: overlap the tip
+    this.muzzleScale = tip.flash;
+    this.muzzle.scale.setScalar(tip.flash);
   }
 
   _lerpX(o) { return o.prevX === undefined ? o.x : o.prevX + (o.x - o.prevX) * this.alpha; }
@@ -899,7 +957,14 @@ export class Renderer3D {
     this.beamPivot.add(this.beam);
     g.add(this.beamPivot);
 
-    // Build pads + one model of each device per pad (shown when that device is placed)
+    // Build pads + a model of every device × level per pad (D50: the level changes the model). Geometry is built once
+    // per map and shared by the pads; only the installed one is visible (hidden meshes cost no draw call).
+    const deviceGeo = {};
+    for (let lv = 1; lv <= 3; lv++) {
+      deviceGeo[`guard_turret@${lv}`] = { base: turretBaseGeometry(lv), head: turretHeadGeometry(lv) };
+      deviceGeo[`frost_coil@${lv}`] = { base: coilGeometry(lv), head: coilHeadGeometry(lv), crystal: coilCrystalGeometry(lv) };
+    }
+    for (const k in deviceGeo) for (const p in deviceGeo[k]) geos.push(deviceGeo[k][p]);
     this.padViews = map.buildPads.map((pad) => {
       const padMesh = mk(padGeometry(), m.prop, 'build-pad');
       padMesh.position.set(pad.x, 0, pad.y);
@@ -907,24 +972,25 @@ export class Renderer3D {
       const rune = mk(new THREE.RingGeometry(20, 24, 32), m.padRune);
       rune.rotation.x = -Math.PI / 2;
       rune.position.set(pad.x, 6.6, pad.y);
-      const turret = new THREE.Group();
-      const head = mk(turretHeadGeometry(), m.character);
-      turret.add(mk(turretBaseGeometry(), m.character), head);
-      turret.position.set(pad.x, 6, pad.y);
-      turret.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-      tag(turret, 'guard-turret');
-      const coil = new THREE.Group();
-      const crystal = mk(coilCrystalGeometry(), m.crystal);
-      coil.add(mk(coilGeometry(), m.character), crystal);
-      coil.position.set(pad.x, 6, pad.y);
-      coil.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-      tag(coil, 'frost-coil');
-      const ring = mk(new THREE.RingGeometry(0.86, 1, 48), m.frostRing);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.set(pad.x, 3, pad.y);
-      turret.visible = coil.visible = ring.visible = false;
-      g.add(padMesh, rune, turret, coil, ring);
-      return { rune, turret, head, coil, crystal, ring };
+      g.add(padMesh, rune);
+      const models = {};
+      for (const key in deviceGeo) {
+        const dg = deviceGeo[key];
+        const root = new THREE.Group();
+        const head = new THREE.Group();
+        const base = new THREE.Mesh(dg.base, m.character);
+        head.add(new THREE.Mesh(dg.head, m.character));
+        let crystal = null;
+        if (dg.crystal) { crystal = new THREE.Mesh(dg.crystal, m.crystal); head.add(crystal); }
+        root.add(base, head);
+        root.position.set(pad.x, 6, pad.y);
+        root.traverse((o) => { if (o.isMesh && o !== crystal) o.castShadow = true; });
+        showModel(root, false); // hidden models skip the per-frame matrix work (turned on while shown)
+        tag(root, key.replace('_', '-').replace('@', '-lv'));
+        g.add(root);
+        models[key] = { root, head, crystal };
+      }
+      return { rune, models, shown: null };
     });
 
     this.mapObjects = g;
@@ -983,24 +1049,24 @@ export class Renderer3D {
       const v = this.padViews[i];
       const d = pads[i] ? pads[i].device : null;
       v.rune.visible = !d;
-      v.turret.visible = !!d && d.id === 'guard_turret';
-      v.coil.visible = !!d && d.id === 'frost_coil';
-      v.ring.visible = false;
-      if (!d) continue;
-      if (d.id === 'guard_turret') {
-        v.head.rotation.y = -d.aimAngle;
-        const recoil = time - d.lastActionAt < 0.1 ? (1 - (time - d.lastActionAt) / 0.1) * 3 : 0;
-        v.head.position.set(-Math.cos(d.aimAngle) * recoil, 0, -Math.sin(d.aimAngle) * recoil);
-      } else {
-        v.crystal.rotation.y = time * 1.6;
-        v.crystal.position.y = Math.sin(time * 2.2) * 2;
-        const k = (time - d.lastActionAt) / 0.45;
-        if (k >= 0 && k < 1) {
-          v.ring.visible = true;
-          v.ring.scale.setScalar(Math.max(1, d.stats.radius * (0.25 + 0.75 * k)));
-          v.ring.material.opacity = 0.6 * (1 - k);
-        }
+      const key = d ? `${d.id}@${d.level}` : null;
+      if (key !== v.shown) {
+        if (v.shown) showModel(v.models[v.shown].root, false);
+        if (key && v.models[key]) showModel(v.models[key].root, true);
+        v.shown = key;
       }
+      if (!d || !v.models[key]) continue;
+      const mv = v.models[key];
+      mv.head.rotation.y = -d.aimAngle;
+      const recoil = time - d.lastActionAt < 0.1 ? (1 - (time - d.lastActionAt) / 0.1) * 3 : 0;
+      mv.head.position.set(-Math.cos(d.aimAngle) * recoil, 0, -Math.sin(d.aimAngle) * recoil);
+      if (mv.crystal) {
+        mv.crystal.rotation.y = time * 1.6 + d.aimAngle; // spins on its own (the head turns it with the aim)
+        mv.crystal.position.y = Math.sin(time * 2.2) * 2;
+      }
+      // a fresh install / level-up pops in (presentation only, on the game clock)
+      const pk = (time - d.installedAt) / 0.35;
+      mv.root.scale.setScalar(pk >= 0 && pk < 1 ? 1 + Math.sin(pk * Math.PI) * 0.18 : 1);
     }
   }
 
