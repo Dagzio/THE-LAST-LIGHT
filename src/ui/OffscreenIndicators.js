@@ -39,12 +39,39 @@ export class OffscreenIndicators {
     this.pick = new Array(MAX_ENEMY_ARROWS).fill(null);
     this.pickD = new Array(MAX_ENEMY_ARROWS).fill(Infinity);
     this.pt = { x: 0, y: 0 };
+    this.avoidRect = undefined; // touch keeper block (measured twice a second)
+    this.avoidTick = 0;
+    this.avoidStart = null;
     game.onFrame(() => this.update());
   }
 
   _hideAll() {
     for (const a of this.arrows) if (a.on) { a.on = false; a.el.classList.remove('on'); }
     for (const b of [this.beaconArrow, this.kioskArrow, this.crateArrow]) if (b.on) { b.on = false; b.el.classList.remove('on'); }
+  }
+
+  /**
+   * D51: on touch the keeper block sits top-left — an arrow landing on it slides down the left edge below it.
+   * The block rect is re-measured twice a second (one layout read), not every frame.
+   */
+  _avoid(x, y) {
+    const r = this.avoidRect;
+    if (r && x < r.right + 14 && y > r.top - 14 && y < r.bottom + 14) return r.bottom + 18;
+    const s = this.avoidStart; // desktop START NEXT WAVE (bottom centre): arrows on the bottom edge go above it
+    if (s && x > s.left - 14 && x < s.right + 14 && y > s.top - 14) return s.top - 18;
+    return y;
+  }
+
+  _measureAvoid() {
+    if (++this.avoidTick < 30 && this.avoidRect !== undefined) return;
+    this.avoidTick = 0;
+    const touch = document.body.classList.contains('touch');
+    const el = touch ? document.querySelector('#screen-game .hud-player') : null;
+    const r = el && el.offsetWidth ? el.getBoundingClientRect() : null;
+    this.avoidRect = r ? { right: r.right, top: r.top, bottom: r.bottom } : null;
+    const sb = !touch ? document.getElementById('btnNextWave') : null;
+    const s = sb && sb.offsetWidth ? sb.getBoundingClientRect() : null;
+    this.avoidStart = s ? { left: s.left, right: s.right, top: s.top } : null;
   }
 
   /** Places arrow `a` on the screen edge towards the projected point; hides it when the point is on screen. */
@@ -54,7 +81,7 @@ export class OffscreenIndicators {
     const dx = px - cx, dy = py - cy;
     const ang = Math.atan2(dy, dx);
     const k = Math.min((cx - EDGE) / Math.max(1e-6, Math.abs(dx)), (cy - EDGE) / Math.max(1e-6, Math.abs(dy)));
-    const x = cx + dx * k, y = cy + dy * k;
+    const x = cx + dx * k, y = this._avoid(cx + dx * k, cy + dy * k);
     if (!a.on) { a.on = true; a.el.classList.add('on'); }
     if (Math.abs(x - a.x) > 0.5 || Math.abs(y - a.y) > 0.5 || Math.abs(ang - a.a) > 0.01) {
       a.x = x; a.y = y; a.a = ang;
@@ -68,6 +95,7 @@ export class OffscreenIndicators {
     if (!g.sm.inMap || !g.run || !r3) { this._hideAll(); return; }
     if (!g.sm.is(STATES.RUNNING) && r3.pausedDrawn) return; // frozen frame — arrows stay
     const W = r3.viewW, H = r3.viewH; // cached size: no layout read between the arrow style writes
+    this._measureAvoid();
     const p = g.run.player;
 
     // Nearest off-screen alive enemies (selection without sorting/allocations).
@@ -118,7 +146,7 @@ export class OffscreenIndicators {
       // intersection of the ray from the centre with the inset screen rectangle
       const hx = cx - EDGE, hy = cy - EDGE;
       const k = Math.min(hx / Math.max(1e-6, Math.abs(dx)), hy / Math.max(1e-6, Math.abs(dy)));
-      const x = cx + dx * k, y = cy + dy * k;
+      const x = cx + dx * k, y = this._avoid(cx + dx * k, cy + dy * k);
       if (!a.on) { a.on = true; a.el.classList.add('on'); }
       if (Math.abs(x - a.x) > 0.5 || Math.abs(y - a.y) > 0.5 || Math.abs(ang - a.a) > 0.01) {
         a.x = x; a.y = y; a.a = ang;

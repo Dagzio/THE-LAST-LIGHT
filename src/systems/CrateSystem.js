@@ -1,7 +1,7 @@
 // Random crates (01_GDD §14, 02_SPEC §14, D41): on waves 2–5 a seeded 30 % roll; max 1 crate per map; it appears at
 // a valid random spot (not near the keeper, beacon, kiosk, pads, enemy spawns, not inside obstacles) and disappears
 // after 30 s. Opening it offers 3 temporary perks (the map run applies the chosen one, once).
-import { CRATE, PERKS, PERK_ORDER } from '../data/perks.js';
+import { CRATE, PERKS, PERK_ORDER, PERK_CATEGORIES } from '../data/perks.js';
 
 export class CrateSystem {
   /**
@@ -73,11 +73,14 @@ export class CrateSystem {
     if (!this.crate) return null;
     this.crate = null;
     const pool = PERK_ORDER.filter((id) => isOffered(PERKS[id]));
+    const pick = (list) => list.splice(Math.floor(this.rng.next() * list.length) % list.length, 1)[0];
     const out = [];
-    while (out.length < CRATE.choices && pool.length > 0) {
-      const k = Math.floor(this.rng.next() * pool.length) % pool.length;
-      out.push(pool.splice(k, 1)[0]);
+    // D51: one perk of each category (weapon / keeper / beacon & defense); an exhausted category is filled from the rest
+    for (const cat of PERK_CATEGORIES) {
+      const inCat = pool.filter((id) => PERKS[id].cat === cat);
+      if (inCat.length) { const id = pick(inCat); out.push(id); pool.splice(pool.indexOf(id), 1); }
     }
+    while (out.length < CRATE.choices && pool.length > 0) out.push(pick(pool));
     this.events.emit('crateOpen', out);
     return out;
   }

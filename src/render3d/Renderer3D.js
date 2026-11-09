@@ -10,6 +10,7 @@ import {
   playerGeometry, gruntGeometry, gruntEyesGeometry, bulletGeometry, muzzleGeometry, tag,
   beaconGeometry, beaconLanternGeometry, beamGeometry, padGeometry, turretBaseGeometry, turretHeadGeometry,
   coilGeometry, coilHeadGeometry, coilCrystalGeometry, reticleGeometry,
+  poisonBaseGeometry, poisonHeadGeometry, poisonTanksGeometry, poisonVialGeometry,
   runnerGeometry, runnerEyesGeometry, bruteGeometry, bruteEyesGeometry, wardenGeometry, wardenEyesGeometry,
   telegraphDiscGeometry, telegraphRingGeometry, kioskGeometry, kioskLanternGeometry,
   crateGeometry, crateGlowGeometry, grenadeGeometry,
@@ -75,6 +76,8 @@ const FLAT_X = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0
 const WHITE = new THREE.Color(1, 1, 1);
 const FLASH = new THREE.Color(2.6, 2.4, 2.2);
 const ICE_BOLT = new THREE.Color(0.45, 0.85, 1.6);
+const TOXIC_BOLT = new THREE.Color(0.55, 1.6, 0.35);
+const POISONED = new THREE.Color(0.8, 1.35, 0.7); // D51: a poisoned enemy turns sickly green
 const LIT = new THREE.Color(1.55, 1.32, 0.95);    // Illuminated: warm highlight, never a white silhouette
 const SLOWED = new THREE.Color(0.72, 0.92, 1.45); // slowed: frosty blue
 const LIT_SLOWED = new THREE.Color(1.2, 1.25, 1.4);
@@ -640,6 +643,7 @@ export class Renderer3D {
       else if (e.casting) tint = CASTING;
       else if (e.illuminated) tint = slowed ? LIT_SLOWED : LIT;
       else if (slowed) tint = SLOWED;
+      else if (e.alive && time < e.poisonUntil) tint = POISONED;
       v.body.setColorAt(v.n, tint);
       v.n++;
       const barY = e.type.barHeight;
@@ -692,7 +696,7 @@ export class Renderer3D {
       Q.setFromAxisAngle(UP, -pr.angle);
       P.set(pr.x, GUN_HEIGHT, pr.y); S.setScalar(1);
       M.compose(P, Q, S);
-      this.bullets.setColorAt(b, pr.weaponId === 'frost_coil' ? ICE_BOLT : WHITE); // D50: icy Frost Coil rounds
+      this.bullets.setColorAt(b, pr.weaponId === 'frost_coil' ? ICE_BOLT : pr.weaponId === 'poison_turret' ? TOXIC_BOLT : WHITE); // D50/D51
       this.bullets.setMatrixAt(b++, M);
     }
     this.bullets.count = b;
@@ -963,8 +967,9 @@ export class Renderer3D {
     for (let lv = 1; lv <= 3; lv++) {
       deviceGeo[`guard_turret@${lv}`] = { base: turretBaseGeometry(lv), head: turretHeadGeometry(lv) };
       deviceGeo[`frost_coil@${lv}`] = { base: coilGeometry(lv), head: coilHeadGeometry(lv), crystal: coilCrystalGeometry(lv) };
+      deviceGeo[`poison_turret@${lv}`] = { base: poisonBaseGeometry(lv), head: poisonHeadGeometry(lv), crystal: poisonVialGeometry(lv), crystalMat: 'toxic', glow: poisonTanksGeometry(lv) };
     }
-    for (const k in deviceGeo) for (const p in deviceGeo[k]) geos.push(deviceGeo[k][p]);
+    for (const k in deviceGeo) for (const p in deviceGeo[k]) if (deviceGeo[k][p].isBufferGeometry) geos.push(deviceGeo[k][p]);
     this.padViews = map.buildPads.map((pad) => {
       const padMesh = mk(padGeometry(), m.prop, 'build-pad');
       padMesh.position.set(pad.x, 0, pad.y);
@@ -981,8 +986,9 @@ export class Renderer3D {
         const base = new THREE.Mesh(dg.base, m.character);
         head.add(new THREE.Mesh(dg.head, m.character));
         let crystal = null;
-        if (dg.crystal) { crystal = new THREE.Mesh(dg.crystal, m.crystal); head.add(crystal); }
+        if (dg.crystal) { crystal = new THREE.Mesh(dg.crystal, m[dg.crystalMat || 'crystal']); head.add(crystal); }
         root.add(base, head);
+        if (dg.glow) root.add(new THREE.Mesh(dg.glow, m.toxic)); // static glowing parts (poison tanks)
         root.position.set(pad.x, 6, pad.y);
         root.traverse((o) => { if (o.isMesh && o !== crystal) o.castShadow = true; });
         showModel(root, false); // hidden models skip the per-frame matrix work (turned on while shown)
@@ -1060,7 +1066,7 @@ export class Renderer3D {
       mv.head.rotation.y = -d.aimAngle;
       const recoil = time - d.lastActionAt < 0.1 ? (1 - (time - d.lastActionAt) / 0.1) * 3 : 0;
       mv.head.position.set(-Math.cos(d.aimAngle) * recoil, 0, -Math.sin(d.aimAngle) * recoil);
-      if (mv.crystal) {
+      if (mv.crystal && d.id === 'frost_coil') {
         mv.crystal.rotation.y = time * 1.6 + d.aimAngle; // spins on its own (the head turns it with the aim)
         mv.crystal.position.y = Math.sin(time * 2.2) * 2;
       }

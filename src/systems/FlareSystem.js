@@ -12,6 +12,7 @@ export class FlareSystem {
     this.charge = 0;
     this.lastUsedAt = -Infinity;
     this.uses = 0;
+    this.chargeMult = 1; // crate perk FLARE_CACHE (D51)
   }
 
   get ready() { return this.charge >= FLARE.maxCharge; }
@@ -24,7 +25,7 @@ export class FlareSystem {
     if (!enemy || this.ready) return;
     const add = FLARE.chargePerKill[enemy.typeId] || 0;
     if (!(add > 0)) return;
-    this.charge = Math.min(FLARE.maxCharge, this.charge + add);
+    this.charge = Math.min(FLARE.maxCharge, this.charge + add * this.chargeMult);
     if (this.ready) this.events.emit('flareReady');
   }
 

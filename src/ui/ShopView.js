@@ -32,6 +32,7 @@ const ICON = { // 24×24 stroke icons (white line style, see art-prompts/06_SHOP
   interact_range: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/>',
   guard_turret: '<path d="M6 20h12l-2-6H8z"/><path d="M8 14V9h8v5M16 11h6"/>',
   frost_coil: '<path d="M12 2v20M3 7l18 10M21 7L3 17"/>',
+  poison_turret: '<path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 0 1-12 0c0-3.4 3-6.5 6-11z"/><path d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5"/>',
   repair: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
   g_frag: '<circle cx="11" cy="14" r="6.5"/><path d="M11 7.5V5h3l2-2M14 5l3 3"/>',
   g_cryo: '<circle cx="12" cy="12" r="9"/><path d="M12 6v12M7 9l10 6M17 9L7 15"/>',
@@ -78,6 +79,7 @@ export class ShopView {
     this.tab = 'weapons';
     this.page = 0; // phones: page of the card row
     this.upgradeWeaponId = null; // weapon shown in the UPGRADES tab
+    this.defensePad = 0;         // D51 desktop DEFENSES: the pad shown (chips above the cards)
     // Phone step (≤ 500 px high, base.css): one row of cards with page arrows, weapon picker card in UPGRADES
     this.phoneMQ = matchMedia('(max-height: 500px)');
 
@@ -109,7 +111,7 @@ export class ShopView {
     if (show === this.visible) return;
     this.root.classList.toggle('show', show);
     if (show) {
-      if (g.sm.is(STATES.SHOP_OPEN)) Sfx.play('open');
+      if (g.sm.is(STATES.SHOP_OPEN)) Sfx.play(Sfx.duration('shopOpen') > 0 ? 'shopOpen' : 'open'); // recorded shop sound
       this.upgradeWeaponId = g.economy.profile.equippedWeaponId;
       this.refresh();
     }
@@ -131,6 +133,7 @@ export class ShopView {
     else if (cmd === 'repair') r = g.shopRepairBeacon();
     else if (cmd === 'grenade') r = g.shopBuyGrenade(a);
     else if (cmd === 'pickWeapon') { this.upgradeWeaponId = a; this.refresh(); return; }
+    else if (cmd === 'pickPad') { this.defensePad = Number(a); Sfx.play('click'); this.refresh(); return; }
     if (!r) return;
     Sfx.play(r.ok ? (cmd === 'equip' || r.equip ? 'click' : 'buy') : 'deny');
     this.refresh();
@@ -372,9 +375,24 @@ export class ShopView {
       else this._footer(card, { cmd: 'repair', price: o.cost, enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
       this.grid.append(card);
     }
-    this.grid.style.setProperty('--pads', String(Math.max(1, pads.length))); // desktop: one column per pad
     const padNames = g.run ? g.run.map.buildPads.map((p) => p.name) : [];
+    // D51: three device types — on desktop one pad at a time (chips like the UPGRADES weapons: name · installed
+    // level), its cards in one row; phones keep the paged row with the pad tag on every card
+    const desk = !this.phoneMQ.matches;
+    if (this.defensePad >= pads.length) this.defensePad = 0;
+    if (desk) {
+      pads.forEach((pad, i) => {
+        const chip = el('button', `shop-chip${i === this.defensePad ? ' active' : ''}`);
+        chip.dataset.shopCmd = `pickPad:${i}`;
+        chip.dataset.nosfx = '';
+        const name = T(`shop.pad.${padNames[i] || (i === 0 ? 'west' : 'east')}`);
+        chip.textContent = pad.device ? `${name} · ${T(`defense.${pad.device.id}`)} ${T('hud.level', { n: pad.device.level })}` : name;
+        this.sub.append(chip);
+      });
+    }
+    this.grid.style.setProperty('--pads', '1');
     pads.forEach((pad, i) => {
+      if (desk && i !== this.defensePad) return;
       const col = el('div', 'shop-pad');
       const title = el('h4', 'shop-pad-title');
       title.textContent = T(`shop.pad.${padNames[i] || (i === 0 ? 'west' : 'east')}`);

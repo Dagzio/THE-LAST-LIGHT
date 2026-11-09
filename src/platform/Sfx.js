@@ -61,20 +61,30 @@ export const Sfx = (() => {
       if (offset >= buf.duration) return;
       const gain = (f ? f.gain : 1) * (opts && opts.gain != null ? opts.gain : 1);
       const max = opts && opts.voices > 0 ? opts.voices : 0;
+      const cut = !!(opts && opts.cut);
       wake();
       try {
         const s = a.createBufferSource(); // a new node per sound
         s.buffer = buf;
         if (rate !== 1) s.playbackRate.value = rate;
-        if (gain !== 1 || max) {
-          const g = a.createGain();
+        let g = null;
+        if (gain !== 1 || max || cut) {
+          g = a.createGain();
           g.gain.value = gain;
           s.connect(g);
           g.connect(a.destination);
           if (max) limit(a, name, s, g, max);
         } else s.connect(a.destination);
         s.start(0, offset);
+        // opts.cut: a handle to fade the sound out early (a long reload clip that must not run past the reload)
+        if (cut) return { stop(fade = 0.06) { try { g.gain.setTargetAtTime(0, a.currentTime, fade / 3); s.stop(a.currentTime + fade * 2); } catch (e) { /* ended */ } } };
       } catch (e) { /* SFX never throws */ }
+      return null;
+    },
+    /** Playable length of a sound in seconds (after its trimmed silence), 0 if not available. */
+    duration(name) {
+      const buf = bufs[name];
+      return buf ? Math.max(0, buf.duration - (files[name] ? files[name].trim : 0)) : 0;
     },
     /**
      * Loads recorded files (data/sounds.js → SFX_FILES). Until a file is decoded (or if it fails) the synthesized

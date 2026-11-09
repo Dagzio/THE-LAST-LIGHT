@@ -24,6 +24,7 @@ export class DefenseSystem {
     this.events = events;
     /** @type {import('./Collision.js').CollisionWorld|null} turret line of sight (D40) */
     this.world = null;
+    this.fireRateMult = 1; // crate perk TURRET_OVERCLOCK (D51): every device fires faster
   }
 
   /** Level of `id` bought on this pad (0 = not bought). */
@@ -99,7 +100,7 @@ export class DefenseSystem {
     const target = d.targeting.update(d, enemies, s.range, time, this.world ? d.canSee : null);
     if (target) d.aimAngle = Math.atan2(target.y - d.y, target.x - d.x);
     if (!target || time < d.nextActionAt) return;
-    d.nextActionAt = time + s.fireInterval;
+    d.nextActionAt = time + s.fireInterval / this.fireRateMult;
     d.lastActionAt = time;
     const barrels = Math.max(1, s.barrels | 0);
     const nx = -Math.sin(d.aimAngle), ny = Math.cos(d.aimAngle); // across the barrels

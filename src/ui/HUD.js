@@ -70,6 +70,7 @@ export class HUD {
       crate: $('cratePrompt'),
       crateTimer: $('crateTimer'),
       gslots: [...document.querySelectorAll('#grenadeSlots .gslot')],
+      gslotsRow: $('grenadeSlots'),
       gBtn: $('grenadeBtn'),
       gBtnIco: $('grenadeBtnIco'),
       gBtnCount: $('grenadeBtnCount'),
@@ -126,6 +127,7 @@ export class HUD {
   _resetCache() {
     this.cache = {
       hp: -1, maxHp: -1, ammo: -1, mag: -1, weaponId: '', reloading: null, reloadPct: -1, integrity: -1, hit: null, low: null,
+      hurt: null, lowAmmo: null,
       waveLabel: '', waveSub: '', nextWave: null, bossOn: null, bossPct: -1, flarePct: -1, flareFull: null, flareReady: null, dashPct: -1, dashCooling: false,
       coins: -1, lv: '', xpPct: -1, canShop: null, kioskOn: null, kioskNear: null, kx: -1, ky: -1,
       gKey: '', crateOn: null, crateNear: null, crateSec: -1, cx: -1, cy: -1,
@@ -246,6 +248,11 @@ export class HUD {
     }
     if (w.ammo !== c.ammo) { c.ammo = w.ammo; el.ammo.textContent = String(w.ammo); }
     if (w.stats.magazineSize !== c.mag) { c.mag = w.stats.magazineSize; el.mag.textContent = String(c.mag); }
+    // D51 warnings: low HP (number pulses red + a red edge on the screen), low ammo (counter turns orange)
+    const hurt = p.alive && p.hp / p.maxHp <= 0.3;
+    if (hurt !== c.hurt) { c.hurt = hurt; el.screen.classList.toggle('keeper-hurt', hurt); }
+    const lowAmmo = !w.reloading && w.ammo <= Math.max(1, Math.ceil(w.stats.magazineSize * 0.25));
+    if (lowAmmo !== c.lowAmmo) { c.lowAmmo = lowAmmo; el.weapon.classList.toggle('low-ammo', lowAmmo); }
     if (w.reloading !== c.reloading) {
       c.reloading = w.reloading;
       el.weapon.classList.toggle('reloading', w.reloading);
@@ -322,6 +329,9 @@ export class HUD {
         slot.classList.toggle('empty', n === 0);
         slot.classList.toggle('sel', gs.selected === t && n > 0);
       }
+      // D51: the slot row is a picker — shown on touch only when there is a choice (2+ types in stock)
+      const types = (gs.stock.frag > 0) + (gs.stock.cryo > 0) + (gs.stock.molotov > 0);
+      el.gslotsRow.classList.toggle('choice', types >= 2);
       el.gBtnIco.className = `gico gico-${gs.selected}`;
       el.gBtnCount.textContent = String(gs.stock[gs.selected]);
       el.gBtn.classList.toggle('empty', gs.total() === 0);

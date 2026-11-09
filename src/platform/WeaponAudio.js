@@ -39,24 +39,40 @@ export class WeaponAudio {
     const rate = r.refDuration > 0 && duration > 0 ? Math.min(r.maxRate || 1, Math.max(1, r.refDuration / duration)) : 1;
     const cues = r.cues.map((q) => {
       const startAt = q.at * duration - q.hit / rate; // the key click lands at `at` of the reload
-      return startAt >= 0 ? { sfx: q.sfx, startAt, offset: 0 } : { sfx: q.sfx, startAt: 0, offset: -startAt * rate };
+      const c = startAt >= 0 ? { sfx: q.sfx, startAt, offset: 0 } : { sfx: q.sfx, startAt: 0, offset: -startAt * rate };
+      c.cut = !!q.cut;
+      return c;
     }).sort((a, b) => a.startAt - b.startAt);
-    return { w, start: w.reloadStartedAt, rate, cues, next: 0 };
+    // a `cut` clip fades out when the next cue starts (the shotgun shells stop when the pump comes)
+    for (let i = 0; i < cues.length; i++) cues[i].stopAt = cues[i].cut && i + 1 < cues.length ? cues[i + 1].startAt : Infinity;
+    return { w, start: w.reloadStartedAt, rate, cues, next: 0, live: [] };
+  }
+
+  /** Fades out the cut clips still sounding (a cancelled reload must not keep clicking). */
+  _stopLive(c, t = Infinity) {
+    for (let i = c.live.length - 1; i >= 0; i--) {
+      if (t >= c.live[i].stopAt) { c.live[i].h.stop(); c.live.splice(i, 1); }
+    }
   }
 
   /** Called after every simulation step (Game.update). */
   update(run, time) {
     const w = run ? run.weapon : null;
-    if (w && w.reloading && (!this.cur || this.cur.w !== w || this.cur.start !== w.reloadStartedAt)) this.cur = this.plan(w);
+    if (w && w.reloading && (!this.cur || this.cur.w !== w || this.cur.start !== w.reloadStartedAt)) {
+      if (this.cur) this._stopLive(this.cur);
+      this.cur = this.plan(w);
+    }
     const c = this.cur;
     if (!c) return;
-    if (c.w !== w || c.start !== w.reloadStartedAt) { this.cur = null; return; } // another run / another reload
+    if (c.w !== w || c.start !== w.reloadStartedAt) { this._stopLive(c); this.cur = null; return; } // another run / reload
     const t = time - c.start;
     while (c.next < c.cues.length && c.cues[c.next].startAt <= t) {
       const q = c.cues[c.next++];
-      Sfx.play(q.sfx, c.rate, { offset: q.offset + (t - q.startAt) * c.rate });
+      const h = Sfx.play(q.sfx, c.rate, { offset: q.offset + (t - q.startAt) * c.rate, cut: q.cut });
+      if (h) c.live.push({ h, stopAt: q.stopAt });
     }
+    this._stopLive(c, t);
     // Kept until the reload is over (all cues done or not): dropping it earlier would plan the same reload again.
-    if (!w.reloading) this.cur = null; // the end step has just fired the last cues
+    if (!w.reloading) { this._stopLive(c); this.cur = null; } // the end step has just fired the last cues
   }
 }

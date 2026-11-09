@@ -31,12 +31,14 @@ import { defaultLoadout } from '../systems/Loadout.js';
 import { buildCollisionWorld } from '../systems/Collision.js';
 import { mapColliders } from '../systems/Props.js';
 import { GrenadeSystem } from '../systems/GrenadeSystem.js';
+import { PoisonSystem } from '../systems/PoisonSystem.js';
 import { CrateSystem } from '../systems/CrateSystem.js';
 import { GRENADE_RULES } from '../data/grenades.js';
 import { CRATE, PERKS } from '../data/perks.js';
 
 const MAX_ENEMIES = 80; // hard cap of live entities (performance guard; waves stay far below it)
 const AIM = { x: 0, y: 0 }; // reused
+const TURRET_SPARK = { frost_coil: '#bfe9ff', poison_turret: '#8dff5a' }; // muzzle sparks per device
 
 /** Weapon stats with the temporary crate perks of this run on top (never stored in the profile). */
 function withPerks(ws, perks) {
@@ -50,6 +52,7 @@ function withPerks(ws, perks) {
     if (k.fireRateMult) s.fireInterval /= k.fireRateMult;
     if (k.penetration) s.penetrationCount += k.penetration;
     if (k.knockback) s.knockback += k.knockback;
+    if (k.critBonus) s.critChance = (s.critChance || 0) + k.critBonus; // KEEN_EYE (D51)
   }
   return s;
 }
@@ -95,6 +98,7 @@ export class MapRun {
     this.temporaryPerks = [];
     this.crateChoices = null;          // perk ids offered by the open crate
     this.grenades = new GrenadeSystem(this.rng, events);
+    this.poison = new PoisonSystem(events, this.rng); // D51: Poison Turret damage over time
     this.crates = new CrateSystem(map, new SeededRandom((runSeed ^ 0x2545f491) >>> 0), events);
     this.grenadePreview = { active: false, x: 0, y: 0 }; // aim landing point (presentation: circle + dotted arc)
     this._gWasDown = false;
@@ -125,7 +129,11 @@ export class MapRun {
         const p = this.player;
         this.particles.cone(p.x, p.y, angle + Math.PI / 2, 0.5, 1, 110, 0.45, 2.2, '#c99a3e');
       }),
-      events.on('turretShot', (x, y, angle, id) => this.particles.cone(x, y, angle, 0.6, 2, 220, 0.1, 2, id === 'frost_coil' ? '#bfe9ff' : '#ffe0a0')),
+      events.on('turretShot', (x, y, angle, id) => this.particles.cone(x, y, angle, 0.6, 2, 220, 0.1, 2, TURRET_SPARK[id] || '#ffe0a0')),
+      events.on('poisonTick', (x, y, amount) => { // D51: a small green puff per poison tick
+        this.stats.damageDealt += amount;
+        this.particles.burst(x, y, 2, 70, 0.35, 2.2, '#8dff5a', 3);
+      }),
       events.on('beaconHit', (x, y, amount) => {
         this.stats.beaconDamageTaken += amount;
         this.particles.burst(x, y, 8, 140, 0.35, 2.5, '#ff9a60');
@@ -170,21 +178,36 @@ export class MapRun {
     if (initial || ws.id !== prev.id) this.weapon.equip(ws);
     else { this.weapon.stats = ws; this.weapon.ammo = Math.min(this.weapon.ammo, ws.magazineSize); }
     let speed = loadout.player.speedMult, taken = loadout.player.damageTakenMult, beam = 0;
+    let dodge = 1, hpBonus = 0, hpRegen = 0, deviceRate = 1, beaconTaken = 1, beaconRegen = 0, flareCharge = 1;
     for (const id of this.temporaryPerks) {
       const k = PERKS[id];
       if (!k) continue;
       if (k.speedMult) speed *= k.speedMult;
       if (k.damageTakenMult) taken *= k.damageTakenMult;
       if (k.beamDeg) beam += k.beamDeg;
+      // D51 perks
+      if (k.dodgeCooldownMult) dodge *= k.dodgeCooldownMult;
+      if (k.maxHpBonus) hpBonus += k.maxHpBonus;
+      if (k.hpRegen) hpRegen += k.hpRegen;
+      if (k.deviceFireRateMult) deviceRate *= k.deviceFireRateMult;
+      if (k.beaconDamageMult) beaconTaken *= k.beaconDamageMult;
+      if (k.beaconRegen) beaconRegen += k.beaconRegen;
+      if (k.flareChargeMult) flareCharge *= k.flareChargeMult;
     }
     const m = loadout.player, p = this.player;
-    const gained = m.maxHp - p.maxHp;
-    p.maxHp = m.maxHp;
+    const maxHp = m.maxHp + hpBonus;
+    const gained = maxHp - p.maxHp;
+    p.maxHp = maxHp;
     if (gained > 0 && !initial) p.hp += gained;
     p.hp = Math.min(p.hp, p.maxHp);
     p.damageTakenMult = taken;
     this.controller.speedMult = speed;
-    this.controller.dodgeCooldownMult = m.dodgeCooldownMult;
+    this.controller.dodgeCooldownMult = m.dodgeCooldownMult * dodge;
+    this.hpRegen = hpRegen;
+    this.beaconRegen = beaconRegen;
+    this.defenses.fireRateMult = deviceRate;
+    this.beacon.damageTakenMult = beaconTaken;
+    this.flare.chargeMult = flareCharge;
     this.interactMult = m.interactMult;
     this.light.extraWidthDeg = beam;
   }
@@ -380,6 +403,7 @@ export class MapRun {
   startNextWave(time) {
     this.lastTime = time;
     if (this.over || !this.waves.startNextWave(time)) return false;
+    this.events.emit('earlyStart'); // presentation: the "called the wave" sound (after this wave's 'waveStart')
     const bonus = WAVE_TIMING.earlyStartBonus | 0;
     if (bonus > 0) {
       this.rewards.coins += bonus;
@@ -412,6 +436,9 @@ export class MapRun {
     p.prevX = p.x; p.prevY = p.y;
     for (let i = 0; i < this.enemies.length; i++) { const e = this.enemies[i]; e.prevX = e.x; e.prevY = e.y; }
     this.controller.update(p, input, dt, time);
+    // D51 perks: keeper / beacon regeneration (continuous, on the game clock)
+    if (this.hpRegen > 0 && p.alive && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + this.hpRegen * dt);
+    if (this.beaconRegen > 0) this.beacon.repair(this.beaconRegen * dt);
     this.weapons.update(this.weapon, p, input.isDown('fire'), input.consumePressed('reload'), time);
     if (input.consumePressed('flare')) this.useFlare(time);
     this._grenadeInput(input, time);
@@ -421,6 +448,7 @@ export class MapRun {
     this.defenses.update(this.enemies, time);
     this.projectileSystem.update(this.enemies, dt, time);
     this.grenades.update(this.enemies, time);
+    this.poison.update(this.enemies, time);
     this._updateGlobs(time);
     if (!p.alive) this._setDefeat('player');
     if (!this.defeat) this.waves.update(this.enemies, time);

@@ -49,6 +49,11 @@ export class Enemy {
     this.pushVX = 0;
     this.pushVY = 0;
     this.pushUntil = 0;
+    // Poison (Poison Turret, D51): damage per second until poisonUntil, ticks every poisonTick s; never stacks
+    this.poisonDps = 0;
+    this.poisonUntil = -Infinity;
+    this.poisonNextTick = 0;
+    this.poisonTick = 0.5;
     // Steering around decor (EnemyAISystem, 2026-11-09): heading offset from the straight line + its re-check time,
     // progress watch (best distance to the beacon so far) and the last-resort "squeeze past decor" window.
     this.steerOffset = 0;
@@ -75,6 +80,18 @@ export class Enemy {
     else this.slowAmount = Math.max(this.slowAmount, a);
     this.slowUntil = Math.max(this.slowUntil, time + duration);
   }
+
+  /** Poison (D51): refreshes the duration, keeps the stronger dps — never stacks. The first tick comes one tick later. */
+  applyPoison(dps, duration, tick, time) {
+    if (!this.alive || !(dps > 0) || !(duration > 0)) return;
+    const active = time < this.poisonUntil;
+    this.poisonDps = active ? Math.max(this.poisonDps, dps) : dps;
+    this.poisonUntil = Math.max(this.poisonUntil, time + duration);
+    this.poisonTick = tick > 0 ? tick : 0.5;
+    if (!active) this.poisonNextTick = time + this.poisonTick;
+  }
+
+  isPoisoned(time) { return time < this.poisonUntil; }
 
   get alive() { return this.state !== ENEMY_STATES.DEAD; }
 

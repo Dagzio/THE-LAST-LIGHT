@@ -16,7 +16,7 @@ export class Beacon {
   /** Discrete damage from an enemy attack. Returns true exactly once — when the beacon falls. */
   applyDamage(amount, time) {
     if (this.destroyed || !(amount > 0) || !Number.isFinite(amount)) return false;
-    this.integrity = Math.max(0, this.integrity - amount);
+    this.integrity = Math.max(0, this.integrity - amount * (this.damageTakenMult ?? 1)); // STONE_SKIN perk (D51)
     this.lastHitAt = time;
     if (this.integrity <= 0) {
       this.destroyed = true;

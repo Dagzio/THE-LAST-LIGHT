@@ -17,7 +17,18 @@ const ICON = {
   repair: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
   fireRate: '<path d="M4 6l6 6-6 6M11 6l6 6-6 6"/>',
   impact: '<circle cx="9" cy="12" r="4"/><path d="M15 8l6-3M15 12h7M15 16l6 3"/>',
+  // D51 perks
+  crit: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5"/>',
+  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  dash: '<path d="M5 5l7 7-7 7M12 5l7 7-7 7"/>',
+  turret: '<path d="M6 20h12l-2-6H8z"/><path d="M8 14V9h8v5M16 11h6"/>',
+  shield: '<path d="M4 8l8-4 8 4M5 9v9M19 9v9M9 10v8M15 10v8M3 20h18"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>',
+  flare: '<circle cx="12" cy="12" r="3.6"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2M5.3 5.3l2.2 2.2M16.5 16.5l2.2 2.2M5.3 18.7l2.2-2.2M16.5 7.5l2.2-2.2"/>',
 };
+
+/** Category label on a crate card (the shop tab names — already in 10 languages). */
+const CAT_LABEL = { weapon: 'shop.tab.weapons', keeper: 'shop.tab.playerUpgrades', beacon: 'shop.tab.defenses' };
 
 export class CrateView {
   /** @param {import('../core/Game.js').Game} game */
@@ -53,8 +64,10 @@ export class CrateView {
       card.className = 'boon-card';
       card.dataset.perk = id;
       card.dataset.nosfx = '';
+      card.classList.add(`boon-${perk.cat || 'weapon'}`);
       card.innerHTML = `<span class="boon-head"><span class="shop-card-ico"><svg viewBox="0 0 24 24">${ICON[perk.icon] || ICON.damage}</svg></span>`
-        + '<span class="boon-name"></span></span><span class="boon-body"><span class="boon-fx"></span><span class="boon-note"></span></span>';
+        + '<span class="boon-name"></span></span><span class="boon-body"><span class="boon-cat"></span><span class="boon-fx"></span><span class="boon-note"></span></span>';
+      card.querySelector('.boon-cat').textContent = T(CAT_LABEL[perk.cat] || CAT_LABEL.weapon); // D51: one per category
       card.querySelector('.boon-name').textContent = T(`perk.${id}`);
       card.querySelector('.boon-fx').textContent = T(`perk.${id}.fx`);
       card.querySelector('.boon-note').textContent = T(perk.once ? 'crate.once' : 'crate.untilEnd');

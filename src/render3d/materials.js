@@ -50,6 +50,7 @@ export function createMaterials() {
       vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     }),
     crystal: new THREE.MeshBasicMaterial({ color: 0x9fe4ff, vertexColors: true }),
+    toxic: new THREE.MeshBasicMaterial({ color: 0x8dff5a, vertexColors: true }), // poison turret tanks (glow)
     frostRing: new THREE.MeshBasicMaterial({
       color: 0x8fd4ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     }),

@@ -79,6 +79,16 @@ const RECIPES = {
       return zap + lp * 0.18 * Math.exp(-t * 28);
     });
   },
+  // Poison Turret round (D51): a wet, low "spit" with a short bubbling tail.
+  poisonShot: () => {
+    let lp = 0;
+    return render(0.2, (t) => {
+      lp += (noise() - lp) * 0.22;
+      const blob = Math.sin(2 * Math.PI * (300 - 700 * t) * t) * Math.exp(-t * 26) * 0.2;
+      const bubble = Math.sin(2 * Math.PI * 90 * t) * Math.sin(2 * Math.PI * 23 * t) * Math.exp(-t * 14) * 0.08;
+      return blob + bubble + lp * 0.16 * Math.exp(-t * 30);
+    });
+  },
   // Frost coil pulse: icy chime + airy hiss.
   frostPulse: () => {
     let lp = 0;

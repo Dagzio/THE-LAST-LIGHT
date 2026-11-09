@@ -10,6 +10,8 @@ export const Music = (() => {
   let src = null, cur = null, pend = null, busy = false, retry = false;
   // Only the current track stays decoded (a 3.5-min stereo track is ~77 MB of PCM — two would be too much for phones).
   let cacheUrl = null, cacheBuf = null, last = null;
+  // Music bed (2026-11-09): a quiet bass loop under the tracks — same gain node (Hush / switch / suspend apply to it)
+  let bed = null, bedBuf = null, bedSrc = null, bedLoading = false;
   const LIFE = ['hidden', 'blur'];
   const Life = new Set(); // page hidden / unfocused → suspend() (only these two reasons!)
   const Hush = new Set(); // 'orientation', 'exitPopup' … → volume 0, context keeps running
@@ -56,6 +58,35 @@ export const Music = (() => {
     play(buf, 0);
   }
 
+  /** Starts the bass loop once per context (decoded once; the AudioBuffer survives an iPhone rebuild). */
+  function startBed() {
+    const a = ac;
+    if (!bed || !a || bedSrc) return;
+    if (!bedBuf) {
+      if (bedLoading) return;
+      bedLoading = true;
+      loadBuf(a, bed.file).then((b) => {
+        bedLoading = false;
+        bedBuf = b;
+        if (b && a === ac && on && Life.size === 0) startBed();
+      });
+      return;
+    }
+    try {
+      const s = a.createBufferSource();
+      s.buffer = bedBuf;
+      s.loop = true;
+      s.loopStart = Math.min(bed.loopStart || 0, bedBuf.duration);
+      s.loopEnd = Math.min(bed.loopEnd || bedBuf.duration, bedBuf.duration);
+      const g = a.createGain();
+      g.gain.value = bed.gain;
+      s.connect(g);
+      g.connect(gain);
+      s.start(0, s.loopStart);
+      bedSrc = s;
+    } catch (e) { /* no bed is fine */ }
+  }
+
   function level() {
     const t = ac.currentTime;
     gain.gain.cancelScheduledValues(t);
@@ -77,13 +108,14 @@ export const Music = (() => {
     if (on && Life.size === 0) {
       if (a.state === 'suspended' || a.state === 'interrupted') { a.resume().catch(() => {}); armRetry(); }
       if (!src) { if (pend) { play(pend.buf, pend.off % pend.buf.duration); pend = null; } else next(); }
+      startBed();
     } else if (a.state === 'running') a.suspend().catch(() => {}); // track position is kept
   }
 
   return {
     ctx,
     sync,
-    init(tracks) { list = shuffle(tracks.slice()); i = 0; },
+    init(tracks, bedCfg = null) { list = shuffle(tracks.slice()); i = 0; bed = bedCfg; },
     start() { started = true; sync(); }, // first time — start, then a cheap sync
     pause(r) { (LIFE.includes(r) ? Life : Hush).add(r); sync(); },
     resume(r) { Life.delete(r); Hush.delete(r); sync(); },
@@ -91,6 +123,7 @@ export const Music = (() => {
     reset() {
       if (cur) pend = { buf: cur.buf, off: place() };
       if (src) { src.onended = null; try { src.stop(); } catch (e) { /* stopped */ } src = null; }
+      if (bedSrc) { try { bedSrc.stop(); } catch (e) { /* stopped */ } bedSrc = null; } // restarts in the new context
       cur = null;
       closeCtx(ac); ac = null; gain = null;
       disarm();

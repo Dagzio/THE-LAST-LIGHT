@@ -36,6 +36,19 @@ export const DEFENSES = {
   },
 };
 
+// Poison Turret (D51, 2026-11-09): greenish rounds — half the Guard damage on hit, then poison: small damage every
+// 0.5 s for a few seconds (a new hit refreshes it, never stacks; poison ignores armour). Shop 68 → L2 58 → L3 85.
+DEFENSES.poison_turret = {
+  id: 'poison_turret', nameKey: 'defense.poison_turret', price: 80,
+  projectileSpeed: 560, spreadAngle: 2, pelletsPerShot: 1, critChance: 0, critMultiplier: 1.5, penetrationCount: 0,
+  muzzleHeight: 38, muzzleOffset: 16, barrelGap: 9,
+  levels: [
+    { damage: GUARD_LEVELS[0].damage * 0.5, barrels: 1, fireInterval: 0.65, range: 215, poisonDps: 2, poisonDuration: 3, poisonTick: 0.5 },
+    { damage: GUARD_LEVELS[1].damage * 0.5, barrels: 2, fireInterval: 0.65, range: 215, poisonDps: 3, poisonDuration: 3.5, poisonTick: 0.5, upgradePrice: 68 },
+    { damage: GUARD_LEVELS[2].damage * 0.5, barrels: 2, fireInterval: 0.5, range: 235, poisonDps: 4, poisonDuration: 4, poisonTick: 0.5, upgradePrice: 100 },
+  ],
+};
+
 export const getDefense = (id) => DEFENSES[id] || null;
 
 const statsCache = new Map();

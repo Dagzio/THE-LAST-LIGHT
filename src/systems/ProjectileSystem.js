@@ -61,12 +61,15 @@ export class ProjectileSystem {
       const hx = sx + ex * hitT, hy = sy + ey * hitT;
       this.events.emit('hit', hx, hy, r.amount, r.crit);
       if (killed) this.events.emit('kill', hit, time);
-      else if (stats.slowOnHit > 0) hit.applySlow(stats.slowOnHit, stats.slowDuration, time); // Frost Coil rounds (D50)
-      else if (stats.knockback > 0 && !hit.type.boss) { // HEAVY_IMPACT perk: a small shove along the bullet
-        const v = Math.hypot(p.vx, p.vy) || 1;
-        hit.pushVX = (p.vx / v) * (stats.knockback / 0.12);
-        hit.pushVY = (p.vy / v) * (stats.knockback / 0.12);
-        hit.pushUntil = time + 0.12;
+      else {
+        if (stats.slowOnHit > 0) hit.applySlow(stats.slowOnHit, stats.slowDuration, time); // Frost Coil rounds (D50)
+        if (stats.poisonDps > 0) hit.applyPoison(stats.poisonDps, stats.poisonDuration, stats.poisonTick, time); // D51
+        if (stats.knockback > 0 && !hit.type.boss) { // HEAVY_IMPACT perk: a small shove along the bullet
+          const v = Math.hypot(p.vx, p.vy) || 1;
+          hit.pushVX = (p.vx / v) * (stats.knockback / 0.12);
+          hit.pushVY = (p.vy / v) * (stats.knockback / 0.12);
+          hit.pushUntil = time + 0.12;
+        }
       }
       if (p.hitsLeft <= 0) { this.pool.release(p); return; }
     }

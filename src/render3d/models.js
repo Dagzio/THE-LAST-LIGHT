@@ -523,6 +523,47 @@ export function coilHeadGeometry(level = 1) {
   return mergeParts(P);
 }
 
+// Poison Turret (D51): a dark-green sprayer on a plinth with glowing toxic tanks (more tanks per level).
+const PZ = { body: '#3f5240', dark: '#26302a', metal: '#5b616b', hazard: '#d8b032', hose: '#1c221e' };
+const tankSpots = (level) => [[-10, 11], [-10, -11], [10, 12], [10, -12]].slice(0, level + 1);
+
+/** Poison Turret base (static): plinth + caps/hoses of the tanks; L3 a hazard band. */
+export function poisonBaseGeometry(level = 1) {
+  const P = [part(new THREE.CylinderGeometry(19, 23, 10, 10), PZ.dark, { y: 11 })];
+  P.push(part(new THREE.CylinderGeometry(6, 7, 20, 10), PZ.body, { y: 25 }));
+  for (const [x, z] of tankSpots(level)) {
+    P.push(part(new THREE.CylinderGeometry(4.6, 4.6, 1.6, 10), PZ.metal, { x, y: 17, z }));  // tank foot
+    P.push(part(new THREE.CylinderGeometry(4.6, 4.6, 1.6, 10), PZ.metal, { x, y: 30, z }));  // tank cap
+    P.push(limb([x * 0.6, 30, z * 0.6], [x * 0.25, 33, z * 0.25], 1.4, PZ.hose));          // hose to the post
+  }
+  if (level >= 3) P.push(part(new THREE.TorusGeometry(21.4, 1.3, 5, 16), PZ.hazard, { y: 15.8, rx: Math.PI / 2 }));
+  return mergeParts(P);
+}
+
+/** Toxic tanks on the base (glowing material, static). */
+export function poisonTanksGeometry(level = 1) {
+  return mergeParts(tankSpots(level).map(([x, z]) => part(new THREE.CylinderGeometry(4, 4, 11.4, 10), '#ffffff', { x, y: 23.5, z })));
+}
+
+/** Poison Turret head (rotates; faces +X): a sprayer — one nozzle at L1, twin at L2, long twin with a drum at L3. */
+export function poisonHeadGeometry(level = 1) {
+  const P = [part(new THREE.SphereGeometry(9, 12, 8), PZ.body, { y: 39, sy: 0.75 })];
+  P.push(part(new THREE.BoxGeometry(12, 6, level >= 2 ? 18 : 12), PZ.dark, { x: 3, y: 39 }));
+  const zs = level >= 2 ? [-4.5, 4.5] : [0];
+  const len = level >= 3 ? 20 : 15;
+  for (const z of zs) {
+    P.push(barrel(len, 2, 8 + len / 2, 40, z, PZ.metal));
+    P.push(part(new THREE.ConeGeometry(3.4, 4.5, 10), PZ.dark, { x: 9 + len, y: 40, z, rz: -Math.PI / 2 })); // spray nozzle
+  }
+  if (level >= 3) P.push(part(new THREE.CylinderGeometry(4.6, 4.6, 7, 12), PZ.hazard, { x: -4, y: 39, z: 0, rx: Math.PI / 2 }));
+  return mergeParts(P);
+}
+
+/** Small toxic vial on top of the head (glowing, turns with the head). */
+export function poisonVialGeometry(level = 1) {
+  return mergeParts([part(new THREE.CylinderGeometry(2.6 + level * 0.3, 2.6 + level * 0.3, 7, 10), '#ffffff', { x: -3, y: 47 })]);
+}
+
 /** Frost Coil crystal (emissive, spins above the head): bigger with the level, a cluster of three at L3. */
 export function coilCrystalGeometry(level = 1) {
   const s = level >= 2 ? 1.15 : 1;
@@ -770,6 +811,10 @@ export function buildShowcase(materials, rng) {
     coil.add(new THREE.Mesh(coilGeometry(lv), materials.character), new THREE.Mesh(coilHeadGeometry(lv), materials.character),
       new THREE.Mesh(coilCrystalGeometry(lv), materials.crystal));
     out.set(`frost-coil-lv${lv}`, tag(coil, `frost-coil-lv${lv}`));
+    const poison = new THREE.Group();
+    poison.add(new THREE.Mesh(poisonBaseGeometry(lv), materials.character), new THREE.Mesh(poisonTanksGeometry(lv), materials.toxic),
+      new THREE.Mesh(poisonHeadGeometry(lv), materials.character), new THREE.Mesh(poisonVialGeometry(lv), materials.toxic));
+    out.set(`poison-turret-lv${lv}`, tag(poison, `poison-turret-lv${lv}`));
   }
   for (const id of WEAPON_MODEL_IDS) out.set(`weapon-${id}`, tag(new THREE.Mesh(weaponGeometry(id), materials.character), `weapon-${id}`));
   const crate = new THREE.Group();
