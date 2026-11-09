@@ -37,6 +37,7 @@ export class Game {
     this.renderer3d = null;
     try {
       this.renderer3d = new Renderer3D(canvas3d, this.quality);
+      this.renderer3d.aimClient = () => this.input.aim; // live cursor / finger for the reticle (read-only)
     } catch (e) {
       console.error('WebGL renderer could not be created', e); // the menus keep working; a map cannot start
     }
@@ -106,8 +107,11 @@ export class Game {
   render(alpha, frameDt) {
     this.presentationTime += frameDt;
     if (this.sm.inMap && this.run && this.renderer3d) {
-      this.renderer3d.render(this.run, frameDt, this.clock.time, !this.sm.is(STATES.RUNNING));
+      this.renderer3d.render(this.run, frameDt, this.clock.time, !this.sm.is(STATES.RUNNING), alpha);
+    } else if (this.renderer3d && this.renderer3d.renderMenu(this.presentationTime, frameDt)) {
+      document.body.classList.add('menu3d'); // D46: the 3D lighthouse scene is the menu backdrop
     } else {
+      document.body.classList.remove('menu3d');
       this.viewport.ensure();
       const v = this._view;
       v.realTime = this.presentationTime;
@@ -323,10 +327,35 @@ export class Game {
   shopRepairBeacon() {
     const o = this.repairOffer();
     if (!o.canBuy) return { ok: false, reason: o.reason };
-    if (!this.economy.spend(o.cost)) return { ok: false, reason: REASON.COINS };
+    return this._repairBeacon(o.cost);
+  }
+
+  /**
+   * HUD repair button (D46): the same full repair at the same price, available any time while the map runs
+   * (also during a wave), without going to the kiosk.
+   */
+  hudRepairOffer() {
+    const run = this.run;
+    const cost = run ? run.beaconRepairCost() : 0;
+    const o = { cost, canBuy: false, reason: null };
+    if (!run || run.over || !this.sm.is(STATES.RUNNING)) o.reason = REASON.CLOSED;
+    else if (cost <= 0) o.reason = 'full';
+    else if (this.economy.coins < cost) o.reason = REASON.COINS;
+    else o.canBuy = true;
+    return o;
+  }
+
+  hudRepairBeacon() {
+    const o = this.hudRepairOffer();
+    if (!o.canBuy) return { ok: false, reason: o.reason };
+    return this._repairBeacon(o.cost);
+  }
+
+  _repairBeacon(cost) {
+    if (!this.economy.spend(cost)) return { ok: false, reason: REASON.COINS };
     const b = this.run.beacon;
     b.repair(b.maxIntegrity - b.integrity);
-    this.events.emit('purchase', 'repair', o.cost);
+    this.events.emit('purchase', 'repair', cost);
     return { ok: true };
   }
 
@@ -352,6 +381,14 @@ export class Game {
     this.clock.reset();
     this.viewport.invalidate();
     return this.sm.set(STATES.MAIN_MENU);
+  }
+
+  /** Pause → EXIT (confirmed, D46): leave the map straight to map select, the same map stays selected. */
+  exitToMapSelect() {
+    const id = this.mapId;
+    if (!this.exitToMenu()) return false;
+    this.selectedMapId = id && this.isMapUnlocked(id) ? id : defaultMapSelection(this.economy.profile);
+    return this.sm.set(STATES.MAP_SELECT);
   }
 
   _disposeRun() {

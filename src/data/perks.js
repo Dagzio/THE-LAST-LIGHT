@@ -3,8 +3,8 @@
 // it disappears after 30 s.
 
 export const CRATE = {
-  chance: 0.30,
-  firstWaveIndex: 1,        // wave 2 (0-based index)
+  chance: 0.35,             // D46: 30 % + 5 %
+  firstWaveIndex: 1,        // wave 2 (0-based index); a map can override it (map.crateFirstWaveIndex, D46: map 1 → wave 3)
   maxPerMap: 1,
   spawnWithin: 15,          // s — appears at a random moment in the first seconds of the wave
   lifetime: 30,             // s, then it disappears (timer shown above it)

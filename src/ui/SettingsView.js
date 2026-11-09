@@ -3,7 +3,7 @@
 import { T, getLang, setLang, onLanguageChange } from '../i18n/i18n.js';
 import { LANGS, LANG_NAMES } from '../i18n/locales.js';
 import { QUALITY_LEVELS } from '../config/settings.js';
-import { BUILD_VERSION } from '../config/constants.js';
+import { toggleFullscreen, isFullscreen, fullscreenSupported } from '../platform/Fullscreen.js';
 import { Sfx } from '../platform/Sfx.js';
 import { Music } from '../platform/Music.js';
 
@@ -20,8 +20,15 @@ export class SettingsView {
     this.slider = document.getElementById('qualitySlider');
     this.qualityName = document.getElementById('qualityName');
     this.langGrid = document.getElementById('langGrid');
-    this.buildLabel = document.getElementById('buildLabel');
+    this.fsBtn = document.getElementById('toggleFullscreen'); // D46 (removed on iOS, like every fullscreen control)
     this.current = 'audio';
+    if (!fullscreenSupported()) { this.fsBtn.remove(); this.fsBtn = null; } else {
+      this.fsBtn.addEventListener('click', () => toggleFullscreen());
+      const sync = () => this.fsBtn && this.fsBtn.setAttribute('aria-checked', isFullscreen() ? 'true' : 'false');
+      document.addEventListener('fullscreenchange', sync);
+      document.addEventListener('webkitfullscreenchange', sync);
+      window.addEventListener('resize', sync);
+    }
 
     this.tabs.forEach((tab) => tab.addEventListener('click', () => this.showTab(tab.dataset.tab)));
     this.soundBtn.addEventListener('click', () => { Sfx.set(!Sfx.on); this.refresh(); });
@@ -38,10 +45,13 @@ export class SettingsView {
 
   /** @param {{inGame:boolean}} opts */
   prepare({ inGame }) {
-    // GAME tab (reset progress) only from the main menu.
-    const gameTab = this.tabs.find((t) => t.dataset.tab === 'game');
-    gameTab.hidden = inGame;
-    this.showTab(inGame && this.current === 'game' ? 'audio' : this.current);
+    // GAME tab (reset progress) only from the main menu; EXIT tab (leave the map) only in the pause menu (D46).
+    this.tabs.find((t) => t.dataset.tab === 'game').hidden = inGame;
+    this.tabs.find((t) => t.dataset.tab === 'exit').hidden = !inGame;
+    let tab = this.current;
+    if (inGame && tab === 'game') tab = 'audio';
+    if (!inGame && tab === 'exit') tab = 'audio';
+    this.showTab(tab);
     this.refresh();
   }
 
@@ -67,7 +77,7 @@ export class SettingsView {
     this.slider.setAttribute('aria-valuenow', String(idx));
     this.slider.classList.toggle('disabled', auto);
     this.qualityName.textContent = T(`quality.${this.game.quality}`);
-    this.buildLabel.textContent = T('settings.build', { v: BUILD_VERSION });
+    if (this.fsBtn) this.fsBtn.setAttribute('aria-checked', isFullscreen() ? 'true' : 'false');
     const lang = getLang();
     this.langGrid.querySelectorAll('.lang-item').forEach((b) => b.classList.toggle('on', b.dataset.lang === lang));
   }

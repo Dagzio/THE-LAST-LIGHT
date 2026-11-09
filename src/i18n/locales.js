@@ -23,6 +23,13 @@ const ROWS = [
   ['aria.exit', 'Exit to menu', 'Вийти в меню', 'Выйти в меню', 'Zum Menü', 'Esci al menu', 'Retour au menu', 'Salir al menú', 'Sair para o menu', 'الخروج إلى القائمة', 'メニューへ戻る'],
   ['aria.close', 'Close', 'Закрити', 'Закрыть', 'Schließen', 'Chiudi', 'Fermer', 'Cerrar', 'Fechar', 'إغلاق', '閉じる'],
   ['aria.back', 'Back', 'Назад', 'Назад', 'Zurück', 'Indietro', 'Retour', 'Atrás', 'Voltar', 'رجوع', '戻る'],
+  // D46: pause EXIT tab, fullscreen setting
+  ['tab.exit', 'EXIT', 'ВИХІД', 'ВЫХОД', 'BEENDEN', 'ESCI', 'QUITTER', 'SALIR', 'SAIR', 'خروج', '終了'],
+  ['exit.title', 'LEAVE THE MAP', 'ПОКИНУТИ КАРТУ', 'ПОКИНУТЬ КАРТУ', 'KARTE VERLASSEN', 'LASCIA LA MAPPA', 'QUITTER LA CARTE', 'SALIR DEL MAPA', 'SAIR DO MAPA', 'مغادرة الخريطة', 'マップを離れる'],
+  ['exit.hint', 'The attempt ends. Coins and XP you earned stay.', 'Спроба завершиться. Зароблені монети й досвід залишаться.', 'Попытка закончится. Заработанные монеты и опыт останутся.', 'Der Versuch endet. Verdiente Münzen und EP bleiben.', 'Il tentativo finisce. Monete ed esperienza guadagnate restano.', 'La tentative s’arrête. Les pièces et l’XP gagnées restent.', 'El intento termina. Las monedas y la experiencia ganadas se quedan.', 'A tentativa termina. As moedas e o XP ganhos ficam.', 'تنتهي المحاولة، وتبقى العملات والخبرة التي ربحتها.', '挑戦は終了。獲得したコインと経験値は残ります。'],
+  ['exit.btn', 'TO MAP SELECT', 'ДО ВИБОРУ КАРТИ', 'К ВЫБОРУ КАРТЫ', 'ZUR KARTENWAHL', 'SCEGLI MAPPA', 'CHOIX DE CARTE', 'ELEGIR MAPA', 'ESCOLHER MAPA', 'اختيار الخريطة', 'マップ選択へ'],
+  ['video.fullscreen', 'Fullscreen', 'Повний екран', 'Полный экран', 'Vollbild', 'Schermo intero', 'Plein écran', 'Pantalla completa', 'Tela cheia', 'ملء الشاشة', '全画面表示'],
+  ['aria.repair', 'Repair the beacon', 'Полагодити маяк', 'Починить маяк', 'Leuchtturm reparieren', 'Ripara il faro', 'Réparer le phare', 'Reparar el faro', 'Reparar o farol', 'إصلاح المنارة', '灯台を修理'],
   ['aria.prevPage', 'Previous page', 'Попередня сторінка', 'Предыдущая страница', 'Vorherige Seite', 'Pagina precedente', 'Page précédente', 'Página anterior', 'Página anterior', 'الصفحة السابقة', '前のページ'],
   ['aria.nextPage', 'Next page', 'Наступна сторінка', 'Следующая страница', 'Nächste Seite', 'Pagina successiva', 'Page suivante', 'Página siguiente', 'Próxima página', 'الصفحة التالية', '次のページ'],
 

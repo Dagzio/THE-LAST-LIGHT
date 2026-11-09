@@ -7,6 +7,7 @@ import { WAVE_PHASE } from '../systems/WaveSystem.js';
 import { levelProgress } from '../data/progression.js';
 import { STATES } from '../core/GameStateMachine.js';
 import { INTROS, INTRO_SECONDS } from '../data/intros.js';
+import { WAVE_TIMING } from '../data/waves.js';
 
 const KIOSK_LABEL_HEIGHT = 74; // world height above the kiosk where its label sits
 
@@ -50,6 +51,8 @@ export class HUD {
       boss: $('hudBoss'),
       bossFill: $('hudBossFill'),
       bossName: $('hudBossName'),
+      repair: $('hudRepair'),
+      repairCost: $('hudRepairCost'),
       intro: $('introCard'),
       introIco: $('introIco'),
       introKicker: $('introKicker'),
@@ -72,6 +75,8 @@ export class HUD {
       gBtnCount: $('grenadeBtnCount'),
     };
     this.pt = { x: 0, y: 0 };
+    // START NEXT WAVE shows its early-start bonus (D46), from the data
+    for (const b of document.querySelectorAll('.wave-bonus b')) b.textContent = `+${WAVE_TIMING.earlyStartBonus}`;
     // Bottom edge of the top HUD block, measured only when it can change (layout reads stay rare).
     this.hudTopDirty = true;
     this.hudTopBottom = 0;
@@ -261,6 +266,15 @@ export class HUD {
     if (hit !== c.hit) { c.hit = hit; el.beacon.classList.toggle('hit', hit); }
     const low = b.integrity / b.maxIntegrity <= 0.3;
     if (low !== c.low) { c.low = low; el.beacon.classList.toggle('low', low); }
+    // D46: wrench repair button next to the bar while the beacon is damaged; dimmed when the coins are short
+    const ro = this.game.hudRepairOffer();
+    const repairOn = !run.over && ro.cost > 0;
+    if (repairOn !== c.repairOn) { c.repairOn = repairOn; el.repair.hidden = !repairOn; this.hudTopDirty = true; }
+    if (repairOn) {
+      if (ro.cost !== c.repairCost) { c.repairCost = ro.cost; el.repairCost.textContent = String(ro.cost); }
+      const can = ro.canBuy;
+      if (can !== c.repairCan) { c.repairCan = can; el.repair.classList.toggle('poor', !can); }
+    }
 
     // Wave header
     const ws = run.waves;

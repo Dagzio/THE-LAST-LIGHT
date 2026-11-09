@@ -25,6 +25,7 @@ export const MAPS = [
     waveCount: 5,
     finalWaveBoss: true,
     completionReward: 50, // coins, once on victory (03_ECONOMY §4)
+    crateFirstWaveIndex: 2, // D46: on the first map crates start with wave 3 (the player learns the basics first)
     enemyMult: 1.0,
     rewardMult: 1.0,
     artSeed: 7331, // cosmetic decoration layout of the arena ground

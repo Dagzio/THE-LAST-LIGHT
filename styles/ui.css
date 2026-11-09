@@ -1,21 +1,27 @@
 /* ===== THE LAST LIGHT — UI components & menu screens (Underlords-style layout, H5 behaviour) ===== */
 
-/* ---------- Round icon button with a thin light ring ---------- */
-.ring-btn {
+/* ---------- Icon buttons (D46): square, grey like the flat NO button, white icon with a 1 px dark outline ----------
+   .ring-btn keeps its name (used everywhere); .sq-btn is the same look for new buttons. */
+.ring-btn, .sq-btn {
   width: var(--ring);
   height: var(--ring);
   flex: none;
-  border-radius: 50%;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #eceeff;
-  background: radial-gradient(circle at 50% 32%, var(--c-indigo-hi) 0%, var(--c-indigo) 58%, var(--c-indigo-lo) 100%);
-  border: 2px solid var(--c-ring);
-  box-shadow: 0 0 0 3px rgba(10, 12, 30, 0.55), 0 6px 14px rgba(0, 0, 0, 0.45), inset 0 0 12px rgba(140, 150, 255, 0.35);
-  transition: transform 0.08s, filter 0.12s;
+  color: #fff;
+  background: linear-gradient(180deg, #949fa8 0%, #7a858e 55%, #6a747d 100%);
+  border: 1px solid rgba(20, 22, 26, 0.65);
+  box-shadow: 0 3px 0 #3d444a, 0 6px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition: transform 0.08s, filter 0.12s, box-shadow 0.08s;
 }
-.ring-btn:active { transform: translateY(2px) scale(0.96); filter: brightness(0.85); }
+.ring-btn .ico, .sq-btn .ico, .neon-btn .ico {
+  stroke: #fff;
+  /* 1 px dark outline around the white icon lines (four hard shadows = an outline, static → composited once) */
+  filter: drop-shadow(1px 0 0 #1f2328) drop-shadow(-1px 0 0 #1f2328) drop-shadow(0 1px 0 #1f2328) drop-shadow(0 -1px 0 #1f2328);
+}
+.ring-btn:active, .sq-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #3d444a, 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2); filter: brightness(0.9); }
 .ring-btn .ico-fs-exit { display: none; }
 .ring-btn.on .ico-fs-enter { display: none; }
 .ring-btn.on .ico-fs-exit { display: block; }
@@ -167,14 +173,38 @@
   justify-content: center;
   gap: calc(28px * var(--fs));
 }
-/* Carousel (D45): the arrows sit on the card's edges (half over it) so the card stays big on a 640 px phone */
-.map-carousel { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(14px * var(--fs)); }
-.map-carousel-row { position: relative; max-width: 100%; display: flex; align-items: center; justify-content: center; padding: 0 calc(var(--ring) / 2 + 4px); }
-.map-arrow { position: absolute; top: 50%; translate: 0 -50%; z-index: 2; }
-.map-arrow[data-action="mapPrev"] { left: 0; }
-.map-arrow[data-action="mapNext"] { right: 0; }
+/* Carousel (D45 → D46): desktop — arrows 30 px off the card's sides, card twice as large (600 px); phones — the arrows
+   go under the card next to the dots (with side arrows a 640 px phone would leave a ~100 px card). The card is sized
+   from the carousel's own width (container query units) and the screen height. */
+.map-carousel {
+  flex: 1; min-width: 0; height: 100%;
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  grid-template-areas: "prev card next" ". dots .";
+  column-gap: 30px;
+  row-gap: calc(14px * var(--fs));
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+  justify-items: center;
+  --card: min(calc(600px * var(--fs)), calc(100dvh - var(--safe-t) - var(--safe-b) - 40px), calc(100cqw - 2 * (var(--ring) + 30px)));
+}
+.map-prev { grid-area: prev; }
+.map-next { grid-area: next; }
+.map-grid { grid-area: card; }
+.map-dots { grid-area: dots; }
 .map-arrow:disabled { opacity: 0.3; pointer-events: none; }
-.map-dots { display: flex; gap: 12px; align-items: center; }
+@media (max-height: 500px) {
+  .map-carousel {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas: "card card card" "prev dots next";
+    column-gap: 16px;
+    row-gap: 10px;
+    --card: min(100cqw, calc(100dvh - var(--safe-t) - var(--safe-b) - var(--ring) - 10px));
+  }
+}
+.map-dots { display: flex; gap: 12px; align-items: center; justify-content: center; }
 .map-dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); transition: transform 0.15s; }
 .map-dots i.open { background: #e3e6ff; }
 .map-dots i.cleared { background: #ffd27a; }
@@ -182,9 +212,8 @@
 .map-grid { min-width: 0; display: flex; align-items: center; justify-content: center; }
 .map-card {
   position: relative;
-  /* square: never taller than the screen allows (dots + safe margins), never wider than the carousel */
-  width: min(calc(300px * var(--fs)), calc(100dvh - var(--safe-t) - var(--safe-b) - 36px));
-  max-width: 100%;
+  /* square, sized by the carousel (--card): never taller than the screen, never wider than the carousel */
+  width: var(--card);
   aspect-ratio: 1 / 1;
   overflow: hidden;
   background: #0d1016;
@@ -201,7 +230,7 @@
   font-family: var(--font-display);
   font-weight: 800;
   font-stretch: condensed;
-  font-size: calc(30px * var(--fs));
+  font-size: clamp(16px, calc(var(--card) * 0.075), 44px); /* grows with the card (D46: 2× card) */
   letter-spacing: 0.03em;
   white-space: nowrap; /* one line; UIManager shrinks long names */
   overflow: hidden;
@@ -343,6 +372,7 @@
   color: #c6ccd2;
   text-align: left;
 }
+.check-pair { display: flex; flex-wrap: wrap; gap: 8px 40px; }
 .check { width: 26px; height: 26px; flex: none; border: 2px solid var(--c-orange); transition: background 0.1s; }
 .check-row[aria-checked="true"] { color: #fff; }
 .check-row[aria-checked="true"] .check { background: var(--c-orange); }
@@ -366,7 +396,10 @@
 .qslider-value { color: #fff; font-family: var(--font-display); font-weight: 800; text-transform: uppercase; }
 
 /* Language list (H5 §8: text only, no flags) */
-.lang-grid { width: 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+/* D46: the Language page is centred — title and the 5 × 2 grid in the middle of the panel */
+.tab-page[data-page="language"] { align-items: center; }
+.tab-page[data-page="language"] .section-title { text-align: center; }
+.lang-grid { width: min(100%, 860px); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .lang-item {
   min-height: 48px;
   padding: 0 6px;
@@ -386,14 +419,17 @@
   position: relative;
   width: min(640px, 100%);
   max-height: 100%;
-  padding: var(--pad);
-  padding-top: calc(var(--pad) + var(--close) * 0.5);
+  /* equal top / bottom room (the close button sits in the corner), light frame (D46) */
+  padding: calc(var(--pad) + var(--close) * 0.5) var(--pad);
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid rgba(235, 240, 248, 0.28);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 .credits-panel .ring-close { position: absolute; top: 16px; right: 16px; margin: 0; }
-.credits-logo { width: min(440px, 70%); max-height: 50vh; object-fit: contain; }
+/* optical centre: a logo reads centred a little above the geometric middle */
+.credits-logo { width: min(440px, 70%); max-height: 50vh; object-fit: contain; translate: 0 -6%; }
 
 /* Confirmation */
 .confirm-panel {
@@ -417,12 +453,13 @@
   .build-label { display: none; } /* tabs need the whole row on phones */
   .tab { padding: 0 0.55em; }
   .tab-page { gap: 12px; }
-  .map-info { gap: 8px; padding: 16px 20px; }
-  .map-info-name { font-size: 26px; }
+  .map-info { gap: 6px; padding: 12px 16px; }
+  .map-info-name { font-size: 24px; }
   .map-info-desc { font-size: 14px; line-height: 1.3; }
-  .map-info-facts { flex-direction: row; flex-wrap: wrap; }
-  .map-info-facts li { font-size: 15px; }
+  .map-info-facts { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .map-info-facts li { font-size: 14px; padding: 0.35em 0.6em; }
   .map-side { gap: 10px; }
+  .brush-cta { font-size: 36px; } /* D46: room for a two-line "Clear … to unlock" in the panel */
 }
 @media (max-height: 359px) {
   .tab-page { gap: 8px; }
@@ -434,7 +471,7 @@
 /* ---------- Hover only for real pointers (no sticky hover on touch) ---------- */
 @media (hover: hover) {
   .menu-item:hover { color: var(--c-gold); }
-  .ring-btn:hover { filter: brightness(1.15); }
+  .ring-btn:hover, .sq-btn:hover { filter: brightness(1.1); }
   .brush-btn:hover { filter: brightness(1.12); }
   .flat-btn:hover { filter: brightness(1.08); }
   .tab:hover { color: #fff; }

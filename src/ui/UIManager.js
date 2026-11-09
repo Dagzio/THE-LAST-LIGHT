@@ -166,7 +166,7 @@ export class UIManager {
       this.game.resetProgress();
     } else if (kind === 'exit') {
       this._closeAll();
-      this.game.exitToMenu();
+      this.game.exitToMapSelect(); // D46: back to map select, not the main menu
     } else if (kind === 'skipTutorial') {
       this._close('confirm');
       this.game.tutorial.skip();
@@ -200,6 +200,7 @@ export class UIManager {
       case 'resultMenu': this.game.exitToMenu(); break; // the map is already over: nothing to lose, no confirmation
       case 'startNextWave': this.game.startNextWave(); break;
       case 'flare': this.game.useFlare(); break;
+      case 'repairBeacon': Sfx.play(this.game.hudRepairBeacon().ok ? 'buy' : 'deny'); break; // D46: HUD wrench
       case 'openShop': if (!this.game.openShop()) Sfx.play('deny'); break; // glows only when it can open
       case 'closeShop': this.game.closeShop(); break;
       case 'openCrate': if (!this.game.openCrate()) Sfx.play('deny'); break;
@@ -217,25 +218,26 @@ export class UIManager {
     this._rebuildMapCards();
   }
 
-  /** Maps the carousel can show: every unlocked map + the first locked one. */
-  _visibleMaps() {
-    const unlocked = this.game.economy.profile.unlockedMaps;
-    const out = [];
-    for (const m of MAPS) {
-      out.push(m);
-      if (!unlocked.includes(m.id)) break;
-    }
-    return out;
-  }
+  /** Maps the carousel shows (D46): the whole campaign — locked maps are browsable, but dark with a lock. */
+  _visibleMaps() { return MAPS; }
 
+  /**
+   * Card preview: the painted 2D version at once, then (next tick) a real top-down render of the map's 3D scene
+   * drawn over it (D46). Both cached per map.
+   */
   _thumb(map) {
     let c = this.thumbs.get(map.id);
     if (!c) {
       c = document.createElement('canvas');
-      c.width = 320;
-      c.height = 320;
+      c.width = c.height = Math.min(640, Math.round(320 * Math.min(2, window.devicePixelRatio || 1)));
       drawMapPreview(c, map, layoutProps(map));
       this.thumbs.set(map.id, c);
+      setTimeout(() => {
+        const r3 = this.game.renderer3d;
+        if (!r3 || this.game.sm.inMap) return;
+        const img = r3.renderMapPreview(map, c.width);
+        if (img) c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      }, 30);
     }
     return c;
   }

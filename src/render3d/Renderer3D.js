@@ -21,6 +21,7 @@ import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
 import { BEACON } from '../data/beacon.js';
 import { getBossPattern } from '../data/boss.js';
 import { getTheme } from '../data/themes.js';
+import { MenuScene } from './MenuScene.js';
 import { FLARE } from '../data/balance.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { CAMERA } from '../config/camera.js';
@@ -57,6 +58,7 @@ const E = new THREE.Euler();
 const ASH = new THREE.Color(0.06, 0.055, 0.065); // dead bodies darken to ash before they crumble
 const TINT = new THREE.Color();
 const ZERO = new THREE.Vector3(0, 0, 0);
+const AIM_PT = { x: 0, y: 0 };
 const CASTING = new THREE.Color(1.35, 1.0, 1.7); // boss tint while an attack is telegraphed
 const MAX_BULLETS = 192;
 const RELOAD_SEGMENTS = 16;
@@ -288,6 +290,13 @@ export class Renderer3D {
   loadMap(map, spawnX, spawnY) {
     this.unloadMap();
     this.map = map;
+    // A new run restarts the game clock at 0: drop every clock-based presentation state of the previous run
+    // (an old shake end time made the camera fly off after RETRY).
+    this.shakeUntil = 0;
+    this.lastSyncTime = 0;
+    this.walk.lastTime = 0;
+    this.walk.blend = 0;
+    this.yaws.clear();
     this._applyTheme(getTheme(map.theme));
     this.env = buildEnvironment(map, this.mats);
     this.env.groundTexture.anisotropy = QUALITY_PRESETS[this.quality].aniso;
@@ -311,6 +320,74 @@ export class Renderer3D {
     this.hemi.intensity = T.hemi[2];
     this.moon.color.set(T.moon[0]);
     this.moon.intensity = T.moon[1];
+  }
+
+  /**
+   * Menu backdrop in 3D (D46): splash, main menu and map select. Built on first use, kept for later visits.
+   * @returns {boolean} false while the renderer is busy (context lost / warm-up) — the 2D backdrop is drawn instead
+   */
+  renderMenu(t, frameDt) {
+    if (this.guard.busy() || this.env) return false;
+    if (!this.menu) {
+      this.menu = new MenuScene(this.quality, this.mats);
+      this.renderer.compile(this.menu.scene, this.menu.camera); // warm the shaders once
+    }
+    this._resize(false);
+    this.menu.setAspect(this.camera.aspect);
+    this.menu.update(t);
+    this.renderer.render(this.menu.scene, this.menu.camera);
+    this._adapt(frameDt);
+    return true;
+  }
+
+  /**
+   * Map-select preview (D46): a real top-down render of the map's 3D scene — themed ground, decor, beacon, pads and
+   * the theme's light — into a 2D canvas. Square crop of the map height around the beacon. Off-screen (render
+   * target), so it works while the game canvas is hidden in the menus. Everything built here is disposed again.
+   * @returns {HTMLCanvasElement|null}
+   */
+  renderMapPreview(map, size = 640) {
+    if (this.guard.busy() || this.env) return null; // never while a map is on (it shares the renderer)
+    const T = getTheme(map.theme);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(T.shore);
+    const hemi = new THREE.HemisphereLight(T.hemi[0], T.hemi[1], T.hemi[2] * 1.15);
+    const moon = new THREE.DirectionalLight(T.moon[0], T.moon[1]);
+    moon.position.set(map.beacon.x - 320, 900, map.beacon.y + 380);
+    moon.target.position.set(map.beacon.x, 0, map.beacon.y);
+    const glow = new THREE.PointLight(0xffb060, 2600, 700, 1.2);
+    glow.position.set(map.beacon.x, 160, map.beacon.y);
+    scene.add(hemi, moon, moon.target, glow);
+    const env = buildEnvironment(map, this.mats);
+    scene.add(env.group);
+    const beacon = new THREE.Mesh(beaconGeometry(), this.mats.prop);
+    beacon.position.set(map.beacon.x, 0, map.beacon.y);
+    const pads = map.buildPads.map((p) => { const m = new THREE.Mesh(padGeometry(), this.mats.prop); m.position.set(p.x, 0, p.y); return m; });
+    scene.add(beacon, ...pads);
+    const half = Math.min(map.height, map.width) / 2;
+    const cx = Math.min(map.width - half, Math.max(half, map.beacon.x));
+    const cam = new THREE.OrthographicCamera(-half, half, half, -half, 10, 4000);
+    cam.position.set(cx, 1500, map.height / 2 + 260); // the game's slight tilt
+    cam.lookAt(cx, 0, map.height / 2);
+    // Rendered into the (hidden) game canvas at the preview size — the screen path keeps the ACES tone mapping and the
+    // sRGB output of the real scene — and copied right away in the same task (no preserveDrawingBuffer needed).
+    const prevShadow = this.renderer.shadowMap.enabled;
+    this.renderer.shadowMap.enabled = false;
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(size, size, false);
+    this.renderer.render(scene, cam);
+    const out = document.createElement('canvas');
+    out.width = out.height = size;
+    out.getContext('2d').drawImage(this.renderer.domElement, 0, 0);
+    this.renderer.shadowMap.enabled = prevShadow;
+    this.renderer.setPixelRatio(this.pixelRatio);
+    this.sizeDirty = true; // the next map sizes the canvas again
+    this.cssW = this.cssH = -1;
+    env.dispose();
+    beacon.geometry.dispose();
+    for (const p of pads) p.geometry.dispose();
+    this.pausedDrawn = false;
+    return out;
   }
 
   unloadMap() {
@@ -374,7 +451,7 @@ export class Renderer3D {
     const d = distanceFor(this.rig.view.h);
     let x = this.rig.x, z = this.rig.y;
     if (time >= 0 && time < this.shakeUntil) { // decaying shake (presentation only)
-      const k = (this.shakeUntil - time) / this.shakeDur;
+      const k = Math.min(1, (this.shakeUntil - time) / this.shakeDur);
       x += Math.sin(time * 73) * this.shakeAmp * k;
       z += Math.cos(time * 61) * this.shakeAmp * k;
     }
@@ -410,13 +487,18 @@ export class Renderer3D {
    * @param {number} time simulation clock (all animation reads it, so pause freezes everything)
    * @param {boolean} paused
    */
-  render(run, frameDt, time, paused) {
+  render(run, frameDt, time, paused, alpha = 1) {
     if (!run || !this.map || this.guard.busy()) return false;
     this._resize(false);
     if (paused && this.pausedDrawn) return false; // the paused frame does not change: draw it once
-    this._sync(run, time);
-    if (!paused) this.rig.follow(run.player.x, run.player.y, frameDt, this.map.width, this.map.height);
+    // Interpolation between the last two fixed steps (alpha 0…1): the camera and the bodies move every frame,
+    // not in 60 Hz jumps against a smoothly moving camera (that read as a blurred / doubled keeper).
+    this.alpha = paused ? 1 : Math.min(1, Math.max(0, alpha));
+    const p = run.player;
+    const px = this._lerpX(p), py = this._lerpY(p);
+    if (!paused) this.rig.follow(px, py, frameDt, this.map.width, this.map.height);
     this._placeCamera(time);
+    this._sync(run, time);
     this.renderer.render(this.scene, this.camera);
     this.pausedDrawn = paused;
     if (!paused) this._adapt(frameDt);
@@ -446,7 +528,8 @@ export class Renderer3D {
     // Player
     const aim = p.aimAngle;
     this.player.visible = p.alive;
-    this.player.position.set(p.x, 0, p.y);
+    const ppx = this._lerpX(p), ppy = this._lerpY(p);
+    this.player.position.set(ppx, 0, ppy);
     this.player.rotation.y = -aim;
     const flicker = p.isInvulnerable(time) && Math.floor(time * 30) % 2 === 0;
     this.playerBody.visible = !flicker;
@@ -457,7 +540,7 @@ export class Renderer3D {
       const g = this.ghosts[k];
       g.visible = trail;
       if (trail) {
-        g.position.set(p.x - p.vx * 0.03 * (k + 1), 0, p.y - p.vy * 0.03 * (k + 1));
+        g.position.set(ppx - p.vx * 0.03 * (k + 1), 0, ppy - p.vy * 0.03 * (k + 1));
         g.rotation.y = -aim;
       }
     }
@@ -505,7 +588,7 @@ export class Renderer3D {
       S.set(sxz * scale, sy * scale, sxz * scale);
       const reach = e.radius * 0.4;
       const lunge = e.alive && time - e.lastAttackAt < 0.22 ? Math.sin(((time - e.lastAttackAt) / 0.22) * Math.PI) * reach : 0;
-      P.set(e.x + Math.cos(yaw) * lunge, lift, e.y + Math.sin(yaw) * lunge);
+      P.set(this._lerpX(e) + Math.cos(yaw) * lunge, lift, this._lerpY(e) + Math.sin(yaw) * lunge);
       M.compose(P, Q, S);
       v.body.setMatrixAt(v.n, M);
       if (!e.alive) M.compose(P, Q, ZERO); // the eyes go out at the moment of death
@@ -520,20 +603,21 @@ export class Renderer3D {
       v.body.setColorAt(v.n, tint);
       v.n++;
       const barY = e.type.barHeight;
+      const ex = this._lerpX(e), ey = this._lerpY(e);
       if (e.alive && barY > 0 && e.hp < e.maxHp) {
         const w = Math.max(34, e.radius * 2), fill = Math.max(0, e.hp / e.maxHp);
-        const bz = e.y - e.radius - 8;
-        P.set(e.x, barY, bz); S.set(w + 2, 6, 1); M.compose(P, FLAT_X, S); this.hpBack.setMatrixAt(bars, M);
-        P.set(e.x - (w * (1 - fill)) / 2, barY + 0.5, bz); S.set(Math.max(0.01, w * fill), 4, 1); M.compose(P, FLAT_X, S);
+        const bz = ey - e.radius - 8;
+        P.set(ex, barY, bz); S.set(w + 2, 6, 1); M.compose(P, FLAT_X, S); this.hpBack.setMatrixAt(bars, M);
+        P.set(ex - (w * (1 - fill)) / 2, barY + 0.5, bz); S.set(Math.max(0.01, w * fill), 4, 1); M.compose(P, FLAT_X, S);
         this.hpFill.setMatrixAt(bars, M);
         bars++;
       }
       if (this.blobs.visible && e.alive && blobs < MAX_ENEMIES) {
         const s = e.radius * 2.6;
-        P.set(e.x, 0.6, e.y); S.set(s, s, 1); M.compose(P, FLAT_X, S); this.blobs.setMatrixAt(blobs++, M);
+        P.set(ex, 0.6, ey); S.set(s, s, 1); M.compose(P, FLAT_X, S); this.blobs.setMatrixAt(blobs++, M);
       }
     }
-    if (this.blobs.visible && p.alive) { P.set(p.x, 0.6, p.y); S.set(44, 44, 1); M.compose(P, FLAT_X, S); this.blobs.setMatrixAt(blobs++, M); }
+    if (this.blobs.visible && p.alive) { P.set(ppx, 0.6, ppy); S.set(44, 44, 1); M.compose(P, FLAT_X, S); this.blobs.setMatrixAt(blobs++, M); }
     for (const id in views) {
       const v = views[id];
       v.body.count = v.eyes.count = v.n;
@@ -550,8 +634,14 @@ export class Renderer3D {
     this._syncBoss(run, time);
 
     // Aim reticle on the ground (cursor / finger) — where the keeper shoots
+    // Placed from the live cursor / finger with THIS frame's camera, so it stays exactly under the pointer while
+    // the camera glides (the simulation's aim point updates only on fixed steps and shimmered against the camera).
     this.reticle.visible = p.alive && p.hasAim;
-    if (this.reticle.visible) this.reticle.position.set(p.aimX, 1.4, p.aimY);
+    if (this.reticle.visible) {
+      const a = this.aimClient && this.aimClient();
+      if (a && a.active) { this.screenToGround(a.clientX, a.clientY, AIM_PT); this.reticle.position.set(AIM_PT.x, 1.4, AIM_PT.y); }
+      else this.reticle.position.set(p.aimX, 1.4, p.aimY);
+    }
 
     this._syncMapObjects(run, time);
 
@@ -571,7 +661,7 @@ export class Renderer3D {
     const w = run.weapon;
     this.muzzle.visible = p.alive && time - w.lastShotAt < 0.06;
     if (this.muzzle.visible) {
-      this.muzzle.position.set(p.x + Math.cos(aim) * (PLAYER.muzzleOffset + 8), GUN_HEIGHT, p.y + Math.sin(aim) * (PLAYER.muzzleOffset + 8));
+      this.muzzle.position.set(ppx + Math.cos(aim) * (PLAYER.muzzleOffset + 8), GUN_HEIGHT, ppy + Math.sin(aim) * (PLAYER.muzzleOffset + 8));
       this.muzzle.rotation.y = -aim;
     }
 
@@ -581,7 +671,7 @@ export class Renderer3D {
       for (let i = 0; i < lit; i++) {
         const a = -Math.PI / 2 + (i / RELOAD_SEGMENTS) * Math.PI * 2;
         Q.setFromAxisAngle(UP, -(a + Math.PI / 2)); // segment along the tangent of the ring
-        P.set(p.x + Math.cos(a) * 12, 66, p.y - 26 + Math.sin(a) * 12); S.setScalar(1);
+        P.set(ppx + Math.cos(a) * 12, 66, ppy - 26 + Math.sin(a) * 12); S.setScalar(1);
         M.compose(P, Q, S);
         this.reloadArc.setMatrixAt(i, M);
       }
@@ -605,6 +695,9 @@ export class Renderer3D {
     this.particleGeo.attributes.position.needsUpdate = true;
     this.particleGeo.attributes.color.needsUpdate = true;
   }
+
+  _lerpX(o) { return o.prevX === undefined ? o.x : o.prevX + (o.x - o.prevX) * this.alpha; }
+  _lerpY(o) { return o.prevY === undefined ? o.y : o.prevY + (o.y - o.prevY) * this.alpha; }
 
   // ---------------- D45 animation helpers (presentation state lives here, never in the simulation) ----------------
   /** Keeper walk cycle: steps follow the distance walked (no foot sliding), the body bobs and leans into the move. */

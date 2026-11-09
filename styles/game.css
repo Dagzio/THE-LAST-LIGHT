@@ -119,8 +119,8 @@ body.paused .touch-controls { opacity: 0.35; }
   width: var(--stick);
   height: var(--stick);
   border-radius: 50%;
-  border: 2px solid rgba(190, 198, 255, 0.35);
-  background: radial-gradient(circle, rgba(46, 52, 112, 0.35), rgba(20, 22, 50, 0.15));
+  border: 2px solid rgba(220, 226, 234, 0.35);
+  background: radial-gradient(circle, rgba(120, 130, 140, 0.3), rgba(40, 44, 50, 0.15)); /* D46: grey like the buttons */
   opacity: 0.55;
 }
 .stick-active .touch-stick {
@@ -138,9 +138,9 @@ body.paused .touch-controls { opacity: 0.35; }
   height: 46%;
   margin: -23% 0 0 -23%;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 35%, #6a73d8, #353c8a);
-  border: 2px solid rgba(220, 225, 255, 0.85);
-  box-shadow: 0 0 12px rgba(120, 130, 255, 0.5);
+  background: radial-gradient(circle at 50% 35%, #a3adb5, #6a747d);
+  border: 2px solid rgba(240, 244, 248, 0.85);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 .touch-actions {
@@ -151,22 +151,24 @@ body.paused .touch-controls { opacity: 0.35; }
   align-items: flex-end;
   gap: var(--gap);
 }
+/* Touch buttons (D46): the same square grey style as every icon button, a little translucent over the map */
 .neon-btn {
   width: var(--neon);
   height: var(--neon);
-  border-radius: 50%;
+  border-radius: 8px;
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #e9ecff;
-  background: radial-gradient(circle at 50% 35%, rgba(80, 90, 200, 0.75), rgba(25, 28, 70, 0.85));
-  border: 3px solid #9aa6ff;
-  box-shadow: 0 0 14px rgba(120, 130, 255, 0.65), inset 0 0 14px rgba(140, 150, 255, 0.45);
+  color: #fff;
+  background: linear-gradient(180deg, rgba(148, 159, 168, 0.86) 0%, rgba(110, 120, 129, 0.86) 100%);
+  border: 1px solid rgba(20, 22, 26, 0.65);
+  box-shadow: 0 3px 0 rgba(61, 68, 74, 0.9), 0 6px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   touch-action: none;
+  transition: transform 0.08s, filter 0.12s;
 }
 .neon-btn.neon-small { width: var(--neon-small); height: var(--neon-small); margin-bottom: calc(var(--neon) * 0.6); }
-.neon-btn.pressed { transform: scale(0.94); filter: brightness(1.25); }
+.neon-btn.pressed { transform: translateY(2px); filter: brightness(0.9); box-shadow: 0 1px 0 rgba(61, 68, 74, 0.9), 0 3px 6px rgba(0, 0, 0, 0.35); }
 .touch-col { display: flex; flex-direction: column; align-items: center; gap: var(--gap); }
 
 /* ===================== Emergency Flare: charge ring (desktop HUD + touch neon button) ===================== */
@@ -210,12 +212,15 @@ body.touch .flare-hud { display: none; }
   border-radius: 4px;
 }
 .flare-neon { position: relative; }
-.flare-neon .flare-ring { inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px); }
+.flare-neon .flare-ring { inset: 3px; width: calc(100% - 6px); height: calc(100% - 6px); } /* charge ring inside the square */
 #screen-game.flare-full .flare-fill { stroke: #ffd27a; }
 #screen-game.flare-full .flare-ico { opacity: 1; }
 #screen-game.flare-ready .flare-hud,
 #screen-game.flare-ready .flare-neon { animation: flareGlow 0.9s ease-in-out infinite alternate; }
-@keyframes flareGlow { from { box-shadow: 0 0 6px rgba(255, 200, 110, 0.4); } to { box-shadow: 0 0 22px rgba(255, 210, 120, 0.95); } }
+@keyframes flareGlow { /* keeps the button's bottom edge while it glows */
+  from { box-shadow: 0 3px 0 #3d444a, 0 0 6px rgba(255, 200, 110, 0.4); }
+  to { box-shadow: 0 3px 0 #3d444a, 0 0 22px rgba(255, 210, 120, 0.95); }
+}
 body.paused #screen-game.flare-ready .flare-hud,
 body.paused #screen-game.flare-ready .flare-neon { animation-play-state: paused; }
 
@@ -223,6 +228,9 @@ body.paused #screen-game.flare-ready .flare-neon { animation-play-state: paused;
 #world3d { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: none; z-index: 0; touch-action: none; }
 body[data-screen="game"] #world3d { display: block; }
 body[data-screen="game"] #world { display: none; }
+/* D46: the menus use the 3D lighthouse scene once WebGL is ready (the 2D backdrop stays as the fallback) */
+body.menu3d #world3d { display: block; }
+body.menu3d #world { display: none; }
 
 /* ===================== Splash loading bar (H5 3D guide §7) ===================== */
 .load-bar {
@@ -234,7 +242,8 @@ body[data-screen="game"] #world { display: none; }
 }
 .load-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #d9862b, #ffd27a); transition: width 0.2s; }
 .load-pct { margin-top: 8px; font-family: var(--font-display); font-weight: 700; font-size: calc(16px * var(--fs)); letter-spacing: 0.1em; color: var(--c-muted); }
-#screen-splash.ready-tap .load-bar, #screen-splash.ready-tap .load-pct { display: none; }
+/* keep their space after loading (D46): the logo must not move when TAP TO PLAY appears */
+#screen-splash.ready-tap .load-bar, #screen-splash.ready-tap .load-pct { visibility: hidden; }
 
 /* ===================== Off-screen indicators ===================== */
 .offscreen { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -258,7 +267,8 @@ body[data-screen="game"] #world { display: none; }
 body.paused .offscreen-arrow.alert svg { animation-play-state: paused; }
 
 /* Manual aim on desktop: precise crosshair over the 3D map (the 3D reticle marks the ground point) */
-@media (hover: hover) and (pointer: fine) { #world3d { cursor: crosshair; } }
+/* No system cursor over the map: the 3D reticle on the ground is the only pointer (D46). Buttons / popups keep theirs. */
+#world3d { cursor: none; }
 
 /* ===================== Top centre: beacon Integrity + wave header + boss bar ===================== */
 .hud-top {
@@ -287,6 +297,26 @@ body.paused .offscreen-arrow.alert svg { animation-play-state: paused; }
 .hud-beacon-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #d9862b, #ffd27a); transition: width 0.2s; }
 .hud-beacon-val { min-width: 2.6em; font-size: calc(24px * var(--fs)); color: #ffe2a8; }
 .hud-beacon.low .hud-beacon-bar i { background: linear-gradient(90deg, #a8443b, #e06a4a); }
+/* D46: repair button — left of the beacon bar (the right side meets the shop / settings buttons on a 640 px phone),
+   absolutely placed so the header never changes its size; wrench on top, price under it */
+.hud-beacon { position: relative; }
+.repair-btn {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  margin-right: 12px;
+  width: max(48px, calc(var(--ring) * 0.9));
+  height: max(48px, calc(var(--ring) * 0.9));
+  flex-direction: column;
+  gap: 1px;
+  pointer-events: auto;
+}
+.repair-btn[hidden] { display: none; }
+.repair-btn .ico { width: 46%; height: 46%; }
+.repair-cost { display: inline-flex; align-items: center; gap: 2px; font: 800 13px / 1 var(--font-display); color: #fff3d6; text-shadow: 0 1px 0 #1f2328, 0 0 2px #1f2328; }
+.repair-cost .coin-ico { width: 11px; height: 11px; }
+.repair-btn.poor { opacity: 0.55; }
+body.map-over .repair-btn { display: none; }
 .hud-beacon.hit .hud-beacon-bar { border-color: #ff6a4a; }
 
 .hud-wave {
@@ -367,7 +397,11 @@ body.paused .wave-banner.show { animation-play-state: paused; }
 
 /* START NEXT WAVE — intermission only. Desktop: bottom centre (user choice). Touch: under the wave timer, because
    the bottom centre holds the player plate next to the neon buttons. */
-.next-wave-btn { display: none; font-size: calc(26px * var(--fs)); pointer-events: auto; white-space: nowrap; }
+.next-wave-btn { display: none; align-items: center; font-size: calc(26px * var(--fs)); pointer-events: auto; white-space: nowrap; }
+/* Early-start bonus on every START NEXT WAVE button (D46): "+25 ●" after the label */
+.wave-bonus { display: inline-flex; align-items: center; gap: 0.18em; margin-left: 0.5em; font-size: 0.78em; color: #ffe2a8; vertical-align: middle; }
+.wave-bonus .coin-ico { width: 0.95em; height: 0.95em; }
+.brush-btn.shop-start { display: inline-flex; align-items: center; justify-content: center; }
 .next-wave-bottom { position: absolute; left: 50%; bottom: var(--safe-b); translate: -50% 0; }
 .next-wave-top { margin-top: calc(6px * var(--fs)); font-size: max(16px, calc(22px * var(--fs))); }
 body:not(.touch) .next-wave-bottom.on,
@@ -602,7 +636,7 @@ body.map-over .shop-btn { display: none; }
   position: relative;
   width: 44px;
   height: 44px;
-  border-radius: 50%;
+  border-radius: 6px; /* D46: square like every icon button */
   display: grid;
   place-items: center;
   pointer-events: auto;
@@ -779,7 +813,9 @@ body.map-over .kiosk-prompt { display: none; }
   overflow-y: auto;
   padding: 16px var(--pad) var(--pad);
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(calc(200px * var(--fs)), 1fr));
+  /* D46: cards keep one width and the row is centred (3 grenades no longer hug the left edge) */
+  grid-template-columns: repeat(auto-fit, minmax(calc(200px * var(--fs)), calc(240px * var(--fs))));
+  justify-content: center;
   gap: 16px;
   align-content: start;
   touch-action: pan-y;
@@ -839,12 +875,18 @@ body.map-over .kiosk-prompt { display: none; }
   .shop-level { font-size: 16px; }
   .shop-xp { display: none; } /* the HUD shows XP; the row needs the room for the timer in long languages */
   .shop-timer { font-size: 16px; }
+  /* D46: on phones the timer is an hourglass + the time (the label no longer fits next to START +25) */
+  .shop-timer-label { display: none; }
+  .shop-timer::before {
+    content: ""; flex: none; width: 16px; height: 16px; align-self: center;
+    background: center / contain no-repeat url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c9cfe0' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9'/></svg>");
+  }
   .shop-start { min-height: 44px; font-size: 17px; }
   .shop-pager { gap: 8px; padding: 8px; }
   .shop-page { display: inline-flex; align-self: center; width: 48px; height: 48px; }
   .shop-page.idle { visibility: hidden; }
   .shop-page:disabled { opacity: 0.35; pointer-events: none; }
-  .shop-grid { --per: 3; display: flex; gap: 8px; padding: 0; overflow: hidden; align-items: stretch; touch-action: none; }
+  .shop-grid { --per: 3; display: flex; justify-content: center; gap: 8px; padding: 0; overflow: hidden; align-items: stretch; touch-action: none; }
   .shop-pad { display: contents; }
   .shop-pad-title { display: none; }
   .shop-grid .shop-card { flex: 0 0 calc((100% - (var(--per) - 1) * 8px) / var(--per)); }

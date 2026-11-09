@@ -22,7 +22,8 @@ export class CrateSystem {
   /** Wave start: maybe schedule a crate (seeded roll). */
   onWaveStart(waveIndex, time) {
     this.pendingAt = null;
-    if (waveIndex < CRATE.firstWaveIndex || this.spawned >= CRATE.maxPerMap || this.crate) return;
+    const first = this.map.crateFirstWaveIndex ?? CRATE.firstWaveIndex;
+    if (waveIndex < first || this.spawned >= CRATE.maxPerMap || this.crate) return;
     if (this.rng.next() >= CRATE.chance) return;
     this.pendingAt = time + this.rng.next() * CRATE.spawnWithin;
   }

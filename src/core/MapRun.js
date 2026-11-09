@@ -409,6 +409,9 @@ export class MapRun {
     if (this.over) return; // the world stops on defeat / victory
     this.lastTime = time;
     const p = this.player;
+    // Positions before this step: the renderer interpolates between them (smooth motion between fixed steps)
+    p.prevX = p.x; p.prevY = p.y;
+    for (let i = 0; i < this.enemies.length; i++) { const e = this.enemies[i]; e.prevX = e.x; e.prevY = e.y; }
     this.controller.update(p, input, dt, time);
     this.weapons.update(this.weapon, p, input.isDown('fire'), input.consumePressed('reload'), time);
     if (input.consumePressed('flare')) this.useFlare(time);
