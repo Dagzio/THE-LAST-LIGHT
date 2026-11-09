@@ -15,7 +15,7 @@ const NAMES = {
 };
 
 const CSS = `
-#dbg-models-btn { position: fixed; left: max(30px, env(safe-area-inset-left)); bottom: 30px; z-index: 9000;
+#dbg-models-btn { position: fixed; right: max(30px, env(safe-area-inset-right)); bottom: 30px; z-index: 9000;
   font: 800 13px/1 system-ui, sans-serif; color: #fff; background: rgba(10, 20, 40, .82); border: 1px dashed #ffd166;
   border-radius: 8px; padding: 9px 12px; cursor: pointer; display: none; }
 body[data-screen="menu"] #dbg-models-btn { display: block; }

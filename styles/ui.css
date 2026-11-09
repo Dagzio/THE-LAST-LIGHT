@@ -94,13 +94,12 @@
 #screen-splash { display: flex; align-items: center; justify-content: center; cursor: default; }
 #screen-splash.ready-tap { cursor: pointer; }
 .splash-inner { text-align: center; }
-.logo { display: flex; flex-direction: column; align-items: center; font-family: var(--font-display); font-weight: 800; font-stretch: condensed; line-height: 0.95; }
-.logo-the { font-size: calc(30px * var(--fs)); letter-spacing: 0.6em; padding-left: 0.6em; color: #c9cfe0; }
-.logo-main {
-  font-size: calc(104px * var(--fs));
-  letter-spacing: 0.04em;
-  color: #fff4dc;
-  text-shadow: 0 0 28px rgba(255, 179, 71, 0.55), 0 0 2px rgba(255, 220, 160, 0.9), 0 6px 0 rgba(0, 0, 0, 0.5);
+/* Game logo (assets/graphics/logo.webp, 1200×439): the box has a fixed size before the image arrives — no shift. */
+.logo-img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.logo {
+  width: min(calc(640px * var(--fs)), 82vw, calc(40dvh * 2.733));
+  aspect-ratio: 1200 / 439;
+  margin: 0 auto;
 }
 .fade { opacity: 0; transition: opacity 1.5s ease; }
 .fade.show { opacity: 1; }
@@ -121,26 +120,33 @@
 
 /* ===================== Main menu ===================== */
 #screen-menu { background: linear-gradient(90deg, rgba(4, 6, 12, 0.72) 0%, rgba(4, 6, 12, 0.25) 42%, rgba(4, 6, 12, 0) 60%); }
+/* Logo top-centre (user request 2026-11-09): as wide as it can be between the corner buttons, ≤ 26 % of the height. */
+#screen-menu {
+  --logo-side: calc(var(--safe-r) + 2 * var(--ring) + var(--gap) + 16px); /* the corner buttons + air, both sides */
+  --logo-w: min(calc(560px * var(--fs)), calc(100vw - 2 * var(--logo-side)), calc(26dvh * 2.733));
+  --logo-h: calc(var(--logo-w) / 2.733);
+}
+/* ≤ 320 px high: a smaller logo so the three 48 px menu items fit under it */
+@media (max-height: 320px) {
+  #screen-menu { --logo-w: min(calc(560px * var(--fs)), calc(100vw - 2 * var(--logo-side)), calc(21dvh * 2.733)); }
+}
 .menu-logo {
   position: absolute;
   top: var(--safe-t);
-  left: var(--safe-l);
-  display: flex;
-  flex-direction: column;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-stretch: condensed;
-  line-height: 0.95;
+  left: 50%;
+  width: var(--logo-w);
+  height: var(--logo-h);
+  translate: -50% 0;
 }
-.menu-logo .logo-the { font-size: calc(18px * var(--fs)); letter-spacing: 0.55em; padding-left: 0; }
-.menu-logo .logo-main { font-size: calc(46px * var(--fs)); text-shadow: 0 0 18px rgba(255, 179, 71, 0.45), 0 4px 0 rgba(0, 0, 0, 0.5); }
+/* The list is centred in the space under the logo (never under it on short phones). */
 .menu-list {
   position: absolute;
   left: var(--safe-l);
-  top: 50%;
-  transform: translateY(-38%);
+  top: calc(var(--safe-t) + var(--logo-h) + var(--gap));
+  bottom: var(--safe-b);
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: flex-start;
   gap: max(10px, calc(10px * var(--fs))); /* ≥ 8 px between tap zones on every height step */
 }
