@@ -36,7 +36,9 @@ export const SFX_FILES = {
   kill: { file: 'enemies/enemy-killed1.mp3', trim: 0.03, gain: 3.2 },
   // D52 new files
   ricochet: { file: 'bullet.mp3', trim: 0.04, gain: 2.0 },               // a bullet stopped by a rock / wall / pad
-  turretShot: { file: 'turret_shot.mp3', trim: 0.035, gain: 0.55 },     // Guard Turret (frost / poison keep their synth)
+  turretShot: { file: 'turret/turret_shot.mp3', trim: 0.035, gain: 0.55 },  // Guard Turret (frost / poison keep their synth)
+  turretHit: { file: 'turret/turret_hitted.mp3', trim: 0.02, gain: 1.8 },    // a device takes damage (D52 health)
+  turretBroken: { file: 'turret/turret_killed.mp3', trim: 0.05, gain: 3.2 }, // a device breaks (0 HP)
   spitterAttack: { file: 'enemies/spitter-attack.mp3', gain: 2.2 },     // Spitter lobs a glob
   'assault_rifle.shot': { file: 'rifle/rifle_shot.mp3', gain: 3.6 },
   'assault_rifle.reload1': { file: 'rifle/rifle_reload1.mp3', trim: 0.015, gain: 2.0 },

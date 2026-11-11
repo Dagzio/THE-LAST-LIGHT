@@ -80,9 +80,10 @@ function wireCombatSounds(events, game) {
     const now = performance.now();
     if (now - lastDeviceHitAt < 120) return;
     lastDeviceHitAt = now;
-    Sfx.play('beaconHit', 1.35 + Math.random() * 0.15);
+    if (Sfx.duration('turretHit') > 0) Sfx.play('turretHit', 0.94 + Math.random() * 0.12, { voices: 2 }); // user file
+    else Sfx.play('beaconHit', 1.35 + Math.random() * 0.15);
   });
-  events.on('deviceBroken', () => Sfx.play('boom', 1.35));
+  events.on('deviceBroken', () => Sfx.play(Sfx.duration('turretBroken') > 0 ? 'turretBroken' : 'boom', Sfx.duration('turretBroken') > 0 ? 1 : 1.35));
   // Wave start (user decision 2026-11-09): START NEXT WAVE pressed → wave-start1 at once; wave-start2 when the first
   // enemy of the wave is out AND wave-start1 has finished. Timer ran out (no press) → only wave-start2 on the first
   // enemy. Timed on the game clock (a pause does not let it fire early). Synth fog horn if the files are missing.
