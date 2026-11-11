@@ -1,0 +1,13 @@
+Sounds in this folder - made from CC0 (public domain) packs, mixed / levelled for THE LAST LIGHT (2026-11-11).
+
+beacon-hit.mp3   bfh1_hit_02          - 75 CC0 breaking/falling/hit sfx  https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx
+cryo-blast.mp3   bfh1_glass_breaking_04 - same pack
+molotov.mp3      bfh1_glass_breaking_02 + spell_fire_06 - same pack + 80 CC0 RPG SFX https://opengameart.org/content/80-cc0-rpg-sfx
+boss-warn.mp3    creature_roar_02     - 80 CC0 RPG SFX
+boss-slam.mp3    lowFrequency_explosion_001 (Kenney Sci-fi Sounds https://opengameart.org/content/sci-fi-sounds) + bfh1_rock_breaking_03
+boss-tide.mp3    forceField_000 (Kenney Sci-fi Sounds) + sfx100v2_air_02 (100 CC0 SFX #2 https://opengameart.org/content/100-cc0-sfx-2)
+flare-ready.mp3  item_gem_04          - 80 CC0 RPG SFX
+deny.mp3         error_006            - Kenney Interface Sounds https://opengameart.org/content/interface-sounds
+stamp.mp3        bookPlace2           - Kenney 50 RPG sound effects https://opengameart.org/content/50-rpg-sound-effects
+
+License: CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/ - attribution not required.

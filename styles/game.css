@@ -258,24 +258,41 @@ body.menu3d #world { display: none; }
 
 /* ===================== Off-screen indicators ===================== */
 .offscreen { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+/* D53: a round badge with an icon (what) + a pointer turning around it (where) — bigger, readable over the map */
 .offscreen-arrow {
+  --c: #ff7a5a;
+  --g: rgba(255, 122, 90, 0.45);
+  --sz: 42px;
   position: absolute;
   left: 0;
   top: 0;
-  width: 26px;
-  height: 26px;
-  margin: -13px 0 0 -13px;
+  width: var(--sz);
+  height: var(--sz);
+  margin: calc(var(--sz) / -2) 0 0 calc(var(--sz) / -2);
   display: none;
   will-change: transform;
+  pointer-events: none;
 }
 .offscreen-arrow.on { display: block; }
-.offscreen-arrow svg { width: 100%; height: 100%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8)); }
-.offscreen-arrow.enemy svg { fill: #ff7a5a; }
-.offscreen-arrow.beacon svg { fill: #ffd27a; }
-.offscreen-arrow.kiosk svg { fill: #aab2ff; }
-.offscreen-arrow.alert svg { animation: arrowAlert 0.5s steps(2) infinite; }
+.oi-badge {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, rgba(32, 28, 34, 0.94), rgba(10, 9, 12, 0.94));
+  box-shadow: 0 0 0 2.5px var(--c), 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 14px var(--g);
+}
+.oi-badge svg { width: 62%; height: 62%; fill: none; stroke: var(--c); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.oi-point { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; transform: rotate(var(--a, 0rad)) translateX(calc(var(--sz) / 2 + 9px)); }
+.oi-point svg { display: block; width: 100%; height: 100%; fill: var(--c); filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9)); }
+.offscreen-arrow.enemy { --c: #ff6a4a; --g: rgba(255, 106, 74, 0.45); }
+.offscreen-arrow.enemy.boss { --c: #c89bff; --g: rgba(200, 155, 255, 0.5); --sz: 50px; }
+.offscreen-arrow.beacon { --c: #ffd27a; --g: rgba(255, 210, 122, 0.45); }
+.offscreen-arrow.kiosk { --c: #b4bcff; --g: rgba(180, 188, 255, 0.4); }
+.offscreen-arrow.crate { --c: #ffc46a; --g: rgba(255, 196, 106, 0.5); --sz: 46px; }
+.offscreen-arrow.crate .oi-badge { animation: oiCrate 1.2s ease-in-out infinite alternate; }
+@keyframes oiCrate { to { box-shadow: 0 0 0 2.5px var(--c), 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 22px var(--c); } }
+.offscreen-arrow.alert .oi-badge { animation: arrowAlert 0.5s steps(2) infinite; }
 @keyframes arrowAlert { 50% { opacity: 0.35; } }
-body.paused .offscreen-arrow.alert svg { animation-play-state: paused; }
+body.paused .offscreen-arrow .oi-badge { animation-play-state: paused; }
+@media (max-height: 500px) { .offscreen-arrow { --sz: 38px; } .offscreen-arrow.enemy.boss { --sz: 44px; } .offscreen-arrow.crate { --sz: 42px; } }
 
 /* Manual aim on desktop: precise crosshair over the 3D map (the 3D reticle marks the ground point) */
 /* No system cursor over the map: the 3D reticle on the ground is the only pointer (D46). Buttons / popups keep theirs. */

@@ -7,10 +7,51 @@ import * as THREE from '../../lib/three.module.js';
 import { buildShowcase } from '../render3d/models.js';
 import { createMaterials } from '../render3d/materials.js';
 import { SeededRandom } from '../core/SeededRandom.js';
+import { loadGLB } from '../render3d/glb.js';
+import { applyRig, rigUniforms, bakeModel, bakeArmWeights } from '../render3d/rig.js';
+import { weaponGeometry } from '../render3d/models.js';
+import { KEEPER_MODEL, GRUNT_MODEL, KEEPER_RIG, GRUNT_RIG, poseFor, gunPlacement } from '../data/keeperRig.js';
+
+/**
+ * D53: the textured models the game draws now (the user's Tripo models, *.min.glb) — the keeper in his aiming pose with
+ * each weapon in hand (the same vertex rig as in the game), the grunt. Export gives the original game file.
+ */
+async function texturedModels() {
+  const out = new Map();
+  const [keeper, grunt] = await Promise.all([loadGLB(KEEPER_MODEL.file), loadGLB(GRUNT_MODEL.file)]);
+  const rigged = (model, height, rig, pose, arms = false) => {
+    bakeModel(model.geometry, height);
+    if (arms) bakeArmWeights(model.geometry, model.texture, rig);
+    const u = rigUniforms(rig);
+    if (pose) u.uPose.value.set(pose.right, pose.left, pose.leftYaw, 0);
+    const mat = applyRig(new THREE.MeshLambertMaterial({ map: model.texture }), u, false, false, arms);
+    const key = `viewer-${rigged.n = (rigged.n || 0) + 1}`; // own program per copy: three.js binds the uniforms of a shared program once
+    mat.customProgramCacheKey = () => `rig-u-c-${key}`;
+    return new THREE.Mesh(model.geometry, mat);
+  };
+  if (keeper) {
+    for (const id of ['pistol', 'smg', 'shotgun', 'assault_rifle']) {
+      const g = new THREE.Group();
+      const body = rigged({ geometry: keeper.geometry.clone(), texture: keeper.texture }, KEEPER_MODEL.height, KEEPER_RIG, poseFor(id), true);
+      const gun = weaponGeometry(id, true);
+      const { grip, scale, hand } = gunPlacement(id);
+      gun.translate(-grip[0], -grip[1], -grip[2]).scale(scale, scale, scale).translate(hand[0], hand[1], hand[2]);
+      g.add(body, new THREE.Mesh(gun, new THREE.MeshLambertMaterial({ vertexColors: true })));
+      g.userData.file = KEEPER_MODEL.file;
+      out.set(id === 'pistol' ? 'keeper' : `keeper-${id}`, g);
+    }
+  }
+  if (grunt) {
+    const m = rigged(grunt, GRUNT_MODEL.height, GRUNT_RIG, null);
+    m.userData.file = GRUNT_MODEL.file;
+    out.set('grunt', m);
+  }
+  return out;
+}
 
 const PREFIX = 'thelastlight';
 const NAMES = {
-  keeper: 'Keeper (player)', grunt: 'Grunt (enemy)', bullet: 'Bullet tracer', muzzle: 'Muzzle flash',
+  keeper: 'Keeper + pistol (textured)', 'keeper-smg': 'Keeper + SMG', 'keeper-shotgun': 'Keeper + shotgun', 'keeper-assault_rifle': 'Keeper + rifle', grunt: 'Grunt (textured)', bullet: 'Bullet tracer', muzzle: 'Muzzle flash',
   'prop-rock': 'Prop: rock', 'prop-ruin': 'Prop: ruin wall', 'prop-stump': 'Prop: dead stump', 'prop-post': 'Prop: fence post',
 };
 
@@ -52,8 +93,11 @@ export function initModelViewer() {
 
 /* ------------------------------------------------------------------ viewer */
 
-function open() {
-  if (document.getElementById('dbg-models')) return;
+async function open() {
+  if (document.getElementById('dbg-models') || open.busy) return;
+  open.busy = true;
+  const textured = await texturedModels().catch(() => new Map()); // D53
+  open.busy = false;
   const el = document.createElement('div');
   el.id = 'dbg-models';
   el.innerHTML = `<aside><h3>Models (debug)</h3><div class="list"></div></aside>
@@ -82,7 +126,9 @@ function open() {
   // every model, built by the game's own code and materials
   const materials = createMaterials();
   const groups = new Map();
-  for (const [name, obj] of buildShowcase(materials, new SeededRandom(7))) {
+  const showcase = buildShowcase(materials, new SeededRandom(7));
+  for (const [name, obj] of textured) showcase.set(name, obj); // D53: the textured keeper / grunt replace the old ones
+  for (const [name, obj] of showcase) {
     const g = new THREE.Group();
     g.add(obj);
     groups.set(name, g);
@@ -97,6 +143,7 @@ function open() {
     g.children.forEach((c) => { c.position.x -= ctr.x; c.position.z -= ctr.z; c.position.y -= box.min.y; });
   }
 
+  window.__viewer = { scene, renderer, groups }; // dev tool only: inspection from DevTools / test scripts
   let current = null, yaw = 0.7, pitch = 0.45, dist = 3, radius = 1;
   const list = el.querySelector('.list');
   const info = el.querySelector('.info');
@@ -174,6 +221,14 @@ function open() {
   el.querySelector('.exp').onclick = () => {
     if (!current) return;
     const name = current.userData.name;
+    const file = current.children[0] && current.children[0].userData.file; // D53: textured → the game's own file
+    if (file) {
+      const a = document.createElement('a');
+      a.href = file;
+      a.download = `${PREFIX}-${name}.glb`;
+      a.click();
+      return;
+    }
     const blob = new Blob([toGLB(current, name)], { type: 'model/gltf-binary' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

@@ -55,6 +55,9 @@ export class UIManager {
     initFullscreenButtons([...document.querySelectorAll('[data-fs]')]);
 
     game.sm.onChange((state) => this._syncScreen(state));
+    // D53: the map-select previews are rendered in the background as soon as the main menu is up (one per tick),
+    // so turning the carousel shows the finished picture at once
+    game.sm.onChange((state) => { if (state === STATES.MAIN_MENU) this._prerenderThumbs(); });
     onLanguageChange(() => this._refreshDynamicText());
     this._buildMapCards();
     applyTranslations();
@@ -78,8 +81,7 @@ export class UIManager {
     const enter = () => {
       if (!el.classList.contains('ready-tap')) return; // early tap = no-op
       el.removeEventListener('click', enter);
-      AC.unlock();               // first real gesture unlocks audio
-      Sfx.play('start');
+      AC.unlock();               // first real gesture unlocks audio (D53: no sound on TAP TO PLAY — user decision)
       this.game.enterMainMenu();
       Music.start();             // once, on entering the main menu; never restarted
       const notice = SAVE_NOTICE[this.game.economy.loadStatus];
@@ -231,24 +233,57 @@ export class UIManager {
   _visibleMaps() { return MAPS; }
 
   /**
-   * Card preview: the painted 2D version at once, then (next tick) a real top-down render of the map's 3D scene
-   * drawn over it (D46). Both cached per map.
+   * Card preview: a real top-down render of the map's 3D scene (D46), cached per map. D53: never the painted 2D
+   * sketch first and the 3D picture a moment later — a card that is not pre-rendered yet is rendered right away; the
+   * 2D sketch stays only as the fallback without WebGL.
    */
   _thumb(map) {
     let c = this.thumbs.get(map.id);
     if (!c) {
       c = document.createElement('canvas');
       c.width = c.height = Math.min(640, Math.round(320 * Math.min(2, window.devicePixelRatio || 1)));
-      drawMapPreview(c, map, layoutProps(map));
       this.thumbs.set(map.id, c);
-      setTimeout(() => {
-        const r3 = this.game.renderer3d;
-        if (!r3 || this.game.sm.inMap) return;
-        const img = r3.renderMapPreview(map, c.width);
-        if (img) c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      }, 30);
+    }
+    if (!c.dataset.ready && !this._render3dThumb(map, c) && !c.dataset.painted) {
+      drawMapPreview(c, map, layoutProps(map)); // no 3D renderer (or busy): the painted version
+      c.dataset.painted = '1';
     }
     return c;
+  }
+
+  /** Draws the 3D preview into the card canvas once. False when the renderer cannot do it now. */
+  _render3dThumb(map, c) {
+    const r3 = this.game.renderer3d;
+    if (!r3 || this.game.sm.inMap) return false;
+    const img = r3.renderMapPreview(map, c.width);
+    if (!img) return false;
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    g.drawImage(img, 0, 0, c.width, c.height);
+    c.dataset.ready = '1';
+    return true;
+  }
+
+  /** D53: renders every map preview in the background (one per tick, menus only); stops when a map starts. */
+  _prerenderThumbs() {
+    if (this.prerendering) return;
+    this.prerendering = true;
+    let i = 0;
+    const next = () => {
+      if (this.game.sm.inMap) { this.prerendering = false; return; } // resumes the next time the menu opens
+      while (i < MAPS.length && this.thumbs.get(MAPS[i].id) && this.thumbs.get(MAPS[i].id).dataset.ready) i++;
+      if (i >= MAPS.length) { this.prerendering = false; return; }
+      const map = MAPS[i++];
+      let c = this.thumbs.get(map.id);
+      if (!c) {
+        c = document.createElement('canvas');
+        c.width = c.height = Math.min(640, Math.round(320 * Math.min(2, window.devicePixelRatio || 1)));
+        this.thumbs.set(map.id, c);
+      }
+      this._render3dThumb(map, c);
+      setTimeout(next, 40);
+    };
+    setTimeout(next, 200); // after the menu's first frames
   }
 
   /** Rebuilt when map select opens / the language changes: starts on the game's selected (unlocked) map. */

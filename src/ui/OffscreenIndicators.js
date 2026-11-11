@@ -5,8 +5,22 @@
 import { STATES } from '../core/GameStateMachine.js';
 
 const MAX_ENEMY_ARROWS = 6;
-const EDGE = 44;          // CSS px from the screen edge (inside the H5 30 px margin)
-const ARROW_SVG = '<svg viewBox="0 0 24 24"><path d="M3 4l19 8-19 8 5-8z"/></svg>';
+// D53: HUD blocks the badges keep clear of (+ AVOID_PAD around them: badge radius + a little air)
+const AVOID_SELECTORS = ['#screen-game .hud-top', '#screen-game .hud-player', '#screen-game .corner-tl', '#screen-game .corner-tr',
+  '#screen-game .grenade-slots', '#btnNextWave', '.touch-actions']; // not the stick: badges ignore taps, and on a small
+// phone the left edge is the only free run
+const AVOID_PAD = 28;
+const P2 = { x: 0, y: 0 }; // reused
+const EDGE = 58;          // CSS px from the screen edge to the badge centre (badge + pointer stay inside the H5 margin)
+// D53: a round badge with an icon (what it is) + a pointer that turns around it (where it is)
+const POINT = '<i class="oi-point"><svg viewBox="0 0 24 24"><path d="M4 4l18 8-18 8 4-8z"/></svg></i>';
+const ICONS = {
+  enemy: '<path d="M5 20l3-9M10 21l2-10M15 20l-1-9"/><path d="M4 11c0-4 4-7 8-7s8 3 8 7"/><circle cx="9" cy="8.5" r="1"/><circle cx="15" cy="8.5" r="1"/>',
+  beacon: '<path d="M9 22l1.5-12h3L15 22z"/><path d="M8.5 8h7l-1-3h-5z"/><path d="M4 6l3 1M20 6l-3 1M12 2v1.5"/>',
+  kiosk: '<path d="M3 4h2l2.4 10.5h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/>',
+  crate: '<rect x="3.5" y="9" width="17" height="11" rx="1"/><path d="M3.5 9l2-4h13l2 4M12 9v11M9.5 13h5"/>',
+};
+const indicatorHtml = (kind) => `${POINT}<span class="oi-badge"><svg viewBox="0 0 24 24">${ICONS[kind]}</svg></span>`;
 
 export class OffscreenIndicators {
   /** @param {import('../core/Game.js').Game} game */
@@ -17,31 +31,30 @@ export class OffscreenIndicators {
     for (let i = 0; i < MAX_ENEMY_ARROWS; i++) {
       const el = document.createElement('div');
       el.className = 'offscreen-arrow enemy';
-      el.innerHTML = ARROW_SVG;
+      el.innerHTML = indicatorHtml('enemy');
       this.root.appendChild(el);
-      this.arrows.push({ el, on: false, x: 0, y: 0, a: 0 });
+      this.arrows.push({ el, on: false, x: 0, y: 0, a: 0, boss: false });
     }
     const be = document.createElement('div');
     be.className = 'offscreen-arrow beacon';
-    be.innerHTML = ARROW_SVG;
+    be.innerHTML = indicatorHtml('beacon');
     this.root.appendChild(be);
     this.beaconArrow = { el: be, on: false, x: 0, y: 0, a: 0, alert: false };
     const ki = document.createElement('div');
     ki.className = 'offscreen-arrow kiosk';
-    ki.innerHTML = ARROW_SVG;
+    ki.innerHTML = indicatorHtml('kiosk');
     this.root.appendChild(ki);
     this.kioskArrow = { el: ki, on: false, x: 0, y: 0, a: 0 }; // between waves only (D28)
     const cr = document.createElement('div');
     cr.className = 'offscreen-arrow crate';
-    cr.innerHTML = ARROW_SVG;
+    cr.innerHTML = indicatorHtml('crate');
     this.root.appendChild(cr);
     this.crateArrow = { el: cr, on: false, x: 0, y: 0, a: 0 }; // while a crate lies on the map (Phase 6)
     this.pick = new Array(MAX_ENEMY_ARROWS).fill(null);
     this.pickD = new Array(MAX_ENEMY_ARROWS).fill(Infinity);
     this.pt = { x: 0, y: 0 };
-    this.avoidRect = undefined; // touch keeper block (measured twice a second)
+    this.avoidRects = undefined; // HUD blocks (measured twice a second)
     this.avoidTick = 0;
-    this.avoidStart = null;
     game.onFrame(() => this.update());
   }
 
@@ -51,27 +64,59 @@ export class OffscreenIndicators {
   }
 
   /**
-   * D51: on touch the keeper block sits top-left — an arrow landing on it slides down the left edge below it.
-   * The block rect is re-measured twice a second (one layout read), not every frame.
+   * D53: a badge that would sit on a HUD block (wave header, keeper block, corner buttons, touch buttons, START …)
+   * slides along the screen edge until it is clear of every block — the nearest free spot; only if the whole edge
+   * run is blocked it steps inwards past the block. The block rects are re-measured twice a second (layout reads only
+   * then, never between the style writes of a frame).
    */
-  _avoid(x, y) {
-    const r = this.avoidRect;
-    if (r && x < r.right + 14 && y > r.top - 14 && y < r.bottom + 14) return r.bottom + 18;
-    const s = this.avoidStart; // desktop START NEXT WAVE (bottom centre): arrows on the bottom edge go above it
-    if (s && x > s.left - 14 && x < s.right + 14 && y > s.top - 14) return s.top - 18;
-    return y;
+  _avoid(x, y, W, H, out) {
+    out.x = x; out.y = y;
+    const rs = this.avoidRects;
+    if (!rs || !rs.length) return out;
+    const hit = (px, py) => rs.find((r) => px > r.l && px < r.r && py > r.t && py < r.b);
+    const r0 = hit(x, y);
+    if (!r0) return out;
+    const lo = EDGE, hiX = W - EDGE, hiY = H - EDGE;
+    const horiz = Math.abs(y - lo) < 1 || Math.abs(y - hiY) < 1; // on the top / bottom edge: slide along x
+    // nearest free position along this edge: the run [lo, hi] minus every block crossing the edge line
+    const free = (v, other, alongX) => {
+      const hi = alongX ? hiX : hiY;
+      const cuts = rs.filter((r) => (alongX ? other > r.t && other < r.b : other > r.l && other < r.r))
+        .map((r) => (alongX ? [r.l, r.r] : [r.t, r.b])).sort((a, b) => a[0] - b[0]);
+      let best = null, bd = Infinity, at = lo;
+      const test = (a, b) => { if (b < a) return; const p = Math.min(b, Math.max(a, v)); const d = Math.abs(p - v); if (d < bd) { bd = d; best = p; } };
+      for (const [a, b] of cuts) { test(at, Math.min(hi, a)); at = Math.max(at, b); }
+      test(at, hi);
+      return best;
+    };
+    const p = free(horiz ? x : y, horiz ? y : x, horiz);
+    if (p !== null && Math.abs(p - (horiz ? x : y)) < (horiz ? W : H) * 0.35) { // a gap not too far from the true spot
+      if (horiz) out.x = p; else out.y = p;
+      return out;
+    }
+    // no gap nearby: step past the block towards the screen centre (stays on this side of the screen)
+    const down = horiz ? y < H / 2 : x < W / 2;
+    for (let r = r0, n = 0; r && n < 4; r = hit(out.x, out.y), n++) { // past every block met on the way in
+      if (horiz) out.y = down ? r.b : r.t; else out.x = down ? r.r : r.l;
+    }
+    out.x = Math.min(hiX, Math.max(lo, out.x)); // never off the screen (a tiny phone may have no free spot at all)
+    out.y = Math.min(hiY, Math.max(lo, out.y));
+    return out;
   }
 
   _measureAvoid() {
-    if (++this.avoidTick < 30 && this.avoidRect !== undefined) return;
+    if (++this.avoidTick < 30 && this.avoidRects !== undefined) return;
     this.avoidTick = 0;
-    const touch = document.body.classList.contains('touch');
-    const el = touch ? document.querySelector('#screen-game .hud-player') : null;
-    const r = el && el.offsetWidth ? el.getBoundingClientRect() : null;
-    this.avoidRect = r ? { right: r.right, top: r.top, bottom: r.bottom } : null;
-    const sb = !touch ? document.getElementById('btnNextWave') : null;
-    const s = sb && sb.offsetWidth ? sb.getBoundingClientRect() : null;
-    this.avoidStart = s ? { left: s.left, right: s.right, top: s.top } : null;
+    const pad = AVOID_PAD;
+    const rects = [];
+    for (const sel of AVOID_SELECTORS) {
+      for (const el of document.querySelectorAll(sel)) {
+        if (!el.offsetWidth || !el.offsetHeight) continue;
+        const r = el.getBoundingClientRect();
+        rects.push({ l: r.left - pad, t: r.top - pad, r: r.right + pad, b: r.bottom + pad });
+      }
+    }
+    this.avoidRects = rects;
   }
 
   /** Places arrow `a` on the screen edge towards the projected point; hides it when the point is on screen. */
@@ -81,11 +126,13 @@ export class OffscreenIndicators {
     const dx = px - cx, dy = py - cy;
     const ang = Math.atan2(dy, dx);
     const k = Math.min((cx - EDGE) / Math.max(1e-6, Math.abs(dx)), (cy - EDGE) / Math.max(1e-6, Math.abs(dy)));
-    const x = cx + dx * k, y = this._avoid(cx + dx * k, cy + dy * k);
+    this._avoid(cx + dx * k, cy + dy * k, W, H, P2);
+    const x = P2.x, y = P2.y;
     if (!a.on) { a.on = true; a.el.classList.add('on'); }
     if (Math.abs(x - a.x) > 0.5 || Math.abs(y - a.y) > 0.5 || Math.abs(ang - a.a) > 0.01) {
       a.x = x; a.y = y; a.a = ang;
-      a.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${ang.toFixed(3)}rad)`;
+      a.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      a.el.style.setProperty('--a', `${ang.toFixed(3)}rad`); // the pointer turns, the icon stays upright
     }
   }
 
@@ -140,17 +187,21 @@ export class OffscreenIndicators {
       const a = this.arrows[i];
       const e = pick[i];
       if (!e) { if (a.on) { a.on = false; a.el.classList.remove('on'); } continue; }
+      const boss = !!e.type.boss; // D53: the boss gets its own colour
+      if (boss !== a.boss) { a.boss = boss; a.el.classList.toggle('boss', boss); }
       r3.projectToScreen(e.x, e.y, 16, this.pt);
       const dx = this.pt.x - cx, dy = this.pt.y - cy;
       const ang = Math.atan2(dy, dx);
       // intersection of the ray from the centre with the inset screen rectangle
       const hx = cx - EDGE, hy = cy - EDGE;
       const k = Math.min(hx / Math.max(1e-6, Math.abs(dx)), hy / Math.max(1e-6, Math.abs(dy)));
-      const x = cx + dx * k, y = this._avoid(cx + dx * k, cy + dy * k);
+      this._avoid(cx + dx * k, cy + dy * k, W, H, P2);
+      const x = P2.x, y = P2.y;
       if (!a.on) { a.on = true; a.el.classList.add('on'); }
       if (Math.abs(x - a.x) > 0.5 || Math.abs(y - a.y) > 0.5 || Math.abs(ang - a.a) > 0.01) {
         a.x = x; a.y = y; a.a = ang;
-        a.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${ang.toFixed(3)}rad)`;
+        a.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      a.el.style.setProperty('--a', `${ang.toFixed(3)}rad`); // the pointer turns, the icon stays upright
       }
     }
   }

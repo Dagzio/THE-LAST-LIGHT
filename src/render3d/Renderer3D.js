@@ -24,7 +24,7 @@ import { getBossPattern } from '../data/boss.js';
 import { getTheme } from '../data/themes.js';
 import { MenuScene } from './MenuScene.js';
 import { loadGLB } from './glb.js';
-import { applyRig, rigUniforms, bakeModel } from './rig.js';
+import { applyRig, rigUniforms, bakeModel, bakeArmWeights } from './rig.js';
 import { KEEPER_MODEL, GRUNT_MODEL, KEEPER_RIG, GRUNT_RIG, poseFor, gunPlacement, muzzlePoint } from '../data/keeperRig.js';
 import { FLARE } from '../data/balance.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
@@ -354,16 +354,17 @@ export class Renderer3D {
   }
 
   /** Rigged material (Lambert like the other characters) + the matching shadow depth material. */
-  _rigMaterials(texture, uniforms, instanced) {
-    const mat = applyRig(new THREE.MeshLambertMaterial({ map: texture }), uniforms, instanced, false);
-    const depth = applyRig(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), uniforms, instanced, true);
+  _rigMaterials(texture, uniforms, instanced, armAttr = false) {
+    const mat = applyRig(new THREE.MeshLambertMaterial({ map: texture }), uniforms, instanced, false, armAttr);
+    const depth = applyRig(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), uniforms, instanced, true, armAttr);
     return { mat, depth };
   }
 
   _useKeeperModel({ geometry, texture }) {
     bakeModel(geometry, KEEPER_MODEL.height);
+    bakeArmWeights(geometry, texture, KEEPER_RIG); // D53: hands apart from the coat (no smeared flap)
     this.keeperRig = rigUniforms(KEEPER_RIG);
-    const { mat, depth } = this._rigMaterials(texture, this.keeperRig, false);
+    const { mat, depth } = this._rigMaterials(texture, this.keeperRig, false, true);
     this.playerBody.geometry = geometry;
     this.playerBody.material = mat;
     this.playerBody.customDepthMaterial = depth;

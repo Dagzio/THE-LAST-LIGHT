@@ -37,9 +37,26 @@ export const SFX_FILES = {
   kill: { file: 'enemies/enemy-killed1.mp3', trim: 0.03, gain: 1 },
   // D52 new files
   ricochet: { file: 'bullet.mp3', trim: 0.04, gain: 1 },               // a bullet stopped by a rock / wall / pad
-  turretShot: { file: 'turret/turret_shot.mp3', trim: 0.035, gain: 1 },  // Guard Turret (frost / poison keep their synth)
+  turretShot: { file: 'turret/turret_shot.mp3', trim: 0.035, gain: 1 },  // every turret (D53: one sound for all)
   turretHit: { file: 'turret/turret_hitted.mp3', trim: 0.02, gain: 1 },    // a device takes damage (D52 health)
   turretBroken: { file: 'turret/turret_killed.mp3', trim: 0.05, gain: 1 }, // a device breaks (0 HP)
+  // D53 keeper (user files, player/): footsteps — one at random per step, never the same twice in a row; hurt — 2 takes
+  step1: { file: 'player/steps1.mp3', trim: 0.07, gain: 1 },
+  step2: { file: 'player/steps2.mp3', trim: 0.17, gain: 1 },
+  step3: { file: 'player/steps3.mp3', trim: 0.05, gain: 1 },
+  step4: { file: 'player/steps4.mp3', trim: 0.1, gain: 1 },
+  playerHurt1: { file: 'player/player-hitted1.mp3', gain: 1 },
+  playerHurt2: { file: 'player/player-hitted2.mp3', trim: 0.025, gain: 1 },
+  // D53 replacements of synthesized sounds: CC0 packs (sfx/CREDITS.txt), mixed / levelled into the file (gain 1)
+  beaconHit: { file: 'sfx/beacon-hit.mp3', gain: 1 },
+  freeze: { file: 'sfx/cryo-blast.mp3', gain: 1 },       // Cryo grenade
+  fire: { file: 'sfx/molotov.mp3', gain: 1 },            // Molotov: bottle breaks + flames
+  bossWarn: { file: 'sfx/boss-warn.mp3', gain: 1 },      // a boss telegraphs an attack (roar)
+  bossSlam: { file: 'sfx/boss-slam.mp3', gain: 1 },
+  bossTide: { file: 'sfx/boss-tide.mp3', gain: 1 },
+  flareReady: { file: 'sfx/flare-ready.mp3', gain: 1 },
+  deny: { file: 'sfx/deny.mp3', gain: 1 },
+  stamp: { file: 'sfx/stamp.mp3', gain: 1 },             // results journal stamp
   spitterAttack: { file: 'enemies/spitter-attack.mp3', gain: 1 },     // Spitter lobs a glob
   'assault_rifle.shot': { file: 'rifle/rifle_shot.mp3', gain: 1 },
   'assault_rifle.reload1': { file: 'rifle/rifle_reload1.mp3', trim: 0.015, gain: 1 },
@@ -60,6 +77,12 @@ export const SFX_FILES = {
   'shotgun.reload1': { file: 'shotgun/shotgun-reload1.mp3', gain: 1 },
   'shotgun.reload2': { file: 'shotgun/shotgun-reload2.mp3', gain: 1 },
 };
+
+/** Keeper footsteps (D53): one at random per step. Two steps per stride of the walk animation (62 world units). */
+export const STEP_SFX = ['step1', 'step2', 'step3', 'step4'];
+/** The keeper is hurt (D53): one of the user's two takes at random (synth 'playerHurt' while they load). */
+export const PLAYER_HURT_SFX = ['playerHurt1', 'playerHurt2'];
+export const STEP_DISTANCE = 31;
 
 /** Hit on an enemy: one of these at random (never the same twice in a row). */
 export const ENEMY_HIT_SFX = ['enemyHit1', 'enemyHit2', 'enemyHit3'];

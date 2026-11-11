@@ -1,7 +1,7 @@
 // Game start (imported by boot.js after the preload): wires platform services, the runtime and the UI.
 // No globals are created (except window.__game while the dev asset viewer flag is on).
 import { DEBUG_ENABLED, DEBUG_MODELS } from './config/constants.js';
-import { MUSIC_FILES, MUSIC_BED, SFX_FILES, AUDIO_DIR, ENEMY_HIT_SFX } from './data/sounds.js';
+import { MUSIC_FILES, MUSIC_BED, SFX_FILES, AUDIO_DIR, ENEMY_HIT_SFX, STEP_SFX, STEP_DISTANCE, PLAYER_HURT_SFX } from './data/sounds.js';
 import { WeaponAudio } from './platform/WeaponAudio.js';
 import { installBrowserHygiene } from './platform/BrowserHygiene.js';
 import { initAudioLifecycle } from './platform/AudioLifecycle.js';
@@ -42,13 +42,15 @@ function wireCombatSounds(events, game) {
   });
   events.on('dash', () => Sfx.play('dash'));
   events.on('beaconHit', () => Sfx.play('beaconHit', 0.9 + Math.random() * 0.2));
-  // Turrets (D50): one sound per volley (a double barrel fires two rounds in the same step); Frost Coil — icy zap
+  // Turrets (D50): one sound per volley (a double barrel fires two rounds in the same step); D53: the same recorded
+  // shot for every turret type (synth per type only while the file loads)
   let lastTurretSound = 0;
   events.on('turretShot', (x, y, a, id) => {
     const now = performance.now();
     if (now - lastTurretSound < 30) return;
     lastTurretSound = now;
-    Sfx.play(id === 'frost_coil' ? 'frostShot' : id === 'poison_turret' ? 'poisonShot' : 'turretShot', 0.92 + Math.random() * 0.16, { voices: 2 });
+    const name = Sfx.duration('turretShot') > 0 ? 'turretShot' : id === 'frost_coil' ? 'frostShot' : id === 'poison_turret' ? 'poisonShot' : 'turretShot';
+    Sfx.play(name, 0.92 + Math.random() * 0.16, { voices: 2 });
   });
   // Killed by a boss (user decision 2026-11-09): its own sting first, the defeat jingle right after it
   let lastHitBy = '';
@@ -100,7 +102,10 @@ function wireCombatSounds(events, game) {
   events.on('enemySpawn', () => { if (wave.pending) wave.spawned = true; });
   events.on('mapDefeat', () => { wave.pending = false; });
   events.on('waveCleared', (i, reward, final) => { if (!final) Sfx.play('waveClear'); });
-  events.on('playerHit', () => Sfx.play('playerHurt', 0.95 + Math.random() * 0.1));
+  events.on('playerHit', () => { // D53: the user's two takes at random
+    const name = PLAYER_HURT_SFX[Math.floor(Math.random() * PLAYER_HURT_SFX.length)];
+    Sfx.play(Sfx.duration(name) > 0 ? name : 'playerHurt', 0.96 + Math.random() * 0.08, { voices: 1 });
+  });
   events.on('bossTelegraph', () => Sfx.play('bossWarn'));
   events.on('bossImpact', (kind) => Sfx.play(kind === 'slam' ? 'bossSlam' : 'bossTide'));
   events.on('bossSummon', () => Sfx.play('bossSlam', 0.7)); // D45: Fog Mother summon
@@ -108,7 +113,24 @@ function wireCombatSounds(events, game) {
     if (Sfx.duration('spitterAttack') > 0) Sfx.play('spitterAttack', 0.94 + Math.random() * 0.12, { voices: 2 });
     else Sfx.play('throw', 0.62 + Math.random() * 0.1);
   });
+  // D53 footsteps: by the distance the keeper walks (not during a dash), two per stride, a random file each time
+  const steps = { acc: STEP_DISTANCE / 2, last: -1, run: null };
+  const footsteps = () => {
+    const run = game.run, p = run && run.player;
+    if (!p) return;
+    if (run !== steps.run) { steps.run = run; steps.acc = STEP_DISTANCE / 2; }
+    const d = Math.hypot(p.x - p.prevX, p.y - p.prevY);
+    if (!p.alive || p.dodging || !(d > 0.05)) { if (!(d > 0.05)) steps.acc = STEP_DISTANCE / 2; return; } // stopped: next step half a stride in
+    steps.acc += d;
+    if (steps.acc < STEP_DISTANCE) return;
+    steps.acc -= STEP_DISTANCE;
+    let i = Math.floor(Math.random() * STEP_SFX.length);
+    if (i === steps.last) i = (i + 1) % STEP_SFX.length;
+    steps.last = i;
+    Sfx.play(STEP_SFX[i], 0.95 + Math.random() * 0.1, { voices: 2 });
+  };
   return (time) => { // called after every simulation step
+    footsteps();
     if (wave.pending && wave.spawned && time >= wave.until) { wave.pending = false; Sfx.play('waveStart2'); }
   };
 }

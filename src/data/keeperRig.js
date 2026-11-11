@@ -11,6 +11,9 @@ const H = KEEPER_MODEL.height, G = GRUNT_MODEL.height;
 export const KEEPER_RIG = {
   hipY: 0.42 * H, shoulderY: 0.80 * H, shoulderZ: 0.13 * H, armZ: 0.145 * H, armZLow: 0.145 * H, armSplitY: 0, armMinY: 0.40 * H,
   legSwing: 0.45, handY: 0.47 * H, handZ: 0.19 * H,
+  // D53 baked arm weights (render3d/rig.js bakeArmWeights): the hands hang at y 0.40H…0.53H beside the coat sides —
+  // there only skin-coloured vertices or ones beyond handZ0 (sleeve cuffs) are arm (measured from the model)
+  handBand: [0.40 * H, 0.53 * H], handZ0: 7.6,
 };
 export const GRUNT_RIG = {
   hipY: 0.42 * G, shoulderY: 0.76 * G, shoulderZ: 0.22 * G, armZ: 0.20 * G, armZLow: 0.255 * G, armSplitY: 0.45 * G, armMinY: 0.15 * G,
