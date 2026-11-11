@@ -5,6 +5,7 @@
 // Final art can replace a model by a .glb with the same tag (art-prompts/02_PLAYER_COMBAT.md).
 import * as THREE from '../../lib/three.module.js';
 import { PROP_KINDS, rollProp } from '../systems/Props.js';
+import { BOSS_SCALE } from '../data/models3d.js';
 
 const tmpColor = new THREE.Color();
 
@@ -238,7 +239,7 @@ export function bruteEyesGeometry() {
   return mergeParts([-1, 1].map((s) => part(new THREE.SphereGeometry(2.2, 8, 6), '#ffffff', { x: 29.5, y: 34, z: s * 4 })));
 }
 
-/** Gloam Warden (boss): tall hooded shade in a flared cloak, bone crown, long clawed arms. Height ≈ 112, radius 46. */
+/** Gloam Warden (boss): tall hooded shade in a flared cloak, bone crown, long clawed arms. Height ≈ 112 × BOSS_SCALE (D55). */
 export function wardenGeometry() {
   const P = [];
   P.push(part(new THREE.CylinderGeometry(20, 44, 64, 14), R.cloak, { y: 32 }));                                // cloak
@@ -259,14 +260,14 @@ export function wardenGeometry() {
     const a = -Math.PI / 2 + (i / 4) * Math.PI;
     P.push(part(new THREE.ConeGeometry(2.4, 15, 5), R.bone, { x: -2 + Math.cos(a) * 3, y: 110, z: Math.sin(a) * 12, rx: Math.sin(a) * 0.5 }));
   }
-  return mergeParts(P);
+  return mergeParts(P).scale(BOSS_SCALE, BOSS_SCALE, BOSS_SCALE);
 }
 
 /** Boss eyes + the gloam orb in its claw (unlit violet glow). */
 export function wardenEyesGeometry() {
   const P = [-1, 1].map((s) => part(new THREE.SphereGeometry(2.4, 8, 6), '#ffffff', { x: 14.5, y: 92, z: s * 4 }));
   P.push(part(new THREE.IcosahedronGeometry(7, 1), '#ffffff', { x: 46, y: 50, z: 30 }));
-  return mergeParts(P);
+  return mergeParts(P).scale(BOSS_SCALE, BOSS_SCALE, BOSS_SCALE);
 }
 
 const N = { // D45 enemy palette
@@ -314,7 +315,7 @@ export function huskEyesGeometry() {
   return mergeParts([-1, 1].map((s) => part(new THREE.SphereGeometry(1.6, 8, 6), '#ffffff', { x: 24.5, y: 18, z: s * 3.4 })));
 }
 
-/** Fog Mother (final boss): tall veiled figure with a long train of tendrils and a cracked bone halo. Height ≈ 130. */
+/** Fog Mother (final boss): tall veiled figure with a long train of tendrils and a cracked bone halo. Height ≈ 130 × BOSS_SCALE. */
 export function motherGeometry() {
   const P = [];
   P.push(part(new THREE.CylinderGeometry(18, 50, 76, 16), N.motherVeil, { y: 38 }));                      // veil
@@ -334,14 +335,14 @@ export function motherGeometry() {
     const a = (i / 9) * Math.PI * 2;
     P.push(part(new THREE.ConeGeometry(1.8, 11, 4), N.motherBone, { x: -8 + Math.cos(a) * 2, y: 112 + Math.sin(a) * 20, z: Math.cos(a) * 20, rx: a + Math.PI / 2 }));
   }
-  return mergeParts(P);
+  return mergeParts(P).scale(BOSS_SCALE, BOSS_SCALE, BOSS_SCALE);
 }
 
 /** Fog Mother eyes + the cold core in her chest (unlit glow). */
 export function motherEyesGeometry() {
   const P = [-1, 1].map((s) => part(new THREE.SphereGeometry(2.2, 8, 6), '#ffffff', { x: 13.5, y: 106, z: s * 3.6 }));
   P.push(part(new THREE.IcosahedronGeometry(6, 1), '#ffffff', { x: 14, y: 86 }));
-  return mergeParts(P);
+  return mergeParts(P).scale(BOSS_SCALE, BOSS_SCALE, BOSS_SCALE);
 }
 
 /** Spitter glob in flight (unlit glow, instanced). */

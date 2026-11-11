@@ -86,7 +86,7 @@ export const ENEMIES = {
     id: 'gloam_warden',
     boss: true,              // one per map, final wave only; attacks in data/boss.js
     nameKey: 'boss.gloam_warden',
-    radius: 46,
+    radius: 53,              // D55 (user decision): bosses bigger — the model ×1.3 (models3d BOSS_SCALE), the body ×1.15 (was 46; more gets stuck between the pads and the groves of Pine Hollow)
     maxHp: 1400,
     moveSpeed: 28,
     beaconDamage: 25,
@@ -103,7 +103,7 @@ export const ENEMIES = {
     id: 'fog_mother',
     boss: true,
     nameKey: 'boss.fog_mother',
-    radius: 52,
+    radius: 60,              // D55: the body ×1.15 (was 52), the model ×1.3
     maxHp: 3200,
     moveSpeed: 24,
     beaconDamage: 30,

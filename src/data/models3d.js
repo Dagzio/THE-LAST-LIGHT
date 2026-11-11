@@ -3,6 +3,8 @@
 // +Z, game units) and how the procedural vertex rig bends it (render3d/rig.js). Numbers were measured from the models
 // (width / height profiles, barrel and neck search) — see PROJECT_AUDIT D54.
 const DIR = 'assets/models/';
+/** D55 (user decision): the boss models are ×1.3 bigger (their collision radius ×1.15: data/enemies.js). */
+export const BOSS_SCALE = 1.3;
 
 /**
  * Enemies. height — game units; rotY — bake rotation (Tripo faces +Z → π/2; the runner already faces +X → 0).
@@ -21,7 +23,7 @@ export const ENEMY_GLB = {
     rig: { hipY: 0.28, shoulderY: 0.9, shoulderZ: 0.2, armZ: 99, armMinY: 0.9, legSwing: 0.45, quad: true, legX: 0.18 } },
   brute: { file: `${DIR}brute.min.glb`, height: 58, rotY: Math.PI / 2,
     rig: { hipY: 0.22, shoulderY: 0.9, shoulderZ: 0.2, armZ: 99, armMinY: 0.9, legSwing: 0.35, quad: true, legX: 0.2 } },
-  fog_mother: { file: `${DIR}mother.min.glb`, height: 130, rotY: Math.PI / 2,
+  fog_mother: { file: `${DIR}mother.min.glb`, height: 130 * BOSS_SCALE, rotY: Math.PI / 2,
     rig: { hipY: 0.18, shoulderY: 0.9, shoulderZ: 0.2, armZ: 99, armMinY: 0.9, legSwing: 0.3, quad: true, legX: 0.2 } },
 };
 

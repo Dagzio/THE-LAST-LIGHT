@@ -10,7 +10,7 @@ import { SeededRandom } from '../core/SeededRandom.js';
 import { loadGLB } from '../render3d/glb.js';
 import { applyRig, rigUniforms, bakeModel, bakeArmWeights } from '../render3d/rig.js';
 import { weaponGeometry } from '../render3d/models.js';
-import { KEEPER_MODEL, KEEPER_RIG, poseFor, gunPlacement } from '../data/keeperRig.js';
+import { KEEPER_MODEL, KEEPER_RIG, KEEPER_STANCE, poseFor, gunPlacement } from '../data/keeperRig.js';
 import { ENEMY_GLB, enemyRig, GUN_GLB, TURRET_GLB } from '../data/models3d.js';
 import { bakeGun, bakeTurret } from '../render3d/glbModels.js';
 
@@ -37,7 +37,11 @@ async function texturedModels() {
     bakeModel(model.geometry, height, rotY);
     if (arms) bakeArmWeights(model.geometry, model.texture, rig);
     const u = rigUniforms(rig);
-    if (pose) u.uPose.value.set(pose.right, pose.left, pose.leftYaw, 0);
+    if (pose) {
+      u.uPose.value.set(pose.right, pose.left, pose.leftYaw, 0);
+      u.uRigC.value.z = pose.rightYaw || 0; // D55: both hands in, knees bent (the game's stance)
+      u.uRigD.value.set(KEEPER_RIG.kneeY, KEEPER_STANCE.knee, KEEPER_STANCE.drop, KEEPER_STANCE.lean);
+    }
     const mat = applyRig(new THREE.MeshLambertMaterial({ map: model.texture }), u, false, false, arms);
     const key = `viewer-${rigged.n = (rigged.n || 0) + 1}`; // own program per copy: three.js binds the uniforms of a shared program once
     mat.customProgramCacheKey = () => `rig-u-c-${key}`;
@@ -51,7 +55,10 @@ async function texturedModels() {
       const gun = m ? bakeGun(m.geometry, GUN_GLB[id], id) : weaponGeometry(id, true);
       const { grip, scale, hand } = gunPlacement(id);
       gun.translate(-grip[0], -grip[1], -grip[2]).scale(scale, scale, scale).translate(hand[0], hand[1], hand[2]);
-      g.add(body, new THREE.Mesh(gun, m ? new THREE.MeshLambertMaterial({ map: m.texture }) : new THREE.MeshLambertMaterial({ vertexColors: true })));
+      const gunMesh = new THREE.Mesh(gun, m ? new THREE.MeshLambertMaterial({ map: m.texture }) : new THREE.MeshLambertMaterial({ vertexColors: true }));
+      const S = KEEPER_STANCE, py = KEEPER_RIG.hipY - S.drop; // D55 stance on the gun (as Renderer3D._gunTransform)
+      gunMesh.applyMatrix4(new THREE.Matrix4().makeTranslation(0, py, 0).multiply(new THREE.Matrix4().makeRotationZ(-S.lean)).multiply(new THREE.Matrix4().makeTranslation(0, -py - S.drop, 0)));
+      g.add(body, gunMesh);
       g.userData.file = KEEPER_MODEL.file;
       out.set(id === 'pistol' ? 'keeper' : `keeper-${id}`, g);
     });
@@ -175,6 +182,7 @@ async function open() {
 
   window.__viewer = { scene, renderer, groups }; // dev tool only: inspection from DevTools / test scripts
   let current = null, yaw = 0.7, pitch = 0.45, dist = 3, radius = 1;
+  window.__viewer.orbit = (y, p, k = 1) => { yaw = y; pitch = p; dist = radius * 2.6 * k; }; // D55: set views from scripts
   const list = el.querySelector('.list');
   const info = el.querySelector('.info');
   for (const name of groups.keys()) {

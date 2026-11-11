@@ -2,7 +2,7 @@
 // (data/themes.js), decor, waves (data/waves.js) and ONE gameplay feature. Map 1 is unchanged.
 // waveCount is shown on the map card and must equal the wave config length in data/waves.js (unit-tested).
 // D52 difficulty (user decision): enemyHpMult scales enemy HP, enemyDamageMult every damage they deal (attacks, contact,
-// boss attacks), bossHpMult is extra boss HP on top (maps 2+); rewardMult scales kill rewards (coins and XP, rounded).
+// boss attacks), bossHpMult is extra boss HP on top (maps 2+; D55: 1.4 × 1.25 = 1.75); rewardMult scales kill rewards (coins and XP, rounded).
 // buildPads[].name → shop label key shop.pad.<name>.
 // decor: scattered props (systems/Props.js) — `kinds` is a pick list (repeats = weight), `clear` keeps the plaza and
 // the kiosk zone free, `border` is the prop kind along the playable edges (`borderSides` limits the edges), `groves`
@@ -52,7 +52,7 @@ export const MAPS = [
     completionReward: 70,
     enemyHpMult: 1.2,
     enemyDamageMult: 1.25,
-    bossHpMult: 1.4,
+    bossHpMult: 1.75, // D55: +25 % (was 1.4)
     rewardMult: 1.1,
     artSeed: 9127,
     width: 2000,
@@ -82,7 +82,7 @@ export const MAPS = [
     completionReward: 90,
     enemyHpMult: 1.35,
     enemyDamageMult: 1.45,
-    bossHpMult: 1.4,
+    bossHpMult: 1.75, // D55: +25 % (was 1.4)
     rewardMult: 1.2,
     artSeed: 4481,
     width: 2000,
@@ -109,7 +109,7 @@ export const MAPS = [
     completionReward: 110,
     enemyHpMult: 1.5,
     enemyDamageMult: 1.65,
-    bossHpMult: 1.4,
+    bossHpMult: 1.75, // D55: +25 % (was 1.4)
     rewardMult: 1.3,
     artSeed: 6203,
     width: 2000,
@@ -137,7 +137,7 @@ export const MAPS = [
     completionReward: 130,
     enemyHpMult: 1.7,
     enemyDamageMult: 1.85,
-    bossHpMult: 1.4,
+    bossHpMult: 1.75, // D55: +25 % (was 1.4)
     rewardMult: 1.4,
     artSeed: 3319,
     width: 2000,
@@ -160,7 +160,7 @@ export const MAPS = [
     completionReward: 180,
     enemyHpMult: 1.9,
     enemyDamageMult: 2.1,
-    bossHpMult: 1.4,
+    bossHpMult: 1.75, // D55: +25 % (was 1.4)
     crateGuaranteedWaves: [0], // D52: the last map gives a crate on wave 1 for sure, then the 50 / 50 rule
     rewardMult: 1.5,
     artSeed: 8805,

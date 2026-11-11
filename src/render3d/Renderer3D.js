@@ -25,7 +25,7 @@ import { getTheme } from '../data/themes.js';
 import { MenuScene } from './MenuScene.js';
 import { loadGLB } from './glb.js';
 import { applyRig, rigUniforms, bakeModel, bakeArmWeights } from './rig.js';
-import { KEEPER_MODEL, KEEPER_RIG, poseFor, gunPlacement, muzzlePoint } from '../data/keeperRig.js';
+import { KEEPER_MODEL, KEEPER_RIG, KEEPER_STANCE, poseFor, gunPlacement, muzzlePoint, muzzleLocal } from '../data/keeperRig.js';
 import { ENEMY_GLB, enemyRig, GUN_GLB, TURRET_GLB } from '../data/models3d.js';
 import { getEnemyType } from '../data/enemies.js';
 import { bakeGun, bakeTurret } from './glbModels.js';
@@ -911,9 +911,9 @@ export class Renderer3D {
   _placeMuzzle(id) {
     const tip = weaponTip(id);
     if (this.keeperRig) { // D52: the gun sits in the raised hand — the same muzzle point the simulation fires from
-      const m = muzzlePoint(id);
-      this.muzzle.position.set(m.f - 1, m.h, m.s);
-      this.gunY = m.h;
+      const l = muzzleLocal(id); // the flash is a child of the gun: its tip before the stance (the gun's transform adds it)
+      this.muzzle.position.set(l[0] - 1, l[1], l[2]);
+      this.gunY = muzzlePoint(id).h;
     } else {
       this.muzzle.position.set(tip.x - 1, tip.y, tip.z); // the star starts 2 units behind its origin: overlap the tip
       this.gunY = GUN_HEIGHT;
@@ -954,6 +954,7 @@ export class Renderer3D {
     const since = w0 ? time - w0.lastShotAt : 1;
     const kick = since >= 0 && since < 0.09 ? (1 - since / 0.09) * 0.22 : 0;
     u.uPose.value.set(pose.right, pose.left, pose.leftYaw, kick);
+    let stance = 1;
     // death: he falls over sideways (presentation time — the world is stopped by then), the gun drops out of sight
     if (!p.alive) {
       this.keeperFall = Math.min(KEEPER_FALL, (this.keeperFall || 0) + (this.frameDt || 0));
@@ -962,8 +963,34 @@ export class Renderer3D {
       body.rotation.z = 0;
       body.position.y = 0;
       u.uPose.value.set(pose.right * (1 - e), pose.left * (1 - e), 0, 0);
+      stance = 1 - e;
     } else this.keeperFall = 0;
+    // D55: both hands turned in (two-handed pistol), knees bent; the gun follows the hands (stance + recoil kick)
+    const yawR = (pose.rightYaw || 0) * stance;
+    u.uRigC.value.z = yawR;
+    u.uRigD.value.set(KEEPER_RIG.kneeY, KEEPER_STANCE.knee * stance, KEEPER_STANCE.drop * stance, KEEPER_STANCE.lean * stance);
+    this._gunTransform(kick, yawR, stance);
     this.weaponMesh.visible = p.alive;
+  }
+
+  /**
+   * D55: the gun moves with the right hand — the recoil kick turns it with the arm around the right shoulder (the
+   * same rotation as the shader: pitch, then the inward yaw), then the stance sinks and leans it with the torso.
+   */
+  _gunTransform(kick, yawR, stance) {
+    const g = this.weaponMesh, r = KEEPER_RIG, S = KEEPER_STANCE;
+    const t = this._gunT || (this._gunT = { m: new THREE.Matrix4(), a: new THREE.Matrix4(), v: new THREE.Vector3() });
+    const m = t.m, a = t.a;
+    // kick about the right shoulder: T(pivot)·Ry(yaw)·Rz(−kick)·Ry(−yaw)·T(−pivot) (three.js rotations = the shader's)
+    m.makeTranslation(0, r.shoulderY, r.shoulderZ);
+    m.multiply(a.makeRotationY(yawR)).multiply(a.makeRotationZ(-kick)).multiply(a.makeRotationY(-yawR));
+    m.multiply(a.makeTranslation(0, -r.shoulderY, -r.shoulderZ));
+    // stance: sink by drop, then lean around the sunken hips: T(py)·Rz(−lean)·T(−py − drop)
+    const py = r.hipY - S.drop * stance;
+    m.premultiply(a.makeTranslation(0, -py - S.drop * stance, 0));
+    m.premultiply(a.makeRotationZ(-S.lean * stance));
+    m.premultiply(a.makeTranslation(0, py, 0));
+    m.decompose(g.position, g.quaternion, t.v);
   }
 
   /** Smoothed facing per enemy (turns take ~0.1 s instead of snapping). Keyed by the enemy id, pruned on growth. */

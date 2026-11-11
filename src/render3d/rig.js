@@ -15,7 +15,8 @@ const GLSL = /* glsl */`
 uniform vec4 uRigA;   // hipY, shoulderY, shoulderZ, armZ
 uniform vec4 uRigB;   // armZLow, armSplitY, armMinY, legSwing
 uniform vec4 uPose;   // right arm raise, left arm raise, left arm inward (yaw), recoil
-uniform vec4 uRigC;   // D54: quad (0 / 1), leg pivot distance from the centre (front / back legs), -, -
+uniform vec4 uRigC;   // D54: quad (0 / 1), leg pivot distance from the centre (front / back legs); D55: right arm inward (yaw), -
+uniform vec4 uRigD;   // D55 stance: knee height, knee forward, body drop, torso lean (rad) — all 0 = none (enemies)
 #ifdef RIG_INSTANCED
 attribute vec4 aAnim; // walk phase (rad), walk blend 0..1, attack 0..1, (spare)
 #define RIG_ANIM aAnim
@@ -56,13 +57,24 @@ void rigDeform(inout vec3 p, inout vec3 n) {
     float right = step(0.0, p.z);
     float a = -swing * 0.45 * (right * 2.0 - 1.0) * (1.0 - max(uPose.x, uPose.y))   // walk counter-swing (not while aiming)
             + RIG_ANIM.z * 1.5                                                        // attack: both arms strike forward
-            + mix(uPose.y, uPose.x, right) - uPose.w * right;                         // aim pose + recoil kick
-    float yaw = (1.0 - right) * uPose.z;                                              // left hand towards the gun
+            + mix(uPose.y, uPose.x, right) - uPose.w;                                 // aim pose + recoil kick (both hands)
+    float yaw = mix(-uPose.z, uRigC.z, right);                                        // the hands turn in (D55: both)
     vec3 piv = vec3(0.0, uRigA.y, (right * 2.0 - 1.0) * uRigA.z);
     vec3 q = rigRotZ(p - piv, a * armW);
-    q = rigRotY(q, -yaw * armW);
+    q = rigRotY(q, yaw * armW);
     p = piv + q;
-    n = rigRotY(rigRotZ(n, a * armW), -yaw * armW);
+    n = rigRotY(rigRotZ(n, a * armW), yaw * armW);
+  }
+  // D55 stance (keeper): the knees go forward (shear of the legs: 0 at the feet and the hips, uRigD.y at the knees),
+  // the body sinks by uRigD.z, the torso leans around the hips. data/keeperRig.js stancePoint() is the same formula.
+  if (uRigD.y + uRigD.z + abs(uRigD.w) > 0.0) {
+    float hy = uRigA.x, ky = uRigD.x, y = p.y;
+    p.x += uRigD.y * (y <= ky ? clamp(y / ky, 0.0, 1.0) : clamp((hy - y) / (hy - ky), 0.0, 1.0));
+    p.y -= uRigD.z * clamp(y / hy, 0.0, 1.0);
+    vec3 piv = vec3(0.0, hy - uRigD.z, 0.0);
+    float a = -uRigD.w * smoothstep(hy, hy + 6.0, y);
+    p = piv + rigRotZ(p - piv, a);
+    n = rigRotZ(n, a);
   }
 }
 `;
@@ -97,6 +109,7 @@ export function rigUniforms(rig) {
     uRigB: { value: new THREE.Vector4(rig.armZLow ?? rig.armZ, rig.armSplitY ?? 0, rig.armMinY ?? 0, rig.legSwing ?? 0.5) },
     uPose: { value: new THREE.Vector4(0, 0, 0, 0) },
     uRigC: { value: new THREE.Vector4(rig.quad ? 1 : 0, rig.legX || 0, 0, 0) },
+    uRigD: { value: new THREE.Vector4(rig.kneeY || 1, 0, 0, 0) }, // D55: the stance amounts are set per frame (keeper)
     uAnim: { value: new THREE.Vector4(0, 0, 0, 0) },
   };
 }
