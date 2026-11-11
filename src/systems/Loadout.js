@@ -39,6 +39,9 @@ export function playerModifiers(playerUpgrades = {}) {
     speedMult: 1 + U.mobility.perRank * r('mobility'),
     dodgeCooldownMult: 1 - U.quick_dodge.perRank * r('quick_dodge'),
     interactMult: 1 + U.interact_range.perRank * r('interact_range'),
+    hpRegen: U.regen.perRank * r('regen'),        // D52: HP per second
+    lifesteal: U.vampirism.perRank * r('vampirism'), // D52: share of the keeper's weapon damage returned as HP
+    critBonus: U.crit.perRank * r('crit'),        // D52: + crit chance of the keeper's weapon
   };
 }
 

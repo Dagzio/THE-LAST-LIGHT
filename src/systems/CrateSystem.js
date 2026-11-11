@@ -1,5 +1,6 @@
-// Random crates (01_GDD §14, 02_SPEC §14, D41): on waves 2–5 a seeded 30 % roll; max 1 crate per map; it appears at
-// a valid random spot (not near the keeper, beacon, kiosk, pads, enemy spawns, not inside obstacles) and disappears
+// Random crates (01_GDD §14, 02_SPEC §14; rules D52 — data/perks.js CRATE): at most one per wave at a random moment,
+// 50 / 50 per eligible wave, never on the first / last wave (map overrides: fixed waves, guaranteed waves). It appears
+// at a valid random spot (not near the keeper, beacon, kiosk, pads, enemy spawns, not inside obstacles) and disappears
 // after 30 s. Opening it offers 3 temporary perks (the map run applies the chosen one, once).
 import { CRATE, PERKS, PERK_ORDER, PERK_CATEGORIES } from '../data/perks.js';
 
@@ -19,12 +20,20 @@ export class CrateSystem {
     this.world = null;
   }
 
-  /** Wave start: maybe schedule a crate (seeded roll). */
+  /** Does this wave get a crate? Fixed waves of the map → guaranteed waves → the 50 / 50 rule (seeded). */
+  _rollWave(waveIndex) {
+    const m = this.map;
+    if (Array.isArray(m.crateWaves)) return m.crateWaves.includes(waveIndex);
+    if (Array.isArray(m.crateGuaranteedWaves) && m.crateGuaranteedWaves.includes(waveIndex)) return true;
+    const last = (m.waveCount | 0) - 1;
+    if (waveIndex < CRATE.firstWaveIndex || waveIndex <= 0 || waveIndex >= last) return false; // never first / last
+    return this.rng.next() < CRATE.waveChance;
+  }
+
+  /** Wave start: maybe schedule a crate for a random moment of this wave (max one per wave). */
   onWaveStart(waveIndex, time) {
     this.pendingAt = null;
-    const first = this.map.crateFirstWaveIndex ?? CRATE.firstWaveIndex;
-    if (waveIndex < first || this.spawned >= CRATE.maxPerMap || this.crate) return;
-    if (this.rng.next() >= CRATE.chance) return;
+    if (this.crate || !this._rollWave(waveIndex)) return;
     this.pendingAt = time + this.rng.next() * CRATE.spawnWithin;
   }
 

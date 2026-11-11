@@ -13,18 +13,22 @@ export const QUALITY_PRESETS = {
     dprCap: 1.5,                                   // 2D menu canvas
     maxPR: Math.min(DPR, TOUCH ? 1.5 : 2), minPR: 1, // 3D render resolution (max / floor of adaptation)
     shadows: true, shadowSize: TOUCH ? 1024 : 2048,
+    crowdShadows: true, // D52: enemies cast real shadows (the textured grunt doubles its triangles in the shadow pass)
     particles: 1.0, trails: 'on', aniso: 4, fpsCap: TOUCH ? 60 : 0, lantern: true,
   },
   medium: {
     dprCap: 1.25,
     maxPR: Math.min(DPR, 1.25), minPR: 0.8,
     shadows: true, shadowSize: 1024,
+    crowdShadows: false, // D52: the keeper / beacon / turrets keep shadows, the enemy crowd gets blob shadows
     particles: 0.65, trails: 'reduced', aniso: 2, fpsCap: 60, lantern: true,
   },
   low: {
     dprCap: 1.0,
     maxPR: Math.min(DPR, 0.9), minPR: 0.6,
     shadows: false, shadowSize: 512,   // no shadow map — blob shadows under characters instead
+    crowdShadows: false,
+    texturedCrowd: false, // D52: the old procedural grunt (1.2k triangles) instead of the textured model (2.3k) in a crowd
     particles: 0.35, trails: 'off', aniso: 1, fpsCap: 60, lantern: false,
   },
 };

@@ -1,6 +1,6 @@
 // Boss attack patterns. Every attack is telegraphed on the ground before it deals damage; the boss stands still while
 // casting. Adds (reinforcements) are wave groups with a boss-HP trigger in data/waves.js.
-// Damage numbers here are base values — the map's enemyMult scales them (D45).
+// Damage numbers here are base values — the map's enemyDamageMult (× the boss's attackMult) scales them (D45, D52).
 
 // Gloam Warden (approved before Phase 4, PROJECT_AUDIT.md D35, variant "Slam + ring").
 export const GLOAM_WARDEN = {

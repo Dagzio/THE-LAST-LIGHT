@@ -1,7 +1,7 @@
 // Projectile movement and hits (04_ARCH §8): swept segment–circle test (no tunnelling at high speed),
 // nearest hit along the segment first, each enemy at most once per bullet, limited distinct targets
 // (1 + penetration). Damage goes through DamageCalculator only.
-import { computeDamage, NEUTRAL_MODIFIERS } from './DamageCalculator.js';
+import { computeDamage, hitDirectionMult, NEUTRAL_MODIFIERS } from './DamageCalculator.js';
 
 export class ProjectileSystem {
   /**
@@ -16,6 +16,8 @@ export class ProjectileSystem {
     this.events = events;
     this.getWeaponStats = getWeaponStats;
     this.modifiers = NEUTRAL_MODIFIERS;
+    /** @type {((amount:number)=>void)|null} damage dealt by the keeper's own bullets (D52 vampirism), set by the map run */
+    this.onKeeperHit = null;
     /** @type {import('./Collision.js').CollisionWorld|null} bullets stop at decor / beacon / pads / kiosk (D40) */
     this.world = null;
   }
@@ -56,10 +58,11 @@ export class ProjectileSystem {
       if (!hit) break;
       p.markHit(hit.id);
       const stats = p.stats || this.getWeaponStats(p.weaponId);
-      const r = computeDamage(stats.damage, stats, hit, this.modifiers, this.rng);
+      const r = computeDamage(stats.damage, stats, hit, this.modifiers, this.rng, hitDirectionMult(hit, p.vx, p.vy)); // D52 side / back
       const killed = hit.applyDamage(r.amount, time);
       const hx = sx + ex * hitT, hy = sy + ey * hitT;
       this.events.emit('hit', hx, hy, r.amount, r.crit);
+      if (!p.stats && this.onKeeperHit) this.onKeeperHit(r.amount); // D52 VAMPIRISM (turret rounds carry their own stats)
       if (killed) this.events.emit('kill', hit, time);
       else {
         if (stats.slowOnHit > 0) hit.applySlow(stats.slowOnHit, stats.slowDuration, time); // Frost Coil rounds (D50)

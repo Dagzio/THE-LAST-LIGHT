@@ -74,7 +74,8 @@ body.touch .hud-player { right: calc(var(--safe-r) + var(--neon) + var(--neon-sm
   font-stretch: condensed;
   text-transform: uppercase;
 }
-.hud-gun { grid-area: gun; width: calc(46px * var(--fs)); height: auto; fill: #d7dde6; stroke: rgba(0, 0, 0, 0.6); stroke-width: 1; }
+/* D52: the user's weapon icon (square art, the gun fills its middle — the box crops the empty top / bottom) */
+.hud-gun { grid-area: gun; width: calc(64px * var(--fs)); height: calc(40px * var(--fs)); object-fit: cover; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.7)); }
 .hud-ammo { grid-area: ammo; font-size: calc(34px * var(--fs)); line-height: 1; color: #fff; white-space: nowrap; }
 .hud-ammo b { color: #ffe2a8; }
 .hud-ammo-sep { margin: 0 2px; color: var(--c-muted); }
@@ -433,6 +434,9 @@ body.touch .wave-banner { top: 44%; }
 }
 body.victory .result-panel { background: radial-gradient(ellipse at center, rgba(60, 40, 8, 0.4), rgba(2, 3, 8, 0.75)); }
 body.map-over .result-panel { display: flex; }
+/* D52: on a defeat the keeper's fall plays first (0.55 s), then the dimmer + journal come in; not clickable before */
+body.defeat .result-panel { animation: resultDelay 0.3s ease 0.55s both; }
+@keyframes resultDelay { from { opacity: 0; visibility: hidden; } to { opacity: 1; visibility: visible; } }
 body.map-over #screen-game [data-action="askExit"],
 body.map-over #screen-game [data-action="openSettings"],
 body.map-over #screen-game [data-action="fullscreen"], /* under the dimmer it could not be pressed (user decision, Phase 9) */
@@ -631,10 +635,11 @@ body.cheats [data-cheat] { pointer-events: auto; cursor: pointer; }
 .coin-pop.show { display: block; animation: coinPop 1.3s ease-out forwards; }
 @keyframes coinPop { 0% { opacity: 0; transform: translateY(8px); } 15% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-22px); } }
 /* ===================== Phase 6: grenades, crate, boon cards ===================== */
-.gico { display: inline-block; width: 62%; height: 62%; background: center / contain no-repeat; }
-.gico-frag { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='14' r='6.5'/><path d='M11 7.5V5h3l2-2M14 5l3 3'/></svg>"); }
-.gico-cryo { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239fe4ff' stroke-width='2' stroke-linecap='round'><circle cx='12' cy='12' r='9'/><path d='M12 6v12M7 9l10 6M17 9L7 15'/></svg>"); }
-.gico-molotov { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffae6a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M10 9h4v3l2 3v6H8v-6l2-3z'/><path d='M12 9V6M12 2c1.5 1.5 1.5 3 0 4-1.5-1-1.5-2.5 0-4z'/></svg>"); }
+.gico { display: inline-block; width: 74%; height: 74%; background: center / contain no-repeat; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
+/* D52: the user's grenade art (assets/ui/guns) */
+.gico-frag { background-image: url("../assets/ui/guns/frag_grenade.webp"); }
+.gico-cryo { background-image: url("../assets/ui/guns/freeze_grenade.webp"); }
+.gico-molotov { background-image: url("../assets/ui/guns/molotov.webp"); }
 
 .grenade-slots {
   position: absolute;
@@ -682,7 +687,7 @@ body.map-over .grenade-slots { display: none; }
 .touch-col-left .neon-btn.neon-small { margin-bottom: 0; }
 .touch-col-left > .neon-btn:last-child { margin-bottom: calc(var(--neon) * 0.15); }
 .grenade-neon { position: relative; }
-.grenade-neon .gico { width: 58%; height: 58%; }
+.grenade-neon .gico { width: 70%; height: 70%; } /* D52: the user art needs a bit more room */
 .grenade-count { position: absolute; right: -4px; bottom: -4px; min-width: 18px; padding: 0 4px; font: 800 13px/18px var(--font-display); color: #fff; background: #23272b; border-radius: 9px; }
 .grenade-neon.empty { opacity: 0.4; }
 .grenade-neon.denied { animation: denyShake 0.3s; }
@@ -1021,7 +1026,7 @@ body.touch .hud-hpbar { width: 132px; height: 7px; }
 body.touch .hud-xpbar { width: 132px; }
 body.touch .hud-weapon { order: 2; justify-items: start; justify-content: start; grid-template-areas: "gun ammo" "reload reload"; column-gap: 10px; row-gap: 2px; }
 body.touch .hud-weapon-name { display: none; }
-body.touch .hud-gun { width: 30px; }
+body.touch .hud-gun { width: 46px; height: 29px; }
 body.touch .hud-ammo { font-size: 24px; }
 body.touch .hud-reload-label { display: none; } /* the bar alone (the ring above the keeper says it too) */
 body.touch .hud-reload-bar { width: 132px; height: 5px; }
@@ -1034,3 +1039,59 @@ body.touch .hud-reload-bar { width: 132px; height: 5px; }
    the grenade button bottom-right always shows the selected type and its count */
 body.touch .grenade-slots:not(.choice) { display: none; }
 body.touch .gslot.empty { display: none; }
+
+/* ===================== D52: device tags (level · HP · wrench), shop heals, device HP / repair ===================== */
+.dev-tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.dev-tag {
+  position: absolute; left: 0; top: 0; display: none; align-items: center; gap: 4px;
+  padding: 2px 4px 2px 2px; background: rgba(8, 7, 5, 0.72); border: 1px solid rgba(255, 210, 122, 0.3); border-radius: 4px;
+  will-change: transform; font: 800 12px / 1 var(--font-display); color: #ffe2a8;
+}
+.dev-tag.on { display: inline-flex; }
+.dev-lv { min-width: 16px; height: 16px; display: grid; place-items: center; color: #1a1206; background: #ffd27a; border-radius: 3px; }
+.dev-hp { display: block; width: 52px; height: 6px; background: rgba(0, 0, 0, 0.7); }
+.dev-hp > i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #3f9d5a, #8be08f); }
+.dev-tag.broken { border-color: #e0604a; }
+.dev-tag.broken .dev-lv { background: #8a8f99; }
+/* the wrench only while damaged: small (user: "не большую"), with an invisible 44 px touch area around it */
+.dev-fix {
+  position: relative; display: none; align-items: center; gap: 2px; height: 22px; padding: 0 5px 0 3px;
+  color: #1a1206; background: linear-gradient(180deg, #ffd88a, #d9932b); border-radius: 3px; pointer-events: auto;
+}
+.dev-fix::before { content: ""; position: absolute; inset: -11px -6px; }
+.dev-tag.hurt .dev-fix { display: inline-flex; }
+.dev-fix .ico { width: 15px; height: 15px; stroke: #1a1206; stroke-width: 2.4; fill: none; }
+.dev-cost { display: inline-flex; align-items: center; gap: 1px; font: 800 12px / 1 var(--font-display); }
+.dev-cost .coin-ico { width: 10px; height: 10px; }
+.dev-fix.poor { filter: grayscale(0.8); opacity: 0.6; }
+.dev-tag.broken .dev-fix:not(.poor) { animation: devFixPulse 0.8s ease-in-out infinite alternate; }
+@keyframes devFixPulse { to { box-shadow: 0 0 10px rgba(255, 200, 110, 0.9); } }
+body.paused .dev-fix { animation-play-state: paused; }
+body.map-over .dev-tags { display: none; }
+
+/* shop: keeper HP on the heal cards, device HP on the pips line, the wrench beside the main button */
+.shop-hp i { background: linear-gradient(90deg, #3f9d5a, #8be08f); }
+.shop-dev-hp { display: inline-block; vertical-align: middle; width: 48px; height: 6px; margin-left: 8px; background: rgba(0, 0, 0, 0.6); }
+.shop-dev-hp > i { display: block; height: 100%; background: linear-gradient(90deg, #3f9d5a, #8be08f); }
+.shop-dev-hp.broken { box-shadow: 0 0 0 1px #e0604a; }
+.shop-broken { color: #ff8a6a; font-family: var(--font-display); letter-spacing: 0.04em; }
+.shop-foot-row { display: flex; gap: 6px; }
+.shop-foot-row > .shop-buy:first-child { flex: 1; min-width: 0; }
+.shop-fix { flex: none; padding: 0 8px; gap: 3px; }
+.shop-fix .ico { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.4; fill: none; }
+.shop-fix:disabled .ico { stroke: currentColor; }
+.buy-up { display: none; }
+.buy-up .ico { width: 18px; height: 18px; stroke: currentColor; stroke-width: 3; fill: none; }
+@media (max-height: 500px) {
+  /* phones: a 4 px strip along the top of the card body — no extra line (the card must fit a 300 px phone) */
+  .shop-card-body { position: relative; }
+  .shop-dev-hp { position: absolute; left: 0; right: 0; top: 0; width: auto; height: 4px; margin: 0; }
+  .shop-foot-row .buy-label { display: none; }
+  .shop-foot-row .buy-up { display: inline-flex; }
+  .shop-fix { padding: 0 5px; font-size: 15px; }
+  .shop-fix .ico { width: 15px; height: 15px; }
+}
+/* D52: the user's weapon / grenade art in the shop card badge */
+.shop-card-ico.art { background: radial-gradient(circle at 50% 45%, #3a4048, #1c2024 70%); }
+.shop-card-ico.art img { width: 86%; height: 86%; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8)); }
+@media (min-height: 501px) { .shop-pad-line { display: flex; align-items: center; } } /* desktop: pips + device HP in one row */

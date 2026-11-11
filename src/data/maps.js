@@ -1,8 +1,9 @@
 // Campaign maps (data-driven, 04_ARCH §11). Six maps (user decision D45, 2026-11-08): every map has its own theme
 // (data/themes.js), decor, waves (data/waves.js) and ONE gameplay feature. Map 1 is unchanged.
 // waveCount is shown on the map card and must equal the wave config length in data/waves.js (unit-tested).
-// enemyMult scales enemy HP and every damage they deal (attacks, contact, boss attacks); rewardMult scales kill
-// rewards (coins and XP, rounded per kill). buildPads[].name → shop label key shop.pad.<name>.
+// D52 difficulty (user decision): enemyHpMult scales enemy HP, enemyDamageMult every damage they deal (attacks, contact,
+// boss attacks), bossHpMult is extra boss HP on top (maps 2+); rewardMult scales kill rewards (coins and XP, rounded).
+// buildPads[].name → shop label key shop.pad.<name>.
 // decor: scattered props (systems/Props.js) — `kinds` is a pick list (repeats = weight), `clear` keeps the plaza and
 // the kiosk zone free, `border` is the prop kind along the playable edges (`borderSides` limits the edges), `groves`
 // are fixed clusters inside the clearing (Pine Hollow: they block turret line of sight on purpose).
@@ -25,8 +26,10 @@ export const MAPS = [
     waveCount: 5,
     finalWaveBoss: true,
     completionReward: 50, // coins, once on victory (03_ECONOMY §4)
-    crateFirstWaveIndex: 2, // D46: on the first map crates start with wave 3 (the player learns the basics first)
-    enemyMult: 1.0,
+    crateWaves: [2, 3], // D52: the first map has a crate on wave 3 and on wave 4, no other (learns the basics first)
+    enemyHpMult: 1,
+    enemyDamageMult: 1,
+    bossHpMult: 1,
     rewardMult: 1.0,
     artSeed: 7331, // cosmetic decoration layout of the arena ground
     width: 2000,   // world units (3D map, decision 2026-11-06: bigger map, camera follows the player)
@@ -47,7 +50,9 @@ export const MAPS = [
     waveCount: 6,
     finalWaveBoss: false,
     completionReward: 70,
-    enemyMult: 1.1,
+    enemyHpMult: 1.2,
+    enemyDamageMult: 1.25,
+    bossHpMult: 1.4,
     rewardMult: 1.1,
     artSeed: 9127,
     width: 2000,
@@ -75,7 +80,9 @@ export const MAPS = [
     waveCount: 6,
     finalWaveBoss: true,
     completionReward: 90,
-    enemyMult: 1.2,
+    enemyHpMult: 1.35,
+    enemyDamageMult: 1.45,
+    bossHpMult: 1.4,
     rewardMult: 1.2,
     artSeed: 4481,
     width: 2000,
@@ -100,7 +107,9 @@ export const MAPS = [
     waveCount: 7,
     finalWaveBoss: false,
     completionReward: 110,
-    enemyMult: 1.3,
+    enemyHpMult: 1.5,
+    enemyDamageMult: 1.65,
+    bossHpMult: 1.4,
     rewardMult: 1.3,
     artSeed: 6203,
     width: 2000,
@@ -126,7 +135,9 @@ export const MAPS = [
     waveCount: 7,
     finalWaveBoss: false,
     completionReward: 130,
-    enemyMult: 1.45,
+    enemyHpMult: 1.7,
+    enemyDamageMult: 1.85,
+    bossHpMult: 1.4,
     rewardMult: 1.4,
     artSeed: 3319,
     width: 2000,
@@ -147,7 +158,10 @@ export const MAPS = [
     waveCount: 8,
     finalWaveBoss: true,
     completionReward: 180,
-    enemyMult: 1.6,
+    enemyHpMult: 1.9,
+    enemyDamageMult: 2.1,
+    bossHpMult: 1.4,
+    crateGuaranteedWaves: [0], // D52: the last map gives a crate on wave 1 for sure, then the 50 / 50 rule
     rewardMult: 1.5,
     artSeed: 8805,
     width: 2000,

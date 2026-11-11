@@ -49,6 +49,16 @@ DEFENSES.poison_turret = {
   ],
 };
 
+// Device health (D52, user decision 2026-11-11): every device has HP by level; a device at 0 HP is broken — it does
+// not shoot until repaired (its level is kept). Repair to full, proportional to the damage, like the beacon: from 1 %
+// to 100 % costs fullFromOnePercent coins (shop DEFENSES card or the small wrench next to its world HP bar).
+export const DEVICE_HP = { perLevel: [120, 160, 200], repair: { fullFromOnePercent: 40 } };
+// Enemies passing close to a working device turn on it: within `range` of its pad edge an enemy walks up and hits it
+// with its beacon damage for `attackTime` s, then goes on to the beacon and ignores devices for `cooldown` s
+// (`giveUpAfter`: it could not reach it). Bosses do not stop — their slam / tide damage devices inside the area.
+// Spitters lob every `spitterEvery`-th glob at a working device within their reach of it.
+export const DEVICE_AGGRO = { range: 80, attackTime: 3, giveUpAfter: 4, cooldown: 8, firstHit: 0.4, spitterEvery: 3, spitterReach: 300 };
+
 export const getDefense = (id) => DEFENSES[id] || null;
 
 const statsCache = new Map();
@@ -62,7 +72,7 @@ export function defenseStats(id, level = 1) {
   let s = statsCache.get(key);
   if (!s) {
     const { levels, ...base } = d;
-    s = Object.freeze({ ...base, ...levels[lv - 1], level: lv });
+    s = Object.freeze({ ...base, ...levels[lv - 1], level: lv, maxHp: DEVICE_HP.perLevel[lv - 1] });
     statsCache.set(key, s);
   }
   return s;

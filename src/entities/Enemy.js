@@ -62,6 +62,13 @@ export class Enemy {
     this.progressAt = 0;
     this.progressDist = Infinity;
     this.phaseUntil = -Infinity;
+    // D52 device distraction: the device it is attacking (null = none), when it stops, when it gives up reaching it,
+    // when it may turn on a device again; spitter glob counter (every n-th glob goes at a device)
+    this.devTarget = null;
+    this.devUntil = 0;
+    this.devGiveUpAt = 0;
+    this.devReadyAt = 0;
+    this.globCount = 0;
   }
 
   isStunned(time) { return time < this.stunUntil; }

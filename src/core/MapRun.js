@@ -85,10 +85,15 @@ export class MapRun {
     this.weaponStats = loadout.weaponStats;
     this.weapon = new WeaponState(this.weaponStats);
     this.interactMult = 1;
+    this.lifesteal = 0; // D52 VAMPIRISM share (applyLoadout)
 
     this.controller = new PlayerController(events, { w: map.width, h: map.height });
     this.weapons = new WeaponSystem(this.projectiles, this.rng, events);
     this.projectileSystem = new ProjectileSystem(this.projectiles, this.rng, events, (id) => this._statsFor(id));
+    this.projectileSystem.onKeeperHit = (amount) => { // D52 VAMPIRISM: a share of the keeper's bullet damage heals him
+      const p = this.player;
+      if (this.lifesteal > 0 && p.alive && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + amount * this.lifesteal);
+    };
     this.light = new LightSystem();
     this.ai = new EnemyAISystem(events);
     this.bossSystem = new BossSystem(events);
@@ -106,13 +111,16 @@ export class MapRun {
     this.lastTime = 0;
     this.waves = new WaveSystem(getWaves(map.id) || [], map.spawnPoints, this.rng, events,
       (id, x, y, time) => this._spawnEnemy(id, x, y, time));
-    // D45: enemy types scaled for this map (HP / damage × enemyMult, rewards × rewardMult), built once per type.
+    // D45/D52: enemy types scaled for this map (HP × enemyHpMult, boss HP also × bossHpMult, damage × enemyDamageMult,
+    // rewards × rewardMult), built once per type.
     this.enemyTypes = new Map();
     // Spitter globs in flight: { x0, y0, x1, y1, t0, t1, damage } — damage on landing, on the game clock
     this.globs = [];
     this.ai.map = map;
     this.controller.map = map;
-    this.ai.onRanged = (e, beacon, time) => this._launchGlob(e, beacon, time);
+    this.ai.onRanged = (e, target, time, device) => this._launchGlob(e, target, time, device);
+    this.ai.defenses = this.defenses;       // D52: enemies may turn on devices
+    this.bossSystem.defenses = this.defenses;
     this.bossSystem.summonFn = (points, enemyId, time) => this._summon(points, enemyId, time);
 
     this._unsub = [
@@ -144,6 +152,8 @@ export class MapRun {
       }),
       events.on('bossImpact', (kind, x, y, r) => this.particles.burst(x, y, kind === 'slam' ? 22 : 30, r * 2.2, 0.45, 3, '#b48cff')),
       events.on('bulletBlocked', (x, y) => this.particles.burst(x, y, 5, 130, 0.18, 2, '#c9c3b5')), // stone chips
+      events.on('deviceHit', (x, y) => this.particles.burst(x, y, 6, 140, 0.25, 2.2, '#ffcf8a')), // D52: sparks
+      events.on('deviceBroken', (i) => { const p = this.defenses.pads[i]; if (p) this.particles.burst(p.x, p.y, 24, 200, 0.6, 3, '#8a8f99'); }),
       events.on('waveCleared', (index, reward, final) => this._onWaveCleared(index, reward, final)),
       events.on('waveStart', (index) => this.crates.onWaveStart(index, this.lastTime)),
       events.on('grenadeBlast', (type, x, y, r) => {
@@ -173,12 +183,13 @@ export class MapRun {
   applyLoadout(loadout, initial = false) {
     this.baseLoadout = loadout;
     const ws = withPerks(loadout.weaponStats, this.temporaryPerks);
+    if (loadout.player.critBonus > 0) ws.critChance = (ws.critChance || 0) + loadout.player.critBonus; // D52 CRIT
     const prev = this.weaponStats;
     this.weaponStats = ws;
     if (initial || ws.id !== prev.id) this.weapon.equip(ws);
     else { this.weapon.stats = ws; this.weapon.ammo = Math.min(this.weapon.ammo, ws.magazineSize); }
     let speed = loadout.player.speedMult, taken = loadout.player.damageTakenMult, beam = 0;
-    let dodge = 1, hpBonus = 0, hpRegen = 0, deviceRate = 1, beaconTaken = 1, beaconRegen = 0, flareCharge = 1;
+    let dodge = 1, hpBonus = 0, hpRegen = loadout.player.hpRegen || 0, deviceRate = 1, beaconTaken = 1, beaconRegen = 0, flareCharge = 1;
     for (const id of this.temporaryPerks) {
       const k = PERKS[id];
       if (!k) continue;
@@ -209,6 +220,7 @@ export class MapRun {
     this.beacon.damageTakenMult = beaconTaken;
     this.flare.chargeMult = flareCharge;
     this.interactMult = m.interactMult;
+    this.lifesteal = m.lifesteal || 0;
     this.light.extraWidthDeg = beam;
   }
 
@@ -318,19 +330,24 @@ export class MapRun {
   _typeFor(enemyId) {
     let t = this.enemyTypes.get(enemyId);
     if (t === undefined) {
-      t = scaledEnemyType(getEnemyType(enemyId), this.map.enemyMult || 1, this.map.rewardMult || 1);
+      const m = this.map;
+      t = scaledEnemyType(getEnemyType(enemyId), m.enemyHpMult || 1, m.rewardMult || 1, m.enemyDamageMult || 1, m.bossHpMult || 1);
       this.enemyTypes.set(enemyId, t);
     }
     return t;
   }
 
-  /** Spitter attack: a glob flies from the spitter to the beacon edge; it lands after distance / globSpeed. */
-  _launchGlob(e, beacon, time) {
-    const dx = beacon.x - e.x, dy = beacon.y - e.y;
+  /**
+   * Spitter attack: a glob flies from the spitter to the beacon edge (or to a device, D52); it lands after
+   * distance / globSpeed.
+   */
+  _launchGlob(e, target, time, device = null) {
+    const r = device ? 20 : target.radius;
+    const dx = target.x - e.x, dy = target.y - e.y;
     const d = Math.hypot(dx, dy) || 1;
-    const x1 = beacon.x - (dx / d) * beacon.radius * 0.6, y1 = beacon.y - (dy / d) * beacon.radius * 0.6;
-    const t1 = time + Math.max(0.3, (d - beacon.radius) / e.type.ranged.globSpeed);
-    this.globs.push({ x0: e.x, y0: e.y, x1, y1, t0: time, t1, damage: e.type.beaconDamage });
+    const x1 = target.x - (dx / d) * r * 0.6, y1 = target.y - (dy / d) * r * 0.6;
+    const t1 = time + Math.max(0.3, (d - r) / e.type.ranged.globSpeed);
+    this.globs.push({ x0: e.x, y0: e.y, x1, y1, t0: time, t1, damage: e.type.beaconDamage, device });
     this.events.emit('glob', e.x, e.y);
   }
 
@@ -339,6 +356,12 @@ export class MapRun {
       const g = this.globs[i];
       if (time < g.t1) continue;
       this.globs.splice(i, 1);
+      if (g.device) { // D52: a glob at a device hurts it only if it is still installed and working
+        const pad = this.defenses.pads[g.device.padIndex];
+        if (pad && pad.device === g.device) this.defenses.damage(g.device, g.damage, time);
+        this.particles.burst(g.x1, g.y1, 10, 150, 0.35, 2.5, '#9be86a');
+        continue;
+      }
       const b = this.beacon;
       if (b.destroyed) continue;
       if (b.applyDamage(g.damage, time)) this._setDefeat('beacon');
@@ -420,6 +443,9 @@ export class MapRun {
     const cost = (BEACON.repair.fullFromOnePercent * missing) / (b.maxIntegrity * 0.99);
     return Math.max(1, Math.round(cost));
   }
+
+  /** D52: full repair price of the device on a pad (0 = none / undamaged). */
+  deviceRepairCost(padIndex) { return this.over ? 0 : this.defenses.repairCost(padIndex); }
 
   /** Emergency Flare (Q / flare button): only during an active wave at full charge; ignored otherwise. */
   useFlare(time) {

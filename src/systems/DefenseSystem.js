@@ -4,10 +4,12 @@
 // switching back is free. Both devices are shooting turrets with their own TargetingSystem (same priority rules as
 // the spec) and fire pooled projectiles through the shared projectile/damage pipeline; L2+ fire from two barrels.
 // The Frost Coil's rounds slow what they hit (ProjectileSystem reads stats.slowOnHit).
+// D52: devices have HP (data/defenses.js DEVICE_HP); a broken one (0 HP) stays on its pad, does not shoot and is not
+// attacked until repaired. HP is kept per device type on the pad (`health`), so a swap never heals or breaks anything.
 // All timers are game-clock timestamps — nothing advances while the simulation is paused.
 // Coins and the "only between waves" rule are validated by the shop (Game) before these commands are called.
 import { TargetingSystem } from './TargetingSystem.js';
-import { getDefense, defenseStats, MAX_DEVICE_LEVEL } from '../data/defenses.js';
+import { getDefense, defenseStats, MAX_DEVICE_LEVEL, DEVICE_HP } from '../data/defenses.js';
 import { PROJECTILES } from '../data/balance.js';
 
 export class DefenseSystem {
@@ -18,7 +20,7 @@ export class DefenseSystem {
    * @param {import('../core/GameEvents.js').GameEvents} events
    */
   constructor(padPositions, pool, rng, events) {
-    this.pads = padPositions.map((p, index) => ({ index, x: p.x, y: p.y, device: null, owned: {} }));
+    this.pads = padPositions.map((p, index) => ({ index, x: p.x, y: p.y, device: null, owned: {}, health: {} }));
     this.pool = pool;
     this.rng = rng;
     this.events = events;
@@ -67,6 +69,12 @@ export class DefenseSystem {
   _install(pad, id, time, aimAngle = -Math.PI / 2) {
     const level = pad.owned[id];
     const stats = defenseStats(id, level);
+    const prev = pad.device;
+    if (prev) pad.health[prev.id] = prev.hp; // the one going to storage keeps its damage
+    let hp = pad.health[id] ?? stats.maxHp;
+    if (prev && prev.id === id && stats.maxHp > prev.maxHp) hp += stats.maxHp - prev.maxHp; // level-up: + the new HP
+    hp = Math.min(stats.maxHp, Math.max(0, hp));
+    pad.health[id] = hp;
     pad.device = {
       id,
       level,
@@ -79,6 +87,9 @@ export class DefenseSystem {
       lastActionAt: -Infinity,
       installedAt: time, // presentation: the model pops in on install / level-up
       targeting: new TargetingSystem(),
+      hp,
+      maxHp: stats.maxHp,
+      lastHitAt: -Infinity, // presentation: hit flash
     };
     this.events.emit('devicePlaced', pad.index, id, level);
   }
@@ -87,10 +98,51 @@ export class DefenseSystem {
     return this.pads;
   }
 
+  /** A device that can be attacked / shoots (installed and not broken). */
+  static working(d) { return !!d && d.hp > 0; }
+
+  /**
+   * Damage to a device (enemy hit, spitter glob, boss impact). Returns true exactly once — when it breaks.
+   * A broken device ignores damage.
+   */
+  damage(d, amount, time) {
+    if (!d || d.hp <= 0 || !(amount > 0) || !Number.isFinite(amount)) return false;
+    d.hp = Math.max(0, d.hp - amount);
+    d.lastHitAt = time;
+    this.pads[d.padIndex].health[d.id] = d.hp;
+    this.events.emit('deviceHit', d.x, d.y, amount, d.padIndex);
+    if (d.hp > 0) return false;
+    d.targeting = new TargetingSystem(); // forget the target: it starts fresh after the repair
+    this.events.emit('deviceBroken', d.padIndex, d.id);
+    return true;
+  }
+
+  /** Price of a full repair of the device on a pad (0 = nothing to repair). Like the beacon (D40). */
+  repairCost(padIndex) {
+    const d = this.pads[padIndex] && this.pads[padIndex].device;
+    if (!d) return 0;
+    const missing = Math.max(0, d.maxHp - d.hp);
+    if (missing <= 0) return 0;
+    return Math.max(1, Math.round((DEVICE_HP.repair.fullFromOnePercent * missing) / (d.maxHp * 0.99)));
+  }
+
+  /** Repairs the device on a pad to full. Coins are validated / taken by the caller (Game). */
+  repair(padIndex, time) {
+    const pad = this.pads[padIndex];
+    const d = pad && pad.device;
+    if (!d || d.hp >= d.maxHp) return false;
+    const wasBroken = d.hp <= 0;
+    d.hp = d.maxHp;
+    pad.health[d.id] = d.hp;
+    if (wasBroken) d.nextActionAt = time + d.stats.fireInterval;
+    this.events.emit('deviceRepaired', padIndex, d.id);
+    return true;
+  }
+
   update(enemies, time) {
     for (let i = 0; i < this.pads.length; i++) {
       const d = this.pads[i].device;
-      if (d) this._turret(d, enemies, time);
+      if (d && d.hp > 0) this._turret(d, enemies, time); // a broken device does nothing until repaired
     }
   }
 
@@ -122,5 +174,5 @@ export class DefenseSystem {
     }
   }
 
-  clear() { for (const p of this.pads) { p.device = null; p.owned = {}; } }
+  clear() { for (const p of this.pads) { p.device = null; p.owned = {}; p.health = {}; } }
 }

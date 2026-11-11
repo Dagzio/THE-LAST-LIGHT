@@ -2,7 +2,7 @@
 // SLAM — circle under the keeper; TIDE — ring around the boss rolling out to its radius (also hits the beacon when it
 // is inside); SUMMON (Fog Mother) — marked circles around the boss, an enemy rises from each when the telegraph ends.
 // One attack at a time; the boss stands still while casting. Damage resolves once per attack, on the game clock
-// (pause freezes telegraphs). Numbers come from data/boss.js × the map's enemyMult (boss.type.damageMult).
+// (pause freezes telegraphs). Numbers come from data/boss.js × the map's enemyDamageMult × attackMult (boss.type.damageMult).
 // No complex state machine: idle → casting → idle.
 import { getBossPattern } from '../data/boss.js';
 
@@ -19,6 +19,8 @@ export class BossSystem {
     this.nextSummonAt = Infinity;
     /** @type {(points:Array<{x:number,y:number}>, enemyId:string, time:number)=>void} set by the map run */
     this.summonFn = null;
+    /** @type {import('./DefenseSystem.js').DefenseSystem|null} D52: slam / tide also damage devices in the area */
+    this.defenses = null;
   }
 
   /** Registers the boss when it spawns. */
@@ -81,6 +83,13 @@ export class BossSystem {
     this.lastImpact = { kind: a.kind, x: a.x, y: a.y, radius: a.radius, at: time };
     let fell = false;
     const inside = (x, y, r) => Math.hypot(x - a.x, y - a.y) <= a.radius + r;
+    if (a.kind !== 'summon' && this.defenses) { // D52: devices inside the impact take the beacon-level damage
+      const dmg = Math.round((a.kind === 'slam' ? P.slam.damage : P.tide.beaconDamage) * k);
+      for (const pad of this.defenses.pads) {
+        const d = pad.device;
+        if (d && d.hp > 0 && inside(d.x, d.y, 24)) this.defenses.damage(d, dmg, time);
+      }
+    }
     if (a.kind === 'slam') {
       this.nextSlamAt = time + P.slam.interval;
       if (player.alive && inside(player.x, player.y, player.radius)) {

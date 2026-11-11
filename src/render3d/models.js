@@ -79,11 +79,11 @@ export const WEAPON_TIPS = {
 };
 export const WEAPON_MODEL_IDS = Object.keys(WEAPON_TIPS);
 
-function weaponParts(id) {
+function weaponParts(id, gunOnly = false) {
   const P = [];
   if (id === 'smg') {
-    P.push(limb(SH_R, [19, 31.6, 5.6], 5, C.coat), glove(19.5, 31.4, 5.6));
-    P.push(limb(SH_L, [30.5, 32.2, 2.6], 5, C.coat), glove(31, 32, 2.8));
+    if (!gunOnly) P.push(limb(SH_R, [19, 31.6, 5.6], 5, C.coat), glove(19.5, 31.4, 5.6));
+    if (!gunOnly) P.push(limb(SH_L, [30.5, 32.2, 2.6], 5, C.coat), glove(31, 32, 2.8));
     P.push(gbox(15, 4.6, 3.4, W.dark, { x: 24, y: 33.6, z: 4 }));
     P.push(gbox(13, 1.2, 2.6, W.metal, { x: 24, y: 36.5, z: 4 }));
     P.push(gcyl(7, 1.6, W.steel, 35, 33.8, 4), gcyl(2.2, 0.9, W.dark, 39.5, 33.8, 4));
@@ -91,8 +91,8 @@ function weaponParts(id) {
     P.push(gbox(3, 5.8, 2.6, W.dark, { x: 19.5, y: 30, z: 4, rz: 0.3 }));
     P.push(limb([16.5, 34.2, 4], [8, 33, 4], 1.3, W.metal), gbox(1.6, 4.6, 2.6, W.dark, { x: 7.6, y: 32.6, z: 4 }));
   } else if (id === 'shotgun') {
-    P.push(limb(SH_R, [17, 31.8, 5.6], 5, C.coat), glove(17.5, 31.4, 5.6));
-    P.push(limb(SH_L, [35, 31.4, 2.6], 5, C.coat), glove(35, 31.2, 2.8));
+    if (!gunOnly) P.push(limb(SH_R, [17, 31.8, 5.6], 5, C.coat), glove(17.5, 31.4, 5.6));
+    if (!gunOnly) P.push(limb(SH_L, [35, 31.4, 2.6], 5, C.coat), glove(35, 31.2, 2.8));
     P.push(gbox(13, 4.8, 3.6, W.dark, { x: 22, y: 33.6, z: 4 }));
     P.push(gcyl(24, 1.5, W.metal, 40.5, 34.4, 4), gcyl(18, 1.2, W.dark, 37, 32, 4));
     P.push(gbox(8, 3.4, 4.2, W.wood, { x: 35, y: 32, z: 4 }));
@@ -100,8 +100,8 @@ function weaponParts(id) {
     P.push(gbox(15, 4.4, 3.2, W.wood, { x: 8.5, y: 32.6, z: 4, rz: -0.1 }), gbox(3.4, 5, 3, W.wood, { x: 16.5, y: 30.6, z: 4, rz: 0.35 }));
     P.push(part(new THREE.SphereGeometry(0.7, 6, 4), W.brass, { x: 51.5, y: 36.1, z: 4 }));
   } else if (id === 'assault_rifle' || id === 'machine_gun') {
-    P.push(limb(SH_R, [20, 31.6, 5.6], 5, C.coat), glove(20.5, 31.4, 5.6));
-    P.push(limb(SH_L, [36, 32, 2.6], 5, C.coat), glove(36, 31.8, 2.8));
+    if (!gunOnly) P.push(limb(SH_R, [20, 31.6, 5.6], 5, C.coat), glove(20.5, 31.4, 5.6));
+    if (!gunOnly) P.push(limb(SH_L, [36, 32, 2.6], 5, C.coat), glove(36, 31.8, 2.8));
     P.push(gbox(17, 5, 3.6, W.dark, { x: 24, y: 33.8, z: 4 }));
     P.push(gbox(11, 4.2, 3.8, W.steel, { x: 37, y: 33.8, z: 4 }));
     P.push(gcyl(8, 1, W.dark, 46.5, 34, 4), gcyl(2.6, 1.5, W.dark, 51, 34, 4));
@@ -111,8 +111,8 @@ function weaponParts(id) {
     P.push(gcyl(8, 1.6, W.steel, 25, 38.4, 4), gbox(3, 2, 2.2, W.dark, { x: 25, y: 36.8, z: 4 }));
     P.push(part(new THREE.CylinderGeometry(1.5, 1.5, 0.4, 10), '#7fc7ff', { x: 29.1, y: 38.4, z: 4, rz: -Math.PI / 2 })); // lens
   } else { // pistol (one hand forward, the off hand near the chest)
-    P.push(limb(SH_R, [18, 32.5, 7], 5, C.coat), glove(18.5, 32, 7));
-    P.push(limb(SH_L, [9, 30, -4], 5, C.coat), glove(10, 30, -3.6));
+    if (!gunOnly) P.push(limb(SH_R, [18, 32.5, 7], 5, C.coat), glove(18.5, 32, 7));
+    if (!gunOnly) P.push(limb(SH_L, [9, 30, -4], 5, C.coat), glove(10, 30, -3.6));
     P.push(gbox(13, 3.4, 3.2, W.metal, { x: 25, y: 34.2, z: 7 }));
     P.push(gbox(10, 2.2, 2.8, W.dark, { x: 24.5, y: 32.4, z: 7 }));
     P.push(gbox(3.2, 6.4, 2.8, W.dark, { x: 20.5, y: 29.8, z: 7, rz: 0.25 }));
@@ -123,7 +123,7 @@ function weaponParts(id) {
 }
 
 /** Arms + gun of a weapon (one merged geometry, the keeper's material). */
-export function weaponGeometry(id) { return mergeParts(weaponParts(id)); }
+export function weaponGeometry(id, gunOnly = false) { return mergeParts(weaponParts(id, gunOnly)); }
 
 /** Muzzle point of a weapon model (unknown ids: the rifle pose for the machine gun, else the pistol). */
 export const weaponTip = (id) => WEAPON_TIPS[id] || (id === 'machine_gun' ? WEAPON_TIPS.assault_rifle : WEAPON_TIPS.pistol);

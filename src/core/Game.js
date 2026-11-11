@@ -18,6 +18,7 @@ import { getMap, MAPS } from '../data/maps.js';
 import { getDefense, upgradeBasePrice, MAX_DEVICE_LEVEL } from '../data/defenses.js';
 import { shopPrice } from '../data/upgrades.js';
 import { getGrenade, GRENADE_RULES } from '../data/grenades.js';
+import { HEALS } from '../data/heals.js';
 import { SaveManager } from './SaveManager.js';
 import { Economy, REASON } from '../systems/Economy.js';
 import { nextMapId, isLastMap, defaultMapSelection, campaignSummary } from '../systems/Campaign.js';
@@ -405,6 +406,56 @@ export class Game {
     const b = this.run.beacon;
     b.repair(b.maxIntegrity - b.integrity);
     this.events.emit('purchase', 'repair', cost);
+    return { ok: true };
+  }
+
+  /**
+   * D52 device repair to full (price like the beacon, data/defenses.js DEVICE_HP). `anyTime` — the small wrench next
+   * to the device's world HP bar works while the map runs (also during a wave); the shop card only between waves.
+   */
+  deviceRepairOffer(padIndex, anyTime = false) {
+    const run = this.run;
+    const cost = run ? run.deviceRepairCost(padIndex) : 0;
+    const o = { padIndex, cost, canBuy: false, reason: null };
+    const open = anyTime ? run && !run.over && this.sm.is(STATES.RUNNING) : this.shopOpen && run && run.betweenWaves;
+    if (!open) o.reason = REASON.CLOSED;
+    else if (cost <= 0) o.reason = 'full';
+    else if (this.economy.coins < cost) o.reason = REASON.COINS;
+    else o.canBuy = true;
+    return o;
+  }
+
+  shopRepairDevice(padIndex) { return this._repairDevice(this.deviceRepairOffer(padIndex, false)); }
+
+  hudRepairDevice(padIndex) { return this._repairDevice(this.deviceRepairOffer(padIndex, true)); }
+
+  _repairDevice(o) {
+    if (!o.canBuy) return { ok: false, reason: o.reason };
+    if (!this.economy.spend(o.cost)) return { ok: false, reason: REASON.COINS };
+    if (!this.run.defenses.repair(o.padIndex, this.clock.time)) { this.economy.grantCoins(o.cost); return { ok: false, reason: REASON.UNKNOWN }; }
+    this.events.emit('purchase', 'deviceRepair', o.padIndex, o.cost);
+    return { ok: true };
+  }
+
+  /** D52 shop heal: validate (kiosk open, between waves, keeper hurt, coins) → debit → heal pct of max HP. */
+  healOffer(id) {
+    const H = HEALS[id], run = this.run, p = run && run.player;
+    const o = { id, price: H ? H.price : 0, canBuy: false, reason: null };
+    if (!H) o.reason = REASON.UNKNOWN;
+    else if (!this.shopOpen || !run || !run.betweenWaves || !p.alive) o.reason = REASON.CLOSED;
+    else if (p.hp >= p.maxHp) o.reason = 'fullHp';
+    else if (this.economy.coins < o.price) o.reason = REASON.COINS;
+    else o.canBuy = true;
+    return o;
+  }
+
+  shopHeal(id) {
+    const o = this.healOffer(id);
+    if (!o.canBuy) return { ok: false, reason: o.reason };
+    if (!this.economy.spend(o.price)) return { ok: false, reason: REASON.COINS };
+    const p = this.run.player;
+    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * HEALS[id].pct);
+    this.events.emit('purchase', 'heal', id);
     return { ok: true };
   }
 

@@ -4,7 +4,9 @@
 // One trigger pull = one round from the magazine; pelletsPerShot projectiles per pull (shotgun).
 // All timers are game-clock timestamps: they freeze with the simulation.
 import { PROJECTILES } from '../data/balance.js';
-import { PLAYER } from '../data/player.js';
+import { muzzlePoint } from '../data/keeperRig.js';
+
+const MIN_CONVERGE = 40; // world units: an aim point closer than this to the muzzle keeps the plain aim direction
 
 export class WeaponState {
   /** @param {object} stats effective weapon stats (base + upgrades + perks) */
@@ -79,9 +81,18 @@ export class WeaponSystem {
     w.ammo -= 1;
     w.nextShotAt = time + s.fireInterval;
     w.lastShotAt = time;
-    const base = player.aimAngle;
-    const mx = player.x + Math.cos(base) * PLAYER.muzzleOffset;
-    const my = player.y + Math.sin(base) * PLAYER.muzzleOffset;
+    // D52: rounds leave the barrel tip of the gun in the keeper's raised right hand (data/keeperRig.js — the same point
+    // the renderer puts the flash on), and fly to the aim point (they converge on the reticle, not parallel beside it)
+    const aim = player.aimAngle;
+    const mz = muzzlePoint(w.weaponId);
+    const c = Math.cos(aim), sn = Math.sin(aim);
+    const mx = player.x + c * mz.f - sn * mz.s;
+    const my = player.y + sn * mz.f + c * mz.s;
+    let base = aim;
+    if (player.hasAim) {
+      const dx = player.aimX - mx, dy = player.aimY - my;
+      if (dx * dx + dy * dy > MIN_CONVERGE * MIN_CONVERGE && dx * c + dy * sn > 0) base = Math.atan2(dy, dx);
+    }
     const spread = (s.spreadAngle * Math.PI) / 180;
     const pellets = Math.max(1, s.pelletsPerShot | 0);
     for (let i = 0; i < pellets; i++) {

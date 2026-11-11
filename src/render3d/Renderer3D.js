@@ -23,6 +23,9 @@ import { BEACON } from '../data/beacon.js';
 import { getBossPattern } from '../data/boss.js';
 import { getTheme } from '../data/themes.js';
 import { MenuScene } from './MenuScene.js';
+import { loadGLB } from './glb.js';
+import { applyRig, rigUniforms, bakeModel } from './rig.js';
+import { KEEPER_MODEL, GRUNT_MODEL, KEEPER_RIG, GRUNT_RIG, poseFor, gunPlacement, muzzlePoint } from '../data/keeperRig.js';
 import { FLARE } from '../data/balance.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { CAMERA } from '../config/camera.js';
@@ -64,6 +67,7 @@ const CASTING = new THREE.Color(1.35, 1.0, 1.7); // boss tint while an attack is
 const MAX_BULLETS = 192;
 const RELOAD_SEGMENTS = 16;
 const GUN_HEIGHT = 34;
+const KEEPER_FALL = 0.55; // s — the textured keeper falls over when he dies
 const TILT = (CAMERA.tilt * Math.PI) / 180;
 
 // reusable temporaries (no allocation in the frame loop)
@@ -128,6 +132,7 @@ export class Renderer3D {
     this.scene.add(this.hemi, this.moon, this.moon.target);
 
     this._buildDynamic();
+    this.modelsReady = this._loadModels(); // D52: textured keeper + grunt (the procedural ones stay as the fallback)
     this.yaws = new Map();     // enemy id → smoothed facing (presentation)
     this.lastSyncTime = 0;
     this.shakeUntil = 0;
@@ -212,7 +217,6 @@ export class Renderer3D {
       this.scene.add(tag(body, def.tag), eyes);
       this.enemyViews[id] = { body, eyes, cap: def.cap, n: 0 };
     }
-
     // Boss telegraphs (own materials: their opacity animates independently)
     const tele = (geo, mat, order) => {
       const mesh = new THREE.Mesh(geo, mat.clone());
@@ -337,7 +341,66 @@ export class Renderer3D {
     this.rig.snap(spawnX, spawnY, map.width, map.height);
     this._placeCamera();
     this.pausedDrawn = false;
-    return this.guard.warmUp();
+    this.keeperFall = 0;
+    // the textured models load once at start; the warm-up compiles their rig shaders with the map (no hitch in a fight)
+    return this.modelsReady.then(() => this.guard.warmUp());
+  }
+
+  // ---------------- D52 textured models (Tripo, simplified offline) + procedural rig ----------------
+  async _loadModels() {
+    const [kp, gr] = await Promise.all([loadGLB(KEEPER_MODEL.file), loadGLB(GRUNT_MODEL.file)]);
+    if (kp) this._useKeeperModel(kp);
+    if (gr) this._useGruntModel(gr);
+  }
+
+  /** Rigged material (Lambert like the other characters) + the matching shadow depth material. */
+  _rigMaterials(texture, uniforms, instanced) {
+    const mat = applyRig(new THREE.MeshLambertMaterial({ map: texture }), uniforms, instanced, false);
+    const depth = applyRig(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), uniforms, instanced, true);
+    return { mat, depth };
+  }
+
+  _useKeeperModel({ geometry, texture }) {
+    bakeModel(geometry, KEEPER_MODEL.height);
+    this.keeperRig = rigUniforms(KEEPER_RIG);
+    const { mat, depth } = this._rigMaterials(texture, this.keeperRig, false);
+    this.playerBody.geometry = geometry;
+    this.playerBody.material = mat;
+    this.playerBody.customDepthMaterial = depth;
+    for (const leg of this.legs) leg.visible = false; // the legs are part of the mesh now
+    this.legsHidden = true;
+    for (const g of this.ghosts) g.geometry = geometry;
+    // the gun alone (no box arms), moved so its grip sits in the raised right hand; the flash on its barrel tip
+    for (const id of WEAPON_MODEL_IDS) {
+      const g = weaponGeometry(id, true);
+      const { grip, scale, hand } = gunPlacement(id);
+      g.translate(-grip[0], -grip[1], -grip[2]).scale(scale, scale, scale).translate(hand[0], hand[1], hand[2]);
+      this.weaponGeos[id] = g;
+    }
+    this.weaponShown = '';
+  }
+
+  _useGruntModel({ geometry, texture }) {
+    bakeModel(geometry, GRUNT_MODEL.height);
+    const v = this.enemyViews.grunt;
+    geometry.setAttribute('aAnim', new THREE.InstancedBufferAttribute(new Float32Array(v.cap * 4), 4).setUsage(THREE.DynamicDrawUsage));
+    this.gruntRig = rigUniforms(GRUNT_RIG);
+    const { mat, depth } = this._rigMaterials(texture, this.gruntRig, true);
+    // D52: LOW keeps the light box grunt (2.3k triangles × a crowd is too much for a weak phone); the others the model
+    v.boxView = { geometry: v.body.geometry, material: v.body.material, depth: v.body.customDepthMaterial };
+    v.rigView = { geometry, material: mat, depth };
+    this._gruntLod();
+  }
+
+  /** D52: textured / box grunt by the preset (texturedCrowd). The eyes are in the texture of the textured one. */
+  _gruntLod() {
+    const v = this.enemyViews && this.enemyViews.grunt, pr = QUALITY_PRESETS[this.quality];
+    if (!v || !v.rigView || !pr) return;
+    const use = pr.texturedCrowd !== false ? v.rigView : v.boxView;
+    v.body.geometry = use.geometry;
+    v.body.material = use.material;
+    v.body.customDepthMaterial = use.depth;
+    v.rigged = use === v.rigView; // animation per instance (aAnim) only on the textured model
   }
 
   /** Sky, fog and the two scene lights of the map's theme (D45). No light is added or removed (no shader rebuild). */
@@ -434,6 +497,13 @@ export class Renderer3D {
 
   busy() { return this.guard.busy(); }
 
+  /** D52: enemy bodies cast shadows only on presets with crowdShadows (HIGH). */
+  _crowdShadows() {
+    const pr = QUALITY_PRESETS[this.quality];
+    if (!this.enemyViews || !pr) return; // built before the first applyQuality: that call sets it
+    for (const id in this.enemyViews) this.enemyViews[id].body.castShadow = !!(pr.shadows && pr.crowdShadows);
+  }
+
   // ---------------- quality (applied live, H5 3D guide §3) ----------------
   applyQuality(quality) {
     this.quality = quality;
@@ -448,7 +518,10 @@ export class Renderer3D {
     this.renderer.shadowMap.enabled = pr.shadows;
     this.moon.castShadow = pr.shadows;
     sh.mapSize.set(pr.shadowSize, pr.shadowSize);
-    this.blobs.visible = !pr.shadows;
+    this.blobs.visible = !pr.shadows || !pr.crowdShadows; // D52: enemy blobs also when only the crowd has no shadows
+    this.playerBlob = !pr.shadows;                         // the keeper has a real shadow whenever shadows are on
+    this._crowdShadows();
+    this._gruntLod();
     this.lanternLight.visible = pr.lantern;
     this.kioskLight.visible = pr.lantern; // light count changes only here, followed by the shader warm-up
     if (this.env) this.env.groundTexture.anisotropy = pr.aniso;
@@ -533,7 +606,9 @@ export class Renderer3D {
   render(run, frameDt, time, paused, alpha = 1) {
     if (!run || !this.map || this.guard.busy()) return false;
     this._resize(false);
-    if (paused && this.pausedDrawn) return false; // the paused frame does not change: draw it once
+    this.frameDt = frameDt;
+    const dying = !!this.keeperRig && !run.player.alive && this.keeperFall < KEEPER_FALL; // the keeper is still falling
+    if (paused && this.pausedDrawn && !dying) return false; // the paused frame does not change: draw it once
     // Interpolation between the last two fixed steps (alpha 0…1): the camera and the bodies move every frame,
     // not in 60 Hz jumps against a smoothly moving camera (that read as a blurred / doubled keeper).
     this.alpha = paused ? 1 : Math.min(1, Math.max(0, alpha));
@@ -568,15 +643,16 @@ export class Renderer3D {
     const p = run.player;
     const preset = QUALITY_PRESETS[this.quality];
 
-    // Player
+    // Player (D52: the textured keeper falls when he dies — presentation time, the world is already stopped)
     const aim = p.aimAngle;
-    this.player.visible = p.alive;
+    this.player.visible = p.alive || !!this.keeperRig;
     const ppx = this._lerpX(p), ppy = this._lerpY(p);
     this.player.position.set(ppx, 0, ppy);
     this.player.rotation.y = -aim;
-    const flicker = p.isInvulnerable(time) && Math.floor(time * 30) % 2 === 0;
+    const flicker = p.alive && p.isInvulnerable(time) && Math.floor(time * 30) % 2 === 0;
     this.playerBody.visible = !flicker;
-    for (const leg of this.legs) leg.visible = !flicker;
+    for (const leg of this.legs) leg.visible = !flicker && !this.legsHidden;
+    this.weaponState = run.weapon;
     this._animateKeeper(p, aim, time);
     const trail = p.dodging && preset.trails !== 'off';
     for (let k = 0; k < this.ghosts.length; k++) {
@@ -601,11 +677,12 @@ export class Renderer3D {
       const A = GAIT[e.typeId] || GAIT.grunt;
       const stunned = e.alive && e.isStunned(time);
       const yaw = this._yaw(e, e.faceAngle, fdt) + (stunned ? Math.sin(time * 22 + e.id) * 0.35 : 0); // stun: dazed wobble
-      let roll = 0, pitch = 0, lift = 0, sy = 1, sxz = 1, scale = 1;
+      let roll = 0, pitch = 0, lift = 0, sy = 1, sxz = 1, scale = 1, walkPh = 0, walkOn = 0;
       if (e.alive) {
         const moving = !stunned && !e.casting && (e.state === ENEMY_STATES.MOVE_TO_BEACON || e.state === ENEMY_STATES.ATTACK_PLAYER);
         if (moving) {
           const ph = time * A.freq * e.slowFactor(time) + e.id * 1.7;
+          walkPh = ph * 0.5; walkOn = 1; // rigged legs: one stride per two body bobs
           lift = Math.abs(Math.sin(ph)) * A.bob;
           roll = Math.sin(ph) * A.roll;
           pitch = -A.pitch;
@@ -625,6 +702,12 @@ export class Renderer3D {
         const sinkK = Math.max(0, (f - 0.35) / 0.65);
         lift = -sinkK * e.radius * 0.9;              // crumbles into the ground
         scale = 1 - sinkK * 0.35;
+      }
+      if (v.rigged) { // the textured model walks with its legs: a softer body squash, the arms strike on an attack
+        sy = 1 + (sy - 1) * 0.35; sxz = 1 + (sxz - 1) * 0.35; roll *= 0.6;
+        const ak = (time - e.lastAttackAt) / 0.35;
+        const atk = e.alive && ak >= 0 && ak < 1 ? Math.sin(ak * Math.PI) : 0;
+        v.body.geometry.attributes.aAnim.setXYZW(v.n, walkPh, walkOn, atk, 0);
       }
       E.set(roll, -yaw, pitch, 'YXZ');
       Q.setFromEuler(E);
@@ -661,14 +744,16 @@ export class Renderer3D {
         P.set(ex, 0.6, ey); S.set(s, s, 1); M.compose(P, FLAT_X, S); this.blobs.setMatrixAt(blobs++, M);
       }
     }
-    if (this.blobs.visible && p.alive) { P.set(ppx, 0.6, ppy); S.set(44, 44, 1); M.compose(P, FLAT_X, S); this.blobs.setMatrixAt(blobs++, M); }
+    if (this.playerBlob && p.alive) { P.set(ppx, 0.6, ppy); S.set(44, 44, 1); M.compose(P, FLAT_X, S); this.blobs.setMatrixAt(blobs++, M); }
     for (const id in views) {
       const v = views[id];
       v.body.count = v.eyes.count = v.n;
-      v.body.visible = v.eyes.visible = v.n > 0; // no draw call for types that are not on the map
+      v.body.visible = v.n > 0; // no draw call for types that are not on the map
+      v.eyes.visible = v.n > 0 && !v.rigged; // the textured grunt has its eyes in the texture
       if (v.n > 0) {
         v.body.instanceMatrix.needsUpdate = v.eyes.instanceMatrix.needsUpdate = true;
         if (v.body.instanceColor) v.body.instanceColor.needsUpdate = true;
+        if (v.rigged) v.body.geometry.attributes.aAnim.needsUpdate = true;
       }
     }
     this.hpBack.count = this.hpFill.count = bars;
@@ -694,7 +779,7 @@ export class Renderer3D {
     for (const pr of run.projectiles.items) {
       if (!pr.active || b >= MAX_BULLETS) continue;
       Q.setFromAxisAngle(UP, -pr.angle);
-      P.set(pr.x, GUN_HEIGHT, pr.y); S.setScalar(1);
+      P.set(pr.x, pr.stats ? GUN_HEIGHT : this.gunY || GUN_HEIGHT, pr.y); S.setScalar(1); // keeper rounds at his barrel height
       M.compose(P, Q, S);
       this.bullets.setColorAt(b, pr.weaponId === 'frost_coil' ? ICE_BOLT : pr.weaponId === 'poison_turret' ? TOXIC_BOLT : WHITE); // D50/D51
       this.bullets.setMatrixAt(b++, M);
@@ -753,9 +838,16 @@ export class Renderer3D {
   /** Puts the muzzle flash on the barrel tip of a weapon model (local to the gun; size per weapon). */
   _placeMuzzle(id) {
     const tip = weaponTip(id);
-    this.muzzle.position.set(tip.x - 1, tip.y, tip.z); // the star starts 2 units behind its origin: overlap the tip
-    this.muzzleScale = tip.flash;
-    this.muzzle.scale.setScalar(tip.flash);
+    if (this.keeperRig) { // D52: the gun sits in the raised hand — the same muzzle point the simulation fires from
+      const m = muzzlePoint(id);
+      this.muzzle.position.set(m.f - 1, m.h, m.s);
+      this.gunY = m.h;
+    } else {
+      this.muzzle.position.set(tip.x - 1, tip.y, tip.z); // the star starts 2 units behind its origin: overlap the tip
+      this.gunY = GUN_HEIGHT;
+    }
+    this.muzzleScale = tip.flash * (this.keeperRig ? gunPlacement(id).scale : 1);
+    this.muzzle.scale.setScalar(this.muzzleScale);
   }
 
   _lerpX(o) { return o.prevX === undefined ? o.x : o.prevX + (o.x - o.prevX) * this.alpha; }
@@ -782,6 +874,24 @@ export class Renderer3D {
     if (p.dodging) { body.rotation.z = -0.3 * Math.cos(rel); body.rotation.x = -0.3 * Math.sin(rel); body.scale.set(1.04, 0.92, 1.04); }
     this.legs[0].rotation.z = swing * 0.6 * b;
     this.legs[1].rotation.z = -swing * 0.6 * b;
+    if (!this.keeperRig) return;
+    // D52 textured keeper: legs + arms in the shader — walk swing, the weapon held in the raised hands, a recoil kick
+    const u = this.keeperRig, w0 = this.weaponState;
+    u.uAnim.value.set(w.phase, p.alive ? b : 0, 0, 0);
+    const pose = poseFor(w0 ? w0.weaponId : 'pistol');
+    const since = w0 ? time - w0.lastShotAt : 1;
+    const kick = since >= 0 && since < 0.09 ? (1 - since / 0.09) * 0.22 : 0;
+    u.uPose.value.set(pose.right, pose.left, pose.leftYaw, kick);
+    // death: he falls over sideways (presentation time — the world is stopped by then), the gun drops out of sight
+    if (!p.alive) {
+      this.keeperFall = Math.min(KEEPER_FALL, (this.keeperFall || 0) + (this.frameDt || 0));
+      const k = this.keeperFall / KEEPER_FALL, e = 1 - (1 - k) ** 3;
+      body.rotation.x = e * (Math.PI / 2) * 0.96;
+      body.rotation.z = 0;
+      body.position.y = 0;
+      u.uPose.value.set(pose.right * (1 - e), pose.left * (1 - e), 0, 0);
+    } else this.keeperFall = 0;
+    this.weaponMesh.visible = p.alive;
   }
 
   /** Smoothed facing per enemy (turns take ~0.1 s instead of snapping). Keyed by the enemy id, pruned on growth. */
@@ -1065,7 +1175,11 @@ export class Renderer3D {
       const mv = v.models[key];
       mv.head.rotation.y = -d.aimAngle;
       const recoil = time - d.lastActionAt < 0.1 ? (1 - (time - d.lastActionAt) / 0.1) * 3 : 0;
-      mv.head.position.set(-Math.cos(d.aimAngle) * recoil, 0, -Math.sin(d.aimAngle) * recoil);
+      // D52: a hit shakes the device for a moment; a broken one hangs its barrel to the ground until repaired
+      const hk = time - d.lastHitAt < 0.18 ? (1 - (time - d.lastHitAt) / 0.18) * 2.5 : 0;
+      const jx = hk ? Math.sin(time * 90) * hk : 0, jz = hk ? Math.cos(time * 77) * hk : 0;
+      mv.head.position.set(-Math.cos(d.aimAngle) * recoil + jx, d.hp <= 0 ? -3 : 0, -Math.sin(d.aimAngle) * recoil + jz);
+      mv.head.rotation.z = d.hp <= 0 ? -0.55 : 0;
       if (mv.crystal && d.id === 'frost_coil') {
         mv.crystal.rotation.y = time * 1.6 + d.aimAngle; // spins on its own (the head turns it with the aim)
         mv.crystal.position.y = Math.sin(time * 2.2) * 2;

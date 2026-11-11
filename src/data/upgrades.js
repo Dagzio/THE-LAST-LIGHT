@@ -44,6 +44,10 @@ export const PLAYER_UPGRADES = {
   mobility: { id: 'mobility', nameKey: 'pup.mobility', max: 5, baseCost: 40, perRank: 0.03 },         // +3% move speed
   quick_dodge: { id: 'quick_dodge', nameKey: 'pup.quick_dodge', max: 5, baseCost: 45, perRank: 0.04 }, // −4% dodge cooldown
   interact_range: { id: 'interact_range', nameKey: 'pup.interact_range', max: 3, baseCost: 35, perRank: 0.15 }, // +15% (D14)
+  // D52 (user decision): fixed prices per rank (`costs`, final coins — no growth formula, no SHOP_PRICE_MULT)
+  regen: { id: 'regen', nameKey: 'pup.regen', max: 3, costs: [50, 80, 110], perRank: 0.5, fxValue: 0.5 },     // +0.5 HP/s
+  vampirism: { id: 'vampirism', nameKey: 'pup.vampirism', max: 3, costs: [60, 95, 130], perRank: 0.02 },     // 2 % of weapon damage → HP
+  crit: { id: 'crit', nameKey: 'pup.crit', max: 5, costs: [40, 75, 110, 145, 180], perRank: 0.03 },          // +3 % crit chance
 };
 
-export const PLAYER_UPGRADE_ORDER = ['vitality', 'armor', 'mobility', 'quick_dodge', 'interact_range'];
+export const PLAYER_UPGRADE_ORDER = ['vitality', 'armor', 'regen', 'vampirism', 'crit', 'mobility', 'quick_dodge', 'interact_range'];

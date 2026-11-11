@@ -15,6 +15,10 @@ export const TARGETING = {
 export const DAMAGE = {
   minDamage: 1,                // step 8: clamp
   illuminatedBonus: 0.15,      // step 6: +15% (GDD §9.2), used once Illuminated exists (Phase 3)
+  // D52 (user decision): where a bullet lands relative to the enemy's facing. Front (within frontCos of the facing)
+  // takes full damage, the sides × sideMult for everyone; the back × backMult for bosses and armoured types
+  // (type.rearArmor — the Husk); for the others the back counts as the front.
+  directional: { frontCos: 0.5, backCos: -0.5, sideMult: 0.85, backMult: 0.65 },
 };
 
 export const PROJECTILES = {

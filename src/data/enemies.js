@@ -77,6 +77,7 @@ export const ENEMIES = {
     attackReach: 30,
     contactDamage: 14,
     armor: 3,
+    rearArmor: true,         // D52: bullets in its back −35 % (sides −15 % for everyone, data/balance.js DAMAGE)
     bossSlowFactor: 1,
     barHeight: 52,
     reward: { coins: 4, xp: 10 },
@@ -112,23 +113,28 @@ export const ENEMIES = {
     armor: 0,
     bossSlowFactor: 0.5,
     barHeight: 0,
+    attackMult: 1.25,        // D52: the strongest boss — her slam / tide / beacon hits +25 % on top of the map
     reward: { coins: 60, xp: 150 },
   },
 };
 
 /**
- * Enemy type scaled for a map (D45): HP and every damage × enemyMult, kill reward × rewardMult (rounded). Returns the
- * base entry for a neutral map, so map 1 keeps the exact original objects.
+ * Enemy type scaled for a map (D45; split HP / damage + boss HP in D52): HP × hpMult (bosses also × bossHpMult), every
+ * damage × damageMult (boss attacks also × type.attackMult), kill reward × rewardMult (rounded). Returns the base entry
+ * for a neutral map, so map 1 keeps the exact original objects.
  */
-export function scaledEnemyType(type, enemyMult = 1, rewardMult = 1) {
-  if (!type || (enemyMult === 1 && rewardMult === 1)) return type;
+export function scaledEnemyType(type, hpMult = 1, rewardMult = 1, damageMult = hpMult, bossHpMult = 1) {
+  if (!type) return type;
+  const hp = hpMult * (type.boss ? bossHpMult : 1);
+  const attack = damageMult * (type.attackMult || 1);
+  if (hp === 1 && damageMult === 1 && rewardMult === 1 && attack === 1) return type;
   const r = type.reward || { coins: 0, xp: 0 };
   return {
     ...type,
-    maxHp: Math.round(type.maxHp * enemyMult),
-    beaconDamage: Math.round(type.beaconDamage * enemyMult),
-    contactDamage: Math.round(type.contactDamage * enemyMult),
-    damageMult: enemyMult, // boss attacks (data/boss.js numbers) read it
+    maxHp: Math.round(type.maxHp * hp),
+    beaconDamage: Math.round(type.beaconDamage * damageMult),
+    contactDamage: Math.round(type.contactDamage * damageMult),
+    damageMult: attack, // boss attacks (data/boss.js numbers) read it
     reward: { coins: Math.round(r.coins * rewardMult), xp: Math.round(r.xp * rewardMult) },
   };
 }

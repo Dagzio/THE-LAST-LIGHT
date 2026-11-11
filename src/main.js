@@ -13,6 +13,8 @@ import { UIManager } from './ui/UIManager.js';
 import { HUD } from './ui/HUD.js';
 import { TouchControls } from './ui/TouchControls.js';
 import { OffscreenIndicators } from './ui/OffscreenIndicators.js';
+import { DeviceTags } from './ui/DeviceTags.js';
+import { preloadIcons } from './data/icons.js';
 import { initDebugOverlay } from './ui/DebugOverlay.js';
 
 /** Gameplay facts → sounds. Repeated shots get a small cosmetic pitch variation (GDD §18). */
@@ -46,7 +48,7 @@ function wireCombatSounds(events, game) {
     const now = performance.now();
     if (now - lastTurretSound < 30) return;
     lastTurretSound = now;
-    Sfx.play(id === 'frost_coil' ? 'frostShot' : id === 'poison_turret' ? 'poisonShot' : 'turretShot', 0.92 + Math.random() * 0.16);
+    Sfx.play(id === 'frost_coil' ? 'frostShot' : id === 'poison_turret' ? 'poisonShot' : 'turretShot', 0.92 + Math.random() * 0.16, { voices: 2 });
   });
   // Killed by a boss (user decision 2026-11-09): its own sting first, the defeat jingle right after it
   let lastHitBy = '';
@@ -69,8 +71,18 @@ function wireCombatSounds(events, game) {
     const now = performance.now();
     if (now - lastRicochetAt < 60) return; // SMG bursts into a wall must not turn into noise
     lastRicochetAt = now;
-    Sfx.play('hit', 1.6 + Math.random() * 0.3);
+    if (Sfx.duration('ricochet') > 0) Sfx.play('ricochet', 0.92 + Math.random() * 0.16, { voices: 2 }); // D52 file
+    else Sfx.play('hit', 1.6 + Math.random() * 0.3);
   });
+  // D52 device health: a hit clanks (throttled — several enemies can hit at once), a breaking device bangs
+  let lastDeviceHitAt = 0;
+  events.on('deviceHit', () => {
+    const now = performance.now();
+    if (now - lastDeviceHitAt < 120) return;
+    lastDeviceHitAt = now;
+    Sfx.play('beaconHit', 1.35 + Math.random() * 0.15);
+  });
+  events.on('deviceBroken', () => Sfx.play('boom', 1.35));
   // Wave start (user decision 2026-11-09): START NEXT WAVE pressed → wave-start1 at once; wave-start2 when the first
   // enemy of the wave is out AND wave-start1 has finished. Timer ran out (no press) → only wave-start2 on the first
   // enemy. Timed on the game clock (a pause does not let it fire early). Synth fog horn if the files are missing.
@@ -91,7 +103,10 @@ function wireCombatSounds(events, game) {
   events.on('bossTelegraph', () => Sfx.play('bossWarn'));
   events.on('bossImpact', (kind) => Sfx.play(kind === 'slam' ? 'bossSlam' : 'bossTide'));
   events.on('bossSummon', () => Sfx.play('bossSlam', 0.7)); // D45: Fog Mother summon
-  events.on('glob', () => Sfx.play('throw', 0.62 + Math.random() * 0.1)); // D45: Spitter
+  events.on('glob', () => { // D45: Spitter (D52: its own recorded spit)
+    if (Sfx.duration('spitterAttack') > 0) Sfx.play('spitterAttack', 0.94 + Math.random() * 0.12, { voices: 2 });
+    else Sfx.play('throw', 0.62 + Math.random() * 0.1);
+  });
   return (time) => { // called after every simulation step
     if (wave.pending && wave.spawned && time >= wave.until) { wave.pending = false; Sfx.play('waveStart2'); }
   };
@@ -121,6 +136,8 @@ export function startGame(boot) {
   new HUD(game);
   new TouchControls(game);
   new OffscreenIndicators(game);
+  new DeviceTags(game); // D52
+  preloadIcons();
   const waveSoundStep = wireCombatSounds(game.events, game);
   const weaponAudio = new WeaponAudio(game.events);
   game.onSimStep = (run, time) => { weaponAudio.update(run, time); waveSoundStep(time); };

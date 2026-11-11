@@ -6,11 +6,14 @@
 // contact damage (D17) — any enemy touching the keeper hurts him; the keeper's hit invulnerability limits the rate.
 // A light separation pass keeps bodies from stacking on one spot (no physics engine).
 // Emergency Flare (D38): a stunned enemy stands still, does not attack and deals no contact damage.
+// D52: a walker passing close to a working device turns on it for a few seconds (data/defenses.js DEVICE_AGGRO), then
+// goes on to the beacon; a Spitter lobs every n-th glob at a device in reach.
 import { ENEMY_STATES } from '../entities/Enemy.js';
 import { BEACON } from '../data/beacon.js';
 import { AI } from '../data/balance.js';
 import { terrainSpeed } from '../data/maps.js';
-import { isStructure } from './Collision.js';
+import { isStructure, COLLIDER } from './Collision.js';
+import { DEVICE_AGGRO } from '../data/defenses.js';
 
 const isDecor = (c) => !isStructure(c);
 
@@ -26,8 +29,53 @@ export class EnemyAISystem {
     this.world = null;
     /** @type {object|null} map data: slow zones (Salt Marsh, D45) */
     this.map = null;
-    /** @type {((e:object, beacon:object, time:number)=>void)|null} ranged attack (Spitter glob), set by the map run */
+    /** @type {((e:object, target:object, time:number, device?:object)=>void)|null} ranged attack (Spitter glob) */
     this.onRanged = null;
+    /** @type {import('./DefenseSystem.js').DefenseSystem|null} devices enemies may turn on (D52), set by the map run */
+    this.defenses = null;
+  }
+
+  /** Nearest working device whose pad edge is within DEVICE_AGGRO.range of the enemy (null if none). */
+  _deviceNear(e, reach) {
+    if (!this.defenses) return null;
+    let best = null, bestD = Infinity;
+    for (const pad of this.defenses.pads) {
+      const d = pad.device;
+      if (!d || d.hp <= 0) continue;
+      const gap = Math.hypot(d.x - e.x, d.y - e.y) - COLLIDER.pad - e.radius;
+      if (gap <= reach && gap < bestD) { bestD = gap; best = d; }
+    }
+    return best;
+  }
+
+  /**
+   * D52: an enemy busy with a device walks up to it and hits it (beacon damage, attack interval) until the attack time
+   * is over. Returns true while it is busy this step (the normal beacon logic is skipped).
+   */
+  _attackDevice(e, t, dt, time) {
+    const d = e.devTarget, A = DEVICE_AGGRO;
+    const pad = d && this.defenses ? this.defenses.pads[d.padIndex] : null;
+    if (!d || d.hp <= 0 || !pad || pad.device !== d || (e.devUntil > 0 && time >= e.devUntil) || (e.devUntil === 0 && time >= e.devGiveUpAt)) {
+      e.devTarget = null;
+      e.devReadyAt = time + A.cooldown;
+      return false;
+    }
+    const dx = d.x - e.x, dy = d.y - e.y;
+    const dist = Math.hypot(dx, dy);
+    const stopAt = COLLIDER.pad + e.radius + t.attackReach;
+    if (dist > 1e-6) e.faceAngle = Math.atan2(dy, dx);
+    if (dist > stopAt + ARRIVE_EPS) {
+      const step = Math.min(dist - stopAt, t.moveSpeed * e.slowFactor(time) * dt);
+      if (step > 0) this._step(e, (dx / dist) * step, (dy / dist) * step, time);
+      return true;
+    }
+    if (e.devUntil === 0) { e.devUntil = time + A.attackTime; e.nextAttackAt = time + A.firstHit; }
+    if (time >= e.nextAttackAt) {
+      e.nextAttackAt = time + t.attackInterval;
+      e.lastAttackAt = time;
+      this.defenses.damage(d, t.beaconDamage, time);
+    }
+    return true;
   }
 
   /**
@@ -138,6 +186,14 @@ export class EnemyAISystem {
         e.faceAngle = Math.atan2(py, px);
       } else if (e.state === ENEMY_STATES.MOVE_TO_BEACON) {
         e.attackingBeacon = false;
+        // D52: a working device close to its path distracts a walker for a moment (bosses / spitters never stop)
+        if (this.defenses && !t.boss && !t.ranged) {
+          if (!e.devTarget && time >= e.devReadyAt) {
+            const d = this._deviceNear(e, DEVICE_AGGRO.range);
+            if (d) { e.devTarget = d; e.devUntil = 0; e.devGiveUpAt = time + DEVICE_AGGRO.giveUpAfter; }
+          }
+          if (e.devTarget && this._attackDevice(e, t, dt, time)) continue;
+        }
         // + ARRIVE_EPS: the last step lands exactly on the ring; float rounding could leave it 1e-13 short forever
         if (dist <= stopAt + ARRIVE_EPS) {
           e.state = ENEMY_STATES.ATTACK_BEACON;
@@ -162,7 +218,13 @@ export class EnemyAISystem {
         if (time >= e.nextAttackAt) {
           e.nextAttackAt = time + t.attackInterval;
           e.lastAttackAt = time;
-          if (t.ranged && this.onRanged) { this.onRanged(e, beacon, time); continue; } // Spitter: damage on landing
+          if (t.ranged && this.onRanged) { // Spitter: damage on landing; every n-th glob at a device in reach (D52)
+            e.globCount += 1;
+            const dev = e.globCount % DEVICE_AGGRO.spitterEvery === 0 ? this._deviceNear(e, DEVICE_AGGRO.spitterReach) : null;
+            if (dev) { e.faceAngle = Math.atan2(dev.y - e.y, dev.x - e.x); this.onRanged(e, dev, time, dev); }
+            else this.onRanged(e, beacon, time);
+            continue;
+          }
           if (beacon.applyDamage(t.beaconDamage, time)) fell = true;
           this.events.emit('beaconHit', e.x + (dx / dist) * e.radius, e.y + (dy / dist) * e.radius, t.beaconDamage);
         }

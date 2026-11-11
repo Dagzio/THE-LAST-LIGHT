@@ -162,7 +162,10 @@ export class Economy {
 
   playerUpgradeCost(id) {
     const u = PLAYER_UPGRADES[id];
-    return u ? shopPrice(u.baseCost * (1 + PLAYER_UPGRADE_COST_GROWTH * (this.profile.playerUpgrades[id] | 0))) : 0;
+    if (!u) return 0;
+    const rank = this.profile.playerUpgrades[id] | 0;
+    if (u.costs) return u.costs[Math.min(rank, u.costs.length - 1)] | 0; // D52: fixed price per rank
+    return shopPrice(u.baseCost * (1 + PLAYER_UPGRADE_COST_GROWTH * rank));
   }
 
   playerUpgradeOffer(id) {

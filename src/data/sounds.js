@@ -29,10 +29,19 @@ export const SFX_FILES = {
   defeat: { file: 'game-over.mp3', trim: 0.07, gain: 1.8 },
   victory: { file: 'game-win.mp3', trim: 0.05, gain: 1.9 },
   boom: { file: 'grenade.mp3', trim: 0.015, gain: 1.2 },            // frag grenade blast
-  enemyHit1: { file: 'enemies/enemy-hit1.mp3', trim: 0.06, gain: 0.9 },
-  enemyHit2: { file: 'enemies/enemy-hit2.mp3', trim: 0.08, gain: 0.5 },
-  enemyHit3: { file: 'enemies/enemy-hit3.mp3', trim: 0.02, gain: 0.75 },
-  kill: { file: 'enemies/enemy-killed1.mp3', trim: 0.03, gain: 0.95 },
+  // D52: the user replaced the hit / kill files — re-measured (punch −23.5 / −22.9 / −25.4 / −33.8 dB)
+  enemyHit1: { file: 'enemies/enemy-hit1.mp3', trim: 0.06, gain: 1.25 },
+  enemyHit2: { file: 'enemies/enemy-hit2.mp3', trim: 0.08, gain: 1.15 },
+  enemyHit3: { file: 'enemies/enemy-hit3.mp3', trim: 0.02, gain: 1.5 },
+  kill: { file: 'enemies/enemy-killed1.mp3', trim: 0.03, gain: 3.2 },
+  // D52 new files
+  ricochet: { file: 'bullet.mp3', trim: 0.04, gain: 2.0 },               // a bullet stopped by a rock / wall / pad
+  turretShot: { file: 'turret_shot.mp3', trim: 0.035, gain: 0.55 },     // Guard Turret (frost / poison keep their synth)
+  spitterAttack: { file: 'enemies/spitter-attack.mp3', gain: 2.2 },     // Spitter lobs a glob
+  'assault_rifle.shot': { file: 'rifle/rifle_shot.mp3', gain: 3.6 },
+  'assault_rifle.reload1': { file: 'rifle/rifle_reload1.mp3', trim: 0.015, gain: 2.0 },
+  'assault_rifle.reload2': { file: 'rifle/rifle_reload2.mp3', trim: 0.015, gain: 2.5 },
+  'assault_rifle.reload3': { file: 'rifle/rifle_reload3.mp3', trim: 0.015, gain: 2.6 },
   waveStart1: { file: 'enemies/wave-start1.mp3', trim: 0.05, gain: 1.0 }, // START NEXT WAVE pressed
   waveStart2: { file: 'enemies/wave-start2.mp3', trim: 0.05, gain: 0.75 }, // the first enemy of the wave is out
   bossKillPlayer: { file: 'enemies/boss-kill-player.mp3', trim: 0.02, gain: 0.6 },
@@ -86,6 +95,19 @@ export const WEAPON_SOUNDS = {
         { sfx: 'smg.reload1', hit: 0.29, at: 0.22 }, // magazine out
         { sfx: 'smg.reload2', hit: 0.36, at: 0.62 }, // new magazine in
         { sfx: 'smg.reload3', hit: 0.04, at: 1.0 },  // bolt released = ready
+      ],
+    },
+  },
+  // D52: assault rifle files (rifle/ folder): shot + three reload cues — magazine out, magazine in, bolt = ready
+  assault_rifle: {
+    shot: { sfx: 'assault_rifle.shot', pitch: 0.035, vol: 0.08, voices: 3 },
+    reload: {
+      refDuration: 1.65,
+      maxRate: 1.12,
+      cues: [
+        { sfx: 'assault_rifle.reload1', hit: 0.01, at: 0.2 },  // magazine out
+        { sfx: 'assault_rifle.reload2', hit: 0.15, at: 0.62 }, // new magazine in
+        { sfx: 'assault_rifle.reload3', hit: 0.01, at: 1.0 },  // bolt released = ready to fire
       ],
     },
   },

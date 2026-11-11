@@ -1,6 +1,6 @@
 // Shop overlay (Underlords shop style, PROJECT_AUDIT.md §6.6; 02_SPEC §12). Shown while the game is in SHOP_OPEN
 // (and stays under the Settings popup when paused from the shop). Tabs: WEAPONS · UPGRADES (weapon) · KEEPER
-// (player upgrades) · GRENADES (Phase 6) · DEFENSES (beacon repair + devices on build pads).
+// (heals + player upgrades, D52) · GRENADES (Phase 6) · DEFENSES (beacon repair + devices on build pads + their repair).
 // The view only displays offers computed by the Economy/Game and calls Game commands — it never edits the profile.
 // DOM is rebuilt on open / tab switch / after a purchase / on language change — never per frame.
 import { STATES } from '../core/GameStateMachine.js';
@@ -9,6 +9,8 @@ import { WEAPONS } from '../data/weapons.js';
 import { WEAPON_NODES, UPGRADE_NODES, NODE_NAME_OVERRIDES, PLAYER_UPGRADES, PLAYER_UPGRADE_ORDER } from '../data/upgrades.js';
 import { DEFENSES, MAX_DEVICE_LEVEL } from '../data/defenses.js';
 import { GRENADES, GRENADE_ORDER } from '../data/grenades.js';
+import { HEALS, HEAL_ORDER } from '../data/heals.js';
+import { gunIcon, grenadeIcon } from '../data/icons.js';
 import { levelProgress } from '../data/progression.js';
 import { effectiveWeaponStats } from '../systems/Loadout.js';
 import { MVP_WEAPON_IDS, REASON } from '../systems/Economy.js';
@@ -30,6 +32,13 @@ const ICON = { // 24×24 stroke icons (white line style, see art-prompts/06_SHOP
   mobility: '<path d="M5 18l5-12 4 8 3-4 3 8"/>',
   quick_dodge: '<path d="M5 5l7 7-7 7M12 5l7 7-7 7"/>',
   interact_range: '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/>',
+  // D52
+  regen: '<path d="M12 20s-7-4.6-7-9.8A4 4 0 0 1 12 8a4 4 0 0 1 7 2.2C19 15.4 12 20 12 20z"/><path d="M12 11v5M9.5 13.5h5"/>',
+  vampirism: '<path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 0 1-12 0c0-3.4 3-6.5 6-11z"/><path d="M9 13l1.5 3 1.5-3 1.5 3 1.5-3"/>',
+  crit: '<path d="M12 2l2.4 6.6L21 9l-5 4.6L17.5 21 12 17.3 6.5 21 8 13.6 3 9l6.6-.4z"/>',
+  bandage: '<rect x="3" y="8" width="18" height="8" rx="4" transform="rotate(-35 12 12)"/><path d="M10.5 10.5h.01M13.5 13.5h.01M13.5 10.5h.01M10.5 13.5h.01"/>',
+  medkit: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M12 10v7M8.5 13.5h7"/>',
+  big_medkit: '<rect x="2" y="6" width="20" height="15" rx="2"/><path d="M8 6V3h8v3M12 9v9M7.5 13.5h9"/><path d="M5 9v9M19 9v9"/>',
   guard_turret: '<path d="M6 20h12l-2-6H8z"/><path d="M8 14V9h8v5M16 11h6"/>',
   frost_coil: '<path d="M12 2v20M3 7l18 10M21 7L3 17"/>',
   poison_turret: '<path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 0 1-12 0c0-3.4 3-6.5 6-11z"/><path d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5"/>',
@@ -80,6 +89,7 @@ export class ShopView {
     this.page = 0; // phones: page of the card row
     this.upgradeWeaponId = null; // weapon shown in the UPGRADES tab
     this.defensePad = 0;         // D51 desktop DEFENSES: the pad shown (chips above the cards)
+    this.keeperView = 'heal';    // D52 desktop KEEPER: 'heal' | 'upgrades' (chips; phones show both in the paged row)
     // Phone step (≤ 500 px high, base.css): one row of cards with page arrows, weapon picker card in UPGRADES
     this.phoneMQ = matchMedia('(max-height: 500px)');
 
@@ -87,6 +97,7 @@ export class ShopView {
       this.tab = t.dataset.shopTab;
       this.page = 0;
       if (this.tab === 'weaponUpgrades') this.upgradeWeaponId = game.economy.profile.equippedWeaponId; // equipped first
+      if (this.tab === 'playerUpgrades') this.keeperView = this._hurt() ? 'heal' : 'upgrades'; // D52
       this.refresh();
     }));
     this.prevBtn.addEventListener('click', () => this._turn(-1));
@@ -102,6 +113,9 @@ export class ShopView {
       raf = requestAnimationFrame(() => { raf = 0; this._layout(); });
     });
   }
+
+  /** D52: the keeper is below full HP (the KEEPER tab opens on its heals then). */
+  _hurt() { const p = this.game.run && this.game.run.player; return !!p && p.alive && p.hp < p.maxHp; }
 
   get visible() { return this.root.classList.contains('show'); }
 
@@ -131,8 +145,11 @@ export class ShopView {
     else if (cmd === 'defense') r = g.shopBuyDefense(Number(a), c);
     else if (cmd === 'dupgrade') r = g.shopUpgradeDefense(Number(a));
     else if (cmd === 'repair') r = g.shopRepairBeacon();
+    else if (cmd === 'drepair') r = g.shopRepairDevice(Number(a)); // D52
+    else if (cmd === 'heal') r = g.shopHeal(a);                    // D52
     else if (cmd === 'grenade') r = g.shopBuyGrenade(a);
     else if (cmd === 'pickWeapon') { this.upgradeWeaponId = a; this.refresh(); return; }
+    else if (cmd === 'pickKeeper') { this.keeperView = a; Sfx.play('click'); this.refresh(); return; }
     else if (cmd === 'pickPad') { this.defensePad = Number(a); Sfx.play('click'); this.refresh(); return; }
     if (!r) return;
     Sfx.play(r.ok ? (cmd === 'equip' || r.equip ? 'click' : 'buy') : 'deny');
@@ -192,6 +209,8 @@ export class ShopView {
     // every size: a single long word must not leave its card (desktop cards are narrow for German / Russian too)
     for (const n of this.grid.querySelectorAll('.shop-card:not(.off) .shop-buy, .shop-card:not(.off) .shop-card-name')) {
       n.style.fontSize = '';
+      // D52 upgrade + wrench pair: on a phone both are icon + price (the word is hidden) — fit only when it is shown
+      if (this.phoneMQ.matches && n.parentElement.classList.contains('shop-foot-row')) continue;
       n.style.overflowWrap = '';
       let fs = parseFloat(getComputedStyle(n).fontSize);
       while (fs > 12 && !textFits(n)) { fs -= 1; n.style.fontSize = `${fs}px`; }
@@ -245,7 +264,7 @@ export class ShopView {
       const G = GRENADES[id];
       const o = g.grenadeOffer(id);
       const body = `${this._pips(o.stock, o.cap)}<p class="shop-fx">${T(`fx.grenade.${id}`)}</p>`;
-      const card = this._card(`g_${id}`, T(G.nameKey), body, o.reason === REASON.LEVEL ? 'locked' : '');
+      const card = this._card(`img:${grenadeIcon(id)}`, T(G.nameKey), body, o.reason === REASON.LEVEL ? 'locked' : '');
       this._footer(card, { cmd: `grenade:${id}`, price: o.price, enabled: o.canBuy, reason: o.canBuy ? null : o.reason, reasonParams: { n: o.requiredLevel } });
       this.grid.append(card);
     }
@@ -254,7 +273,9 @@ export class ShopView {
   _card(icon, title, bodyHtml, extraCls = '') {
     const card = el('div', `shop-card ${extraCls}`);
     const head = el('div', 'shop-card-head');
-    head.append(el('span', 'shop-card-ico', `<svg viewBox="0 0 24 24">${ICON[icon] || ICON.damage}</svg>`), el('span', 'shop-card-name'));
+    // D52: 'img:<url>' — the user's weapon / grenade art instead of a line icon
+    const ico = icon.startsWith('img:') ? `<img src="${icon.slice(4)}" alt="" draggable="false">` : `<svg viewBox="0 0 24 24">${ICON[icon] || ICON.damage}</svg>`;
+    head.append(el('span', `shop-card-ico${icon.startsWith('img:') ? ' art' : ''}`, ico), el('span', 'shop-card-name'));
     head.lastChild.textContent = title;
     card.append(head, el('div', 'shop-card-body', bodyHtml));
     return card;
@@ -294,7 +315,7 @@ export class ShopView {
         <dt>${T('stat.rate')}</dt><dd>${(1 / s.fireInterval).toFixed(1)}</dd>
         <dt>${T('stat.magazine')}</dt><dd>${s.magazineSize}</dd>
         <dt>${T('stat.range')}</dt><dd>${Math.round(s.range)}</dd></dl>`;
-      const card = this._card('weapon', T(w.nameKey), body, o.equipped ? 'equipped' : o.owned ? 'owned' : o.reason === REASON.LEVEL ? 'locked' : '');
+      const card = this._card(`img:${gunIcon(id)}`, T(w.nameKey), body, o.equipped ? 'equipped' : o.owned ? 'owned' : o.reason === REASON.LEVEL ? 'locked' : '');
       if (o.equipped) this._footer(card, { label: T('shop.equipped'), enabled: false, done: true });
       else if (o.owned) this._footer(card, { cmd: `equip:${id}`, label: T('shop.equip'), enabled: true });
       else this._footer(card, { cmd: `buyWeapon:${id}`, price: o.price, enabled: o.canBuy, reason: o.canBuy ? null : o.reason, reasonParams: { n: o.requiredLevel } });
@@ -331,7 +352,7 @@ export class ShopView {
   /** Phone UPGRADES: the selected weapon + its level; ◀ ▶ switch between owned weapons (only when there are several). */
   _weaponPicker(owned) {
     const eco = this.game.economy, wid = this.upgradeWeaponId, n = owned.length, i = owned.indexOf(wid);
-    const card = this._card('weapon', T(WEAPONS[wid].nameKey), `<p class="shop-pick-lv">${T('shop.weaponLevel', { n: eco.weaponLevel(wid) })}</p>`, 'equipped shop-picker');
+    const card = this._card(`img:${gunIcon(wid)}`, T(WEAPONS[wid].nameKey), `<p class="shop-pick-lv">${T('shop.weaponLevel', { n: eco.weaponLevel(wid) })}</p>`, 'equipped shop-picker');
     if (n > 1) {
       const foot = el('div', 'shop-card-foot shop-pick-foot');
       const arrow = (dir) => {
@@ -348,17 +369,64 @@ export class ShopView {
   }
 
   _playerUpgrades() {
-    const eco = this.game.economy;
-    for (const id of PLAYER_UPGRADE_ORDER) {
+    const eco = this.game.economy, g = this.game;
+    // D52: heals first (one-off, this map) — the keeper's HP bar on the card shows what they would fix.
+    // Desktop: two chips (HEALING · UPGRADES) so the 11 cards never need scrolling; phones: one paged row.
+    const p = g.run && g.run.player;
+    const desk = !this.phoneMQ.matches;
+    if (desk) {
+      for (const [view, key] of [['heal', 'shop.chip.heal'], ['upgrades', 'shop.tab.weaponUpgrades']]) {
+        const chip = el('button', `shop-chip${view === this.keeperView ? ' active' : ''}`);
+        chip.dataset.shopCmd = `pickKeeper:${view}`;
+        chip.dataset.nosfx = '';
+        chip.textContent = T(key);
+        this.sub.append(chip);
+      }
+    }
+    if (!desk || this.keeperView === 'heal') for (const id of HEAL_ORDER) {
+      const H = HEALS[id], o = g.healOffer(id);
+      const pct = p ? Math.max(0, Math.min(100, (p.hp / p.maxHp) * 100)) : 100;
+      const body = `<i class="shop-integrity shop-hp"><i style="width:${pct.toFixed(1)}%"></i></i><p class="shop-fx">${T('fx.heal', { v: Math.round(H.pct * 100) })}</p>`;
+      const card = this._card(id, T(H.nameKey), body, `shop-heal${o.reason === 'fullHp' ? ' maxed' : ''}`);
+      if (o.reason === 'fullHp') this._footer(card, { label: T('shop.reason.fullHp'), enabled: false, done: true });
+      else this._footer(card, { cmd: `heal:${id}`, price: o.price, enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
+      this.grid.append(card);
+    }
+    if (!desk || this.keeperView === 'upgrades') for (const id of PLAYER_UPGRADE_ORDER) {
       const u = PLAYER_UPGRADES[id];
       const o = eco.playerUpgradeOffer(id);
-      const v = u.perRank < 1 ? Math.round(u.perRank * 100) : u.perRank;
+      const v = u.fxValue ?? (u.perRank < 1 ? Math.round(u.perRank * 100) : u.perRank);
       const body = `${this._pips(o.rank, o.max)}<p class="shop-fx">${T(`fx.${id}`, { v })}</p>`;
       const card = this._card(id, T(u.nameKey), body, o.reason === REASON.MAX ? 'maxed' : '');
       if (o.reason === REASON.MAX) this._footer(card, { label: T('shop.max'), enabled: false, done: true });
       else this._footer(card, { cmd: `player:${id}`, price: o.cost, enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
       this.grid.append(card);
     }
+  }
+
+  /** D52: a small wrench + price beside the card's main button (only while the installed device is damaged). */
+  _repairButton(card, padIndex) {
+    const r = this.game.deviceRepairOffer(padIndex, false);
+    if (r.reason === 'full') return;
+    const foot = card.querySelector('.shop-card-foot');
+    const main = foot && foot.querySelector('.shop-buy');
+    if (!main) return;
+    const row = el('div', 'shop-foot-row');
+    const b = el('button', 'shop-buy shop-fix', `<svg class="ico" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>${COIN}<b>${r.cost}</b>`);
+    b.dataset.shopCmd = `drepair:${padIndex}`;
+    b.dataset.nosfx = '';
+    b.disabled = !r.canBuy;
+    b.setAttribute('aria-label', T('aria.repairDevice'));
+    // narrow phone cards: the action word gives way to an up arrow, so the price on both buttons stays whole
+    const word = [...main.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+    if (word) {
+      const span = el('span', 'buy-label');
+      span.textContent = word.textContent;
+      word.replaceWith(span);
+      span.before(el('span', 'buy-up', '<svg class="ico" viewBox="0 0 24 24"><path d="M12 19V6M6 11l6-6 6 6"/></svg>'));
+    }
+    main.replaceWith(row);
+    row.append(main, b);
   }
 
   _defenses() {
@@ -404,14 +472,20 @@ export class ShopView {
         const o = g.defenseOffer(i, id);
         // the pad tag is shown on phones only, where the pad columns become one paged row
         const pips = o.level ? this._pips(o.level, MAX_DEVICE_LEVEL) : '';
+        // D52: the installed device shows its HP (a thin bar on the pips line — no extra height on a phone)
+        const dev = o.installed ? pad.device : null;
+        const hpPct = dev ? Math.max(0, Math.min(100, (dev.hp / dev.maxHp) * 100)) : 0;
+        const hpBar = dev ? `<i class="shop-dev-hp${dev.hp <= 0 ? ' broken' : ''}"><i style="width:${hpPct.toFixed(1)}%"></i></i>` : '';
+        const fx = dev && dev.hp <= 0 ? `<b class="shop-broken">${T('shop.deviceBroken')}</b>` : T(`fx.${id}`);
         // phones: pips + pad tag on one line (the tag is hidden on desktop, the pips stay)
-        const body = `<p class="shop-pad-line">${pips}<span class="shop-pad-tag">${title.textContent}</span></p><p class="shop-fx">${T(`fx.${id}`)}</p>`;
+        const body = `<p class="shop-pad-line">${pips}${hpBar}<span class="shop-pad-tag">${title.textContent}</span></p><p class="shop-fx">${fx}</p>`;
         const maxed = o.installed && o.level >= MAX_DEVICE_LEVEL;
         const card = this._card(id, T(`defense.${id}`), body, o.installed ? `equipped${maxed ? ' maxed' : ''}` : o.owned ? 'owned' : '');
         if (o.installed) {
           const u = g.defenseUpgradeOffer(i);
           if (u.reason === REASON.MAX) this._footer(card, { label: T('shop.max'), enabled: false, done: true });
           else this._footer(card, { cmd: `dupgrade:${i}`, label: T('shop.upgrade'), price: u.price, enabled: u.canBuy, reason: u.canBuy ? null : u.reason });
+          this._repairButton(card, i); // D52: wrench + price next to the main button while it is damaged
         } else if (o.owned) this._footer(card, { cmd: `defense:${i}:${id}`, label: T('shop.install'), enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
         else this._footer(card, { cmd: `defense:${i}:${id}`, price: o.price, enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
         col.append(card);

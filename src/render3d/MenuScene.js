@@ -85,7 +85,7 @@ function cloudTexture(seed) {
 
 /** Low-poly rock blob: an icosahedron with seeded vertex noise, coloured darker at the bottom, moss on top. */
 function rockParts(rng, x, y, z, sx, sy, sz, detail = 1) {
-  const g = new THREE.IcosahedronGeometry(1, detail).toNonIndexed();
+  const g = new THREE.IcosahedronGeometry(1, detail); // already non-indexed in r166 (toNonIndexed() only warned)
   const pos = g.attributes.position;
   const col = new Float32Array(pos.count * 3);
   const c = new THREE.Color();

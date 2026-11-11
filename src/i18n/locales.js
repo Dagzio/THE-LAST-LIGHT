@@ -531,6 +531,22 @@ const ROWS = [
   ['save.repaired', 'Some save data was invalid and has been corrected.', 'Частину збереження було виправлено.', 'Часть сохранения была исправлена.', 'Einige Speicherdaten waren ungültig und wurden korrigiert.', 'Alcuni dati di salvataggio non validi sono stati corretti.', 'Certaines données de sauvegarde invalides ont été corrigées.', 'Se corrigieron algunos datos guardados no válidos.', 'Alguns dados salvos inválidos foram corrigidos.', 'تم تصحيح بعض بيانات الحفظ غير الصالحة.', '一部の不正なセーブデータを修正しました。'],
 
   ['hud.paused', 'GAME PAUSED', 'ГРУ ПРИЗУПИНЕНО', 'ИГРА НА ПАУЗЕ', 'PAUSIERT', 'GIOCO IN PAUSA', 'JEU EN PAUSE', 'JUEGO EN PAUSA', 'JOGO PAUSADO', 'اللعبة متوقفة', '一時停止中'],
+
+  // D52: keeper upgrades, shop heals, device health
+  ['pup.regen', 'REGENERATION', 'РЕГЕНЕРАЦІЯ', 'РЕГЕНЕРАЦИЯ', 'REGENERATION', 'RIGENERAZIONE', 'RÉGÉNÉRATION', 'REGENERACIÓN', 'REGENERAÇÃO', 'التجدد', '再生'],
+  ['pup.vampirism', 'VAMPIRISM', 'ВАМПІРИЗМ', 'ВАМПИРИЗМ', 'VAMPIRISMUS', 'VAMPIRISMO', 'VAMPIRISME', 'VAMPIRISMO', 'VAMPIRISMO', 'مصّ الحياة', 'ライフスティール'],
+  ['pup.crit', 'CRITICAL EYE', 'КРИТИЧНЕ ОКО', 'КРИТИЧЕСКИЙ ГЛАЗ', 'KRITISCHES AUGE', 'OCCHIO CRITICO', 'ŒIL CRITIQUE', 'OJO CRÍTICO', 'OLHO CRÍTICO', 'العين الحرجة', 'クリティカル眼'],
+  ['fx.regen', '+{v} HP per second per rank', '+{v} здоров’я за секунду за ранг', '+{v} здоровья в секунду за ранг', '+{v} LP pro Sekunde pro Rang', '+{v} PS al secondo per grado', '+{v} PV par seconde par rang', '+{v} PS por segundo por rango', '+{v} PV por segundo por nível', '+{v} صحة في الثانية لكل رتبة', 'ランクごとに毎秒HP+{v}'],
+  ['fx.vampirism', '{v}% of weapon damage heals you, per rank', '{v}% шкоди зброї лікує тебе, за ранг', '{v}% урона оружия лечит тебя, за ранг', '{v}% des Waffenschadens heilt dich, pro Rang', 'il {v}% dei danni dell’arma ti cura, per grado', '{v} % des dégâts de l’arme te soignent, par rang', 'el {v}% del daño del arma te cura, por rango', '{v}% do dano da arma cura você, por nível', '{v}% من ضرر السلاح يعالجك، لكل رتبة', 'ランクごとに武器ダメージの{v}%を回復'],
+  ['fx.crit', '+{v}% critical hit chance per rank', '+{v}% шансу криту за ранг', '+{v}% шанса крита за ранг', '+{v}% Krit-Chance pro Rang', '+{v}% di probabilità critica per grado', '+{v} % de chance de critique par rang', '+{v}% de probabilidad de crítico por rango', '+{v}% de chance de crítico por nível', '+{v}% فرصة ضربة حرجة لكل رتبة', 'ランクごとにクリティカル率+{v}%'],
+  ['heal.bandage', 'BANDAGE', 'БИНТ', 'БИНТ', 'VERBAND', 'BENDA', 'BANDAGE', 'VENDA', 'BANDAGEM', 'ضمادة', '包帯'],
+  ['heal.medkit', 'MEDKIT', 'АПТЕЧКА', 'АПТЕЧКА', 'MEDIKIT', 'MEDIKIT', 'TROUSSE DE SOINS', 'BOTIQUÍN', 'KIT MÉDICO', 'حقيبة إسعاف', '救急キット'],
+  ['heal.big_medkit', 'BIG MEDKIT', 'ВЕЛИКА АПТЕЧКА', 'БОЛЬШАЯ АПТЕЧКА', 'GROSSES MEDIKIT', 'MEDIKIT GRANDE', 'GRANDE TROUSSE', 'BOTIQUÍN GRANDE', 'KIT MÉDICO GRANDE', 'حقيبة إسعاف كبيرة', '大型救急キット'],
+  ['fx.heal', '+{v}% HP now', '+{v}% здоров’я одразу', '+{v}% здоровья сразу', '+{v}% LP sofort', '+{v}% PS subito', '+{v} % de PV tout de suite', '+{v}% de PS ahora', '+{v}% de PV agora', '+{v}% صحة فورًا', 'HPを即{v}%回復'],
+  ['shop.chip.heal', 'HEALING', 'ЛІКУВАННЯ', 'ЛЕЧЕНИЕ', 'HEILUNG', 'CURE', 'SOINS', 'CURACIÓN', 'CURA', 'العلاج', '回復'],
+  ['shop.reason.fullHp', 'FULL HEALTH', 'ПОВНЕ ЗДОРОВ’Я', 'ПОЛНОЕ ЗДОРОВЬЕ', 'VOLLE GESUNDHEIT', 'SALUTE PIENA', 'SANTÉ MAX', 'SALUD COMPLETA', 'VIDA CHEIA', 'صحة كاملة', 'HP満タン'],
+  ['shop.deviceBroken', 'BROKEN — REPAIR IT', 'ЗЛАМАНО — ПОЛАГОДЬ', 'СЛОМАНО — ПОЧИНИ', 'KAPUTT — REPARIEREN', 'ROTTA — RIPARALA', 'CASSÉE — RÉPARE-LA', 'ROTA — REPÁRALA', 'QUEBRADA — CONSERTE', 'معطلة — أصلحها', '故障中 — 修理して'],
+  ['aria.repairDevice', 'Repair the turret', 'Полагодити турель', 'Починить турель', 'Geschütz reparieren', 'Ripara la torretta', 'Réparer la tourelle', 'Reparar la torreta', 'Reparar a torre', 'إصلاح البرج', 'タレットを修理'],
 ];
 
 /** LOCALES[lang][key] = string */

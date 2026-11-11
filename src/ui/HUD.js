@@ -8,6 +8,7 @@ import { levelProgress } from '../data/progression.js';
 import { STATES } from '../core/GameStateMachine.js';
 import { INTROS, INTRO_SECONDS } from '../data/intros.js';
 import { WAVE_TIMING } from '../data/waves.js';
+import { gunIcon } from '../data/icons.js';
 
 const KIOSK_LABEL_HEIGHT = 74; // world height above the kiosk where its label sits
 
@@ -40,6 +41,7 @@ export class HUD {
       ammo: $('hudAmmo'),
       mag: $('hudMag'),
       weaponName: $('hudWeaponName'),
+      gun: $('hudGun'), // D52: the user's weapon icon
       weapon: $('hudWeapon'),
       reloadFill: $('hudReloadFill'),
       beacon: $('hudBeacon'),
@@ -245,6 +247,7 @@ export class HUD {
     if (w.weaponId !== c.weaponId) {
       c.weaponId = w.weaponId;
       el.weaponName.textContent = T(w.stats.nameKey);
+      el.gun.src = gunIcon(w.weaponId);
     }
     if (w.ammo !== c.ammo) { c.ammo = w.ammo; el.ammo.textContent = String(w.ammo); }
     if (w.stats.magazineSize !== c.mag) { c.mag = w.stats.magazineSize; el.mag.textContent = String(c.mag); }
@@ -307,7 +310,7 @@ export class HUD {
     const lp = levelProgress(prof.totalXp);
     const lv = T('hud.level', { n: lp.level });
     if (lv !== c.lv) { c.lv = lv; el.lv.textContent = lv; }
-    const xpPct = Math.round((lp.into / lp.need) * 100);
+    const xpPct = lp.need > 0 ? Math.min(100, Math.round((lp.into / lp.need) * 100)) : 100; // max level: full, never wider
     if (xpPct !== c.xpPct) { c.xpPct = xpPct; el.xpFill.style.width = `${xpPct}%`; }
 
     // Shop button glows only when the shop can open; kiosk label between waves

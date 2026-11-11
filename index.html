@@ -84,6 +84,9 @@
 
   <!-- ===== Game scene HUD (Phase 1: system buttons only) ===== -->
   <section class="screen" id="screen-game">
+    <!-- D52: above every installed device — level, HP bar, small wrench + repair price while damaged (first: the HUD
+         stays on top of a tag that slides under it) -->
+    <div class="dev-tags" id="deviceTags"></div>
     <!-- D46: no EXIT button on the map — leaving is in the pause menu (EXIT tab) -->
     <div class="corner corner-tl corner-col">
       <button class="ring-btn" data-action="fullscreen" data-fs data-i18n-aria="aria.fullscreen">
@@ -183,7 +186,7 @@
         <span class="flare-key">Q</span>
       </button>
       <div class="hud-weapon" id="hudWeapon">
-        <svg class="hud-gun" viewBox="0 0 48 24"><path d="M4 7h30l2-3h6v6h-4l-2 2H24l-2 9h-7l2-9H4z"/></svg>
+        <img class="hud-gun" id="hudGun" src="assets/ui/guns/pistol.webp" alt="" draggable="false">
         <span class="hud-weapon-name" id="hudWeaponName"></span>
         <span class="hud-ammo"><b id="hudAmmo">0</b><span class="hud-ammo-sep">/</span><span id="hudMag">0</span></span>
         <span class="hud-reload"><span class="hud-reload-label" data-i18n="hud.reloading"></span><i class="hud-reload-bar"><i id="hudReloadFill"></i></i></span>
