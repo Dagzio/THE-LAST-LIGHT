@@ -4,9 +4,8 @@
 // Model: assets/models/player.min.glb (Tripo, 1 unit tall, baked to KEEPER_MODEL.height).
 
 export const KEEPER_MODEL = { file: 'assets/models/player.min.glb', height: 54 };
-export const GRUNT_MODEL = { file: 'assets/models/grunt.min.glb', height: 38 };
 
-const H = KEEPER_MODEL.height, G = GRUNT_MODEL.height;
+const H = KEEPER_MODEL.height; // the grunt and the other enemies: data/models3d.js (D54)
 /** Pivots measured from the model's width profile (fractions of its height). */
 export const KEEPER_RIG = {
   hipY: 0.42 * H, shoulderY: 0.80 * H, shoulderZ: 0.13 * H, armZ: 0.145 * H, armZLow: 0.145 * H, armSplitY: 0, armMinY: 0.40 * H,
@@ -14,10 +13,6 @@ export const KEEPER_RIG = {
   // D53 baked arm weights (render3d/rig.js bakeArmWeights): the hands hang at y 0.40H…0.53H beside the coat sides —
   // there only skin-coloured vertices or ones beyond handZ0 (sleeve cuffs) are arm (measured from the model)
   handBand: [0.40 * H, 0.53 * H], handZ0: 7.6,
-};
-export const GRUNT_RIG = {
-  hipY: 0.42 * G, shoulderY: 0.76 * G, shoulderZ: 0.22 * G, armZ: 0.20 * G, armZLow: 0.255 * G, armSplitY: 0.45 * G, armMinY: 0.15 * G,
-  legSwing: 0.5,
 };
 
 /** Arm poses while holding a weapon (radians forward from hanging; yaw turns the left hand in towards the gun). */

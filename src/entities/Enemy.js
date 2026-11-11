@@ -69,6 +69,8 @@ export class Enemy {
     this.devGiveUpAt = 0;
     this.devReadyAt = 0;
     this.globCount = 0;
+    // D54 melee on the keeper: time of the next strike (0 = not fighting him)
+    this.meleeAt = 0;
   }
 
   isStunned(time) { return time < this.stunUntil; }

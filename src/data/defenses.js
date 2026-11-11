@@ -8,6 +8,8 @@
 // (25 / 40 / 60 %, never stacking, bosses get bossSlowFactor of it).
 // A pad keeps every device bought on it during the map run (with its level); switching back to one is free.
 
+import { TURRET_GLB, turretMuzzle } from './models3d.js';
+
 export const MAX_DEVICE_LEVEL = 3;
 export const FROST_DAMAGE_MULT = 0.65; // −35 % of the Guard Turret damage at the same level
 
@@ -58,6 +60,14 @@ export const DEVICE_HP = { perLevel: [120, 160, 200], repair: { fullFromOnePerce
 // (`giveUpAfter`: it could not reach it). Bosses do not stop — their slam / tide damage devices inside the area.
 // Spitters lob every `spitterEvery`-th glob at a working device within their reach of it.
 export const DEVICE_AGGRO = { range: 80, attackTime: 3, giveUpAfter: 4, cooldown: 8, firstHit: 0.4, spitterEvery: 3, spitterReach: 300 };
+
+// D54: rounds start at the barrel tip of the user's turret model of that level (muzzleOffset forward from the pad centre,
+// muzzleHeight — the height they fly at, presentation)
+for (const id in TURRET_GLB) {
+  const d = DEFENSES[id];
+  if (!d) continue;
+  TURRET_GLB[id].forEach((e, i) => { const m = turretMuzzle(e); if (d.levels[i]) Object.assign(d.levels[i], { muzzleOffset: m.offset, muzzleHeight: m.height }); });
+}
 
 export const getDefense = (id) => DEFENSES[id] || null;
 

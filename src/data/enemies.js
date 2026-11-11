@@ -29,7 +29,7 @@ export const ENEMIES = {
     contactDamage: 10,
     armor: 0,
     bossSlowFactor: 1,
-    barHeight: 40,
+    barHeight: 50,           // D54: above the taller textured model
     // ATTACK_PLAYER (D17): a keeper closer than aggroRange pulls the runner off its path for up to chaseDuration;
     // it gives up when the keeper gets farther than aggroRange × giveUpFactor, then ignores him for cooldown.
     chase: { aggroRange: 170, chaseDuration: 3.0, giveUpFactor: 1.6, cooldown: 4.0 },
@@ -46,7 +46,7 @@ export const ENEMIES = {
     contactDamage: 18,
     armor: 0,
     bossSlowFactor: 1,
-    barHeight: 62,
+    barHeight: 66,
     reward: { coins: 5, xp: 12 },
   },
   // Spitter (D45, from map 3): stops far from the beacon and lobs glowing globs at it (visible flight, damage on

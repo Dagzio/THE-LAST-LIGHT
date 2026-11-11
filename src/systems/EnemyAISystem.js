@@ -3,7 +3,8 @@
 // ATTACK_BEACON — stops at the beacon edge + reach, hits it every attackInterval (first hit one interval after
 //   arriving, so an enemy killed before its attack never damages the beacon). Damage is discrete, never per frame;
 // ATTACK_PLAYER — only types with `chase` (Runner, D17): a close keeper pulls it off its path for a short time;
-// contact damage (D17) — any enemy touching the keeper hurts him; the keeper's hit invulnerability limits the rate.
+// melee (D54, replaces the contact damage of D17) — an enemy next to the keeper stops, winds up and strikes; he can
+// step away or dash during the wind-up. Keeper and enemies are solid to each other.
 // A light separation pass keeps bodies from stacking on one spot (no physics engine).
 // Emergency Flare (D38): a stunned enemy stands still, does not attack and deals no contact damage.
 // D52: a walker passing close to a working device turns on it for a few seconds (data/defenses.js DEVICE_AGGRO), then
@@ -17,7 +18,6 @@ import { DEVICE_AGGRO } from '../data/defenses.js';
 
 const isDecor = (c) => !isStructure(c);
 
-const CONTACT_PAD = AI.contactPad;
 const SEPARATION = AI.separation;
 const ARRIVE_EPS = 0.5; // world units
 
@@ -170,6 +170,7 @@ export class EnemyAISystem {
       }
 
       if (e.casting) { e.attackingBeacon = false; continue; } // boss telegraphing: stands still
+      if (player && player.alive && this._melee(e, t, player, time)) continue; // D54: fighting the keeper
 
       if (e.state === ENEMY_STATES.ATTACK_PLAYER) {
         e.attackingBeacon = false;
@@ -231,13 +232,12 @@ export class EnemyAISystem {
       }
     }
 
-    this._separate(enemies, beacon);
-    if (player) this._contact(enemies, player, time);
+    this._separate(enemies, beacon, player);
     return fell;
   }
 
   /** Pushes overlapping bodies apart; the boss is never pushed. Beacon attackers slide along their attack ring. */
-  _separate(enemies, beacon) {
+  _separate(enemies, beacon, player = null) {
     const n = enemies.length;
     for (let i = 0; i < n; i++) {
       const a = enemies[i];
@@ -278,23 +278,50 @@ export class EnemyAISystem {
         if (e.alive) this.world.pushOut(e, this._time < e.phaseUntil ? isStructure : null);
       }
     }
+    if (player && player.alive) this._bodies(enemies, player);
   }
 
-  /** Contact damage: the first touching enemy hurts the keeper; his hit invulnerability blocks the rest. */
-  _contact(enemies, player, time) {
-    if (!player.alive || player.isInvulnerable(time)) return;
+  /** D54: keeper ⟷ enemy bodies never overlap (the enemy gives way more; a boss stands; a dash shoves through). */
+  _bodies(enemies, p) {
+    const kp0 = AI.bodyPushKeeper;
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
-      if (!e.alive || !(e.type.contactDamage > 0) || e.isStunned(time)) continue;
-      const r = e.radius + player.radius + CONTACT_PAD;
-      const dx = player.x - e.x, dy = player.y - e.y;
-      if (dx * dx + dy * dy > r * r) continue;
-      const applied = player.applyDamage(e.type.contactDamage, time);
-      if (applied > 0) {
-        e.lastAttackAt = time;
-        this.events.emit('playerHit', player.x, player.y, applied, e.typeId);
-      }
-      return;
+      if (!e.alive) continue;
+      const dx = e.x - p.x, dy = e.y - p.y, min = e.radius + p.radius;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= min * min) continue;
+      const d = Math.sqrt(d2) || 1e-3, push = min - d;
+      const ux = d2 > 1e-9 ? dx / d : 1, uy = d2 > 1e-9 ? dy / d : 0;
+      const kp = p.dodging ? 0 : e.type.boss ? 1 : kp0;
+      e.x += ux * push * (1 - kp); e.y += uy * push * (1 - kp);
+      p.x -= ux * push * kp; p.y -= uy * push * kp;
+      if (this.world) { this.world.pushOut(e); this.world.pushOut(p); }
     }
+  }
+
+  /**
+   * D54 melee: true while the enemy is fighting the keeper this step (it stands, faces him and the strike timer runs).
+   */
+  _melee(e, t, p, time) {
+    const M = AI.melee;
+    if (!(t.contactDamage > 0)) return false;
+    const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy);
+    const reach = e.radius + p.radius + M.reach;
+    if (d > reach + (e.meleeAt ? M.slack : 0)) { e.meleeAt = 0; return false; } // out of reach: the swing is off
+    e.attackingBeacon = false;
+    if (d > 1e-6) e.faceAngle = Math.atan2(dy, dx);
+    if (e.state === ENEMY_STATES.ATTACK_PLAYER && time >= e.chaseEndsAt) { // a runner's chase time is over (it fights on while he is next to it)
+      e.state = ENEMY_STATES.MOVE_TO_BEACON;
+      e.chaseReadyAt = time + t.chase.cooldown;
+    }
+    if (!e.meleeAt) { e.meleeAt = time + M.firstDelay; return true; } // reached him: wind-up (time to dodge)
+    if (time < e.meleeAt) return true;
+    e.lastAttackAt = time; // the strike (same lunge / arm swing as on the beacon)
+    e.meleeAt = time + Math.max(M.firstDelay, t.attackInterval);
+    if (d <= reach + M.slack) {
+      const applied = p.applyDamage(t.contactDamage, time);
+      if (applied > 0) this.events.emit('playerHit', p.x, p.y, applied, e.typeId);
+    }
+    return true;
   }
 }

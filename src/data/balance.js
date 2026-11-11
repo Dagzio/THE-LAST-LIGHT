@@ -49,6 +49,14 @@ export const FLARE = {
 // Enemy body tuning (EnemyAISystem): contact reach and crowd separation.
 export const AI = {
   contactPad: 2,            // world units of extra reach for contact damage
+  // D54 (user decision): no damage on touch — an enemy next to the keeper stops, winds up and strikes (the same lunge
+  // as on the beacon). The first strike after it reaches him comes after firstDelay (time to dodge away); then one
+  // every attackInterval of the type (never faster than firstDelay). A strike hits only if he is still within reach
+  // + slack; stepping out of it cancels the swing. Damage = the type's contactDamage.
+  melee: { reach: 6, firstDelay: 0.6, slack: 10 },
+  // D54: the keeper and the enemies are solid to each other — overlaps are resolved every step (the enemy gives
+  // way more than the keeper; a boss never moves; during a dash he shoves through)
+  bodyPushKeeper: 0.35,
   separation: 0.5,          // share of an overlap between two bodies resolved per step
   // Steering around decor (no pathfinding, rule 14): a short look-ahead ray; when it is blocked, side headings are
   // tried (radians, the last chosen side first). Re-checked on a timer, not every step (weak phones).

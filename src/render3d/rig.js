@@ -15,6 +15,7 @@ const GLSL = /* glsl */`
 uniform vec4 uRigA;   // hipY, shoulderY, shoulderZ, armZ
 uniform vec4 uRigB;   // armZLow, armSplitY, armMinY, legSwing
 uniform vec4 uPose;   // right arm raise, left arm raise, left arm inward (yaw), recoil
+uniform vec4 uRigC;   // D54: quad (0 / 1), leg pivot distance from the centre (front / back legs), -, -
 #ifdef RIG_INSTANCED
 attribute vec4 aAnim; // walk phase (rad), walk blend 0..1, attack 0..1, (spare)
 #define RIG_ANIM aAnim
@@ -43,6 +44,11 @@ void rigDeform(inout vec3 p, inout vec3 n) {
   if (legW > 0.001) {
     float a = swing * uRigB.w * clamp(p.z * 0.8, -1.0, 1.0) * legW; // right leg forward while the left goes back
     vec3 piv = vec3(0.0, uRigA.x, p.z);
+    if (uRigC.x > 0.5) { // D54 four / more legs: diagonal pairs swing together around the front / back leg pivots
+      float fb = p.x >= 0.0 ? 1.0 : -1.0;
+      a *= fb;
+      piv.x = fb * uRigC.y;
+    }
     p = piv + rigRotZ(p - piv, a);
     n = rigRotZ(n, a);
   }
@@ -90,6 +96,7 @@ export function rigUniforms(rig) {
     uRigA: { value: new THREE.Vector4(rig.hipY, rig.shoulderY, rig.shoulderZ, rig.armZ) },
     uRigB: { value: new THREE.Vector4(rig.armZLow ?? rig.armZ, rig.armSplitY ?? 0, rig.armMinY ?? 0, rig.legSwing ?? 0.5) },
     uPose: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uRigC: { value: new THREE.Vector4(rig.quad ? 1 : 0, rig.legX || 0, 0, 0) },
     uAnim: { value: new THREE.Vector4(0, 0, 0, 0) },
   };
 }
@@ -98,8 +105,8 @@ export function rigUniforms(rig) {
  * Bakes a loaded GLB geometry into the game frame: the Tripo models face +Z and are 1 unit tall → rotate to face +X,
  * scale to `height` game units, feet on y = 0.
  */
-export function bakeModel(geometry, height) {
-  geometry.rotateY(Math.PI / 2);
+export function bakeModel(geometry, height, rotY = Math.PI / 2) {
+  if (rotY) geometry.rotateY(rotY); // D54: a model that already faces +X passes 0
   geometry.scale(height, height, height);
   geometry.computeBoundingBox();
   geometry.translate(0, -geometry.boundingBox.min.y, 0);

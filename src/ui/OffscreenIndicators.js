@@ -162,11 +162,9 @@ export class OffscreenIndicators {
     }
 
     // Beacon: shown when off-screen, blinking while it is being attacked.
-    const bc = g.run.beacon;
-    r3.projectToScreen(bc.x, bc.y, 60, this.pt);
-    this._place(this.beaconArrow, this.pt.x, this.pt.y, W, H);
-    const alert = !bc.destroyed && g.clock.time - bc.lastHitAt < 1.5;
-    if (alert !== this.beaconArrow.alert) { this.beaconArrow.alert = alert; this.beaconArrow.el.classList.toggle('alert', alert); }
+    // D54 (user decision): no beacon badge — the keeper knows where it is (the HUD bar shows its state)
+    const ba = this.beaconArrow;
+    if (ba.on) { ba.on = false; ba.el.classList.remove('on'); }
 
     // Kiosk: between waves only (prep / intermission)
     const ka = this.kioskArrow;

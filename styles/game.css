@@ -1005,6 +1005,8 @@ body:not(.touch) .hud-player::before {
   transition: opacity 0.3s;
 }
 #screen-game.keeper-hurt::before { opacity: 1; animation: hurtEdge 1.1s ease-in-out infinite alternate; }
+/* D54: a hit (above the low-HP threshold): the red edge for 0.7 s, then it fades */
+#screen-game.keeper-hit::before { opacity: 1; transition: opacity 0.08s; }
 #screen-game.keeper-hurt .hud-hp { color: #ff6a4a; animation: hurtPulse 0.8s ease-in-out infinite alternate; }
 #screen-game.keeper-hurt .hud-heart { fill: #ff6a4a; }
 #screen-game.keeper-hurt .hud-hpbar i { background: linear-gradient(90deg, #a8443b, #ff6a4a); }

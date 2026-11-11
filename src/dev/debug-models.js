@@ -10,17 +10,31 @@ import { SeededRandom } from '../core/SeededRandom.js';
 import { loadGLB } from '../render3d/glb.js';
 import { applyRig, rigUniforms, bakeModel, bakeArmWeights } from '../render3d/rig.js';
 import { weaponGeometry } from '../render3d/models.js';
-import { KEEPER_MODEL, GRUNT_MODEL, KEEPER_RIG, GRUNT_RIG, poseFor, gunPlacement } from '../data/keeperRig.js';
+import { KEEPER_MODEL, KEEPER_RIG, poseFor, gunPlacement } from '../data/keeperRig.js';
+import { ENEMY_GLB, enemyRig, GUN_GLB, TURRET_GLB } from '../data/models3d.js';
+import { bakeGun, bakeTurret } from '../render3d/glbModels.js';
+
+/** Viewer names of the textured enemies (game type id → the tag the procedural model has in the list). */
+const ENEMY_TAG = { grunt: 'grunt', runner: 'runner', husk: 'husk', spitter: 'spitter', brute: 'brute', fog_mother: 'fog-mother' };
+const TURRET_TAG = { guard_turret: 'guard-turret', frost_coil: 'frost-coil', poison_turret: 'poison-turret' };
 
 /**
- * D53: the textured models the game draws now (the user's Tripo models, *.min.glb) — the keeper in his aiming pose with
- * each weapon in hand (the same vertex rig as in the game), the grunt. Export gives the original game file.
+ * D53 / D54: the textured models the game draws now (the user's Tripo models, *.min.glb) — the keeper in his aiming
+ * pose with each of his textured guns (the same vertex rig as in the game), every textured enemy, every turret level
+ * (base + head). They replace the procedural entries of the same name. Export gives the original game file.
  */
 async function texturedModels() {
   const out = new Map();
-  const [keeper, grunt] = await Promise.all([loadGLB(KEEPER_MODEL.file), loadGLB(GRUNT_MODEL.file)]);
-  const rigged = (model, height, rig, pose, arms = false) => {
-    bakeModel(model.geometry, height);
+  const gunIds = Object.keys(GUN_GLB), enemyIds = Object.keys(ENEMY_GLB);
+  const tKeys = []; for (const id in TURRET_GLB) TURRET_GLB[id].forEach((e, i) => tKeys.push([id, i + 1, e]));
+  const [keeper, guns, enemies, turrets] = await Promise.all([
+    loadGLB(KEEPER_MODEL.file),
+    Promise.all(gunIds.map((id) => loadGLB(GUN_GLB[id].file))),
+    Promise.all(enemyIds.map((id) => loadGLB(ENEMY_GLB[id].file))),
+    Promise.all(tKeys.map(([, , e]) => loadGLB(e.file))),
+  ]);
+  const rigged = (model, height, rig, pose, arms = false, rotY = Math.PI / 2) => {
+    bakeModel(model.geometry, height, rotY);
     if (arms) bakeArmWeights(model.geometry, model.texture, rig);
     const u = rigUniforms(rig);
     if (pose) u.uPose.value.set(pose.right, pose.left, pose.leftYaw, 0);
@@ -30,22 +44,38 @@ async function texturedModels() {
     return new THREE.Mesh(model.geometry, mat);
   };
   if (keeper) {
-    for (const id of ['pistol', 'smg', 'shotgun', 'assault_rifle']) {
+    gunIds.forEach((id, i) => {
       const g = new THREE.Group();
       const body = rigged({ geometry: keeper.geometry.clone(), texture: keeper.texture }, KEEPER_MODEL.height, KEEPER_RIG, poseFor(id), true);
-      const gun = weaponGeometry(id, true);
+      const m = guns[i];
+      const gun = m ? bakeGun(m.geometry, GUN_GLB[id], id) : weaponGeometry(id, true);
       const { grip, scale, hand } = gunPlacement(id);
       gun.translate(-grip[0], -grip[1], -grip[2]).scale(scale, scale, scale).translate(hand[0], hand[1], hand[2]);
-      g.add(body, new THREE.Mesh(gun, new THREE.MeshLambertMaterial({ vertexColors: true })));
+      g.add(body, new THREE.Mesh(gun, m ? new THREE.MeshLambertMaterial({ map: m.texture }) : new THREE.MeshLambertMaterial({ vertexColors: true })));
       g.userData.file = KEEPER_MODEL.file;
       out.set(id === 'pistol' ? 'keeper' : `keeper-${id}`, g);
-    }
+    });
   }
-  if (grunt) {
-    const m = rigged(grunt, GRUNT_MODEL.height, GRUNT_RIG, null);
-    m.userData.file = GRUNT_MODEL.file;
-    out.set('grunt', m);
-  }
+  enemyIds.forEach((id, i) => {
+    const m = enemies[i];
+    if (!m) return;
+    const e = ENEMY_GLB[id];
+    const mesh = rigged(m, e.height, enemyRig(e), null, false, e.rotY);
+    mesh.userData.file = e.file;
+    out.set(ENEMY_TAG[id] || id, mesh);
+  });
+  tKeys.forEach(([id, lv, e], i) => {
+    const m = turrets[i];
+    if (!m) return;
+    const { base, head } = bakeTurret(m.geometry, e);
+    const mat = new THREE.MeshLambertMaterial({ map: m.texture });
+    const g = new THREE.Group();
+    const h = new THREE.Mesh(head, mat);
+    h.rotation.y = -0.5; // the head turned a little: shows that it is a separate part
+    g.add(new THREE.Mesh(base, mat), h);
+    g.userData.file = e.file;
+    out.set(`${TURRET_TAG[id]}-lv${lv}`, g);
+  });
   return out;
 }
 

@@ -25,7 +25,10 @@ import { getTheme } from '../data/themes.js';
 import { MenuScene } from './MenuScene.js';
 import { loadGLB } from './glb.js';
 import { applyRig, rigUniforms, bakeModel, bakeArmWeights } from './rig.js';
-import { KEEPER_MODEL, GRUNT_MODEL, KEEPER_RIG, GRUNT_RIG, poseFor, gunPlacement, muzzlePoint } from '../data/keeperRig.js';
+import { KEEPER_MODEL, KEEPER_RIG, poseFor, gunPlacement, muzzlePoint } from '../data/keeperRig.js';
+import { ENEMY_GLB, enemyRig, GUN_GLB, TURRET_GLB } from '../data/models3d.js';
+import { getEnemyType } from '../data/enemies.js';
+import { bakeGun, bakeTurret } from './glbModels.js';
 import { FLARE } from '../data/balance.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { CAMERA } from '../config/camera.js';
@@ -343,14 +346,36 @@ export class Renderer3D {
     this.pausedDrawn = false;
     this.keeperFall = 0;
     // the textured models load once at start; the warm-up compiles their rig shaders with the map (no hitch in a fight)
-    return this.modelsReady.then(() => this.guard.warmUp());
+    return this.modelsReady.then(() => { this._applyTurretModels(); return this._warmAll(); });
   }
 
   // ---------------- D52 textured models (Tripo, simplified offline) + procedural rig ----------------
+  /**
+   * D52 / D54: the user's textured models (data/models3d.js). Loaded once in parallel; a file that fails keeps the
+   * procedural model of that object. Guns are ready before the keeper uses them (same promise).
+   */
   async _loadModels() {
-    const [kp, gr] = await Promise.all([loadGLB(KEEPER_MODEL.file), loadGLB(GRUNT_MODEL.file)]);
+    const enemyIds = Object.keys(ENEMY_GLB), gunIds = Object.keys(GUN_GLB);
+    const turretKeys = [];
+    for (const id in TURRET_GLB) TURRET_GLB[id].forEach((e, i) => turretKeys.push([`${id}@${i + 1}`, e]));
+    const [kp, enemies, guns, turrets] = await Promise.all([
+      loadGLB(KEEPER_MODEL.file),
+      Promise.all(enemyIds.map((id) => loadGLB(ENEMY_GLB[id].file))),
+      Promise.all(gunIds.map((id) => loadGLB(GUN_GLB[id].file))),
+      Promise.all(turretKeys.map(([, e]) => loadGLB(e.file))),
+    ]);
+    this.gunModels = {};
+    gunIds.forEach((id, i) => {
+      const m = guns[i];
+      if (m) this.gunModels[id] = { geometry: bakeGun(m.geometry, GUN_GLB[id], id), material: new THREE.MeshLambertMaterial({ map: m.texture }) };
+    });
     if (kp) this._useKeeperModel(kp);
-    if (gr) this._useGruntModel(gr);
+    enemyIds.forEach((id, i) => { if (enemies[i]) this._useEnemyModel(id, enemies[i]); });
+    this.turretModels = {};
+    turretKeys.forEach(([key, e], i) => {
+      const m = turrets[i];
+      if (m) this.turretModels[key] = { ...bakeTurret(m.geometry, e), material: new THREE.MeshLambertMaterial({ map: m.texture }) };
+    });
   }
 
   /** Rigged material (Lambert like the other characters) + the matching shadow depth material. */
@@ -372,36 +397,78 @@ export class Renderer3D {
     this.legsHidden = true;
     for (const g of this.ghosts) g.geometry = geometry;
     // the gun alone (no box arms), moved so its grip sits in the raised right hand; the flash on its barrel tip
+    this.weaponMats = {};
     for (const id of WEAPON_MODEL_IDS) {
-      const g = weaponGeometry(id, true);
+      const tex = this.gunModels && this.gunModels[id]; // D54: the user's gun model (else the procedural one)
+      const g = tex ? tex.geometry : weaponGeometry(id, true);
       const { grip, scale, hand } = gunPlacement(id);
       g.translate(-grip[0], -grip[1], -grip[2]).scale(scale, scale, scale).translate(hand[0], hand[1], hand[2]);
       this.weaponGeos[id] = g;
+      if (tex) this.weaponMats[id] = tex.material;
     }
     this.weaponShown = '';
   }
 
-  _useGruntModel({ geometry, texture }) {
-    bakeModel(geometry, GRUNT_MODEL.height);
-    const v = this.enemyViews.grunt;
+  /** D54: a textured enemy model (any type) with the vertex rig; the procedural one stays for LOW crowds. */
+  _useEnemyModel(id, { geometry, texture }) {
+    const v = this.enemyViews[id], entry = ENEMY_GLB[id];
+    if (!v || !entry) return;
+    bakeModel(geometry, entry.height, entry.rotY);
     geometry.setAttribute('aAnim', new THREE.InstancedBufferAttribute(new Float32Array(v.cap * 4), 4).setUsage(THREE.DynamicDrawUsage));
-    this.gruntRig = rigUniforms(GRUNT_RIG);
-    const { mat, depth } = this._rigMaterials(texture, this.gruntRig, true);
-    // D52: LOW keeps the light box grunt (2.3k triangles × a crowd is too much for a weak phone); the others the model
+    v.rigU = rigUniforms(enemyRig(entry));
+    const { mat, depth } = this._rigMaterials(texture, v.rigU, true);
     v.boxView = { geometry: v.body.geometry, material: v.body.material, depth: v.body.customDepthMaterial };
     v.rigView = { geometry, material: mat, depth };
-    this._gruntLod();
+    v.boss = !!(getEnemyType(id) && getEnemyType(id).boss);
+    this._crowdLod();
   }
 
-  /** D52: textured / box grunt by the preset (texturedCrowd). The eyes are in the texture of the textured one. */
-  _gruntLod() {
-    const v = this.enemyViews && this.enemyViews.grunt, pr = QUALITY_PRESETS[this.quality];
-    if (!v || !v.rigView || !pr) return;
-    const use = pr.texturedCrowd !== false ? v.rigView : v.boxView;
-    v.body.geometry = use.geometry;
-    v.body.material = use.material;
-    v.body.customDepthMaterial = use.depth;
-    v.rigged = use === v.rigView; // animation per instance (aAnim) only on the textured model
+  /**
+   * D52 / D54: textured or procedural enemies by the preset (texturedCrowd: LOW keeps the light procedural crowd;
+   * a boss is always textured — there is one of it). The eyes are in the texture of the textured models.
+   */
+  _crowdLod() {
+    const pr = QUALITY_PRESETS[this.quality];
+    if (!this.enemyViews || !pr) return;
+    for (const id in this.enemyViews) {
+      const v = this.enemyViews[id];
+      if (!v.rigView) continue;
+      const use = pr.texturedCrowd !== false || v.boss ? v.rigView : v.boxView;
+      v.body.geometry = use.geometry;
+      v.body.material = use.material;
+      v.body.customDepthMaterial = use.depth;
+      v.rigged = use === v.rigView; // animation per instance (aAnim) only on the textured model
+    }
+  }
+
+  /** D54: the user's turret models on every pad (base + head that turns), replacing the procedural ones. */
+  _applyTurretModels() {
+    if (!this.turretModels || !this.padViews) return;
+    for (const pv of this.padViews) {
+      for (const key in pv.models) {
+        const tm = this.turretModels[key];
+        const mv = pv.models[key];
+        if (!tm || mv.textured) continue;
+        const root = mv.root;
+        for (const c of [...root.children]) root.remove(c);
+        const base = new THREE.Mesh(tm.base, tm.material);
+        const head = new THREE.Group();
+        head.add(new THREE.Mesh(tm.head, tm.material));
+        root.add(base, head);
+        root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        root.visible = pv.shown === key;
+        showModel(root, root.visible);
+        pv.models[key] = { root, head, crystal: null, textured: true };
+      }
+    }
+  }
+
+  /** D54: every hidden model the map may show (enemy types, turret levels) is compiled now, not on first sight. */
+  _warmAll() {
+    const flip = [];
+    for (const id in this.enemyViews) { const b = this.enemyViews[id].body; if (!b.visible) { b.visible = true; flip.push(b); } }
+    for (const pv of this.padViews || []) for (const key in pv.models) { const r = pv.models[key].root; if (!r.visible) { r.visible = true; flip.push(r); } }
+    return this.guard.warmUp().then(() => { for (const o of flip) o.visible = false; });
   }
 
   /** Sky, fog and the two scene lights of the map's theme (D45). No light is added or removed (no shader rebuild). */
@@ -522,7 +589,7 @@ export class Renderer3D {
     this.blobs.visible = !pr.shadows || !pr.crowdShadows; // D52: enemy blobs also when only the crowd has no shadows
     this.playerBlob = !pr.shadows;                         // the keeper has a real shadow whenever shadows are on
     this._crowdShadows();
-    this._gruntLod();
+    this._crowdLod();
     this.lanternLight.visible = pr.lantern;
     this.kioskLight.visible = pr.lantern; // light count changes only here, followed by the shader warm-up
     if (this.env) this.env.groundTexture.anisotropy = pr.aniso;
@@ -650,9 +717,9 @@ export class Renderer3D {
     const ppx = this._lerpX(p), ppy = this._lerpY(p);
     this.player.position.set(ppx, 0, ppy);
     this.player.rotation.y = -aim;
-    const flicker = p.alive && p.isInvulnerable(time) && Math.floor(time * 30) % 2 === 0;
-    this.playerBody.visible = !flicker;
-    for (const leg of this.legs) leg.visible = !flicker && !this.legsHidden;
+    // D54: no flicker on a hit (the HUD flashes a red edge instead)
+    this.playerBody.visible = true;
+    for (const leg of this.legs) leg.visible = !this.legsHidden;
     this.weaponState = run.weapon;
     this._animateKeeper(p, aim, time);
     const trail = p.dodging && preset.trails !== 'off';
@@ -707,14 +774,17 @@ export class Renderer3D {
       if (v.rigged) { // the textured model walks with its legs: a softer body squash, the arms strike on an attack
         sy = 1 + (sy - 1) * 0.35; sxz = 1 + (sxz - 1) * 0.35; roll *= 0.6;
         const ak = (time - e.lastAttackAt) / 0.35;
-        const atk = e.alive && ak >= 0 && ak < 1 ? Math.sin(ak * Math.PI) : 0;
+        let atk = e.alive && ak >= 0 && ak < 1 ? Math.sin(ak * Math.PI) : 0;
+        const wu = e.alive && e.meleeAt > time ? 1 - Math.min(1, (e.meleeAt - time) / 0.35) : 0; // D54 wind-up: arms drawn back
+        if (wu > 0 && atk === 0) atk = -0.55 * wu;
         v.body.geometry.attributes.aAnim.setXYZW(v.n, walkPh, walkOn, atk, 0);
       }
       E.set(roll, -yaw, pitch, 'YXZ');
       Q.setFromEuler(E);
       S.set(sxz * scale, sy * scale, sxz * scale);
       const reach = e.radius * 0.4;
-      const lunge = e.alive && time - e.lastAttackAt < 0.22 ? Math.sin(((time - e.lastAttackAt) / 0.22) * Math.PI) * reach : 0;
+      let lunge = e.alive && time - e.lastAttackAt < 0.22 ? Math.sin(((time - e.lastAttackAt) / 0.22) * Math.PI) * reach : 0;
+      if (!lunge && e.alive && e.meleeAt > time && e.meleeAt - time < 0.35) lunge = -reach * 0.35 * (1 - (e.meleeAt - time) / 0.35); // D54: leans back before the strike
       P.set(this._lerpX(e) + Math.cos(yaw) * lunge, lift, this._lerpY(e) + Math.sin(yaw) * lunge);
       M.compose(P, Q, S);
       v.body.setMatrixAt(v.n, M);
@@ -780,7 +850,7 @@ export class Renderer3D {
     for (const pr of run.projectiles.items) {
       if (!pr.active || b >= MAX_BULLETS) continue;
       Q.setFromAxisAngle(UP, -pr.angle);
-      P.set(pr.x, pr.stats ? GUN_HEIGHT : this.gunY || GUN_HEIGHT, pr.y); S.setScalar(1); // keeper rounds at his barrel height
+      P.set(pr.x, pr.stats ? pr.stats.muzzleHeight || GUN_HEIGHT : this.gunY || GUN_HEIGHT, pr.y); S.setScalar(1); // each round at its barrel height
       M.compose(P, Q, S);
       this.bullets.setColorAt(b, pr.weaponId === 'frost_coil' ? ICE_BOLT : pr.weaponId === 'poison_turret' ? TOXIC_BOLT : WHITE); // D50/D51
       this.bullets.setMatrixAt(b++, M);
@@ -794,6 +864,7 @@ export class Renderer3D {
     if (w.weaponId !== this.weaponShown) {
       const id = this.weaponGeos[w.weaponId] ? w.weaponId : (w.weaponId === 'machine_gun' ? 'assault_rifle' : 'pistol');
       this.weaponMesh.geometry = this.weaponGeos[id];
+      this.weaponMesh.material = (this.weaponMats && this.weaponMats[id]) || this.mats.character;
       this.weaponShown = w.weaponId;
       this._placeMuzzle(id);
     }
