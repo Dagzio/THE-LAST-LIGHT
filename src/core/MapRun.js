@@ -329,11 +329,16 @@ export class MapRun {
   }
 
   _typeFor(enemyId) {
-    let t = this.enemyTypes.get(enemyId);
+    // D60: the current wave's power (extra waves of maps 2–6: +20 % HP and damage per wave; never the boss itself)
+    const w = this.waves && this.waves.waves[this.waves.waveIndex];
+    const base = getEnemyType(enemyId);
+    const pw = base && !base.boss && w && w.power > 0 ? w.power : 1;
+    const key = pw === 1 ? enemyId : `${enemyId}@${pw}`;
+    let t = this.enemyTypes.get(key);
     if (t === undefined) {
       const m = this.map;
-      t = scaledEnemyType(getEnemyType(enemyId), m.enemyHpMult || 1, m.rewardMult || 1, m.enemyDamageMult || 1, m.bossHpMult || 1);
-      this.enemyTypes.set(enemyId, t);
+      t = scaledEnemyType(base, (m.enemyHpMult || 1) * pw, m.rewardMult || 1, (m.enemyDamageMult || 1) * pw, m.bossHpMult || 1);
+      this.enemyTypes.set(key, t);
     }
     return t;
   }

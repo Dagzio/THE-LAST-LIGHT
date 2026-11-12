@@ -47,7 +47,7 @@ export const MAPS = [
     descKey: 'map.drowned_pier.desc',
     featureKey: 'feature.drowned_pier',
     theme: 'pier',
-    waveCount: 6,
+    waveCount: 10, // D60: 6 + 4
     finalWaveBoss: false,
     completionReward: 70,
     enemyHpMult: 1.2,
@@ -77,7 +77,7 @@ export const MAPS = [
     descKey: 'map.pine_hollow.desc',
     featureKey: 'feature.pine_hollow',
     theme: 'forest',
-    waveCount: 6,
+    waveCount: 11, // D60: 6 + 5
     finalWaveBoss: true,
     completionReward: 90,
     enemyHpMult: 1.35,
@@ -104,7 +104,7 @@ export const MAPS = [
     descKey: 'map.salt_marsh.desc',
     featureKey: 'feature.salt_marsh',
     theme: 'marsh',
-    waveCount: 7,
+    waveCount: 13, // D60: 7 + 6
     finalWaveBoss: false,
     completionReward: 110,
     enemyHpMult: 1.5,
@@ -132,7 +132,7 @@ export const MAPS = [
     descKey: 'map.frost_ridge.desc',
     featureKey: 'feature.frost_ridge',
     theme: 'ice',
-    waveCount: 7,
+    waveCount: 13, // D60: 7 + 6
     finalWaveBoss: false,
     completionReward: 130,
     enemyHpMult: 1.7,
@@ -155,7 +155,7 @@ export const MAPS = [
     descKey: 'map.black_lighthouse.desc',
     featureKey: 'feature.black_lighthouse',
     theme: 'black',
-    waveCount: 8,
+    waveCount: 15, // D60: 8 + 7
     finalWaveBoss: true,
     completionReward: 180,
     enemyHpMult: 1.9,

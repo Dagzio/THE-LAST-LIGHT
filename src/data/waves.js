@@ -103,7 +103,7 @@ export const WAVES = {
       g('grunt', 3, 1.4, 'north', 1), g('runner', 4, 1.2, 'east', 2), g('husk', 2, 2.4, 'west', 3),
       g('spitter', 2, 2.4, 'south', 4), g('brute', 1, 1, 'north', 7), g('brute', 1, 1, 'south', 9)] },
   ],
-  black_lighthouse: [ // the finale: four sides, the Fog Mother in wave 8
+  black_lighthouse: [ // the finale: four sides, the Fog Mother in the final wave (15 since D60)
     { reward: 24, groups: [g('grunt', 3, 1.7, 'north', 1), g('grunt', 2, 1.7, 'south', 3), g('runner', 2, 1.8, 'east', 5)] },
     { reward: 28, groups: [g('grunt', 3, 1.6, 'west', 1), g('runner', 3, 1.6, 'east', 3), g('spitter', 1, 1, 'north', 6)] },
     { reward: 32, groups: [g('grunt', 3, 1.6, 'south', 1), g('husk', 1, 1, 'north', 3), g('spitter', 2, 2.4, 'east', 5), g('brute', 1, 1, 'west', 9)] },
@@ -118,6 +118,33 @@ export const WAVES = {
       g('husk', 1, 1, 'east', 0, 0.66), g('spitter', 1, 1, 'west', 0, 0.4)] },
   ],
 };
+
+/**
+ * D60 (user decision): more waves on maps 2–6 — +4…+7 in map order, inserted before the final (boss / elite) wave.
+ * An extra wave repeats one of the map's last three regular waves (in turn, sides rotated), with `power` = HP and
+ * damage multiplier of its enemies: +20 % over the previous extra wave (1.2, 1.4, …). The final wave keeps the last
+ * step for its enemies (the boss itself is not scaled — its HP has bossHpMult). Rewards: +4 coins per extra wave.
+ */
+export const EXTRA_WAVES = { drowned_pier: 4, pine_hollow: 5, salt_marsh: 6, frost_ridge: 6, black_lighthouse: 7 };
+export const WAVE_POWER_STEP = 0.2;
+
+function extendWaves(list, n) {
+  const final = list[list.length - 1], regular = list.slice(0, -1);
+  const sides = [...new Set(regular.flatMap((w) => w.groups.map((x) => x.spawnPointGroup)))];
+  const lastReward = regular[regular.length - 1].reward;
+  const out = [...regular];
+  for (let k = 1; k <= n; k++) {
+    const tpl = regular[regular.length - 1 - ((k - 1) % Math.min(3, regular.length))];
+    out.push({
+      reward: lastReward + 4 * k,
+      power: Math.round((1 + WAVE_POWER_STEP * k) * 100) / 100,
+      groups: tpl.groups.map((x) => ({ ...x, spawnPointGroup: sides[(sides.indexOf(x.spawnPointGroup) + k) % sides.length] })),
+    });
+  }
+  out.push({ ...final, power: Math.round((1 + WAVE_POWER_STEP * n) * 100) / 100 });
+  return out;
+}
+for (const id in EXTRA_WAVES) WAVES[id] = extendWaves(WAVES[id], EXTRA_WAVES[id]);
 
 /** Wave group shorthand (data only). */
 function g(enemyId, count, spawnInterval, spawnPointGroup, initialDelay, bossHpBelow) {
