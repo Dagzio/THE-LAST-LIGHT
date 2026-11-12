@@ -17,6 +17,8 @@ const pct = document.getElementById('loadPct');
 // gap between them; the bar low in the centre — kept on screen when the bottom of the picture is cut.
 const ART = { w: 2500, h: 1407, x: 0.4, y: 0.335, ground: 0.55, gap: 0.41, barY: 0.857, barW: 0.465 };
 const inner = document.getElementById('splashInner');
+// D70: the mobile version has a 20 % bigger logo (styles/ui.css) — it may reach a little past the lamp-moon gap
+const MOBILE = typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
 function placeSplash() {
   if (!splash.classList.contains('active')) return;
   const W = innerWidth, H = innerHeight, k = Math.max(W / ART.w, H / ART.h);
@@ -24,7 +26,7 @@ function placeSplash() {
   const bw = Math.min(iw * ART.barW, W * 0.8, 900);
   const bh = Math.max(14, bw * 0.052);
   const barY = Math.min(oy + ih * ART.barY, H * 0.875);              // on screen even when the bottom is cut
-  splash.style.setProperty('--splash-logo-max', `${Math.round(Math.min(iw * ART.gap, W - 24))}px`);
+  splash.style.setProperty('--splash-logo-max', `${Math.round(Math.min(iw * (MOBILE ? 0.5 : ART.gap), W - 24))}px`);
   splash.style.setProperty('--splash-bw', `${Math.round(bw)}px`);
   splash.style.setProperty('--bar-x', `${Math.round(W / 2)}px`);
   splash.style.setProperty('--bar-y', `${Math.round(barY)}px`);
