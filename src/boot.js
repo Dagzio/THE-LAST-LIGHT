@@ -14,7 +14,7 @@ const pct = document.getElementById('loadPct');
 // D64 / D67: the splash art is shown whole on every screen (contain, the free bands filled by a blurred copy), so the
 // logo column, the loading bar and TAP TO PLAY are placed by points of the picture itself: the logo between the lamp
 // (left) and the moon, its bottom above the ground, never wider than the gap between them; the bar low in the centre.
-const ART = { w: 1672, h: 941, x: 0.4, y: 0.335, ground: 0.55, gap: 0.41, barY: 0.857, barW: 0.465 };
+const ART = { w: 2500, h: 1407, x: 0.4, y: 0.335, ground: 0.55, gap: 0.41, barY: 0.857, barW: 0.465 };
 const inner = document.getElementById('splashInner');
 function placeSplash() {
   if (!splash.classList.contains('active')) return;
