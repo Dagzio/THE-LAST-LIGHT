@@ -35,7 +35,7 @@ const shownAt = performance.now();
 
 onProgress((p) => {
   const n = Math.floor(p * 100);
-  fill.style.width = `${(p * 100).toFixed(1)}%`;
+  fill.style.setProperty('--p', `${(p * 100).toFixed(1)}%`); // D66: the fill reveals its inner layer
   pct.textContent = `${n}%`;
   bar.setAttribute('aria-valuenow', String(n));
 });

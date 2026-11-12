@@ -271,26 +271,26 @@ body.menu3d #world { display: none; }
   clip-path: polygon(var(--tip) 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, var(--tip) 100%, 0 50%);
   background: linear-gradient(180deg, #0c0d10, #24272c);
 }
+/* D66: the fill keeps the track's shape (same 45° tips, an even dark margin inside the steel frame) and is revealed
+   left → right by its inner layer (--p from boot.js) — it can never poke out of the frame; one flat orange. */
 .load-bar i {
   position: absolute;
-  left: 0;
-  top: max(1px, calc(var(--bh) * 0.08));
-  bottom: max(1px, calc(var(--bh) * 0.08));
-  width: 0;
-  --tip: calc((max(14px, var(--bh)) - 2 * max(2px, calc(var(--bh) * 0.12))) * 0.42);
+  --m: max(2px, calc(var(--bh) * 0.13));
+  inset: var(--m);
+  --tip: calc((max(14px, var(--bh)) - 2 * max(2px, calc(var(--bh) * 0.12)) - 2 * var(--m)) * 0.5);
   clip-path: polygon(var(--tip) 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, var(--tip) 100%, 0 50%);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 48%, rgba(80, 20, 0, 0.18) 100%),
-    repeating-linear-gradient(-60deg, #ffc43e 0 calc(var(--bh) * 0.42), #ee8a10 calc(var(--bh) * 0.42) calc(var(--bh) * 0.84));
-  background-size: 100% 100%, calc(var(--bh) * 1.94) 100%;
-  animation: loadStripes 0.9s linear infinite;
+}
+.load-bar i::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  background: #f39a1c;
   transition: width 0.2s;
 }
-@keyframes loadStripes { to { background-position: 0 0, calc(var(--bh) * 1.94) 0; } }
 .load-pct { display: none; } /* the reference shows the bar only (the value stays on the bar's aria-valuenow) */
 /* the bar's spot goes to TAP TO PLAY after loading */
 #screen-splash.ready-tap .load-bar, #screen-splash.ready-tap .load-pct { visibility: hidden; }
-#screen-splash.ready-tap .load-bar i { animation: none; }
 
 /* ===================== Off-screen indicators ===================== */
 .offscreen { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
