@@ -6,7 +6,7 @@
 import { STATES } from '../core/GameStateMachine.js';
 import { T, onLanguageChange } from '../i18n/i18n.js';
 import { WEAPONS } from '../data/weapons.js';
-import { WEAPON_NODES, UPGRADE_NODES, NODE_NAME_OVERRIDES, PLAYER_UPGRADES, PLAYER_UPGRADE_ORDER } from '../data/upgrades.js';
+import { WEAPON_UPGRADE, WEAPON_NODES, UPGRADE_NODES, NODE_NAME_OVERRIDES, PLAYER_UPGRADES, PLAYER_UPGRADE_ORDER } from '../data/upgrades.js';
 import { DEFENSES, MAX_DEVICE_LEVEL } from '../data/defenses.js';
 import { GRENADES, GRENADE_ORDER } from '../data/grenades.js';
 import { HEALS, HEAL_ORDER } from '../data/heals.js';
@@ -93,9 +93,11 @@ export class ShopView {
     // Phone step (≤ 500 px high, base.css): one row of cards with page arrows, weapon picker card in UPGRADES
     this.phoneMQ = matchMedia('(max-height: 500px)');
 
+    this.sellArmed = null; // D63: the sale waiting for its confirmation (the SELL button's command), or null
     this.tabs.forEach((t) => t.addEventListener('click', () => {
       this.tab = t.dataset.shopTab;
       this.page = 0;
+      this.sellArmed = null;
       if (this.tab === 'weaponUpgrades') this.upgradeWeaponId = game.economy.profile.equippedWeaponId; // equipped first
       if (this.tab === 'playerUpgrades') this.keeperView = this._hurt() ? 'heal' : 'upgrades'; // D52
       this.refresh();
@@ -127,18 +129,30 @@ export class ShopView {
     if (show) {
       if (g.sm.is(STATES.SHOP_OPEN)) Sfx.play(Sfx.duration('shopOpen') > 0 ? 'shopOpen' : 'open'); // recorded shop sound
       this.upgradeWeaponId = g.economy.profile.equippedWeaponId;
+      this.sellArmed = null;
       this.refresh();
     }
   }
 
   // ---------------- commands ----------------
   _onClick(e) {
+    // D63: the tag in a card's corner arms the sale (the card's button becomes SELL +coins); tapped again — cancels
+    const arm = e.target.closest('[data-sell-arm]');
+    if (arm) {
+      this.sellArmed = this.sellArmed === arm.dataset.sellArm ? null : arm.dataset.sellArm;
+      Sfx.play('click');
+      this.refresh();
+      return;
+    }
     const b = e.target.closest('[data-shop-cmd]');
     if (!b || b.disabled) return;
     const [cmd, a, c] = b.dataset.shopCmd.split(':');
     const g = this.game;
     let r = null;
-    if (cmd === 'buyWeapon') r = g.shopBuyWeapon(a);
+    this.sellArmed = null; // any other action cancels an armed sale
+    if (cmd === 'sellW') r = g.shopSellWeapon(a);
+    else if (cmd === 'sellD') r = g.shopSellDefense(Number(a), c);
+    else if (cmd === 'buyWeapon') r = g.shopBuyWeapon(a);
     else if (cmd === 'equip') r = g.shopEquipWeapon(a);
     else if (cmd === 'upgrade') r = g.shopBuyWeaponUpgrade(a, c);
     else if (cmd === 'player') r = g.shopBuyPlayerUpgrade(a);
@@ -212,8 +226,13 @@ export class ShopView {
       // D52 upgrade + wrench pair: on a phone both are icon + price (the word is hidden) — fit only when it is shown
       if (this.phoneMQ.matches && n.parentElement.classList.contains('shop-foot-row')) continue;
       n.style.overflowWrap = '';
+      n.style.whiteSpace = '';
+      n.style.lineHeight = '';
+      n.style.textAlign = '';
       let fs = parseFloat(getComputedStyle(n).fontSize);
       while (fs > 12 && !textFits(n)) { fs -= 1; n.style.fontSize = `${fs}px`; }
+      // D63: a two-word label ("FULL INTEGRITY") wraps between its words before any word is broken
+      if (!textFits(n) && n.classList.contains('shop-buy')) { n.style.whiteSpace = 'normal'; n.style.lineHeight = '1.1'; n.style.textAlign = 'center'; }
       if (!textFits(n)) n.style.overflowWrap = 'anywhere'; // last resort: break the word rather than leave the card
     }
   }
@@ -221,9 +240,10 @@ export class ShopView {
   /** Long languages: shrink all tab labels to one common size (never wrap, never cut; H5 one role = one size). */
   _fitTabs() {
     for (const t of this.tabs) t.style.fontSize = '';
-    if (!this.phoneMQ.matches) return;
     let fs = parseFloat(getComputedStyle(this.tabs[0]).fontSize);
-    const overflow = () => this.tabs.some((t) => !textFits(t));
+    // D63: desktop step on a small tablet (1024 × 600): the tab row runs under the coins — shrink until it fits
+    const row = this.tabs[0].parentElement;
+    const overflow = this.phoneMQ.matches ? () => this.tabs.some((t) => !textFits(t)) : () => row.scrollWidth > row.clientWidth + 1;
     while (fs > 12 && overflow()) {
       fs -= 1;
       for (const t of this.tabs) t.style.fontSize = `${fs}px`;
@@ -251,6 +271,7 @@ export class ShopView {
 
   _turn(dir) {
     const before = this.page;
+    if (this.sellArmed) { this.sellArmed = null; this.page += dir; this.refresh(); if (this.page !== before) Sfx.play('click'); return; }
     this.page += dir;
     this._paginate();
     this._fitButtons();
@@ -298,6 +319,29 @@ export class ShopView {
     return card;
   }
 
+  /**
+   * D63: a sellable card gets a small price-tag button in its head corner. Armed (tapped once), the card's footer turns
+   * into one red SELL +coins button — a second, deliberate tap sells (no accidental sale on a phone); the corner
+   * button becomes × (keep it).
+   */
+  _sellable(card, sellCmd, refund) {
+    const armed = this.sellArmed === sellCmd;
+    const tag = el('button', 'shop-sell-tag', armed
+      ? '<svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+      : '<svg class="ico" viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-7 7z"/><circle cx="7.5" cy="8.5" r="1.6"/></svg>');
+    tag.dataset.sellArm = sellCmd;
+    tag.dataset.nosfx = '';
+    tag.setAttribute('aria-label', T(armed ? 'aria.sellCancel' : 'aria.sell'));
+    card.querySelector('.shop-card-head').append(tag);
+    card.classList.add('sellable');
+    if (!armed) return;
+    card.classList.add('selling');
+    const old = card.querySelector('.shop-card-foot');
+    if (old) old.remove();
+    this._footer(card, { cmd: sellCmd, label: T('shop.sell'), price: `+${refund}`, enabled: true });
+    card.querySelector('.shop-card-foot .shop-buy').classList.add('shop-sell-go');
+  }
+
   _pips(rank, max) {
     let s = '<span class="pips">';
     for (let i = 0; i < max; i++) s += `<i class="${i < rank ? 'on' : ''}"></i>`;
@@ -319,6 +363,8 @@ export class ShopView {
       if (o.equipped) this._footer(card, { label: T('shop.equipped'), enabled: false, done: true });
       else if (o.owned) this._footer(card, { cmd: `equip:${id}`, label: T('shop.equip'), enabled: true });
       else this._footer(card, { cmd: `buyWeapon:${id}`, price: o.price, enabled: o.canBuy, reason: o.canBuy ? null : o.reason, reasonParams: { n: o.requiredLevel } });
+      const so = eco.weaponSellOffer(id);
+      if (so.canSell) this._sellable(card, `sellW:${id}`, so.refund);
       this.grid.append(card);
     }
   }
@@ -332,7 +378,7 @@ export class ShopView {
       const chip = el('button', `shop-chip${id === this.upgradeWeaponId ? ' active' : ''}`);
       chip.dataset.shopCmd = `pickWeapon:${id}`;
       chip.dataset.nosfx = '';
-      chip.textContent = `${T(WEAPONS[id].nameKey)} · ${T('shop.weaponLevel', { n: eco.weaponLevel(id) })}`;
+      chip.textContent = `${T(WEAPONS[id].nameKey)} · ${T('shop.weaponLevel', { n: eco.weaponLevel(id), max: WEAPON_UPGRADE.maxWeaponLevel })}`;
       this.sub.append(chip);
     }
     const wid = this.upgradeWeaponId;
@@ -352,7 +398,7 @@ export class ShopView {
   /** Phone UPGRADES: the selected weapon + its level; ◀ ▶ switch between owned weapons (only when there are several). */
   _weaponPicker(owned) {
     const eco = this.game.economy, wid = this.upgradeWeaponId, n = owned.length, i = owned.indexOf(wid);
-    const card = this._card(`img:${gunIcon(wid)}`, T(WEAPONS[wid].nameKey), `<p class="shop-pick-lv">${T('shop.weaponLevel', { n: eco.weaponLevel(wid) })}</p>`, 'equipped shop-picker');
+    const card = this._card(`img:${gunIcon(wid)}`, T(WEAPONS[wid].nameKey), `<p class="shop-pick-lv">${T('shop.weaponLevel', { n: eco.weaponLevel(wid), max: WEAPON_UPGRADE.maxWeaponLevel })}</p>`, 'equipped shop-picker');
     if (n > 1) {
       const foot = el('div', 'shop-card-foot shop-pick-foot');
       const arrow = (dir) => {
@@ -488,6 +534,8 @@ export class ShopView {
           this._repairButton(card, i); // D52: wrench + price next to the main button while it is damaged
         } else if (o.owned) this._footer(card, { cmd: `defense:${i}:${id}`, label: T('shop.install'), enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
         else this._footer(card, { cmd: `defense:${i}:${id}`, price: o.price, enabled: o.canBuy, reason: o.canBuy ? null : o.reason });
+        const so = g.defenseSellOffer(i, id);
+        if (so.canSell) this._sellable(card, `sellD:${i}:${id}`, so.refund);
         col.append(card);
       }
       this.grid.append(col);

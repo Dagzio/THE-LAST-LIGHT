@@ -3,7 +3,7 @@
 // and the economy just books them. Purchases follow validate → debit → apply → save → notify; an invalid purchase
 // changes nothing. Offers (state + price + reason) are computed here so the UI only displays them.
 import { WEAPONS, getWeapon } from '../data/weapons.js';
-import { WEAPON_UPGRADE, UPGRADE_NODES, WEAPON_NODES, PLAYER_UPGRADES, PLAYER_UPGRADE_COST_GROWTH, shopPrice } from '../data/upgrades.js';
+import { WEAPON_UPGRADE, UPGRADE_NODES, WEAPON_NODES, PLAYER_UPGRADES, PLAYER_UPGRADE_COST_GROWTH, shopPrice, weaponUpgradePrice, sellRefund } from '../data/upgrades.js';
 import { levelForXp } from '../data/progression.js';
 import { effectiveWeaponStats, playerModifiers } from './Loadout.js';
 import { nextMapId } from './Campaign.js';
@@ -12,8 +12,11 @@ import { MAPS } from '../data/maps.js';
 /** Reasons an offer cannot be bought (i18n keys `shop.reason.*`). */
 export const REASON = Object.freeze({
   COINS: 'coins', LEVEL: 'level', OWNED: 'owned', NOT_OWNED: 'notOwned', MAX: 'max', WEAPON_MAX: 'weaponMax',
-  UNKNOWN: 'unknown', CLOSED: 'closed', PAD_BUSY: 'padBusy',
+  UNKNOWN: 'unknown', CLOSED: 'closed', PAD_BUSY: 'padBusy', STARTER: 'starter',
 });
+
+/** The weapon every profile starts with (never sold, D63). */
+export const STARTER_WEAPON_ID = 'pistol';
 
 export class Economy {
   /**
@@ -140,9 +143,37 @@ export class Economy {
 
   weaponUpgradeCost(weaponId, nodeId) {
     const node = UPGRADE_NODES[nodeId];
-    const base = WEAPON_UPGRADE.baseCost[weaponId] || 0;
-    const mult = node && node.unique ? WEAPON_UPGRADE.uniqueCostMultiplier : 1;
-    return shopPrice(base * (1 + WEAPON_UPGRADE.costGrowth * (this.weaponLevel(weaponId) - 1)) * mult);
+    return weaponUpgradePrice(weaponId, this.weaponLevel(weaponId), !!(node && node.unique));
+  }
+
+  /**
+   * D63: selling an owned weapon returns half of the coins spent on it (purchase + upgrades); its upgrades are lost.
+   * The starting pistol cannot be sold (the keeper always keeps a weapon).
+   * @returns {{id, refund, canSell, reason}}
+   */
+  weaponSellOffer(id) {
+    const p = this.profile;
+    const o = { id, refund: 0, canSell: false, reason: null };
+    if (!p.ownedWeapons.includes(id)) o.reason = REASON.NOT_OWNED;
+    else if (id === STARTER_WEAPON_ID) o.reason = REASON.STARTER;
+    else {
+      o.refund = sellRefund(p.weaponProgress[id] ? p.weaponProgress[id].spent : 0);
+      o.canSell = true;
+    }
+    return o;
+  }
+
+  sellWeapon(id) {
+    const o = this.weaponSellOffer(id);
+    if (!o.canSell) return { ok: false, reason: o.reason };
+    const p = this.profile;
+    p.ownedWeapons = p.ownedWeapons.filter((w) => w !== id);
+    delete p.weaponProgress[id];
+    if (p.equippedWeaponId === id) p.equippedWeaponId = STARTER_WEAPON_ID;
+    p.coins = Math.min(1e9, p.coins + o.refund);
+    this._commit();
+    this.events.emit('sale', 'weapon', id, o.refund);
+    return { ok: true, refund: o.refund };
   }
 
   /** @returns {{weaponId, nodeId, rank, max, cost, canBuy, reason}} */
@@ -186,7 +217,7 @@ export class Economy {
     const p = this.profile;
     p.coins -= o.price;
     p.ownedWeapons.push(id);
-    p.weaponProgress[id] = { level: 1, upgrades: {} };
+    p.weaponProgress[id] = { level: 1, upgrades: {}, spent: o.price }; // D63: coins spent on it (for selling)
     p.equippedWeaponId = id; // a new weapon is equipped right away
     this._commit();
     this.events.emit('purchase', 'weapon', id);
@@ -210,6 +241,7 @@ export class Economy {
     p.coins -= o.cost;
     wp.upgrades[nodeId] = o.rank + 1;
     wp.level += 1;
+    wp.spent = (wp.spent | 0) + o.cost;
     this._commit();
     this.events.emit('purchase', 'weaponUpgrade', weaponId, nodeId);
     return { ok: true };

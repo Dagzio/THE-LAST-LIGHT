@@ -5,6 +5,7 @@
 import { STATES } from '../core/GameStateMachine.js';
 import { T, onLanguageChange } from '../i18n/i18n.js';
 import { Sfx } from '../platform/Sfx.js';
+import { coversHud } from './hudBlockers.js';
 
 const TAG_HEIGHT = 74; // world height above the pad (over the turret models)
 const WRENCH = '<svg class="ico" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>';
@@ -39,7 +40,7 @@ export class DeviceTags {
       fix.setAttribute('aria-label', T('aria.repairDevice'));
       this.tags.push({
         el, fix, lv: el.querySelector('.dev-lv'), fill: el.querySelector('.dev-hp > i'), cost: el.querySelector('.dev-cost b'),
-        on: false, x: -1, y: -1, level: -1, pct: -1, broken: null, fixOn: null, price: -1, poor: null,
+        on: false, x: -1, y: -1, level: -1, pct: -1, broken: null, fixOn: null, price: -1, poor: null, w: 0, h: 0,
       });
     }
   }
@@ -59,8 +60,11 @@ export class DeviceTags {
       if (!d) { this._hide(t); continue; }
       r3.projectToScreen(d.x, d.y, TAG_HEIGHT, this.pt);
       if (this.pt.x < 0 || this.pt.x > W || this.pt.y < 0 || this.pt.y > H) { this._hide(t); continue; }
-      if (!t.on) { t.on = true; t.el.classList.add('on'); }
+      // D63: never under a HUD block (action buttons, stick, keeper block…) — its numbers would mix with the HUD's and
+      // the wrench could catch a tap meant for a button. Size: measured once per look (with / without the wrench).
       const x = Math.round(this.pt.x), y = Math.round(this.pt.y);
+      if (t.w && (y - t.h < 0 || x - t.w / 2 < 0 || x + t.w / 2 > W || coversHud(x - t.w / 2, y - t.h, x + t.w / 2, y))) { this._hide(t); continue; }
+      if (!t.on) { t.on = true; t.el.classList.add('on'); }
       if (x !== t.x || y !== t.y) { t.x = x; t.y = y; t.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`; }
       if (d.level !== t.level) { t.level = d.level; t.lv.textContent = String(d.level); }
       const pct = Math.round((d.hp / d.maxHp) * 200) / 2; // 0.5 % steps: no style write for tiny changes
@@ -69,7 +73,8 @@ export class DeviceTags {
       if (broken !== t.broken) { t.broken = broken; t.el.classList.toggle('broken', broken); }
       const o = g.deviceRepairOffer(i, true);
       const fixOn = o.reason !== 'full' && o.cost > 0;
-      if (fixOn !== t.fixOn) { t.fixOn = fixOn; t.el.classList.toggle('hurt', fixOn); }
+      if (fixOn !== t.fixOn) { t.fixOn = fixOn; t.el.classList.toggle('hurt', fixOn); t.w = 0; }
+      if (!t.w) { t.w = t.el.offsetWidth; t.h = t.el.offsetHeight; } // after a change of look only
       if (!fixOn) continue;
       if (o.cost !== t.price) { t.price = o.cost; t.cost.textContent = String(o.cost); }
       const poor = !o.canBuy;

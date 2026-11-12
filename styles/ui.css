@@ -281,6 +281,8 @@
   overflow: hidden;
 }
 .map-info-name { font-family: var(--font-display); font-weight: 800; font-stretch: condensed; font-size: calc(36px * var(--fs)); line-height: 1; color: #fff; }
+/* D63: Arabic / Japanese glyphs are taller than a 1.0 line box (they poked 4 px out of it) */
+[data-lang="ar"] .map-info-name, [data-lang="ja"] .map-info-name { line-height: 1.3; }
 .map-info-desc { font-size: calc(18px * var(--fs)); line-height: 1.35; color: #c3cad1; }
 .map-info-facts { display: flex; flex-direction: column; gap: 0.4em; }
 .map-info-facts li {
@@ -472,6 +474,17 @@
   /* H5 minimums on the very low step (--fs 0.72 would give 13–15 px) */
   .check-row, .lang-item { font-size: 16px; }
   .hint, .qslider-labels { font-size: 14px; }
+  /* D63: a 320 px high phone — the waves / boss / state facts must stay above START: the description gives way first */
+  .map-info-name { font-size: 22px; }
+  .map-info-desc { flex: none; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .brush-cta { font-size: 30px; }
+}
+/* ≤ 359 px high and narrow (568 × 320): no room for the description at all — the facts stay whole */
+@media (max-height: 359px) and (max-width: 619px) { .map-info-desc { display: none; } }
+/* D63: narrow phones (< 620 px): the 5 language buttons are ~83 px wide — "Українська" / "Português" keep their room */
+@media (max-height: 500px) and (max-width: 619px) {
+  .lang-grid { gap: 6px; }
+  .lang-item { padding: 0 2px; font-size: 15px; }
 }
 
 /* ---------- Hover only for real pointers (no sticky hover on touch) ---------- */

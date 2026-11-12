@@ -36,6 +36,7 @@ export class CrateView {
     this.game = game;
     this.root = document.getElementById('popup-crate');
     this.cards = document.getElementById('crateCards');
+    this.range = document.createRange(); // D63: name fitting
     this.cards.addEventListener('click', (e) => {
       const b = e.target.closest('[data-perk]');
       if (!b) return;
@@ -72,6 +73,26 @@ export class CrateView {
       card.querySelector('.boon-fx').textContent = T(`perk.${id}.fx`);
       card.querySelector('.boon-note').textContent = T(perk.once ? 'crate.once' : 'crate.untilEnd');
       this.cards.append(card);
+    }
+    this._fitNames();
+  }
+
+  /**
+   * D63: a single long word ("ПЕРЕДАВЛЕНИЕ", German compounds) must not run out of a narrow phone card: the name
+   * shrinks down to 12 px (only on build — never per frame).
+   */
+  _fitNames() {
+    for (const n of this.cards.querySelectorAll('.boon-name')) {
+      n.style.fontSize = '';
+      let fs = parseFloat(getComputedStyle(n).fontSize);
+      const head = n.parentElement, hs = getComputedStyle(head);
+      const fits = () => { // both sides: Arabic runs out on the left
+        const h = head.getBoundingClientRect();
+        this.range.selectNodeContents(n);
+        const t = this.range.getBoundingClientRect();
+        return t.right <= h.right - parseFloat(hs.paddingRight) + 0.5 && t.left >= h.left + parseFloat(hs.paddingLeft) - 0.5;
+      };
+      while (fs > 12 && !fits()) { fs -= 1; n.style.fontSize = `${fs}px`; }
     }
   }
 }

@@ -6,10 +6,11 @@ import { STATES } from '../core/GameStateMachine.js';
 
 const MAX_ENEMY_ARROWS = 6;
 // D53: HUD blocks the badges keep clear of (+ AVOID_PAD around them: badge radius + a little air)
+// D63: the touch / desktop action buttons one by one — they sit outside their container's box
 const AVOID_SELECTORS = ['#screen-game .hud-top', '#screen-game .hud-player', '#screen-game .corner-tl', '#screen-game .corner-tr',
-  '#btnNextWave', '.touch-actions', '#hudActions']; // not the stick: badges ignore taps, and on a small
-// phone the left edge is the only free run
-const AVOID_PAD = 28;
+  '#btnNextWave', '.touch-actions', '.touch-actions button', '#hudActions', '#hudActions button']; // not the stick: badges ignore
+// taps, and on a small phone the left edge is the only free run
+const AVOID_PAD = 32; // D63: badge radius (~26) + air — 28 let the badge touch START by a few px
 const P2 = { x: 0, y: 0 }; // reused
 const EDGE = 58;          // CSS px from the screen edge to the badge centre (badge + pointer stay inside the H5 margin)
 // D53: a round badge with an icon (what it is) + a pointer that turns around it (where it is)

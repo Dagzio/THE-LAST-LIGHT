@@ -9,6 +9,7 @@ import { STATES } from '../core/GameStateMachine.js';
 import { INTROS, INTRO_SECONDS } from '../data/intros.js';
 import { WAVE_TIMING } from '../data/waves.js';
 import { gunIcon } from '../data/icons.js';
+import { coversHud, invalidateHudBlockers } from './hudBlockers.js';
 
 const KIOSK_LABEL_HEIGHT = 74; // world height above the kiosk where its label sits
 
@@ -81,7 +82,8 @@ export class HUD {
     this.hudTopDirty = true;
     this.hudTopBottom = 0;
     this.labelH = 24;
-    const dirty = () => { this.hudTopDirty = true; };
+    this.labelSize = new Map();    // D63: label element → its size (re-measured after a resize / language change)
+    const dirty = () => { this.hudTopDirty = true; invalidateHudBlockers(); this.labelSize.clear(); };
     window.addEventListener('resize', dirty);
     onLanguageChange(dirty);
     game.sm.onChange(dirty);
@@ -147,6 +149,20 @@ export class HUD {
     };
   }
 
+  /**
+   * D63: would a world label (centred on x, its top at y + dy × its height) cover a HUD block? The blocks are measured
+   * after a resize / language / state change and at most twice a second (the header grows with the boss bar, the
+   * repair button…) — never every frame.
+   */
+  _underHud(el, x, y, dy) {
+    let size = this.labelSize.get(el);
+    if (!size || !size.w) { size = { w: el.offsetWidth, h: el.offsetHeight }; this.labelSize.set(el, size); } // after it was shown once
+    if (!size.w) return false;
+    const t = y + dy * size.h, l = x - size.w / 2, r = x + size.w / 2, r3 = this.game.renderer3d;
+    if (t < 0 || l < 0 || r > r3.viewW || t + size.h > r3.viewH) return true; // partly off screen
+    return coversHud(l, t, r, t + size.h);
+  }
+
   /** "E · SHOP" above the kiosk while shopping is possible this phase; highlighted when the keeper is in reach. */
   _kioskLabel(run, running) {
     const c = this.cache, el = this.el.kiosk, r3 = this.game.renderer3d;
@@ -164,6 +180,9 @@ export class HUD {
       }
       if (this.pt.y - this.labelH < this.hudTopBottom + 6) { r3.projectToScreen(run.kiosk.x, run.kiosk.y, 0, this.pt); below = true; }
       on = this.pt.x > 0 && this.pt.x < W && this.pt.y > 0 && this.pt.y < H;
+      // D63: never under a HUD block (the keeper block, corner buttons, stick…) — the texts would mix; the label is
+      // only a hint (the glowing cart button / E open the shop)
+      if (on && this._underHud(el, this.pt.x, this.pt.y, below ? 0.3 : -1)) on = false;
     }
     if (on !== c.kioskOn) { c.kioskOn = on; el.classList.toggle('on', on); }
     if (!on) return;
@@ -184,6 +203,7 @@ export class HUD {
       r3.projectToScreen(cr.x, cr.y, 56, this.pt);
       const W = r3.viewW, H = r3.viewH;
       on = this.pt.x > 0 && this.pt.x < W && this.pt.y > 0 && this.pt.y < H;
+      if (on && this._underHud(el, this.pt.x, this.pt.y, -1)) on = false; // D63
     }
     if (on !== c.crateOn) { c.crateOn = on; el.classList.toggle('on', on); }
     if (!on) return;

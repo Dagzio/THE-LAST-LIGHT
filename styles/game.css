@@ -954,6 +954,13 @@ body.map-over .kiosk-prompt { display: none; }
   .shop-pick-btn { flex: 1; }
   .shop-pick-btn .ico { width: 24px; height: 24px; stroke-width: 3; }
 }
+/* D63: narrow phones (568–619 px wide, below the 640 standard): 2 cards per page — names and stats keep whole words;
+   START a step smaller so it never runs into the timer */
+@media (max-height: 500px) and (max-width: 619px) {
+  .shop-grid { --per: 2; }
+  .shop-start { font-size: 15px; }
+  .shop-bar { gap: 10px; }
+}
 @media (max-height: 500px) and (min-width: 760px) { .shop-grid { --per: 4; } }
 @media (max-height: 500px) and (min-width: 900px) { .shop-grid { --per: 5; } }
 /* Very low (≤ 359 px, phone with browser bars): tighter lines so the card + 44 px button fit */
@@ -1101,6 +1108,25 @@ body.map-over .dev-tags { display: none; }
   .shop-foot-row .buy-up { display: inline-flex; }
   .shop-fix { padding: 0 5px; font-size: 15px; }
   .shop-fix .ico { width: 15px; height: 15px; }
+}
+/* D63: sell — a small price tag in the card head (44 px touch area), armed → the footer is one red SELL +coins button */
+.shop-sell-tag {
+  position: relative; flex: none; margin-inline-start: auto; width: 30px; height: 30px; display: grid; place-items: center;
+  color: #ffe2a8; background: rgba(10, 11, 13, 0.55); border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(255, 226, 168, 0.45);
+}
+.shop-sell-tag::before { content: ""; position: absolute; inset: -7px; }
+.shop-sell-tag .ico { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.shop-sell-tag:active { transform: scale(0.92); }
+.shop-card.selling .shop-card-head { background: linear-gradient(180deg, #a8443b, #7a2f28); }
+.shop-card.selling .shop-sell-tag { color: #fff; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.6); }
+.shop-buy.shop-sell-go { color: #fff; background: linear-gradient(180deg, #e0604a, #a8443b); box-shadow: 0 3px 0 #5e231d; }
+.shop-buy.shop-sell-go:active { box-shadow: 0 1px 0 #5e231d; }
+@media (max-height: 500px) {
+  /* a narrow card keeps its name whole: a smaller tag, pulled into the head padding (44 px touch area stays) */
+  .shop-sell-tag { width: 24px; height: 24px; margin-inline-end: -3px; }
+  .shop-sell-tag::before { inset: -10px -8px; }
+  .shop-sell-tag .ico { width: 14px; height: 14px; }
+  .shop-card.sellable .shop-card-head { gap: 5px; }
 }
 /* D52: the user's weapon / grenade art in the shop card badge */
 .shop-card-ico.art { background: radial-gradient(circle at 50% 45%, #3a4048, #1c2024 70%); }

@@ -4,7 +4,7 @@
 // previous valid save as a backup. No live map state is saved (a reload restarts the map, the profile stays).
 import { Storage } from '../platform/StorageService.js';
 import { WEAPONS } from '../data/weapons.js';
-import { WEAPON_NODES, UPGRADE_NODES, WEAPON_UPGRADE, PLAYER_UPGRADES } from '../data/upgrades.js';
+import { WEAPON_NODES, UPGRADE_NODES, WEAPON_UPGRADE, PLAYER_UPGRADES, estimateWeaponSpent } from '../data/upgrades.js';
 import { MAPS } from '../data/maps.js';
 import { levelForXp } from '../data/progression.js';
 import { TUTORIAL_STEP_IDS } from '../data/tutorial.js';
@@ -25,7 +25,7 @@ export function createDefaultProfile() {
     playerLevel: 1,
     ownedWeapons: ['pistol'],
     equippedWeaponId: 'pistol',
-    weaponProgress: { pistol: { level: 1, upgrades: {} } },
+    weaponProgress: { pistol: { level: 1, upgrades: {}, spent: 0 } }, // spent (D63): coins put into it, for selling
     playerUpgrades: {},
     unlockedMaps: [MAPS[0].id],
     completedMaps: [],
@@ -84,11 +84,13 @@ export function validateProfile(data) {
     for (const nodeId of WEAPON_NODES[id] || []) {
       let r = int(src[nodeId], 0, UPGRADE_NODES[nodeId].max) ?? 0;
       fix(src[nodeId] === undefined || r === src[nodeId]);
-      r = Math.min(r, WEAPON_UPGRADE.maxWeaponLevel - 1 - total); // weaponLevel never above 10
+      r = Math.min(r, WEAPON_UPGRADE.maxWeaponLevel - 1 - total); // weaponLevel never above the cap (12)
       if (r > 0) upgrades[nodeId] = r;
       total += r;
     }
-    p.weaponProgress[id] = { level: 1 + total, upgrades };
+    // D63: coins spent on the weapon (selling). Older saves have none → estimated from the price and the ranks.
+    const spent = wp[id] ? int(wp[id].spent, 0, MAX_COINS) : null;
+    p.weaponProgress[id] = { level: 1 + total, upgrades, spent: spent ?? estimateWeaponSpent(id, WEAPONS[id].price, upgrades) };
     fix(wp[id] && wp[id].level === 1 + total);
   }
 

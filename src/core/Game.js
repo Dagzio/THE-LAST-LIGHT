@@ -16,7 +16,7 @@ import { createRunSeed } from './SeededRandom.js';
 import { QUALITY_LEVELS, QUALITY_PRESETS, resolveAutoQuality } from '../config/settings.js';
 import { getMap, MAPS } from '../data/maps.js';
 import { getDefense, upgradeBasePrice, MAX_DEVICE_LEVEL } from '../data/defenses.js';
-import { shopPrice } from '../data/upgrades.js';
+import { shopPrice, sellRefund } from '../data/upgrades.js';
 import { getGrenade, GRENADE_RULES } from '../data/grenades.js';
 import { HEALS } from '../data/heals.js';
 import { SaveManager } from './SaveManager.js';
@@ -340,6 +340,7 @@ export class Game {
     if (!this.economy.spend(offer.price)) return { ok: false, reason: REASON.COINS };
     const placed = ds.place(padIndex, defenseId, this.clock.time);
     if (!placed) { this.economy.grantCoins(offer.price); return { ok: false, reason: REASON.UNKNOWN }; } // never lose coins
+    ds.addSpent(padIndex, defenseId, offer.price);
     this.events.emit('purchase', 'defense', defenseId, padIndex);
     return { ok: true };
   }
@@ -350,9 +351,36 @@ export class Game {
     if (!o.canBuy) return { ok: false, reason: o.reason };
     if (!this.economy.spend(o.price)) return { ok: false, reason: REASON.COINS };
     if (!this.run.defenses.upgrade(padIndex, this.clock.time)) { this.economy.grantCoins(o.price); return { ok: false, reason: REASON.UNKNOWN }; }
+    this.run.defenses.addSpent(padIndex, o.defenseId, o.price);
     this.events.emit('purchase', 'defenseUpgrade', o.defenseId, padIndex);
     return { ok: true };
   }
+
+  /**
+   * D63: selling a device bought on a pad (installed or in the pad's storage) returns half of the coins spent on it in
+   * this map run (buy + upgrades + repairs). Only in the shop, between waves.
+   * @returns {{padIndex, defenseId, refund, canSell, reason}}
+   */
+  defenseSellOffer(padIndex, defenseId) {
+    const ds = this.run && this.run.defenses;
+    const o = { padIndex, defenseId, refund: 0, canSell: false, reason: null };
+    if (!this.shopOpen || !this.run || !this.run.betweenWaves) o.reason = REASON.CLOSED;
+    else if (!ds.ownedLevel(padIndex, defenseId)) o.reason = REASON.NOT_OWNED;
+    else { o.refund = sellRefund(ds.spentOn(padIndex, defenseId)); o.canSell = true; }
+    return o;
+  }
+
+  shopSellDefense(padIndex, defenseId) {
+    const o = this.defenseSellOffer(padIndex, defenseId);
+    if (!o.canSell) return { ok: false, reason: o.reason };
+    if (this.run.defenses.sell(padIndex, defenseId) < 0) return { ok: false, reason: REASON.UNKNOWN };
+    this.economy.grantCoins(o.refund);
+    this.events.emit('sale', 'defense', defenseId, o.refund);
+    return { ok: true, refund: o.refund };
+  }
+
+  /** D63: sell an owned weapon (not the starting pistol) for half of what was spent on it. */
+  shopSellWeapon(id) { return this.shopOpen ? this._afterProfileChange(this.economy.sellWeapon(id)) : { ok: false, reason: REASON.CLOSED }; }
 
   /** @returns {{padIndex, defenseId, level, max, price, canBuy, reason}} upgrade of the device installed on a pad */
   defenseUpgradeOffer(padIndex) {
@@ -440,7 +468,9 @@ export class Game {
   _repairDevice(o) {
     if (!o.canBuy) return { ok: false, reason: o.reason };
     if (!this.economy.spend(o.cost)) return { ok: false, reason: REASON.COINS };
+    const dev = this.run.defenses.pads[o.padIndex].device;
     if (!this.run.defenses.repair(o.padIndex, this.clock.time)) { this.economy.grantCoins(o.cost); return { ok: false, reason: REASON.UNKNOWN }; }
+    this.run.defenses.addSpent(o.padIndex, dev.id, o.cost); // D63: a repair counts as coins put into the device
     this.events.emit('purchase', 'deviceRepair', o.padIndex, o.cost);
     return { ok: true };
   }

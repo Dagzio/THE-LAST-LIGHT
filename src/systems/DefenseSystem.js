@@ -20,7 +20,8 @@ export class DefenseSystem {
    * @param {import('../core/GameEvents.js').GameEvents} events
    */
   constructor(padPositions, pool, rng, events) {
-    this.pads = padPositions.map((p, index) => ({ index, x: p.x, y: p.y, device: null, owned: {}, health: {} }));
+    // spent (D63): coins put into each device type on this pad during the run (buy + upgrades + repairs), for selling
+    this.pads = padPositions.map((p, index) => ({ index, x: p.x, y: p.y, device: null, owned: {}, health: {}, spent: {} }));
     this.pool = pool;
     this.rng = rng;
     this.events = events;
@@ -174,5 +175,34 @@ export class DefenseSystem {
     }
   }
 
-  clear() { for (const p of this.pads) { p.device = null; p.owned = {}; p.health = {}; } }
+  /** D63: books coins put into a device type on a pad (the shop calls it after a successful purchase). */
+  addSpent(padIndex, id, coins) {
+    const pad = this.pads[padIndex];
+    if (!pad || !pad.owned[id] || !(coins > 0)) return;
+    pad.spent[id] = (pad.spent[id] | 0) + (coins | 0);
+  }
+
+  /** Coins put into a device type on a pad (0 = none / not bought). */
+  spentOn(padIndex, id) {
+    const pad = this.pads[padIndex];
+    return pad && pad.owned[id] ? pad.spent[id] | 0 : 0;
+  }
+
+  /**
+   * D63: removes a device type bought on a pad (installed or in the pad's storage) with its level, HP and record.
+   * An installed one leaves the pad empty. Returns the coins that were spent on it, or -1 if it is not on the pad.
+   */
+  sell(padIndex, id) {
+    const pad = this.pads[padIndex];
+    if (!pad || !pad.owned[id]) return -1;
+    const spent = pad.spent[id] | 0;
+    if (pad.device && pad.device.id === id) pad.device = null;
+    delete pad.owned[id];
+    delete pad.health[id];
+    delete pad.spent[id];
+    this.events.emit('deviceSold', padIndex, id);
+    return spent;
+  }
+
+  clear() { for (const p of this.pads) { p.device = null; p.owned = {}; p.health = {}; p.spent = {}; } }
 }

@@ -4,9 +4,13 @@
 export const SHOP_PRICE_MULT = 0.85;
 export const shopPrice = (base) => (base > 0 ? Math.max(1, Math.round(base * SHOP_PRICE_MULT)) : 0);
 
+/** D63: selling a weapon / defense device returns this share of the coins actually spent on it (rounded down). */
+export const SELL_REFUND = 0.5;
+export const sellRefund = (spent) => (spent > 0 ? Math.floor(spent * SELL_REFUND) : 0);
+
 // ---------------- weapon upgrade tree ----------------
 export const WEAPON_UPGRADE = {
-  maxWeaponLevel: 10,           // weaponLevel = 1 + purchased nodes (≤ 9 nodes per weapon)
+  maxWeaponLevel: 12,           // weaponLevel = 1 + purchased nodes; D63: 12 = every node of every weapon (11 ranks)
   costGrowth: 0.22,             // cost = round(base × (1 + 0.22 × (weaponLevel − 1)) × multiplier)
   uniqueCostMultiplier: 1.35,
   baseCost: { pistol: 25, smg: 35, shotgun: 40, assault_rifle: 50, machine_gun: 65 },
@@ -31,6 +35,23 @@ export const WEAPON_NODES = {
   shotgun: ['damage', 'fireRate', 'reload', 'extraPellet', 'magazine'],
   assault_rifle: ['damage', 'fireRate', 'reload', 'magazine', 'penetration'],
 };
+
+/** Price of one upgrade of a weapon at its current weapon level (03_ECONOMY §6). */
+export function weaponUpgradePrice(weaponId, weaponLevel, unique) {
+  const base = WEAPON_UPGRADE.baseCost[weaponId] || 0;
+  return shopPrice(base * (1 + WEAPON_UPGRADE.costGrowth * (weaponLevel - 1)) * (unique ? WEAPON_UPGRADE.uniqueCostMultiplier : 1));
+}
+
+/**
+ * D63: coins spent on a weapon, for saves made before the record existed: its shop price + every bought rank at the
+ * weapon level it was bought at (the order is not known — the unique node is counted last).
+ */
+export function estimateWeaponSpent(weaponId, basePrice, upgrades) {
+  let spent = shopPrice(basePrice), level = 1;
+  const ranks = (WEAPON_NODES[weaponId] || []).map((n) => [UPGRADE_NODES[n], upgrades[n] | 0]).sort((a, b) => !!a[0].unique - !!b[0].unique);
+  for (const [node, r] of ranks) for (let i = 0; i < r; i++) spent += weaponUpgradePrice(weaponId, level++, node.unique);
+  return spent;
+}
 
 /** Display name overrides (03_ECONOMY §6: the shotgun calls its damage node "Pellet Damage"). */
 export const NODE_NAME_OVERRIDES = { shotgun: { damage: 'upg.pelletDamage' } };

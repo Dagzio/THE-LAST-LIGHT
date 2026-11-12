@@ -648,7 +648,10 @@ export class Renderer3D {
     this._crowdLod();
     this.lanternLight.visible = pr.lantern;
     this.kioskLight.visible = pr.lantern; // light count changes only here, followed by the shader warm-up
-    if (this.env) this.env.groundTexture.anisotropy = pr.aniso;
+    if (this.env && this.env.groundTexture.anisotropy !== pr.aniso) {
+      this.env.groundTexture.anisotropy = pr.aniso;
+      this.env.groundTexture.needsUpdate = true; // D63: sampler parameters are set on upload — re-upload once to apply
+    }
     for (const mat of Object.values(this.mats)) mat.needsUpdate = true;
     this.sizeDirty = true;
     this.pausedDrawn = false;
