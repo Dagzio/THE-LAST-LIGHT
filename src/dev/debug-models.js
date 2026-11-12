@@ -16,7 +16,7 @@ import { ENEMY_GLB, enemyRig, GUN_GLB, TURRET_GLB } from '../data/models3d.js';
 import { bakeGun, bakeTurret } from '../render3d/glbModels.js';
 
 /** Viewer names of the textured enemies (game type id → the tag the procedural model has in the list). */
-const ENEMY_TAG = { grunt: 'grunt', runner: 'runner', husk: 'husk', spitter: 'spitter', brute: 'brute', fog_mother: 'fog-mother' };
+const ENEMY_TAG = { grunt: 'grunt', runner: 'runner', husk: 'husk', spitter: 'spitter', brute: 'brute', fog_mother: 'fog-mother', gloam_warden: 'gloam-warden' };
 const TURRET_TAG = { guard_turret: 'guard-turret', frost_coil: 'frost-coil', poison_turret: 'poison-turret' };
 
 /**

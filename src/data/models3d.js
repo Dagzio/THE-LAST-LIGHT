@@ -7,24 +7,29 @@ const DIR = 'assets/models/';
 export const BOSS_SCALE = 1.3;
 
 /**
- * Enemies. height — game units; rotY — bake rotation (Tripo faces +Z → π/2; the runner already faces +X → 0).
+ * Enemies. height — game units; rotY — bake rotation (Tripo faces +Z → π/2; D57: the user's auto-rigged files are
+ * loaded as static meshes in their modelled pose — their raw mesh faces +X → 0, the runner faces −Z → −π/2).
  * rig (fractions of the height): hipY — legs swing below it; shoulderY / shoulderZ / armZ / armMinY — the arm
  * region (armZ ≥ 9 = no arm rig, the attack is the body lunge); quad — four or more legs: diagonal pairs swing, legX
  * = distance of the leg pivots from the body centre.
  */
 export const ENEMY_GLB = {
-  grunt: { file: `${DIR}grunt.min.glb`, height: 40, rotY: Math.PI / 2,
-    rig: { hipY: 0.32, shoulderY: 0.66, shoulderZ: 0.22, armZ: 0.24, armMinY: 0.34, legSwing: 0.5 } },
-  runner: { file: `${DIR}runner.min.glb`, height: 42, rotY: 0,
-    rig: { hipY: 0.4, shoulderY: 0.7, shoulderZ: 0.2, armZ: 99, armMinY: 0.5, legSwing: 0.55 } },
+  // D57: new grunt / runner (the rig numbers measured from their skeletons: hips, shoulders, hands)
+  grunt: { file: `${DIR}grunt.min.glb`, height: 40, rotY: 0,
+    rig: { hipY: 0.45, shoulderY: 0.69, shoulderZ: 0.16, armZ: 0.27, armMinY: 0.3, legSwing: 0.5 } },
+  runner: { file: `${DIR}runner.min.glb`, height: 42, rotY: -Math.PI / 2,
+    rig: { hipY: 0.5, shoulderY: 0.76, shoulderZ: 0.2, armZ: 99, armMinY: 0.5, legSwing: 0.55 } },
   husk: { file: `${DIR}husk.min.glb`, height: 44, rotY: Math.PI / 2,
     rig: { hipY: 0.24, shoulderY: 0.62, shoulderZ: 0.26, armZ: 0.3, armMinY: 0.2, legSwing: 0.45 } },
   spitter: { file: `${DIR}spitter.min.glb`, height: 36, rotY: Math.PI / 2,
     rig: { hipY: 0.28, shoulderY: 0.9, shoulderZ: 0.2, armZ: 99, armMinY: 0.9, legSwing: 0.45, quad: true, legX: 0.18 } },
   brute: { file: `${DIR}brute.min.glb`, height: 58, rotY: Math.PI / 2,
     rig: { hipY: 0.22, shoulderY: 0.9, shoulderZ: 0.2, armZ: 99, armMinY: 0.9, legSwing: 0.35, quad: true, legX: 0.2 } },
-  fog_mother: { file: `${DIR}mother.min.glb`, height: 130 * BOSS_SCALE, rotY: Math.PI / 2,
-    rig: { hipY: 0.18, shoulderY: 0.9, shoulderZ: 0.2, armZ: 99, armMinY: 0.9, legSwing: 0.3, quad: true, legX: 0.2 } },
+  // D57: new boss models (two legs; wings / cape → no arm rig, the attack is the body lunge)
+  fog_mother: { file: `${DIR}mother.min.glb`, height: 130 * BOSS_SCALE, rotY: 0,
+    rig: { hipY: 0.28, shoulderY: 0.42, shoulderZ: 0.16, armZ: 99, armMinY: 0.9, legSwing: 0.3 } },
+  gloam_warden: { file: `${DIR}warden.min.glb`, height: 112 * BOSS_SCALE, rotY: 0,
+    rig: { hipY: 0.42, shoulderY: 0.69, shoulderZ: 0.11, armZ: 99, armMinY: 0.9, legSwing: 0.35 } },
 };
 
 /** Rig in game units for a model entry (the shader works in the baked frame). */
@@ -43,7 +48,8 @@ export function enemyRig(entry) {
  */
 export const GUN_GLB = {
   pistol: { file: `${DIR}pistol.min.glb`, rotY: 0.0059, grip: [-0.2992, 0.4963, 0.0017], tip: [0.5002, 0.6218, 0.0017] },
-  smg: { file: `${DIR}smg.min.glb`, rotY: -0.0018, grip: [-0.14, 0.3466, -0.0138], tip: [0.5, 0.469, -0.0138] },
+  // D57: the SMG turned round (its muzzle is the end with the front grip; the pistol grip with the trigger is the back)
+  smg: { file: `${DIR}smg.min.glb`, rotY: Math.PI - 0.0018, grip: [-0.26, 0.34, 0.0138], tip: [0.46, 0.55, 0.0138] },
   shotgun: { file: `${DIR}shotgun.min.glb`, rotY: -3.1398, grip: [-0.1993, 0.1459, -0.0006], tip: [0.5, 0.187, -0.0006] },
   assault_rifle: { file: `${DIR}rifle.min.glb`, rotY: 0.8881, grip: [-0.2395, 0.2103, -0.004], tip: [0.6341, 0.2806, -0.004] },
 };

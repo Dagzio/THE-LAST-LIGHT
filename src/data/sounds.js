@@ -45,7 +45,7 @@ export const SFX_FILES = {
   playerHurt1: { file: 'player/player-hitted1.mp3', gain: 1 },
   playerHurt2: { file: 'player/player-hitted2.mp3', trim: 0.025, gain: 1 },
   // D53 replacements of synthesized sounds: CC0 packs (sfx/CREDITS.txt), mixed / levelled into the file (gain 1)
-  // D56: the user removed sfx/beacon-hit.mp3 — the beacon hit is synthesized again (SfxLibrary 'beaconHit')
+  beaconHit: { file: 'sfx/beacon-hit.mp3', gain: 1 }, // D57: the user's request — the recorded beacon hit is back
   freeze: { file: 'sfx/cryo-blast.mp3', gain: 1 },       // Cryo grenade
   fire: { file: 'sfx/molotov.mp3', gain: 1 },            // Molotov: bottle breaks + flames
   bossWarn: { file: 'sfx/boss-warn.mp3', gain: 1 },      // a boss telegraphs an attack (roar)

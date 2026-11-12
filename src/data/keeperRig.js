@@ -35,7 +35,7 @@ const LEFT_WRAP = { along: [1, -0.35, 0], palm: [0, 0, 1] };
 const LEFT_UNDER = { along: [0.35, 0, 1], palm: [0, 1, 0] };
 export const GUN_HOLD = {
   pistol: { at: [11.5, 38.6, 0.9], gun: [-1.6, 2, 0], left: [-0.2, -0.4, -1.8], hands: [RIGHT_GRIP, LEFT_WRAP] },
-  smg: { at: [9, 37.6, 1.6], gun: [2.6, 2.4, 0], left: [5.5, -0.6, -1.3], hands: [RIGHT_GRIP, LEFT_UNDER] },
+  smg: { at: [9, 37.6, 1.6], gun: [0.2, 1.6, 0], left: [6.5, -0.6, -1.3], hands: [RIGHT_GRIP, LEFT_UNDER] },
   shotgun: { at: [7.5, 37, 1.6], gun: [0, 1.4, 0], left: [7.5, -0.6, -1.5], hands: [RIGHT_GRIP, LEFT_UNDER] },
   assault_rifle: { at: [7.5, 37, 1.6], gun: [0, 1.4, 0], left: [7.5, -0.4, -1.5], hands: [RIGHT_GRIP, LEFT_UNDER] },
 };
