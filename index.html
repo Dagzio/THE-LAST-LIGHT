@@ -24,7 +24,10 @@
     <img class="splash-bg fade" id="splashBg" src="assets/graphics/splash.webp" width="1672" height="941" alt="" draggable="false">
     <div class="splash-inner" id="splashInner">
       <h1 class="logo fade"><img class="logo-img" src="assets/graphics/logo.webp" width="1200" height="439" alt="THE LAST LIGHT" draggable="false"></h1>
-      <div class="load-bar" id="loadBar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i id="loadFill"></i></div>
+    </div>
+    <!-- D65: the loading bar low in the centre (the user's reference); TAP TO PLAY takes its place when loading ends -->
+    <div class="splash-bottom">
+      <div class="load-bar" id="loadBar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span class="load-track"><i id="loadFill"></i></span></div>
       <p class="load-pct" id="loadPct">0%</p>
       <p class="tap-prompt" id="tapPrompt" data-i18n="tap.toPlay"></p>
     </div>

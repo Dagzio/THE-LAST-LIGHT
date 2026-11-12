@@ -95,11 +95,11 @@
 #screen-splash.ready-tap { cursor: pointer; }
 .splash-inner { text-align: center; }
 /* D64: the user's splash art fills the screen (cover); boot.js places the logo column (--splash-x / --splash-y) at a
-   point of the picture — between the lamp and the moon, above the ground. The logo is the main menu's size. */
+   point of the picture — between the lamp and the moon, above the ground. The logo: the main menu's size + 15 % (D65). */
 .splash-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 #screen-splash .splash-inner { position: absolute; z-index: 1; left: var(--splash-x, 40%); top: var(--splash-y, 20%); translate: -50% 0; }
-#screen-splash .logo { width: var(--logo-w); height: var(--logo-h); filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.55)); }
-#screen-splash .load-bar, #screen-splash .tap-prompt, #screen-splash .load-pct { text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85); }
+#screen-splash .logo { width: calc(var(--logo-w) * 1.15); height: calc(var(--logo-h) * 1.15); filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.55)); }
+#screen-splash .tap-prompt { margin: 0; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85); } /* D65: on the bar's spot */
 /* Game logo (assets/graphics/logo.webp, 1200×439): the box has a fixed size before the image arrives — no shift. */
 .logo-img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
 .logo {

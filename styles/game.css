@@ -240,17 +240,57 @@ body.menu3d #world3d { display: block; }
 body.menu3d #world { display: none; }
 
 /* ===================== Splash loading bar (H5 3D guide §7) ===================== */
-.load-bar {
-  width: min(calc(420px * var(--fs)), 60vw);
-  height: 6px;
-  margin: calc(34px * var(--fs)) auto 0;
-  background: rgba(255, 255, 255, 0.12);
-  overflow: hidden;
+/* D65 (the user's reference): low in the centre, about half the screen wide; a steel frame with pointed ends, a dark
+   track, an orange striped fill with a warm glow. TAP TO PLAY takes its place when loading ends (same spot, no jump). */
+.splash-bottom {
+  --bw: min(46.5vw, 900px);
+  --bh: calc(var(--bw) * 0.052);
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 85.7%;
+  width: var(--bw);
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
 }
-.load-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #d9862b, #ffd27a); transition: width 0.2s; }
-.load-pct { margin-top: 8px; font-family: var(--font-display); font-weight: 700; font-size: calc(16px * var(--fs)); letter-spacing: 0.1em; color: var(--c-muted); }
-/* keep their space after loading (D46): the logo must not move when TAP TO PLAY appears */
+.splash-bottom > * { grid-area: 1 / 1; }
+.load-bar {
+  position: relative;
+  width: 100%;
+  height: max(14px, var(--bh));
+  --tip: calc(max(14px, var(--bh)) * 0.5);
+  clip-path: polygon(var(--tip) 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, var(--tip) 100%, 0 50%);
+  background: linear-gradient(180deg, #b9bcc0 0%, #6a6e74 40%, #33363b 100%);
+  filter: drop-shadow(0 0 calc(var(--bh) * 0.4) rgba(255, 140, 30, 0.6));
+}
+.load-track {
+  position: absolute;
+  inset: max(2px, calc(var(--bh) * 0.12));
+  --tip: calc((max(14px, var(--bh)) - 2 * max(2px, calc(var(--bh) * 0.12))) * 0.5);
+  clip-path: polygon(var(--tip) 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, var(--tip) 100%, 0 50%);
+  background: linear-gradient(180deg, #0c0d10, #24272c);
+}
+.load-bar i {
+  position: absolute;
+  left: 0;
+  top: max(1px, calc(var(--bh) * 0.08));
+  bottom: max(1px, calc(var(--bh) * 0.08));
+  width: 0;
+  --tip: calc((max(14px, var(--bh)) - 2 * max(2px, calc(var(--bh) * 0.12))) * 0.42);
+  clip-path: polygon(var(--tip) 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, var(--tip) 100%, 0 50%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 48%, rgba(80, 20, 0, 0.18) 100%),
+    repeating-linear-gradient(-60deg, #ffc43e 0 calc(var(--bh) * 0.42), #ee8a10 calc(var(--bh) * 0.42) calc(var(--bh) * 0.84));
+  background-size: 100% 100%, calc(var(--bh) * 1.94) 100%;
+  animation: loadStripes 0.9s linear infinite;
+  transition: width 0.2s;
+}
+@keyframes loadStripes { to { background-position: 0 0, calc(var(--bh) * 1.94) 0; } }
+.load-pct { display: none; } /* the reference shows the bar only (the value stays on the bar's aria-valuenow) */
+/* the bar's spot goes to TAP TO PLAY after loading */
 #screen-splash.ready-tap .load-bar, #screen-splash.ready-tap .load-pct { visibility: hidden; }
+#screen-splash.ready-tap .load-bar i { animation: none; }
 
 /* ===================== Off-screen indicators ===================== */
 .offscreen { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
