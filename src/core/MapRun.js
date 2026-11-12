@@ -106,8 +106,13 @@ export class MapRun {
     this.poison = new PoisonSystem(events, this.rng); // D51: Poison Turret damage over time
     this.crates = new CrateSystem(map, new SeededRandom((runSeed ^ 0x2545f491) >>> 0), events);
     this.grenadePreview = { active: false, x: 0, y: 0 }; // aim landing point (presentation: circle + dotted arc)
-    this._gWasDown = false;
     this._gTarget = { x: 0, y: 0 };
+    // D61: a grenade picked in the wheel is ARMED for the next shot: the next fire press aims it (landing circle +
+    // arc), the release throws it. _gWaitUp — fire was already held when it was armed (wait for a fresh press).
+    this.grenadeArmed = null;
+    this._gWaitUp = false;
+    this._gFire = false;
+    this.holdFire = false; // D61: the grenade wheel is open (no shooting)
     this.lastTime = 0;
     this.waves = new WaveSystem(getWaves(map.id) || [], map.spawnPoints, this.rng, events,
       (id, x, y, time) => this._spawnEnemy(id, x, y, time));
@@ -257,7 +262,7 @@ export class MapRun {
     return true;
   }
 
-  // ---------------- grenades: hold G / drag the touch button to aim, release to throw (D41) ----------------
+  // ---------------- grenades (D61): pick in the wheel → armed; the next shot aims, its release throws ----------------
   _forward(out) {
     const p = this.player;
     out.x = p.x + Math.cos(p.aimAngle) * GRENADE_RULES.tapThrowRange;
@@ -265,38 +270,49 @@ export class MapRun {
     return out;
   }
 
-  _grenadeInput(input, time) {
-    const g = this.grenades, p = this.player, pv = this.grenadePreview;
-    if (input.consumePressed('grenade1')) g.select('frag');
-    if (input.consumePressed('grenade2')) g.select('cryo');
-    if (input.consumePressed('grenade3')) g.select('molotov');
-    const down = input.isDown('throwGrenade');
-    const quickTap = input.consumePressed('throwGrenade') && !down && !this._gWasDown; // pressed + released in one step
-    const ga = input.grenadeAim;
-    pv.active = false;
-    if (ga && ga.active) {
-      pv.active = true;
-      GrenadeSystem.landing(p.x, p.y, p.x + ga.ox, p.y + ga.oy, pv);
-    } else if (down || quickTap) {
-      pv.active = true;
-      const a = input.getAimWorld ? input.getAimWorld(AIM) : null;
-      if (a) GrenadeSystem.landing(p.x, p.y, a.x, a.y, pv); else this._forward(pv);
-    }
-    if (pv.active) { this._gTarget.x = pv.x; this._gTarget.y = pv.y; }
-    if ((this._gWasDown && !down) || quickTap) g.throw(p, this._gTarget.x, this._gTarget.y, time);
-    this._gWasDown = down;
-    if (ga && ga.released) {
-      ga.released = false;
-      if (ga.tap) this._forward(this._gTarget);
-      else GrenadeSystem.landing(p.x, p.y, p.x + ga.ox, p.y + ga.oy, this._gTarget);
-      ga.tap = false;
-      g.throw(p, this._gTarget.x, this._gTarget.y, time);
-    }
-    pv.active = pv.active && g.total() > 0 && p.alive;
+  /** Arms a type in stock for the next shot (the wheel, keys 1 / 2 / 3). */
+  armGrenade(type) {
+    const g = this.grenades;
+    if (!(type in g.stock) || !(g.stock[type] > 0) || !this.player.alive) return false;
+    g.select(type);
+    this.grenadeArmed = type;
+    this._gWaitUp = true; // a shot already held does not count: the next press aims
+    this._gFire = false;
+    return true;
   }
 
-  /** Leaving RUNNING (pause, shop, crate): an aim in progress is dropped, never thrown on resume. */
-  cancelGrenadeAim() { this._gWasDown = false; this.grenadePreview.active = false; }
+  _grenadeInput(input, time) {
+    const g = this.grenades, p = this.player, pv = this.grenadePreview;
+    if (input.consumePressed('grenade1')) this.armGrenade('frag');
+    if (input.consumePressed('grenade2')) this.armGrenade('cryo');
+    if (input.consumePressed('grenade3')) this.armGrenade('molotov');
+    if (this.grenadeArmed && !(g.stock[this.grenadeArmed] > 0)) this.grenadeArmed = null;
+    pv.active = false;
+    const armed = this.grenadeArmed;
+    // the press edge counts too: a quick tap (down + up between two steps) must still throw
+    const edge = !!(input.consumePressed && input.consumePressed('fire')) && !this.holdFire;
+    if (!armed || !p.alive) { this._gFire = false; return; }
+    const fire = input.isDown('fire') && !this.holdFire;
+    let a = input.getAimWorld ? input.getAimWorld(AIM) : null; // mouse: always; touch: while the finger is down
+    if (!a && edge && !fire && input.getLastAimWorld) a = input.getLastAimWorld(AIM); // the tap's point
+    if (a) {
+      GrenadeSystem.landing(p.x, p.y, a.x, a.y, pv);
+      pv.active = true;
+      this._gTarget.x = pv.x; this._gTarget.y = pv.y;
+    }
+    if (edge) { this._gWaitUp = false; this._gFire = true; } // a fresh press after arming
+    if (this._gWaitUp) { if (!fire) this._gWaitUp = false; return; }
+    if (fire) { this._gFire = true; return; }
+    if (this._gFire) { // the shot released: throw the armed grenade at the aimed point
+      this._gFire = false;
+      if (!a) pv.active = false;
+      g.select(armed);
+      if (g.throw(p, this._gTarget.x, this._gTarget.y, time)) this.grenadeArmed = null;
+    }
+  }
+
+  /** Leaving RUNNING (pause, shop, crate): an aim in progress is dropped, never thrown on resume (it stays armed). */
+  cancelGrenadeAim() { this._gFire = false; this._gWaitUp = true; this.holdFire = false; this.grenadePreview.active = false; }
 
   /** Radius in which the keeper can open the shop (base × INTERACT RANGE). */
   get interactRadius() { return KIOSK.interactRadius * this.interactMult; }
@@ -471,7 +487,8 @@ export class MapRun {
     // D51 perks: keeper / beacon regeneration (continuous, on the game clock)
     if (this.hpRegen > 0 && p.alive && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + this.hpRegen * dt);
     if (this.beaconRegen > 0) this.beacon.repair(this.beaconRegen * dt);
-    this.weapons.update(this.weapon, p, input.isDown('fire'), input.consumePressed('reload'), time);
+    // D61: no shooting while the grenade wheel is open or a grenade is armed (that shot throws it)
+    this.weapons.update(this.weapon, p, input.isDown('fire') && !this.holdFire && !this.grenadeArmed, input.consumePressed('reload'), time);
     if (input.consumePressed('flare')) this.useFlare(time);
     this._grenadeInput(input, time);
     this.light.update(this.beacon, this.enemies, time);

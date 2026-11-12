@@ -80,6 +80,7 @@ export class Game {
       if (next === STATES.RUNNING) this.input.clearPressed();
       if (next === STATES.PAUSED || next === STATES.SHOP_OPEN || next === STATES.CRATE_REWARD_OPEN || next === STATES.TUTORIAL) this.input.releaseAll();
       if (next !== STATES.RUNNING && this.run) this.run.cancelGrenadeAim(); // never thrown on resume
+      if (next !== STATES.RUNNING) this.setTimeScale(1); // D61: the grenade wheel closes with the pause
       if (this.renderer3d) this.renderer3d.pausedDrawn = false; // redraw once with the new overlay state
     });
   }
@@ -215,6 +216,13 @@ export class Game {
   }
 
   /** Emergency Flare from the HUD button (desktop click); keyboard Q / touch go through the input actions. */
+  /** D61: game speed while the grenade wheel is open (1 = normal). Presentation-side controller, sim stays fixed-step. */
+  setTimeScale(k) { this.loop.timeScale = Number.isFinite(k) && k > 0 ? Math.min(1, k) : 1; }
+
+  /** D61: arm a grenade type for the next shot (the next fire press aims it, the release throws). */
+  armGrenade(type) { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.armGrenade(type)); }
+  disarmGrenade() { if (this.run) this.run.grenadeArmed = null; }
+
   useFlare() {
     if (!this.sm.is(STATES.RUNNING) || !this.run) return false;
     return this.run.useFlare(this.clock.time);

@@ -7,7 +7,7 @@ import { STATES } from '../core/GameStateMachine.js';
 const MAX_ENEMY_ARROWS = 6;
 // D53: HUD blocks the badges keep clear of (+ AVOID_PAD around them: badge radius + a little air)
 const AVOID_SELECTORS = ['#screen-game .hud-top', '#screen-game .hud-player', '#screen-game .corner-tl', '#screen-game .corner-tr',
-  '#screen-game .grenade-slots', '#btnNextWave', '.touch-actions']; // not the stick: badges ignore taps, and on a small
+  '#btnNextWave', '.touch-actions', '#hudActions']; // not the stick: badges ignore taps, and on a small
 // phone the left edge is the only free run
 const AVOID_PAD = 28;
 const P2 = { x: 0, y: 0 }; // reused

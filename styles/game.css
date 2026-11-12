@@ -176,10 +176,6 @@ body.paused .touch-controls { opacity: 0.35; }
 /* --flare (0–100) is set on #screen-game by the HUD; .flare-full = charged; .flare-ready = charged and usable now */
 .flare-hud {
   position: relative;
-  width: calc(58px * var(--fs));
-  height: calc(58px * var(--fs));
-  min-width: 44px;
-  min-height: 44px;
   border-radius: 50%;
   pointer-events: auto;
   display: inline-flex;
@@ -1021,7 +1017,7 @@ body.touch .hud-player {
   right: auto;
   bottom: auto;
   left: var(--safe-l);
-  top: calc(var(--safe-t) + var(--ring) + 10px);
+  top: calc(var(--safe-t) + var(--ring) + 24px); /* D61: its backdrop (−8 px) stays clear of the fullscreen button + shadow */
   align-items: flex-start;
   gap: 4px;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.75);
@@ -1048,14 +1044,11 @@ body.touch .hud-ammo { font-size: 24px; }
 body.touch .hud-reload-label { display: none; } /* the bar alone (the ring above the keeper says it too) */
 body.touch .hud-reload-bar { width: 132px; height: 5px; }
 @media (max-height: 359px) {
-  body.touch .hud-player { top: calc(var(--safe-t) + var(--ring) + 6px); gap: 2px; }
+  body.touch .hud-player { top: calc(var(--safe-t) + var(--ring) + 18px); gap: 2px; }
   body.touch .hud-name, body.touch .hud-hp, body.touch .hud-ammo { font-size: 20px; }
   body.touch .hud-hpbar, body.touch .hud-xpbar, body.touch .hud-reload-bar { width: 116px; }
 }
-/* Touch grenades: the slot row is only a picker — shown when there are 2+ types to choose from (empty slots hidden);
-   the grenade button bottom-right always shows the selected type and its count */
-body.touch .grenade-slots:not(.choice) { display: none; }
-body.touch .gslot.empty { display: none; }
+/* D61: the grenade slot row is gone — the grenade button opens the wheel (both platforms) */
 
 /* ===================== D52: device tags (level · HP · wrench), shop heals, device HP / repair ===================== */
 .dev-tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -1112,3 +1105,103 @@ body.map-over .dev-tags { display: none; }
 .shop-card-ico.art { background: radial-gradient(circle at 50% 45%, #3a4048, #1c2024 70%); }
 .shop-card-ico.art img { width: 86%; height: 86%; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8)); }
 @media (min-height: 501px) { .shop-pad-line { display: flex; align-items: center; } } /* desktop: pips + device HP in one row */
+
+/* ===================== D61: desktop action bar (DASH · GRENADE · FLARE) above the weapon block ===================== */
+.hud-actions { display: flex; gap: calc(14px * var(--fs)); margin-bottom: calc(6px * var(--fs)); pointer-events: none; }
+body.touch .hud-actions { display: none; }
+body.map-over .hud-actions { display: none; }
+.act-btn {
+  position: relative;
+  width: calc(76px * var(--fs));
+  height: calc(76px * var(--fs));
+  min-width: 56px;
+  min-height: 56px;
+  border-radius: 12px;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: radial-gradient(circle at 50% 38%, rgba(48, 52, 62, 0.92), rgba(12, 13, 17, 0.92));
+  border: 2px solid rgba(190, 200, 225, 0.32);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.55), 0 6px 14px rgba(0, 0, 0, 0.4);
+  transition: transform 0.08s, filter 0.12s, border-color 0.12s;
+}
+.act-btn .ico { width: 46%; height: 46%; }
+.act-btn.pressed { transform: translateY(2px); filter: brightness(0.9); }
+.act-btn.flare-hud { border-radius: 50%; color: #ffe2a8; }
+.act-btn .flare-ring { inset: 4px; width: calc(100% - 8px); height: calc(100% - 8px); }
+.act-btn .flare-ico { width: 50%; height: 50%; }
+.act-key {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  min-width: 22px;
+  padding: 0 5px;
+  font: 800 13px/20px var(--font-display);
+  letter-spacing: 0.04em;
+  color: #1a1206;
+  background: #ffd27a;
+  border-radius: 5px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.act-key-wide { font-size: 11px; }
+.act-grenade .gico { width: 68%; height: 68%; }
+.act-grenade .grenade-count { left: -6px; right: auto; top: -6px; bottom: auto; font-size: 14px; }
+.act-grenade.empty { opacity: 0.45; }
+.act-grenade.denied { animation: denyShake 0.3s; }
+/* armed (the next shot throws it): a gold frame that breathes */
+.act-grenade.armed, .grenade-neon.armed { border-color: #ffd27a; animation: armedGlow 0.8s ease-in-out infinite alternate; }
+@keyframes armedGlow { from { box-shadow: 0 3px 0 rgba(0, 0, 0, 0.55), 0 0 6px rgba(255, 210, 122, 0.45); } to { box-shadow: 0 3px 0 rgba(0, 0, 0, 0.55), 0 0 20px rgba(255, 210, 122, 0.95); } }
+body.paused .act-grenade.armed, body.paused .grenade-neon.armed { animation-play-state: paused; }
+.act-dash .dash-ring { opacity: 0; transition: opacity 0.15s; }
+#screen-game.dash-cooling .act-dash { filter: brightness(0.6) saturate(0.6); }
+#screen-game.dash-cooling .act-dash .dash-ring { opacity: 1; }
+#screen-game.dash-ready-pop .act-dash { animation: dashReady 0.3s ease-out; }
+
+/* ===================== D61: grenade wheel — black cells fanned out from the held grenade button ===================== */
+.gwheel { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 30; display: none; pointer-events: none; }
+.gwheel.on { display: block; }
+.gwheel::before { /* a dark disc behind the fan: the cells read over any map */
+  content: "";
+  position: absolute;
+  left: calc(var(--gw-r) * -1.55);
+  top: calc(var(--gw-r) * -1.55);
+  width: calc(var(--gw-r) * 3.1);
+  height: calc(var(--gw-r) * 3.1);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.35) 45%, rgba(0, 0, 0, 0) 70%);
+}
+.gw-cell {
+  position: absolute;
+  width: var(--gw-cell);
+  height: var(--gw-cell);
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(6, 7, 10, 0.92);
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
+  transition: transform 0.08s, border-color 0.08s, box-shadow 0.08s;
+}
+.gw-cell .gico { width: 70%; height: 70%; }
+.gw-cell b { position: absolute; right: -6px; bottom: -6px; min-width: 20px; padding: 0 5px; font: 800 13px/20px var(--font-display); color: #fff; background: #23272b; border-radius: 10px; }
+.gw-cell.empty { opacity: 0.35; }
+.gw-cell.sel { transform: scale(1.14); border-color: #ffd27a; box-shadow: 0 0 0 2px rgba(255, 210, 122, 0.35), 0 0 22px rgba(255, 210, 122, 0.85); }
+.gw-cell.sel.empty { border-color: #ff6a4a; box-shadow: 0 0 14px rgba(255, 106, 74, 0.7); }
+.gw-name:empty { display: none; }
+.gw-name {
+  position: absolute;
+  /* beyond the middle (up-left) cell, along the same diagonal — never on a cell */
+  left: calc(var(--gw-r) * -1.32 - var(--gw-cell) * 0.2);
+  top: calc(var(--gw-r) * -1.32 - var(--gw-cell) * 0.2);
+  translate: -50% -50%;
+  padding: 3px 8px;
+  background: rgba(6, 7, 10, 0.85);
+  border-radius: 6px;
+  font: 800 15px/1 var(--font-display);
+  letter-spacing: 0.08em;
+  color: #ffe2a8;
+  white-space: nowrap;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.8);
+}

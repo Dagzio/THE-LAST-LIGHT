@@ -435,7 +435,7 @@
 }
 .credits-panel .ring-close { position: absolute; top: 16px; right: 16px; margin: 0; }
 /* optical centre: a logo reads centred a little above the geometric middle */
-.credits-logo { width: min(440px, 70%); max-height: 50vh; object-fit: contain; translate: 0 -6%; }
+.credits-logo { width: min(440px, 70%); max-height: 50vh; object-fit: contain; translate: 0 6%; } /* D61: a little lower (was −6 %) */
 
 /* Confirmation */
 .confirm-panel {

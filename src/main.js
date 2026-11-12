@@ -14,6 +14,7 @@ import { Game } from './core/Game.js';
 import { UIManager } from './ui/UIManager.js';
 import { HUD } from './ui/HUD.js';
 import { TouchControls } from './ui/TouchControls.js';
+import { GrenadeWheel } from './ui/GrenadeWheel.js';
 import { OffscreenIndicators } from './ui/OffscreenIndicators.js';
 import { DeviceTags } from './ui/DeviceTags.js';
 import { preloadIcons } from './data/icons.js';
@@ -156,6 +157,7 @@ export function startGame(boot) {
   const ui = new UIManager(game);
   new HUD(game);
   new TouchControls(game);
+  new GrenadeWheel(game); // D61
   new OffscreenIndicators(game);
   new DeviceTags(game); // D52
   preloadIcons();

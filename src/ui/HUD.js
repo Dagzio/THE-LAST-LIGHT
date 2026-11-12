@@ -71,11 +71,8 @@ export class HUD {
       kiosk: $('kioskPrompt'),
       crate: $('cratePrompt'),
       crateTimer: $('crateTimer'),
-      gslots: [...document.querySelectorAll('#grenadeSlots .gslot')],
-      gslotsRow: $('grenadeSlots'),
-      gBtn: $('grenadeBtn'),
-      gBtnIco: $('grenadeBtnIco'),
-      gBtnCount: $('grenadeBtnCount'),
+      // D61: one grenade button per platform (touch neon / desktop action bar) — the armed or selected type + its count
+      gBtns: [[$('grenadeBtn'), $('grenadeBtnIco'), $('grenadeBtnCount')], [$('hudGrenade'), $('hudGrenadeIco'), $('hudGrenadeCount')]].filter((b) => b[0]),
     };
     this.pt = { x: 0, y: 0 };
     // START NEXT WAVE shows its early-start bonus (D46), from the data
@@ -124,6 +121,20 @@ export class HUD {
     game.sm.onChange(() => { if (!game.sm.inMap) this._hideBanner(); });
     this.el.banner.addEventListener('animationend', () => this._hideBanner());
     game.onFrame(() => this.update());
+    // D61 desktop action bar: buttons with data-hold-action act like their key while pressed (DASH = Space)
+    for (const btn of document.querySelectorAll('#hudActions [data-hold-action]')) {
+      const action = btn.dataset.holdAction;
+      const up = () => { btn.classList.remove('pressed'); game.input.setSourceAction('hud', action, false); };
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        if (!game.sm.is(STATES.RUNNING)) return;
+        btn.classList.add('pressed');
+        game.input.setSourceAction('hud', action, true);
+      });
+      btn.addEventListener('pointerup', up);
+      btn.addEventListener('pointercancel', up);
+      btn.addEventListener('pointerleave', up);
+    }
   }
 
   _resetCache() {
@@ -324,23 +335,18 @@ export class HUD {
     this._crateLabel(run, running, time);
     this._updateIntro(time, running);
 
-    // Grenade slots (counts, selected) + the touch grenade button (selected type icon + count)
-    const gs = run.grenades;
-    const gKey = `${gs.stock.frag},${gs.stock.cryo},${gs.stock.molotov},${gs.selected}`;
+    // D61 grenade buttons: the armed type (glows) or the selected one, its count; dim with an empty stock
+    const gs = run.grenades, armed = run.grenadeArmed;
+    const shown = armed || gs.selected;
+    const gKey = `${gs.stock.frag},${gs.stock.cryo},${gs.stock.molotov},${shown},${armed}`;
     if (gKey !== c.gKey) {
       c.gKey = gKey;
-      for (const slot of el.gslots) {
-        const t = slot.dataset.type, n = gs.stock[t];
-        slot.querySelector('b').textContent = String(n);
-        slot.classList.toggle('empty', n === 0);
-        slot.classList.toggle('sel', gs.selected === t && n > 0);
+      for (const [btn, ico, cnt] of el.gBtns) {
+        ico.className = `gico gico-${shown}`;
+        cnt.textContent = String(gs.stock[shown] | 0);
+        btn.classList.toggle('empty', gs.total() === 0);
+        btn.classList.toggle('armed', !!armed);
       }
-      // D51: the slot row is a picker — shown on touch only when there is a choice (2+ types in stock)
-      const types = (gs.stock.frag > 0) + (gs.stock.cryo > 0) + (gs.stock.molotov > 0);
-      el.gslotsRow.classList.toggle('choice', types >= 2);
-      el.gBtnIco.className = `gico gico-${gs.selected}`;
-      el.gBtnCount.textContent = String(gs.stock[gs.selected]);
-      el.gBtn.classList.toggle('empty', gs.total() === 0);
     }
 
     // Emergency Flare charge ring

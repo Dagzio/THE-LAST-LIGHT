@@ -79,6 +79,12 @@ export class InputManager {
     this.aim.clientY = clientY;
   }
 
+  /** D61: the last aimed ground point even after the finger lifted (a quick tap throws an armed grenade there). */
+  getLastAimWorld(out) {
+    if (!this.pointerMapper || !Number.isFinite(this.aim.clientX)) return null;
+    return this.pointerMapper(this.aim.clientX, this.aim.clientY, out);
+  }
+
   /** Touch released: keep the current facing, no aim point. */
   clearAim() { this.aim.active = false; }
 

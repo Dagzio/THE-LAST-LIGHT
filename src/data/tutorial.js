@@ -14,7 +14,7 @@ export const TUTORIAL = {
     dash: { icon: 'dash', text: 'tut.dash', touchText: 'tut.dash.touch', target: { desk: null, touch: '[data-touch-action="dash"]' } },
     shop: { icon: 'shop', text: 'tut.shop', touchText: 'tut.shop.touch', target: { desk: '#hudShop', touch: '#hudShop' } },
     shopTabs: { icon: 'shop', text: 'tut.shopTabs', target: { desk: '#popup-shop .tabs', touch: '#popup-shop .tabs' } },
-    grenade: { icon: 'grenade', text: 'tut.grenade', touchText: 'tut.grenade.touch', target: { desk: '#grenadeSlots', touch: '#grenadeBtn' } },
+    grenade: { icon: 'grenade', text: 'tut.grenade', touchText: 'tut.grenade.touch', target: { desk: '#hudGrenade', touch: '#grenadeBtn' } },
     device: { icon: 'device', text: 'tut.device', target: { desk: null, touch: null } },
     crate: { icon: 'crate', text: 'tut.crate', target: { desk: null, touch: null } },
     flare: { icon: 'flare', text: 'tut.flare', touchText: 'tut.flare.touch', target: { desk: '.flare-hud', touch: '.flare-neon' } },
