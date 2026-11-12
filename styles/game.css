@@ -1080,7 +1080,6 @@ body.touch .hud-player::before {
   pointer-events: none;
 }
 body.touch .hud-plate { order: 1; grid-template-columns: max-content 1fr; justify-items: start; column-gap: 10px; row-gap: 3px; }
-body.touch .hud-name > span:first-child { display: none; } /* the word KEEPER — the level stays */
 body.touch .hud-name { font-size: 22px; }
 body.touch .hud-hp { font-size: 24px; }
 body.touch .hud-hpbar { width: 132px; height: 7px; }
