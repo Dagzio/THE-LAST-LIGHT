@@ -15,8 +15,7 @@ const GLSL = /* glsl */`
 uniform vec4 uRigA;   // hipY, shoulderY, shoulderZ, armZ
 uniform vec4 uRigB;   // armZLow, armSplitY, armMinY, legSwing
 uniform vec4 uPose;   // right arm raise, left arm raise, left arm inward (yaw), recoil
-uniform vec4 uRigC;   // D54: quad (0 / 1), leg pivot distance from the centre (front / back legs); D55: right arm inward (yaw), -
-uniform vec4 uRigD;   // D55 stance: knee height, knee forward, body drop, torso lean (rad) — all 0 = none (enemies)
+uniform vec4 uRigC;   // D54: quad (0 / 1), leg pivot distance from the centre (front / back legs), -, -
 #ifdef RIG_INSTANCED
 attribute vec4 aAnim; // walk phase (rad), walk blend 0..1, attack 0..1, (spare)
 #define RIG_ANIM aAnim
@@ -26,13 +25,7 @@ uniform vec4 uAnim;
 #endif
 vec3 rigRotZ(vec3 q, float a) { float c = cos(a), s = sin(a); return vec3(q.x * c - q.y * s, q.x * s + q.y * c, q.z); }
 vec3 rigRotY(vec3 q, float a) { float c = cos(a), s = sin(a); return vec3(q.x * c + q.z * s, q.y, -q.x * s + q.z * c); }
-#ifdef RIG_ARM_ATTR
-attribute float aArm; // D53: arm weight baked at load (bakeArmWeights) — hands told apart from the coat by the texture
-#endif
 float rigArmW(vec3 p) {
-#ifdef RIG_ARM_ATTR
-  return aArm;
-#endif
   float z = abs(p.z);
   float lim = p.y < uRigB.y ? uRigB.x : uRigA.w;
   return smoothstep(lim - 0.8, lim + 0.8, z) * (1.0 - smoothstep(uRigA.y - 0.5, uRigA.y + 2.0, p.y)) * step(uRigB.z, p.y);
@@ -65,17 +58,6 @@ void rigDeform(inout vec3 p, inout vec3 n) {
     p = piv + q;
     n = rigRotY(rigRotZ(n, a * armW), yaw * armW);
   }
-  // D55 stance (keeper): the knees go forward (shear of the legs: 0 at the feet and the hips, uRigD.y at the knees),
-  // the body sinks by uRigD.z, the torso leans around the hips. data/keeperRig.js stancePoint() is the same formula.
-  if (uRigD.y + uRigD.z + abs(uRigD.w) > 0.0) {
-    float hy = uRigA.x, ky = uRigD.x, y = p.y;
-    p.x += uRigD.y * (y <= ky ? clamp(y / ky, 0.0, 1.0) : clamp((hy - y) / (hy - ky), 0.0, 1.0));
-    p.y -= uRigD.z * clamp(y / hy, 0.0, 1.0);
-    vec3 piv = vec3(0.0, hy - uRigD.z, 0.0);
-    float a = -uRigD.w * smoothstep(hy, hy + 6.0, y);
-    p = piv + rigRotZ(p - piv, a);
-    n = rigRotZ(n, a);
-  }
 }
 `;
 
@@ -83,11 +65,10 @@ void rigDeform(inout vec3 p, inout vec3 n) {
  * Injects the rig into a material (Lambert / Standard, or a MeshDepthMaterial for the shadow pass when `depth`).
  * `shared` holds the uniforms (one block per model, shared by its colour and depth materials).
  */
-export function applyRig(material, shared, instanced, depth = false, armAttr = false) {
+export function applyRig(material, shared, instanced, depth = false) {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, shared);
     if (instanced) shader.defines = { ...(shader.defines || {}), RIG_INSTANCED: 1 };
-    if (armAttr) shader.defines = { ...(shader.defines || {}), RIG_ARM_ATTR: 1 };
     let vs = shader.vertexShader.replace('#include <common>', `#include <common>\n${GLSL}`);
     if (depth) { // the depth shader has no normal chunk outside its #ifdefs: bend the position only
       vs = vs.replace('#include <begin_vertex>', '#include <begin_vertex>\nvec3 rigN0 = vec3(0.0, 1.0, 0.0); rigDeform(transformed, rigN0);');
@@ -98,7 +79,7 @@ export function applyRig(material, shared, instanced, depth = false, armAttr = f
     }
     shader.vertexShader = vs;
   };
-  material.customProgramCacheKey = () => `rig-${instanced ? 'i' : 'u'}-${depth ? 'd' : 'c'}${armAttr ? '-a' : ''}`;
+  material.customProgramCacheKey = () => `rig-${instanced ? 'i' : 'u'}-${depth ? 'd' : 'c'}`;
   return material;
 }
 
@@ -109,7 +90,6 @@ export function rigUniforms(rig) {
     uRigB: { value: new THREE.Vector4(rig.armZLow ?? rig.armZ, rig.armSplitY ?? 0, rig.armMinY ?? 0, rig.legSwing ?? 0.5) },
     uPose: { value: new THREE.Vector4(0, 0, 0, 0) },
     uRigC: { value: new THREE.Vector4(rig.quad ? 1 : 0, rig.legX || 0, 0, 0) },
-    uRigD: { value: new THREE.Vector4(rig.kneeY || 1, 0, 0, 0) }, // D55: the stance amounts are set per frame (keeper)
     uAnim: { value: new THREE.Vector4(0, 0, 0, 0) },
   };
 }
@@ -125,46 +105,5 @@ export function bakeModel(geometry, height, rotY = Math.PI / 2) {
   geometry.translate(0, -geometry.boundingBox.min.y, 0);
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
-  return geometry;
-}
-
-const smooth = (a, b, x) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
-
-/**
- * D53: per-vertex arm weight (attribute aArm) for a model whose hands hang beside a long coat. The position rule of the
- * shader (|z| beyond armZ, between armMinY and the shoulder) is kept, but inside rig.handBand [y0, y1] — where hands
- * and coat sides share the same |z| — a vertex is arm only if its texture colour is skin, or it lies beyond
- * rig.handZ0 (sleeve cuff). Hands and coat are separate surfaces there, so the hard edge never tears the mesh.
- * @param {THREE.BufferGeometry} geometry baked (game frame)
- * @param {THREE.Texture} texture its colour map (image: ImageBitmap / canvas / img)
- */
-export function bakeArmWeights(geometry, texture, rig) {
-  const P = geometry.attributes.position, U = geometry.attributes.uv;
-  const w = new Float32Array(P.count);
-  let px = null, tw = 0, th = 0;
-  try {
-    const img = texture && texture.image;
-    tw = img.width; th = img.height;
-    const c = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(tw, th) : Object.assign(document.createElement('canvas'), { width: tw, height: th });
-    const g = c.getContext('2d');
-    g.drawImage(img, 0, 0);
-    px = g.getImageData(0, 0, tw, th).data;
-  } catch (e) { px = null; } // no pixels: the position rule alone
-  const skin = (i) => {
-    if (!px || !U) return false;
-    const u = U.getX(i), v = U.getY(i); // flipY = false: v runs down the image
-    const k = (Math.min(th - 1, Math.max(0, Math.floor(v * th))) * tw + Math.min(tw - 1, Math.max(0, Math.floor(u * tw)))) * 4;
-    const R = px[k], G = px[k + 1], B = px[k + 2];
-    return R > 90 && R > G * 1.25 && R > B * 1.3;
-  };
-  const [y0, y1] = rig.handBand || [Infinity, -Infinity];
-  for (let i = 0; i < P.count; i++) {
-    const y = P.getY(i), z = Math.abs(P.getZ(i));
-    if (y < rig.armMinY) continue;
-    const vert = 1 - smooth(rig.shoulderY - 0.5, rig.shoulderY + 2, y);
-    if (y >= y0 && y <= y1) w[i] = (skin(i) || z > rig.handZ0) ? vert : 0;
-    else w[i] = smooth(rig.armZ - 0.8, rig.armZ + 0.8, z) * vert;
-  }
-  geometry.setAttribute('aArm', new THREE.BufferAttribute(w, 1));
   return geometry;
 }

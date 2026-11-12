@@ -241,6 +241,7 @@ export class MapRun {
     if (!this.canOpenCrate || this.crateChoices) return null;
     const choices = this.crates.open(time, (perk) => this._perkOffered(perk));
     this.crateChoices = choices && choices.length ? choices : null;
+    if (this.crateChoices) this.events.emit('crateOpened'); // D56: its sound
     return this.crateChoices;
   }
 

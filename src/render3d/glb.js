@@ -51,6 +51,75 @@ export function parseGLB(buffer) {
   return { geometry: g, image };
 }
 
+/**
+ * D56: a SKINNED GLB (one mesh + one skin, the keeper with his Tripo / Mixamo skeleton) → { root, mesh, bones, image }.
+ * root — the node tree (bones are THREE.Bone, other nodes Groups) with the SkinnedMesh bound to its skeleton;
+ * bones — Map of bone name → Bone. The material is set by the caller.
+ */
+export function parseSkinnedGLB(buffer) {
+  const { geometry, image } = parseGLB(buffer);
+  const dv = new DataView(buffer);
+  const jsonLen = dv.getUint32(12, true);
+  const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, jsonLen)));
+  const binStart = 20 + jsonLen + 8;
+  const floats = (accIndex) => {
+    const a = json.accessors[accIndex], bv = json.bufferViews[a.bufferView];
+    const start = binStart + (bv.byteOffset || 0) + (a.byteOffset || 0);
+    const n = COMPONENTS[a.type] || 16;
+    return new Float32Array(buffer.slice(start, start + a.count * n * 4));
+  };
+  const intAttr = (accIndex) => {
+    const a = json.accessors[accIndex], bv = json.bufferViews[a.bufferView];
+    const start = binStart + (bv.byteOffset || 0) + (a.byteOffset || 0), Arr = ARRAYS[a.componentType];
+    return new Arr(buffer.slice(start, start + a.count * 4 * Arr.BYTES_PER_ELEMENT));
+  };
+  const prim = json.meshes[0].primitives[0];
+  geometry.setAttribute('skinIndex', new THREE.BufferAttribute(intAttr(prim.attributes.JOINTS_0), 4));
+  const wa = json.accessors[prim.attributes.WEIGHTS_0];
+  const w = wa.componentType === 5126 ? floats(prim.attributes.WEIGHTS_0) : Float32Array.from(intAttr(prim.attributes.WEIGHTS_0), (v) => v / (wa.componentType === 5121 ? 255 : 65535));
+  geometry.setAttribute('skinWeight', new THREE.BufferAttribute(w, 4));
+  const skin = json.skins[0];
+  const jointSet = new Set(skin.joints);
+  const objs = json.nodes.map((n, i) => {
+    const o = jointSet.has(i) ? new THREE.Bone() : new THREE.Group();
+    o.name = n.name || '';
+    if (n.matrix) new THREE.Matrix4().fromArray(n.matrix).decompose(o.position, o.quaternion, o.scale);
+    else {
+      if (n.translation) o.position.fromArray(n.translation);
+      if (n.rotation) o.quaternion.fromArray(n.rotation);
+      if (n.scale) o.scale.fromArray(n.scale);
+    }
+    return o;
+  });
+  json.nodes.forEach((n, i) => { for (const c of n.children || []) objs[i].add(objs[c]); });
+  const root = new THREE.Group();
+  for (const i of json.scenes[json.scene || 0].nodes) root.add(objs[i]);
+  const meshNode = json.nodes.findIndex((n) => n.mesh === 0);
+  const mesh = new THREE.SkinnedMesh(geometry, new THREE.MeshBasicMaterial());
+  objs[meshNode].add(mesh);
+  root.updateMatrixWorld(true);
+  // The Tripo file's inverse bind matrices leave out the mesh node's own rotation (glTF ignores it for skinned
+  // meshes, three.js applies it), so the skin and the bones would not line up once posed. The file's rest pose IS
+  // its bind pose (T-pose), so the inverses are computed from the rest bones instead (Skeleton without inverses).
+  const bones = skin.joints.map((i) => objs[i]);
+  mesh.bind(new THREE.Skeleton(bones), mesh.matrixWorld);
+  const byName = new Map();
+  for (const b of bones) byName.set(b.name.replace(/^mixamorig:?/, ''), b);
+  return { root, mesh, bones: byName, image };
+}
+
+/** Fetches + parses a local skinned GLB → { root, mesh, bones, texture } or null. */
+export async function loadSkinnedGLB(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const m = parseSkinnedGLB(await r.arrayBuffer());
+    return { ...m, texture: await blobTexture(m.image) };
+  } catch (e) {
+    return null;
+  }
+}
+
 /** Image Blob → THREE.Texture (sRGB, mipmapped). Resolves null if the image cannot be decoded. */
 export async function blobTexture(blob) {
   if (!blob) return null;

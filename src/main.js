@@ -1,7 +1,9 @@
 // Game start (imported by boot.js after the preload): wires platform services, the runtime and the UI.
 // No globals are created (except window.__game while the dev asset viewer flag is on).
 import { DEBUG_ENABLED, DEBUG_MODELS } from './config/constants.js';
-import { MUSIC_FILES, MUSIC_BED, SFX_FILES, AUDIO_DIR, ENEMY_HIT_SFX, STEP_SFX, STEP_DISTANCE, PLAYER_HURT_SFX } from './data/sounds.js';
+import { MUSIC_FILES, MUSIC_BED, SFX_FILES, AUDIO_DIR, ENEMY_HIT_SFX, FOOTSTEPS, PLAYER_HURT_SFX } from './data/sounds.js';
+import { PLAYER } from './data/player.js';
+import { STATES } from './core/GameStateMachine.js';
 import { WeaponAudio } from './platform/WeaponAudio.js';
 import { installBrowserHygiene } from './platform/BrowserHygiene.js';
 import { initAudioLifecycle } from './platform/AudioLifecycle.js';
@@ -68,6 +70,7 @@ function wireCombatSounds(events, game) {
   events.on('grenadeThrow', () => Sfx.play('throw'));
   events.on('grenadeBlast', (type) => Sfx.play(type === 'frag' ? 'boom' : type === 'cryo' ? 'freeze' : 'fire'));
   events.on('crateSpawn', () => Sfx.play('crate'));
+  events.on('crateOpened', () => Sfx.play('crateOpen'));
   let lastRicochetAt = 0;
   events.on('bulletBlocked', () => {
     const now = performance.now();
@@ -113,24 +116,19 @@ function wireCombatSounds(events, game) {
     if (Sfx.duration('spitterAttack') > 0) Sfx.play('spitterAttack', 0.94 + Math.random() * 0.12, { voices: 2 });
     else Sfx.play('throw', 0.62 + Math.random() * 0.1);
   });
-  // D53 footsteps: by the distance the keeper walks (not during a dash), two per stride, a random file each time
-  const steps = { acc: STEP_DISTANCE / 2, last: -1, run: null };
-  const footsteps = () => {
+  // D56 footsteps: the whole recorded loop while the keeper walks, at his speed; off at once when he stops, dashes,
+  // dies or the game is not running (checked every frame — a pause stops it too; mute / hidden tab: Sfx stops loops)
+  const steps = { h: null };
+  game.onFrame(() => {
     const run = game.run, p = run && run.player;
-    if (!p) return;
-    if (run !== steps.run) { steps.run = run; steps.acc = STEP_DISTANCE / 2; }
-    const d = Math.hypot(p.x - p.prevX, p.y - p.prevY);
-    if (!p.alive || p.dodging || !(d > 0.05)) { if (!(d > 0.05)) steps.acc = STEP_DISTANCE / 2; return; } // stopped: next step half a stride in
-    steps.acc += d;
-    if (steps.acc < STEP_DISTANCE) return;
-    steps.acc -= STEP_DISTANCE;
-    let i = Math.floor(Math.random() * STEP_SFX.length);
-    if (i === steps.last) i = (i + 1) % STEP_SFX.length;
-    steps.last = i;
-    Sfx.play(STEP_SFX[i], 0.95 + Math.random() * 0.1, { voices: 2 });
-  };
+    const speed = p ? Math.hypot(p.vx, p.vy) : 0;
+    const walking = !!p && game.sm.is(STATES.RUNNING) && p.alive && !p.dodging && speed > FOOTSTEPS.minSpeed;
+    if (!walking) { if (steps.h) { steps.h.stop(); steps.h = null; } return; }
+    const rate = Math.min(FOOTSTEPS.maxRate, Math.max(FOOTSTEPS.minRate, speed / PLAYER.moveSpeed));
+    if (!steps.h || steps.h.done) steps.h = Sfx.loop(FOOTSTEPS.sfx, rate);
+    else steps.h.rate(rate);
+  });
   return (time) => { // called after every simulation step
-    footsteps();
     if (wave.pending && wave.spawned && time >= wave.until) { wave.pending = false; Sfx.play('waveStart2'); }
   };
 }

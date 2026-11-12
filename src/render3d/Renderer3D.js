@@ -23,9 +23,10 @@ import { BEACON } from '../data/beacon.js';
 import { getBossPattern } from '../data/boss.js';
 import { getTheme } from '../data/themes.js';
 import { MenuScene } from './MenuScene.js';
-import { loadGLB } from './glb.js';
-import { applyRig, rigUniforms, bakeModel, bakeArmWeights } from './rig.js';
-import { KEEPER_MODEL, KEEPER_RIG, KEEPER_STANCE, poseFor, gunPlacement, muzzlePoint, muzzleLocal } from '../data/keeperRig.js';
+import { loadGLB, loadSkinnedGLB } from './glb.js';
+import { applyRig, rigUniforms, bakeModel } from './rig.js';
+import { KeeperSkeleton } from './keeperSkeleton.js';
+import { KEEPER_MODEL, gunPlacement, muzzlePoint, holdOf } from '../data/keeperRig.js';
 import { ENEMY_GLB, enemyRig, GUN_GLB, TURRET_GLB } from '../data/models3d.js';
 import { getEnemyType } from '../data/enemies.js';
 import { bakeGun, bakeTurret } from './glbModels.js';
@@ -359,7 +360,7 @@ export class Renderer3D {
     const turretKeys = [];
     for (const id in TURRET_GLB) TURRET_GLB[id].forEach((e, i) => turretKeys.push([`${id}@${i + 1}`, e]));
     const [kp, enemies, guns, turrets] = await Promise.all([
-      loadGLB(KEEPER_MODEL.file),
+      loadSkinnedGLB(KEEPER_MODEL.file),
       Promise.all(enemyIds.map((id) => loadGLB(ENEMY_GLB[id].file))),
       Promise.all(gunIds.map((id) => loadGLB(GUN_GLB[id].file))),
       Promise.all(turretKeys.map(([, e]) => loadGLB(e.file))),
@@ -379,24 +380,20 @@ export class Renderer3D {
   }
 
   /** Rigged material (Lambert like the other characters) + the matching shadow depth material. */
-  _rigMaterials(texture, uniforms, instanced, armAttr = false) {
-    const mat = applyRig(new THREE.MeshLambertMaterial({ map: texture }), uniforms, instanced, false, armAttr);
-    const depth = applyRig(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), uniforms, instanced, true, armAttr);
+  _rigMaterials(texture, uniforms, instanced) {
+    const mat = applyRig(new THREE.MeshLambertMaterial({ map: texture }), uniforms, instanced, false);
+    const depth = applyRig(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), uniforms, instanced, true);
     return { mat, depth };
   }
 
-  _useKeeperModel({ geometry, texture }) {
-    bakeModel(geometry, KEEPER_MODEL.height);
-    bakeArmWeights(geometry, texture, KEEPER_RIG); // D53: hands apart from the coat (no smeared flap)
-    this.keeperRig = rigUniforms(KEEPER_RIG);
-    const { mat, depth } = this._rigMaterials(texture, this.keeperRig, false, true);
-    this.playerBody.geometry = geometry;
-    this.playerBody.material = mat;
-    this.playerBody.customDepthMaterial = depth;
-    for (const leg of this.legs) leg.visible = false; // the legs are part of the mesh now
+  /** D56: the keeper with his skeleton (render3d/keeperSkeleton.js); the dodge ghosts keep the light silhouette. */
+  _useKeeperModel(model) {
+    try { this.keeper = new KeeperSkeleton(model); } catch (e) { this.keeper = null; return; } // keeps the procedural keeper
+    this.playerBody.geometry = new THREE.BufferGeometry(); // the skinned model (a child) draws him now
+    this.playerBody.add(this.keeper.group);
+    for (const leg of this.legs) leg.visible = false; // the legs are part of the model
     this.legsHidden = true;
-    for (const g of this.ghosts) g.geometry = geometry;
-    // the gun alone (no box arms), moved so its grip sits in the raised right hand; the flash on its barrel tip
+    // the gun alone (no box arms), its grip at the right palm (data/keeperRig.js GUN_HOLD); the flash on its barrel tip
     this.weaponMats = {};
     for (const id of WEAPON_MODEL_IDS) {
       const tex = this.gunModels && this.gunModels[id]; // D54: the user's gun model (else the procedural one)
@@ -675,7 +672,7 @@ export class Renderer3D {
     if (!run || !this.map || this.guard.busy()) return false;
     this._resize(false);
     this.frameDt = frameDt;
-    const dying = !!this.keeperRig && !run.player.alive && this.keeperFall < KEEPER_FALL; // the keeper is still falling
+    const dying = !!this.keeper && !run.player.alive && this.keeperFall < KEEPER_FALL; // the keeper is still falling
     if (paused && this.pausedDrawn && !dying) return false; // the paused frame does not change: draw it once
     // Interpolation between the last two fixed steps (alpha 0…1): the camera and the bodies move every frame,
     // not in 60 Hz jumps against a smoothly moving camera (that read as a blurred / doubled keeper).
@@ -713,7 +710,7 @@ export class Renderer3D {
 
     // Player (D52: the textured keeper falls when he dies — presentation time, the world is already stopped)
     const aim = p.aimAngle;
-    this.player.visible = p.alive || !!this.keeperRig;
+    this.player.visible = p.alive || !!this.keeper;
     const ppx = this._lerpX(p), ppy = this._lerpY(p);
     this.player.position.set(ppx, 0, ppy);
     this.player.rotation.y = -aim;
@@ -910,15 +907,15 @@ export class Renderer3D {
   /** Puts the muzzle flash on the barrel tip of a weapon model (local to the gun; size per weapon). */
   _placeMuzzle(id) {
     const tip = weaponTip(id);
-    if (this.keeperRig) { // D52: the gun sits in the raised hand — the same muzzle point the simulation fires from
-      const l = muzzleLocal(id); // the flash is a child of the gun: its tip before the stance (the gun's transform adds it)
-      this.muzzle.position.set(l[0] - 1, l[1], l[2]);
-      this.gunY = muzzlePoint(id).h;
+    if (this.keeper) { // the gun sits in the hands — the same muzzle point the simulation fires from
+      const m = muzzlePoint(id);
+      this.muzzle.position.set(m.f - 1, m.h, m.s);
+      this.gunY = m.h;
     } else {
       this.muzzle.position.set(tip.x - 1, tip.y, tip.z); // the star starts 2 units behind its origin: overlap the tip
       this.gunY = GUN_HEIGHT;
     }
-    this.muzzleScale = tip.flash * (this.keeperRig ? gunPlacement(id).scale : 1);
+    this.muzzleScale = tip.flash * (this.keeper ? gunPlacement(id).scale : 1);
     this.muzzle.scale.setScalar(this.muzzleScale);
   }
 
@@ -946,51 +943,32 @@ export class Renderer3D {
     if (p.dodging) { body.rotation.z = -0.3 * Math.cos(rel); body.rotation.x = -0.3 * Math.sin(rel); body.scale.set(1.04, 0.92, 1.04); }
     this.legs[0].rotation.z = swing * 0.6 * b;
     this.legs[1].rotation.z = -swing * 0.6 * b;
-    if (!this.keeperRig) return;
-    // D52 textured keeper: legs + arms in the shader — walk swing, the weapon held in the raised hands, a recoil kick
-    const u = this.keeperRig, w0 = this.weaponState;
-    u.uAnim.value.set(w.phase, p.alive ? b : 0, 0, 0);
-    const pose = poseFor(w0 ? w0.weaponId : 'pistol');
+    if (!this.keeper) return;
+    // D56 skeleton: stance, walk, both hands on the gun (IK), a recoil kick; he falls over sideways when he dies
+    const w0 = this.weaponState, id = w0 ? w0.weaponId : 'pistol';
     const since = w0 ? time - w0.lastShotAt : 1;
-    const kick = since >= 0 && since < 0.09 ? (1 - since / 0.09) * 0.22 : 0;
-    u.uPose.value.set(pose.right, pose.left, pose.leftYaw, kick);
-    let stance = 1;
-    // death: he falls over sideways (presentation time — the world is stopped by then), the gun drops out of sight
-    if (!p.alive) {
+    const kick = p.alive && since >= 0 && since < 0.09 ? 1 - since / 0.09 : 0;
+    let down = 0;
+    if (!p.alive) { // presentation time — the world is stopped by then; the gun drops out of sight
       this.keeperFall = Math.min(KEEPER_FALL, (this.keeperFall || 0) + (this.frameDt || 0));
-      const k = this.keeperFall / KEEPER_FALL, e = 1 - (1 - k) ** 3;
-      body.rotation.x = e * (Math.PI / 2) * 0.96;
+      const k = this.keeperFall / KEEPER_FALL;
+      down = 1 - (1 - k) ** 3;
+      body.rotation.x = down * (Math.PI / 2) * 0.96;
       body.rotation.z = 0;
       body.position.y = 0;
-      u.uPose.value.set(pose.right * (1 - e), pose.left * (1 - e), 0, 0);
-      stance = 1 - e;
     } else this.keeperFall = 0;
-    // D55: both hands turned in (two-handed pistol), knees bent; the gun follows the hands (stance + recoil kick)
-    const yawR = (pose.rightYaw || 0) * stance;
-    u.uRigC.value.z = yawR;
-    u.uRigD.value.set(KEEPER_RIG.kneeY, KEEPER_STANCE.knee * stance, KEEPER_STANCE.drop * stance, KEEPER_STANCE.lean * stance);
-    this._gunTransform(kick, yawR, stance);
+    this.keeper.update({ weaponId: id, phase: w.phase, blend: p.alive && !p.dodging ? b : 0, moveRel: rel, kick, down });
+    this._gunKick(id, kick);
     this.weaponMesh.visible = p.alive;
   }
 
-  /**
-   * D55: the gun moves with the right hand — the recoil kick turns it with the arm around the right shoulder (the
-   * same rotation as the shader: pitch, then the inward yaw), then the stance sinks and leans it with the torso.
-   */
-  _gunTransform(kick, yawR, stance) {
-    const g = this.weaponMesh, r = KEEPER_RIG, S = KEEPER_STANCE;
+  /** D56 recoil: the gun jumps back and its muzzle up around the right palm (the hands follow it by IK). */
+  _gunKick(id, kick) {
+    const g = this.weaponMesh, at = holdOf(id).at;
     const t = this._gunT || (this._gunT = { m: new THREE.Matrix4(), a: new THREE.Matrix4(), v: new THREE.Vector3() });
-    const m = t.m, a = t.a;
-    // kick about the right shoulder: T(pivot)·Ry(yaw)·Rz(−kick)·Ry(−yaw)·T(−pivot) (three.js rotations = the shader's)
-    m.makeTranslation(0, r.shoulderY, r.shoulderZ);
-    m.multiply(a.makeRotationY(yawR)).multiply(a.makeRotationZ(-kick)).multiply(a.makeRotationY(-yawR));
-    m.multiply(a.makeTranslation(0, -r.shoulderY, -r.shoulderZ));
-    // stance: sink by drop, then lean around the sunken hips: T(py)·Rz(−lean)·T(−py − drop)
-    const py = r.hipY - S.drop * stance;
-    m.premultiply(a.makeTranslation(0, -py - S.drop * stance, 0));
-    m.premultiply(a.makeRotationZ(-S.lean * stance));
-    m.premultiply(a.makeTranslation(0, py, 0));
-    m.decompose(g.position, g.quaternion, t.v);
+    t.m.makeTranslation(at[0] - kick * 1.6, at[1] + kick * 0.5, at[2]);
+    t.m.multiply(t.a.makeRotationZ(kick * 0.12)).multiply(t.a.makeTranslation(-at[0], -at[1], -at[2]));
+    t.m.decompose(g.position, g.quaternion, t.v);
   }
 
   /** Smoothed facing per enemy (turns take ~0.1 s instead of snapping). Keyed by the enemy id, pruned on growth. */

@@ -481,11 +481,11 @@ body.map-over .intro-card { display: none; }
     repeating-linear-gradient(180deg, transparent 0 27px, rgba(120, 90, 50, 0.13) 27px 28px),
     radial-gradient(ellipse at 30% 20%, #f3e3c3, #e2c99a 70%, #c9a978);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(120, 80, 30, 0.35);
-  rotate: -1deg;
+  /* D56 (user decision): the page and all its text stand straight */
   cursor: pointer;
   animation: journalIn 0.35s ease-out;
 }
-@keyframes journalIn { from { opacity: 0; transform: translateY(18px) rotate(2deg); } to { opacity: 1; transform: none; } }
+@keyframes journalIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 .journal-kicker { font: 700 calc(13px * var(--fs)) / 1.2 var(--font-display); letter-spacing: 0.18em; color: #7a5a34; text-transform: uppercase; }
 .journal-title { margin-top: 4px; font-size: calc(30px * var(--fs)); line-height: 1.1; font-weight: 700; font-style: italic; color: #4a1a12; }
 .journal.won .journal-title { color: #2f3d1c; }
@@ -498,17 +498,16 @@ body.map-over .intro-card { display: none; }
 .jl-value { font-family: var(--font-display); font-weight: 800; font-size: 1.1em; color: #2a1a0e; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .journal-divider { height: 0; margin: 4px 0; border-top: 1px solid rgba(80, 55, 30, 0.35); opacity: 1 !important; transform: none !important; }
 .journal-stamp {
-  /* its own row under the lines (right side) — never covers the numbers */
+  /* its own row under the lines, centred on the page, straight (D56) — never covers the numbers */
   position: relative;
   display: table;
-  margin: calc(12px * var(--fs)) calc(6px * var(--fs)) 0 auto;
+  margin: calc(12px * var(--fs)) auto 0;
   padding: 0.12em 0.5em;
   font: 800 calc(30px * var(--fs)) / 1 var(--font-display);
   letter-spacing: 0.08em;
   color: rgba(150, 28, 22, 0.88);
   border: 4px double rgba(150, 28, 22, 0.88);
   text-transform: uppercase;
-  rotate: -12deg;
   opacity: 0;
   scale: 2.4;
   pointer-events: none;
@@ -519,7 +518,6 @@ body.map-over .intro-card { display: none; }
 @keyframes stampIn { to { opacity: 1; scale: 1; } }
 .journal.congrats { width: min(620px, 94vw); }
 .journal.congrats .journal-title { font-size: calc(34px * var(--fs)); }
-.journal.congrats .journal-stamp { rotate: -6deg; } /* long text: a flatter angle keeps it off the numbers */
 /* Phones (Phase 9): H5 minimums (kicker 12, sub 14, lines 15, title 22); Congrats lines in two columns — this map |
    the whole campaign — so the page and its buttons fit a 300 px high screen. */
 @media (max-height: 500px) {

@@ -7,10 +7,11 @@ import * as THREE from '../../lib/three.module.js';
 import { buildShowcase } from '../render3d/models.js';
 import { createMaterials } from '../render3d/materials.js';
 import { SeededRandom } from '../core/SeededRandom.js';
-import { loadGLB } from '../render3d/glb.js';
-import { applyRig, rigUniforms, bakeModel, bakeArmWeights } from '../render3d/rig.js';
+import { loadGLB, loadSkinnedGLB } from '../render3d/glb.js';
+import { KeeperSkeleton } from '../render3d/keeperSkeleton.js';
+import { applyRig, rigUniforms, bakeModel } from '../render3d/rig.js';
 import { weaponGeometry } from '../render3d/models.js';
-import { KEEPER_MODEL, KEEPER_RIG, KEEPER_STANCE, poseFor, gunPlacement } from '../data/keeperRig.js';
+import { KEEPER_MODEL, gunPlacement } from '../data/keeperRig.js';
 import { ENEMY_GLB, enemyRig, GUN_GLB, TURRET_GLB } from '../data/models3d.js';
 import { bakeGun, bakeTurret } from '../render3d/glbModels.js';
 
@@ -27,47 +28,42 @@ async function texturedModels() {
   const out = new Map();
   const gunIds = Object.keys(GUN_GLB), enemyIds = Object.keys(ENEMY_GLB);
   const tKeys = []; for (const id in TURRET_GLB) TURRET_GLB[id].forEach((e, i) => tKeys.push([id, i + 1, e]));
-  const [keeper, guns, enemies, turrets] = await Promise.all([
-    loadGLB(KEEPER_MODEL.file),
+  const [keepers, guns, enemies, turrets] = await Promise.all([
+    Promise.all(gunIds.map(() => loadSkinnedGLB(KEEPER_MODEL.file))), // one skeleton per pose
     Promise.all(gunIds.map((id) => loadGLB(GUN_GLB[id].file))),
     Promise.all(enemyIds.map((id) => loadGLB(ENEMY_GLB[id].file))),
     Promise.all(tKeys.map(([, , e]) => loadGLB(e.file))),
   ]);
-  const rigged = (model, height, rig, pose, arms = false, rotY = Math.PI / 2) => {
+  const rigged = (model, height, rig, rotY = Math.PI / 2) => {
     bakeModel(model.geometry, height, rotY);
-    if (arms) bakeArmWeights(model.geometry, model.texture, rig);
     const u = rigUniforms(rig);
-    if (pose) {
-      u.uPose.value.set(pose.right, pose.left, pose.leftYaw, 0);
-      u.uRigC.value.z = pose.rightYaw || 0; // D55: both hands in, knees bent (the game's stance)
-      u.uRigD.value.set(KEEPER_RIG.kneeY, KEEPER_STANCE.knee, KEEPER_STANCE.drop, KEEPER_STANCE.lean);
-    }
-    const mat = applyRig(new THREE.MeshLambertMaterial({ map: model.texture }), u, false, false, arms);
+    const mat = applyRig(new THREE.MeshLambertMaterial({ map: model.texture }), u, false, false);
     const key = `viewer-${rigged.n = (rigged.n || 0) + 1}`; // own program per copy: three.js binds the uniforms of a shared program once
     mat.customProgramCacheKey = () => `rig-u-c-${key}`;
     return new THREE.Mesh(model.geometry, mat);
   };
-  if (keeper) {
-    gunIds.forEach((id, i) => {
+  gunIds.forEach((id, i) => {
+    if (!keepers[i]) return;
+    {
       const g = new THREE.Group();
-      const body = rigged({ geometry: keeper.geometry.clone(), texture: keeper.texture }, KEEPER_MODEL.height, KEEPER_RIG, poseFor(id), true);
+      const keeper = new KeeperSkeleton(keepers[i]); // D56: the game's skeleton pose (stance, both hands on the gun)
+      keeper.update({ weaponId: id, phase: 0, blend: 0, moveRel: 0, kick: 0, down: 0 });
+      const body = keeper.group;
       const m = guns[i];
       const gun = m ? bakeGun(m.geometry, GUN_GLB[id], id) : weaponGeometry(id, true);
       const { grip, scale, hand } = gunPlacement(id);
       gun.translate(-grip[0], -grip[1], -grip[2]).scale(scale, scale, scale).translate(hand[0], hand[1], hand[2]);
       const gunMesh = new THREE.Mesh(gun, m ? new THREE.MeshLambertMaterial({ map: m.texture }) : new THREE.MeshLambertMaterial({ vertexColors: true }));
-      const S = KEEPER_STANCE, py = KEEPER_RIG.hipY - S.drop; // D55 stance on the gun (as Renderer3D._gunTransform)
-      gunMesh.applyMatrix4(new THREE.Matrix4().makeTranslation(0, py, 0).multiply(new THREE.Matrix4().makeRotationZ(-S.lean)).multiply(new THREE.Matrix4().makeTranslation(0, -py - S.drop, 0)));
       g.add(body, gunMesh);
       g.userData.file = KEEPER_MODEL.file;
       out.set(id === 'pistol' ? 'keeper' : `keeper-${id}`, g);
-    });
-  }
+    }
+  });
   enemyIds.forEach((id, i) => {
     const m = enemies[i];
     if (!m) return;
     const e = ENEMY_GLB[id];
-    const mesh = rigged(m, e.height, enemyRig(e), null, false, e.rotY);
+    const mesh = rigged(m, e.height, enemyRig(e), e.rotY);
     mesh.userData.file = e.file;
     out.set(ENEMY_TAG[id] || id, mesh);
   });

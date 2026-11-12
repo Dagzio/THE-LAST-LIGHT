@@ -3,7 +3,7 @@
 export const PLAYER = {
   radius: 18,
   maxHp: 100,
-  moveSpeed: 124,           // px/s — D54 (user decision): 190 − 35 %; MOBILITY / FLEET FOOTED are % of it
+  moveSpeed: 112,           // px/s — D54: 190 − 35 % = 124; D56 (user decision): − 10 % → 112; MOBILITY / FLEET FOOTED are % of it
   dodge: {
     duration: 0.2,          // s
     speed: 530,             // px/s (GDD 500–560)

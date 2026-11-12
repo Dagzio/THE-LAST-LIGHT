@@ -18,6 +18,8 @@ export const Sfx = (() => {
   const bufs = {};
   const files = {};        // name → {trim, gain} of a loaded recorded file
   const voices = {};       // name → playing [{s, g}] (only for sounds with a voice limit)
+  const loops = new Set(); // D56: playing loops (footsteps) — stopped on mute / sound off / rebuild
+  const stopLoops = () => { for (const h of [...loops]) h.stop(); };
 
   const ctx = () => (ac ??= newCtx());
   const wake = () => {
@@ -81,6 +83,39 @@ export const Sfx = (() => {
       } catch (e) { /* SFX never throws */ }
       return null;
     },
+    /**
+     * D56: a looping recorded file (the keeper's footsteps) from its start. Returns a handle { rate(r), stop(),
+     * done } or null (sound off / muted / file not loaded). Mute, sound off and a rebuild stop it.
+     */
+    loop(name, rate = 1) {
+      const a = ctx(), buf = bufs[name], f = files[name];
+      if (!on || muted.size > 0 || !a || !buf || !f) return null;
+      wake();
+      try {
+        const s = a.createBufferSource(), g = a.createGain();
+        s.buffer = buf;
+        s.loop = true;
+        s.loopStart = f.trim;
+        s.loopEnd = buf.duration;
+        s.playbackRate.value = rate;
+        g.gain.value = f.gain;
+        s.connect(g);
+        g.connect(a.destination);
+        s.start(0, f.trim);
+        const h = {
+          done: false,
+          rate(r) { if (!h.done) s.playbackRate.setTargetAtTime(r, a.currentTime, 0.05); },
+          stop() {
+            if (h.done) return;
+            h.done = true;
+            loops.delete(h);
+            try { g.gain.setTargetAtTime(0, a.currentTime, 0.015); s.stop(a.currentTime + 0.08); } catch (e) { /* ended */ }
+          },
+        };
+        loops.add(h);
+        return h;
+      } catch (e) { return null; }
+    },
     /** Playable length of a sound in seconds (after its trimmed silence), 0 if not available. */
     duration(name) {
       const buf = bufs[name];
@@ -122,9 +157,9 @@ export const Sfx = (() => {
       idle(next);
     },
     /** Rebuild: close the context; buffers stay (AudioBuffer plays in any context). */
-    reset() { closeCtx(ac); ac = null; for (const k in voices) voices[k].length = 0; },
-    setMuted(reason, value) { if (value) muted.add(reason); else muted.delete(reason); },
-    set(value) { on = !!value; Prefs.setSoundOn(on); },
+    reset() { stopLoops(); closeCtx(ac); ac = null; for (const k in voices) voices[k].length = 0; },
+    setMuted(reason, value) { if (value) { muted.add(reason); stopLoops(); } else muted.delete(reason); },
+    set(value) { on = !!value; if (!on) stopLoops(); Prefs.setSoundOn(on); },
     get on() { return on; },
   };
 })();
