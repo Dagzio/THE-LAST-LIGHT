@@ -91,14 +91,17 @@
 .corner-col { flex-direction: column; }
 
 /* ===================== Splash / TAP TO PLAY ===================== */
-#screen-splash { display: flex; align-items: center; justify-content: center; cursor: default; background: #070a12; }
+#screen-splash { display: flex; align-items: center; justify-content: center; cursor: default; background: #070a12; overflow: hidden; }
 #screen-splash.ready-tap { cursor: pointer; }
 .splash-inner { text-align: center; }
 /* D64: the user's splash art fills the screen (cover); boot.js places the logo column (--splash-x / --splash-y) at a
    point of the picture — between the lamp and the moon, above the ground. The logo: the main menu's size + 15 % (D65). */
-.splash-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+/* D67: the picture is never cropped (contain); the bands around it show it again, blurred and darkened (one static layer) */
+.splash-bg, .splash-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-position: 50% 50%; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.splash-bg { object-fit: contain; }
+.splash-fill { object-fit: cover; filter: blur(22px) brightness(0.5) saturate(0.9); transform: scale(1.12); }
 #screen-splash .splash-inner { position: absolute; z-index: 1; left: var(--splash-x, 40%); top: var(--splash-y, 20%); translate: -50% 0; }
-#screen-splash .logo { width: calc(var(--logo-w) * 1.15); height: calc(var(--logo-h) * 1.15); filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.55)); }
+#screen-splash .logo { width: min(calc(var(--logo-w) * 1.15), var(--splash-logo-max, 9999px)); height: auto; filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.55)); }
 #screen-splash .tap-prompt { margin: 0; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85); } /* D65: on the bar's spot */
 /* Game logo (assets/graphics/logo.webp, 1200×439): the box has a fixed size before the image arrives — no shift. */
 .logo-img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }

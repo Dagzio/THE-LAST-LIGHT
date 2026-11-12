@@ -243,12 +243,12 @@ body.menu3d #world { display: none; }
 /* D65 (the user's reference): low in the centre, about half the screen wide; a steel frame with pointed ends, a dark
    track, an orange striped fill with a warm glow. TAP TO PLAY takes its place when loading ends (same spot, no jump). */
 .splash-bottom {
-  --bw: min(46.5vw, 900px);
+  --bw: var(--splash-bw, min(46.5vw, 900px)); /* D67: 46.5 % of the picture width (boot.js) */
   --bh: calc(var(--bw) * 0.052);
   position: absolute;
   z-index: 1;
-  left: 50%;
-  top: 85.7%;
+  left: var(--bar-x, 50%);
+  top: var(--bar-y, 85.7%); /* D67: 85.7 % down the picture, not the screen */
   width: var(--bw);
   translate: -50% -50%;
   display: grid;
