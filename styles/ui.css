@@ -91,9 +91,15 @@
 .corner-col { flex-direction: column; }
 
 /* ===================== Splash / TAP TO PLAY ===================== */
-#screen-splash { display: flex; align-items: center; justify-content: center; cursor: default; }
+#screen-splash { display: flex; align-items: center; justify-content: center; cursor: default; background: #070a12; }
 #screen-splash.ready-tap { cursor: pointer; }
 .splash-inner { text-align: center; }
+/* D64: the user's splash art fills the screen (cover); boot.js places the logo column (--splash-x / --splash-y) at a
+   point of the picture — between the lamp and the moon, above the ground. The logo is the main menu's size. */
+.splash-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+#screen-splash .splash-inner { position: absolute; z-index: 1; left: var(--splash-x, 40%); top: var(--splash-y, 20%); translate: -50% 0; }
+#screen-splash .logo { width: var(--logo-w); height: var(--logo-h); filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.55)); }
+#screen-splash .load-bar, #screen-splash .tap-prompt, #screen-splash .load-pct { text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85); }
 /* Game logo (assets/graphics/logo.webp, 1200×439): the box has a fixed size before the image arrives — no shift. */
 .logo-img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
 .logo {
@@ -121,14 +127,14 @@
 /* ===================== Main menu ===================== */
 #screen-menu { background: linear-gradient(90deg, rgba(4, 6, 12, 0.72) 0%, rgba(4, 6, 12, 0.25) 42%, rgba(4, 6, 12, 0) 60%); }
 /* Logo top-centre (user request 2026-11-09): as wide as it can be between the corner buttons, ≤ 26 % of the height. */
-#screen-menu {
+#screen-menu, #screen-splash { /* D64: the splash logo has the menu logo's size */
   --logo-side: calc(var(--safe-r) + 2 * var(--ring) + var(--gap) + 16px); /* the corner buttons + air, both sides */
   --logo-w: min(calc(560px * var(--fs)), calc(100vw - 2 * var(--logo-side)), calc(26dvh * 2.733));
   --logo-h: calc(var(--logo-w) / 2.733);
 }
 /* ≤ 320 px high: a smaller logo so the three 48 px menu items fit under it */
 @media (max-height: 320px) {
-  #screen-menu { --logo-w: min(calc(560px * var(--fs)), calc(100vw - 2 * var(--logo-side)), calc(21dvh * 2.733)); }
+  #screen-menu, #screen-splash { --logo-w: min(calc(560px * var(--fs)), calc(100vw - 2 * var(--logo-side)), calc(21dvh * 2.733)); }
 }
 .menu-logo {
   position: absolute;
@@ -136,7 +142,7 @@
   left: 50%;
   width: var(--logo-w);
   height: var(--logo-h);
-  translate: -50% 0;
+  translate: calc(-50% - 30px) 0; /* D64: 30 px left of the centre (user request) */
 }
 /* The list is centred in the space under the logo (never under it on short phones). */
 .menu-list {

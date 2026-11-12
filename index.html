@@ -8,6 +8,7 @@
   <link rel="icon" type="image/png" sizes="64x64" href="assets/graphics/favicon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/graphics/apple-touch-icon.png">
   <link rel="preload" as="image" href="assets/graphics/logo.webp" type="image/webp">
+  <link rel="preload" as="image" href="assets/graphics/splash.webp" type="image/webp">
   <link rel="stylesheet" href="styles/base.css">
   <link rel="stylesheet" href="styles/ui.css">
   <link rel="stylesheet" href="styles/game.css">
@@ -19,7 +20,9 @@
 
   <!-- ===== Splash → TAP TO PLAY (H5 §1) ===== -->
   <section class="screen active" id="screen-splash">
-    <div class="splash-inner">
+    <!-- D64: the user's splash art (cover); the logo column sits between the lamp and the moon, above the ground -->
+    <img class="splash-bg fade" id="splashBg" src="assets/graphics/splash.webp" width="1672" height="941" alt="" draggable="false">
+    <div class="splash-inner" id="splashInner">
       <h1 class="logo fade"><img class="logo-img" src="assets/graphics/logo.webp" width="1200" height="439" alt="THE LAST LIGHT" draggable="false"></h1>
       <div class="load-bar" id="loadBar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i id="loadFill"></i></div>
       <p class="load-pct" id="loadPct">0%</p>
