@@ -148,7 +148,7 @@ export class KeeperSkeleton {
       const st = Math.sin(ph) * S.stride * bl, lift = Math.max(0, Math.cos(ph)) * S.lift * bl;
       const r = this.ankle[side], spread = (side === 'Left' ? -1 : 1) * S.footSpread * up;
       const t = this._pt(r.x + cx * st, r.y + lift, r.z + spread + cz * st, T.t);
-      const pole = this._dir(1, 0, side === 'Left' ? -0.15 : 0.15, T.pole);
+      const pole = this._dir(1, 0, 0, T.pole); // D59: knees straight forward (not splayed)
       this._ik(this.b[`${side}UpLeg`], this.b[`${side}Leg`], this.b[`${side}Foot`], t, pole);
       this.group.getWorldQuaternion(Q[1]);
       this._setWorldQ(this.b[`${side}Foot`], Q[1].multiply(this.footQ[side])); // the foot stays flat

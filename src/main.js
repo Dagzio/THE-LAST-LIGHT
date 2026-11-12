@@ -124,7 +124,7 @@ function wireCombatSounds(events, game) {
     const speed = p ? Math.hypot(p.vx, p.vy) : 0;
     const walking = !!p && game.sm.is(STATES.RUNNING) && p.alive && !p.dodging && speed > FOOTSTEPS.minSpeed;
     if (!walking) { if (steps.h) { steps.h.stop(); steps.h = null; } return; }
-    const rate = Math.min(FOOTSTEPS.maxRate, Math.max(FOOTSTEPS.minRate, speed / PLAYER.moveSpeed));
+    const rate = Math.min(FOOTSTEPS.maxRate, Math.max(FOOTSTEPS.minRate, speed / (FOOTSTEPS.refSpeed || PLAYER.moveSpeed)));
     if (!steps.h || steps.h.done) steps.h = Sfx.loop(FOOTSTEPS.sfx, rate);
     else steps.h.rate(rate);
   });

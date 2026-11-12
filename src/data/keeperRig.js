@@ -11,7 +11,7 @@ export const KEEPER_MODEL = { file: 'assets/models/player.min.glb', height: 54, 
  * shoulders come forward a little (more reach for the short arms); feet a bit wider than at rest.
  * Walk: the feet step along the movement direction (stride ± `stride`, lifted by `lift`), two steps per walk cycle.
  */
-export const KEEPER_STANCE = { hipDrop: 2.4, hipBack: 0.6, lean: 0.12, shoulderForward: 0.3, footSpread: 1, stride: 8, lift: 3.5 };
+export const KEEPER_STANCE = { hipDrop: 2.4, hipBack: 0.6, lean: 0.12, shoulderForward: 0.3, footSpread: -2.2, stride: 7, lift: 3.5 }; // D59: feet closer together (were too far apart)
 
 /** Gun models: their grip and barrel tip in the reference gun frame (render3d/glbModels.js bakeGun maps the
  *  textured guns onto it); scale — the size in the hands (D55: pistol / SMG halved; D56: long guns for the short arms). */

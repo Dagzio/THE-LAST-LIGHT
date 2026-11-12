@@ -79,9 +79,10 @@ export const SFX_FILES = {
 /**
  * Keeper footsteps (D56, user decision): the whole `steps` file loops only while he walks and stops at once when he
  * stops (or dashes, dies, the game pauses). Playback speed follows his speed: rate = speed / base speed (upgrades,
- * perks, salt pools), clamped to minRate…maxRate.
+ * perks, salt pools), clamped to minRate…maxRate. D59: rate = speed / refSpeed — the recording's tempo fits a walk at
+ * 112 (the D56 speed), so the slower keeper (95) steps slower too.
  */
-export const FOOTSTEPS = { sfx: 'steps', minSpeed: 8, minRate: 0.6, maxRate: 1.6 };
+export const FOOTSTEPS = { sfx: 'steps', minSpeed: 8, minRate: 0.6, maxRate: 1.6, refSpeed: 112 };
 /** The keeper is hurt (D53): one of the user's two takes at random (synth 'playerHurt' while they load). */
 export const PLAYER_HURT_SFX = ['playerHurt1', 'playerHurt2'];
 

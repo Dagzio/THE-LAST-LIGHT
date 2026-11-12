@@ -785,7 +785,9 @@ export class Renderer3D {
       const yaw = this._yaw(e, e.faceAngle, fdt) + (stunned ? Math.sin(time * 22 + e.id) * 0.35 : 0); // stun: dazed wobble
       let roll = 0, pitch = 0, lift = 0, sy = 1, sxz = 1, scale = 1, walkPh = 0, walkOn = 0;
       if (e.alive) {
-        const moving = !stunned && !e.casting && (e.state === ENEMY_STATES.MOVE_TO_BEACON || e.state === ENEMY_STATES.ATTACK_PLAYER);
+        // D59: the walk plays only while the body really moves this step (a runner / any enemy standing to strike stops walking)
+        const stepMove = e.prevX === undefined ? 1 : Math.hypot(e.x - e.prevX, e.y - e.prevY);
+        const moving = !stunned && !e.casting && stepMove > 0.04 && (e.state === ENEMY_STATES.MOVE_TO_BEACON || e.state === ENEMY_STATES.ATTACK_PLAYER);
         if (moving) {
           const ph = time * A.freq * e.slowFactor(time) + e.id * 1.7;
           walkPh = ph * 0.5; walkOn = 1; // rigged legs: one stride per two body bobs
