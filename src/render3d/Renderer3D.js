@@ -53,6 +53,44 @@ const SUMMON_MARKS = 3;
 // Procedural gait per enemy type (D45, presentation only): step frequency (rad/s at full speed), body lift, roll
 // (side to side), forward pitch, squash & stretch; float = hovering bosses. All on the instance transform → no
 // extra draw calls, no skinning.
+// D58: how each type strikes (presentation, on the instance transform): a wind-up in the last `wind` s before the
+// hit (pitch > 0 = rears back, crouch = squat, back = pulls back × reach) and the strike over `dur` s after it (pitch
+// < 0 = dives forward, reach × radius forward, hop = jump height, squash = body squash on the impact). The grunt keeps
+// its D54 lunge + arm swing (no entry).
+const STRIKE = {
+  runner: { wind: 0.3, dur: 0.32, windPitch: 0.22, crouch: 0.16, back: 0.25, pitch: -0.5, reach: 1.0, hop: 7, squash: 0.08 },   // pounce
+  husk: { wind: 0.35, dur: 0.26, windPitch: 0.3, crouch: 0.05, back: 0.35, pitch: -0.45, reach: 0.65, hop: 0, squash: 0.06 },  // head-butt bite
+  spitter: { wind: 0.3, dur: 0.24, windPitch: 0.4, crouch: 0, back: 0.2, pitch: -0.6, reach: 0.55, hop: 0, squash: 0.05 },     // neck snap bite
+  brute: { wind: 0.45, dur: 0.34, windPitch: 0.35, crouch: 0, back: 0.2, pitch: -0.32, reach: 0.5, hop: 5, squash: 0.14 },     // rear up + slam
+  gloam_warden: { wind: 0.5, dur: 0.42, windPitch: 0.25, crouch: 0, back: 0.15, pitch: -0.25, reach: 0.4, hop: 6, squash: 0.1 },
+  fog_mother: { wind: 0.5, dur: 0.42, windPitch: 0.25, crouch: 0, back: 0.15, pitch: -0.28, reach: 0.4, hop: 6, squash: 0.1 },
+};
+const STRIKE_OUT = { pitch: 0, lunge: 0, lift: 0, sy: 1, sxz: 1 };
+/** D58: the strike pose of an enemy now (wind-up before its next hit on the keeper / beacon / a device, then the hit). */
+function strikePose(e, S, time) {
+  const o = STRIKE_OUT, R = e.radius;
+  o.pitch = 0; o.lunge = 0; o.lift = 0; o.sy = 1; o.sxz = 1;
+  const k = (time - e.lastAttackAt) / S.dur;
+  if (k >= 0 && k < 1) { // the hit: fast dive (first 30 %), then back
+    const s = k < 0.3 ? k / 0.3 : 1 - (k - 0.3) / 0.7, e3 = s * s * (3 - 2 * s);
+    o.pitch = S.pitch * e3;
+    o.lunge = S.reach * R * e3;
+    o.lift = S.hop * Math.sin(Math.min(1, k / 0.6) * Math.PI);
+    const imp = k > 0.2 && k < 0.5 ? Math.sin(((k - 0.2) / 0.3) * Math.PI) * S.squash : 0;
+    o.sy = 1 - imp; o.sxz = 1 + imp * 0.6;
+    return o;
+  }
+  const next = e.meleeAt > time ? e.meleeAt
+    : (e.attackingBeacon || (e.devTarget && e.devUntil > 0)) && e.nextAttackAt > time ? e.nextAttackAt : 0;
+  if (next && next - time < S.wind) { // the wind-up: rears / pulls back / squats
+    const w = 1 - (next - time) / S.wind, e3 = w * w * (3 - 2 * w);
+    o.pitch = S.windPitch * e3;
+    o.lunge = -S.back * R * 0.4 * e3;
+    o.sy = 1 - S.crouch * e3; o.sxz = 1 + S.crouch * 0.4 * e3;
+  }
+  return o;
+}
+
 const GAIT = {
   grunt: { freq: 9, bob: 2.2, roll: 0.13, pitch: 0.06, squash: 0.05 },
   runner: { freq: 16, bob: 3.2, roll: 0.05, pitch: 0.14, squash: 0.07 },
@@ -391,6 +429,9 @@ export class Renderer3D {
     try { this.keeper = new KeeperSkeleton(model); } catch (e) { this.keeper = null; return; } // keeps the procedural keeper
     this.playerBody.geometry = new THREE.BufferGeometry(); // the skinned model (a child) draws him now
     this.playerBody.add(this.keeper.group);
+    // D58: the lantern glow becomes a flashlight under the barrel of every gun (moves with the gun, recoil included)
+    this.weaponMesh.add(this.lanternMesh, this.lanternLight);
+    this.lanternMesh.scale.setScalar(0.4);
     for (const leg of this.legs) leg.visible = false; // the legs are part of the model
     this.legsHidden = true;
     // the gun alone (no box arms), its grip at the right palm (data/keeperRig.js GUN_HOLD); the flash on its barrel tip
@@ -776,12 +817,19 @@ export class Renderer3D {
         if (wu > 0 && atk === 0) atk = -0.55 * wu;
         v.body.geometry.attributes.aAnim.setXYZW(v.n, walkPh, walkOn, atk, 0);
       }
+      const SP = e.alive && STRIKE[e.typeId];
+      let lunge = 0;
+      if (SP) { // D58: the type's own strike (pounce / bite / slam) with a wind-up
+        const st = strikePose(e, SP, time);
+        pitch += st.pitch; lift += st.lift; lunge = st.lunge; sy *= st.sy; sxz *= st.sxz;
+      } else {
+        const reach = e.radius * 0.4;
+        lunge = e.alive && time - e.lastAttackAt < 0.22 ? Math.sin(((time - e.lastAttackAt) / 0.22) * Math.PI) * reach : 0;
+        if (!lunge && e.alive && e.meleeAt > time && e.meleeAt - time < 0.35) lunge = -reach * 0.35 * (1 - (e.meleeAt - time) / 0.35); // D54: leans back before the strike
+      }
       E.set(roll, -yaw, pitch, 'YXZ');
       Q.setFromEuler(E);
       S.set(sxz * scale, sy * scale, sxz * scale);
-      const reach = e.radius * 0.4;
-      let lunge = e.alive && time - e.lastAttackAt < 0.22 ? Math.sin(((time - e.lastAttackAt) / 0.22) * Math.PI) * reach : 0;
-      if (!lunge && e.alive && e.meleeAt > time && e.meleeAt - time < 0.35) lunge = -reach * 0.35 * (1 - (e.meleeAt - time) / 0.35); // D54: leans back before the strike
       P.set(this._lerpX(e) + Math.cos(yaw) * lunge, lift, this._lerpY(e) + Math.sin(yaw) * lunge);
       M.compose(P, Q, S);
       v.body.setMatrixAt(v.n, M);
@@ -911,6 +959,9 @@ export class Renderer3D {
       const m = muzzlePoint(id);
       this.muzzle.position.set(m.f - 1, m.h, m.s);
       this.gunY = m.h;
+      const back = id === 'pistol' ? 2.2 : 4.5, down = id === 'pistol' ? 1.5 : 1.9; // D58 flashlight under the barrel
+      this.lanternMesh.position.set(m.f - back, m.h - down, m.s);
+      this.lanternLight.position.set(m.f - back + 3, m.h - down, m.s);
     } else {
       this.muzzle.position.set(tip.x - 1, tip.y, tip.z); // the star starts 2 units behind its origin: overlap the tip
       this.gunY = GUN_HEIGHT;

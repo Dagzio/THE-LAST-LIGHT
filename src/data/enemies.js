@@ -32,7 +32,8 @@ export const ENEMIES = {
     barHeight: 50,           // D54: above the taller textured model
     // ATTACK_PLAYER (D17): a keeper closer than aggroRange pulls the runner off its path for up to chaseDuration;
     // it gives up when the keeper gets farther than aggroRange × giveUpFactor, then ignores him for cooldown.
-    chase: { aggroRange: 170, chaseDuration: 3.0, giveUpFactor: 1.6, cooldown: 4.0 },
+    // D58 (user decision): chaseDuration 3 → 9 s (+6) — a distracted runner fights the keeper longer
+    chase: { aggroRange: 170, chaseDuration: 9.0, giveUpFactor: 1.6, cooldown: 4.0 },
     reward: { coins: 2, xp: 6 },
   },
   brute: {

@@ -59,7 +59,8 @@ export const DEVICE_HP = { perLevel: [120, 160, 200], repair: { fullFromOnePerce
 // with its beacon damage for `attackTime` s, then goes on to the beacon and ignores devices for `cooldown` s
 // (`giveUpAfter`: it could not reach it). Bosses do not stop — their slam / tide damage devices inside the area.
 // Spitters lob every `spitterEvery`-th glob at a working device within their reach of it.
-export const DEVICE_AGGRO = { range: 80, attackTime: 3, giveUpAfter: 4, cooldown: 8, firstHit: 0.4, spitterEvery: 3, spitterReach: 300 };
+// D58 (user decision): attackTime 3 → 9 s (+6) — distracted enemies stay on a device longer
+export const DEVICE_AGGRO = { range: 80, attackTime: 9, giveUpAfter: 4, cooldown: 8, firstHit: 0.4, spitterEvery: 3, spitterReach: 300 };
 
 // D54: rounds start at the barrel tip of the user's turret model of that level (muzzleOffset forward from the pad centre,
 // muzzleHeight — the height they fly at, presentation)
