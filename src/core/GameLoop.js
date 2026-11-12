@@ -30,7 +30,7 @@ export class GameLoop {
     this.updateMs = 0;   // diagnostics: cost of the fixed updates in the last frame
     this.renderMs = 0;   // diagnostics: cost of the last render
     this.fpsCap = 0;
-    this.timeScale = 1;  // D61: slow motion (the grenade wheel) — fewer fixed steps per second, same step size     // >0: skip animation frames faster than this (90–120 Hz phones, H5 3D guide §3)
+    this.timeScale = 1;  // D61 / D62: slow motion (the grenade wheel): every step advances step × timeScale (smooth)     // >0: skip animation frames faster than this (90–120 Hz phones, H5 3D guide §3)
     this._lastFrameTs = -Infinity;
     this._frame = (ts) => {
       if (!this.running) return;
@@ -73,13 +73,13 @@ export class GameLoop {
     if (!(frameDt > 0)) frameDt = 0;
     if (frameDt > this.maxFrameDelta) frameDt = this.maxFrameDelta;
     this.frameDt = frameDt;
-    this.accumulator += frameDt * (this.timeScale > 0 ? this.timeScale : 0);
+    this.accumulator += frameDt;
 
     let steps = 0;
     const t0 = now();
     // Small epsilon so 1/60 + 1/60 accumulations from 120 Hz don't lose a step to float error.
     while (this.accumulator + 1e-9 >= this.step) {
-      this.update(this.step);
+      this.update(this.timeScale > 0 && this.timeScale < 1 ? this.step * this.timeScale : this.step); // D62: slow motion = shorter steps (smooth)
       this.accumulator -= this.step;
       steps += 1;
     }

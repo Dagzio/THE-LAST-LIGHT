@@ -124,6 +124,7 @@ export class MapRun {
     this.ai.map = map;
     this.controller.map = map;
     this.ai.onRanged = (e, target, time, device) => this._launchGlob(e, target, time, device);
+    this.ai.onSpit = (e, x, y, time) => this._spitAtKeeper(e, x, y, time); // D62
     this.ai.defenses = this.defenses;       // D52: enemies may turn on devices
     this.bossSystem.defenses = this.defenses;
     this.bossSystem.summonFn = (points, enemyId, time) => this._summon(points, enemyId, time);
@@ -373,9 +374,53 @@ export class MapRun {
     this.events.emit('glob', e.x, e.y);
   }
 
+  /** D62: a spit at the spot where the keeper stood — a straight, low flight; hits him only if he is on its way. */
+  _spitAtKeeper(e, x, y, time) {
+    const R = e.type.ranged, K = R.keeper;
+    const d = Math.hypot(x - e.x, y - e.y) || 1;
+    const base = e.type.beaconDamage;
+    this.globs.push({
+      keeper: true, x0: e.x, y0: e.y, x1: x, y1: y, t0: time, t1: time + Math.max(0.15, d / R.globSpeed), r: R.globRadius,
+      damage: Math.max(1, Math.round(base * K.hitMult)), poison: Math.max(1, Math.round(base * K.poisonMult)),
+      poisonTime: K.poisonTime, poisonEvery: K.poisonEvery,
+    });
+    this.events.emit('glob', e.x, e.y);
+  }
+
+  /** D62: poison on the keeper — a tick every poisonEvery s until it wears off (through the hit invulnerability). */
+  _updatePoison(time) {
+    const p = this.player;
+    if (!p.alive || !(p.poisonUntil > 0)) return;
+    while (p.poisonNextAt > 0 && time >= p.poisonNextAt && p.poisonNextAt <= p.poisonUntil + 1e-6) {
+      const at = p.poisonNextAt;
+      p.poisonNextAt += p.poisonEvery;
+      const applied = p.applyDamage(p.poisonDamage, time, 0, true);
+      if (applied > 0) this.events.emit('playerHit', p.x, p.y, applied, 'poison');
+      if (!p.alive) break;
+      if (at <= 0) break;
+    }
+    if (time > p.poisonUntil) { p.poisonUntil = 0; p.poisonNextAt = 0; }
+  }
+
   _updateGlobs(time) {
     for (let i = this.globs.length - 1; i >= 0; i--) {
       const g = this.globs[i];
+      if (g.keeper) { // D62 spit: in flight it hits the keeper on its way; at the end it splats on the ground
+        const k = Math.min(1, Math.max(0, (time - g.t0) / (g.t1 - g.t0)));
+        const gx = g.x0 + (g.x1 - g.x0) * k, gy = g.y0 + (g.y1 - g.y0) * k, p = this.player;
+        if (p.alive && Math.hypot(p.x - gx, p.y - gy) <= p.radius + g.r) {
+          this.globs.splice(i, 1);
+          const applied = p.applyDamage(g.damage, time);
+          if (applied > 0) this.events.emit('playerHit', p.x, p.y, applied, 'spitter');
+          p.poisonDamage = g.poison; p.poisonEvery = g.poisonEvery;
+          if (!(p.poisonUntil > time)) p.poisonNextAt = time + g.poisonEvery; // a new spit renews it, never stacks
+          p.poisonUntil = time + g.poisonTime;
+          this.particles.burst(gx, gy, 12, 150, 0.35, 2.5, '#9be86a');
+          continue;
+        }
+        if (time >= g.t1) { this.globs.splice(i, 1); this.particles.burst(g.x1, g.y1, 8, 110, 0.3, 2.2, '#7fbf55'); }
+        continue;
+      }
       if (time < g.t1) continue;
       this.globs.splice(i, 1);
       if (g.device) { // D52: a glob at a device hurts it only if it is still installed and working
@@ -499,6 +544,7 @@ export class MapRun {
     this.grenades.update(this.enemies, time);
     this.poison.update(this.enemies, time);
     this._updateGlobs(time);
+    this._updatePoison(time); // D62
     if (!p.alive) this._setDefeat('player');
     if (!this.defeat) this.waves.update(this.enemies, time);
     this.crates.update(p, this.kiosk, time);

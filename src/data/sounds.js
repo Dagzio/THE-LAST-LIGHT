@@ -48,6 +48,7 @@ export const SFX_FILES = {
   beaconHit: { file: 'sfx/beacon-hit.mp3', gain: 1 }, // D57: the user's request — the recorded beacon hit is back
   freeze: { file: 'sfx/cryo-blast.mp3', gain: 1 },       // Cryo grenade
   fire: { file: 'sfx/molotov.mp3', gain: 1 },            // Molotov: bottle breaks + flames
+  molotovFire: { file: 'grenades/molotov.mp3', trim: 0.2, gain: 1 }, // D62 user file: the fire crackle while it burns
   bossWarn: { file: 'sfx/boss-warn.mp3', gain: 1 },      // a boss telegraphs an attack (roar)
   bossSlam: { file: 'sfx/boss-slam.mp3', gain: 1 },
   bossTide: { file: 'sfx/boss-tide.mp3', gain: 1 },

@@ -64,7 +64,11 @@ export const ENEMIES = {
     armor: 0,
     bossSlowFactor: 1,
     barHeight: 44,
-    ranged: { globSpeed: 260, globRadius: 7 }, // world units / s; travel time = distance / speed
+    ranged: { globSpeed: 260, globRadius: 7, // world units / s; travel time = distance / speed
+      // D62 (user decision): the keeper within `range` (and not close enough to bite) gets a spit: after `windup` s the
+      // spitter fixes where he stands and spits there in a straight line; the glob hits him if he is on its way
+      // (hitMult × its glob damage + poison: poisonMult × it every second for poisonTime s), else it splats on the ground.
+      keeper: { range: 220, windup: 0.5, hitMult: 0.35, poisonMult: 0.5, poisonTime: 4.5, poisonEvery: 1 } },
     reward: { coins: 3, xp: 8 },
   },
   // Husk (D45, from map 4): armoured shell — every bullet hit loses 3 damage; grenades ignore armour.

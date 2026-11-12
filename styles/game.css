@@ -1000,7 +1000,8 @@ body:not(.touch) .hud-player::before {
 }
 #screen-game.keeper-hurt::before { opacity: 1; animation: hurtEdge 1.1s ease-in-out infinite alternate; }
 /* D54: a hit (above the low-HP threshold): the red edge for 0.7 s, then it fades */
-#screen-game.keeper-hit::before { opacity: 1; transition: opacity 0.08s; }
+#screen-game.keeper-hit::before { opacity: 1; transition: opacity 0.08s; animation: hitEdge 0.7s ease-out; } /* D62: each hit pulses, at low HP too */
+@keyframes hitEdge { 0% { opacity: 1; filter: saturate(1.6) brightness(1.15); } 100% { opacity: 1; } }
 #screen-game.keeper-hurt .hud-hp { color: #ff6a4a; animation: hurtPulse 0.8s ease-in-out infinite alternate; }
 #screen-game.keeper-hurt .hud-heart { fill: #ff6a4a; }
 #screen-game.keeper-hurt .hud-hpbar i { background: linear-gradient(90deg, #a8443b, #ff6a4a); }
@@ -1165,12 +1166,13 @@ body.paused .act-grenade.armed, body.paused .grenade-neon.armed { animation-play
 .gwheel::before { /* a dark disc behind the fan: the cells read over any map */
   content: "";
   position: absolute;
-  left: calc(var(--gw-r) * -1.55);
-  top: calc(var(--gw-r) * -1.55);
-  width: calc(var(--gw-r) * 3.1);
-  height: calc(var(--gw-r) * 3.1);
+  /* D62: +25 % darker and wider — the shade runs a little past the cells */
+  left: calc(var(--gw-r) * -2);
+  top: calc(var(--gw-r) * -2);
+  width: calc(var(--gw-r) * 4);
+  height: calc(var(--gw-r) * 4);
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.35) 45%, rgba(0, 0, 0, 0) 70%);
+  background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.69), rgba(0, 0, 0, 0.5) 42%, rgba(0, 0, 0, 0.22) 60%, rgba(0, 0, 0, 0) 72%);
 }
 .gw-cell {
   position: absolute;
@@ -1192,9 +1194,7 @@ body.paused .act-grenade.armed, body.paused .grenade-neon.armed { animation-play
 .gw-name:empty { display: none; }
 .gw-name {
   position: absolute;
-  /* beyond the middle (up-left) cell, along the same diagonal — never on a cell */
-  left: calc(var(--gw-r) * -1.32 - var(--gw-cell) * 0.2);
-  top: calc(var(--gw-r) * -1.32 - var(--gw-cell) * 0.2);
+  /* left / top set by the wheel: past the middle cell, never on a cell */
   translate: -50% -50%;
   padding: 3px 8px;
   background: rgba(6, 7, 10, 0.85);

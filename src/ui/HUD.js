@@ -265,9 +265,11 @@ export class HUD {
     // D51 warnings: low HP (number pulses red + a red edge on the screen), low ammo (counter turns orange)
     const hurt = p.alive && p.hp / p.maxHp <= 0.3;
     if (hurt !== c.hurt) { c.hurt = hurt; el.screen.classList.toggle('keeper-hurt', hurt); }
-    // D54: a hit above the low-HP threshold flashes the same red edge for 0.7 s (game clock: a pause holds it)
-    const hitFlash = !hurt && p.alive && this.game.clock.time - p.lastHitAt < 0.7;
-    if (hitFlash !== c.hitFlash) { c.hitFlash = hitFlash; el.screen.classList.toggle('keeper-hit', hitFlash); }
+    // D54 / D62: every hit flashes the red edge for 0.7 s (at low HP too — over the breathing edge); a new hit restarts it
+    const hitFlash = p.alive && this.game.clock.time - p.lastHitAt < 0.7;
+    if (hitFlash && p.lastHitAt !== c.lastHitAt) { el.screen.classList.remove('keeper-hit'); void el.screen.offsetWidth; el.screen.classList.add('keeper-hit'); c.hitFlash = true; }
+    else if (hitFlash !== c.hitFlash) { c.hitFlash = hitFlash; el.screen.classList.toggle('keeper-hit', hitFlash); }
+    c.lastHitAt = p.lastHitAt;
     const lowAmmo = !w.reloading && w.ammo <= Math.max(1, Math.ceil(w.stats.magazineSize * 0.25));
     if (lowAmmo !== c.lowAmmo) { c.lowAmmo = lowAmmo; el.weapon.classList.toggle('low-ammo', lowAmmo); }
     if (w.reloading !== c.reloading) {

@@ -29,6 +29,8 @@ export class EnemyAISystem {
     this.world = null;
     /** @type {object|null} map data: slow zones (Salt Marsh, D45) */
     this.map = null;
+    /** @type {((e:object, x:number, y:number, time:number)=>void)|null} D62 Spitter spit at the keeper's spot */
+    this.onSpit = null;
     /** @type {((e:object, target:object, time:number, device?:object)=>void)|null} ranged attack (Spitter glob) */
     this.onRanged = null;
     /** @type {import('./DefenseSystem.js').DefenseSystem|null} devices enemies may turn on (D52), set by the map run */
@@ -171,6 +173,7 @@ export class EnemyAISystem {
 
       if (e.casting) { e.attackingBeacon = false; continue; } // boss telegraphing: stands still
       if (player && player.alive && this._melee(e, t, player, time)) continue; // D54: fighting the keeper
+      if (t.ranged && t.ranged.keeper && player && player.alive && this.onSpit && this._spit(e, t, player, time)) continue; // D62
 
       if (e.state === ENEMY_STATES.ATTACK_PLAYER) {
         e.attackingBeacon = false;
@@ -297,6 +300,21 @@ export class EnemyAISystem {
       p.x -= ux * push * kp; p.y -= uy * push * kp;
       if (this.world) { this.world.pushOut(e); this.world.pushOut(p); }
     }
+  }
+
+  /** D62 Spitter: the keeper in spit range → stand, face him, wind up, spit at the spot where he stands (then every interval). */
+  _spit(e, t, p, time) {
+    const K = t.ranged.keeper;
+    const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy);
+    if (d > K.range) { e.spitAt = 0; return false; }
+    e.attackingBeacon = false;
+    if (d > 1e-6) e.faceAngle = Math.atan2(dy, dx);
+    if (!e.spitAt) { e.spitAt = time + K.windup; return true; }
+    if (time < e.spitAt) return true;
+    e.lastAttackAt = time;
+    e.spitAt = time + Math.max(K.windup, t.attackInterval);
+    this.onSpit(e, p.x, p.y, time);
+    return true;
   }
 
   /**

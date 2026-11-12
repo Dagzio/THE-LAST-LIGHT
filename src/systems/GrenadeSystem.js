@@ -94,7 +94,7 @@ export class GrenadeSystem {
         this._damageIn(z.x, z.y, z.r, GRENADES.molotov.tickDamage, GRENADES.molotov, enemies, z.nextTick);
         z.nextTick += GRENADES.molotov.tickInterval;
       }
-      if (time >= z.until) this.zones.splice(i, 1);
+      if (time >= z.until) { this.zones.splice(i, 1); this.events.emit('molotovOut', z.x, z.y); } // D62: its fire sound fades
     }
     for (let i = this.blasts.length - 1; i >= 0; i--) if (time - this.blasts[i].at > 1.0) this.blasts.splice(i, 1);
   }
@@ -120,6 +120,7 @@ export class GrenadeSystem {
     } else if (g.type === 'cryo') {
       for (const e of enemies) {
         if (!e.alive || Math.hypot(e.x - x, e.y - y) > G.radius + e.radius) continue;
+        if (G.damage > 0 && this._hit(e, G.damage, G, time)) continue; // D62: cryo hurts a little too
         if (e.type.boss) e.applySlow(G.bossSlow, G.bossSlowDuration, time, false);
         else e.applySlow(G.slow, G.slowDuration, time, false);
       }

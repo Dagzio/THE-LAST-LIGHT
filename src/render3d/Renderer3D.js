@@ -27,7 +27,7 @@ import { loadGLB, loadSkinnedGLB } from './glb.js';
 import { applyRig, rigUniforms, bakeModel } from './rig.js';
 import { KeeperSkeleton } from './keeperSkeleton.js';
 import { KEEPER_MODEL, gunPlacement, muzzlePoint, holdOf } from '../data/keeperRig.js';
-import { ENEMY_GLB, enemyRig, GUN_GLB, TURRET_GLB } from '../data/models3d.js';
+import { ENEMY_GLB, enemyRig, GUN_GLB, TURRET_GLB, GRENADE_GLB } from '../data/models3d.js';
 import { getEnemyType } from '../data/enemies.js';
 import { bakeGun, bakeTurret } from './glbModels.js';
 import { FLARE } from '../data/balance.js';
@@ -80,7 +80,7 @@ function strikePose(e, S, time) {
     o.sy = 1 - imp; o.sxz = 1 + imp * 0.6;
     return o;
   }
-  const next = e.meleeAt > time ? e.meleeAt
+  const next = e.meleeAt > time ? e.meleeAt : e.spitAt > time ? e.spitAt // D62: the spit wind-up too
     : (e.attackingBeacon || (e.devTarget && e.devUntil > 0)) && e.nextAttackAt > time ? e.nextAttackAt : 0;
   if (next && next - time < S.wind) { // the wind-up: rears / pulls back / squats
     const w = 1 - (next - time) / S.wind, e3 = w * w * (3 - 2 * w);
@@ -397,12 +397,29 @@ export class Renderer3D {
     const enemyIds = Object.keys(ENEMY_GLB), gunIds = Object.keys(GUN_GLB);
     const turretKeys = [];
     for (const id in TURRET_GLB) TURRET_GLB[id].forEach((e, i) => turretKeys.push([`${id}@${i + 1}`, e]));
-    const [kp, enemies, guns, turrets] = await Promise.all([
+    const grenadeIds = Object.keys(GRENADE_GLB);
+    const [kp, enemies, guns, turrets, grenades] = await Promise.all([
       loadSkinnedGLB(KEEPER_MODEL.file),
       Promise.all(enemyIds.map((id) => loadGLB(ENEMY_GLB[id].file))),
       Promise.all(gunIds.map((id) => loadGLB(GUN_GLB[id].file))),
       Promise.all(turretKeys.map(([, e]) => loadGLB(e.file))),
+      Promise.all(grenadeIds.map((id) => loadGLB(GRENADE_GLB[id].file))),
     ]);
+    // D62: the user's grenade models in flight (one instanced mesh per type; the procedural ball stays the fallback)
+    this.grenadeModels = {};
+    grenadeIds.forEach((id, i) => {
+      const m = grenades[i];
+      if (!m) return;
+      bakeModel(m.geometry, GRENADE_GLB[id].height, 0);
+      m.geometry.translate(0, -GRENADE_GLB[id].height / 2, 0); // spins around its middle
+      const mesh = new THREE.InstancedMesh(m.geometry, new THREE.MeshLambertMaterial({ map: m.texture }), 16);
+      mesh.frustumCulled = false;
+      mesh.castShadow = true;
+      mesh.count = 0;
+      mesh.visible = false;
+      this.scene.add(mesh);
+      this.grenadeModels[id] = mesh;
+    });
     this.gunModels = {};
     gunIds.forEach((id, i) => {
       const m = guns[i];
@@ -506,6 +523,7 @@ export class Renderer3D {
     const flip = [];
     for (const id in this.enemyViews) { const b = this.enemyViews[id].body; if (!b.visible) { b.visible = true; flip.push(b); } }
     for (const pv of this.padViews || []) for (const key in pv.models) { const r = pv.models[key].root; if (!r.visible) { r.visible = true; flip.push(r); } }
+    for (const id in this.grenadeModels || {}) { const g = this.grenadeModels[id]; if (!g.visible) { g.visible = true; flip.push(g); } }
     return this.guard.warmUp().then(() => { for (const o of flip) o.visible = false; });
   }
 
@@ -1011,6 +1029,10 @@ export class Renderer3D {
       body.position.y = 0;
     } else this.keeperFall = 0;
     this.keeper.update({ weaponId: id, phase: w.phase, blend: p.alive && !p.dodging ? b : 0, moveRel: rel, kick, down });
+    // D62: poisoned (Spitter spit) — a sickly green pulse on the keeper
+    const poisoned = p.alive && p.poisonUntil > time;
+    const kc = this.keeper.mesh.material.color;
+    if (poisoned) { const k = 0.5 + 0.5 * Math.sin(time * 9); kc.setRGB(0.72 + 0.1 * k, 1, 0.62 + 0.1 * k); } else if (kc.r !== 1 || kc.b !== 1) kc.setRGB(1, 1, 1);
     this._gunKick(id, kick);
     this.weaponMesh.visible = p.alive;
   }
@@ -1110,20 +1132,33 @@ export class Renderer3D {
       this.aimDots.instanceMatrix.needsUpdate = true;
     }
 
-    // grenades in flight (same arc)
+    // grenades in flight (same arc): the user's model of the type (D62), tumbling; else the procedural ball
     let k = 0;
+    const gm = this.grenadeModels || {};
+    for (const id in gm) gm[id].count = 0;
     for (const g of gs.flying) {
-      if (k >= 16) break;
       const t = Math.min(1, Math.max(0, (time - g.t0) / (g.t1 - g.t0)));
       const d = Math.hypot(g.x1 - g.x0, g.y1 - g.y0);
       const H = GRENADE_RULES.arcHeight + d * 0.12;
       P.set(g.x0 + (g.x1 - g.x0) * t, 30 + 4 * H * t * (1 - t) - 26 * t, g.y0 + (g.y1 - g.y0) * t);
-      Q.setFromAxisAngle(UP, time * 9); S.setScalar(1);
+      S.setScalar(1);
+      const model = gm[g.type];
+      if (model) {
+        if (model.count >= 16) continue;
+        E.set(time * 11, time * 5, 0.4, 'YXZ'); // end over end while it flies
+        Q.setFromEuler(E);
+        M.compose(P, Q, S);
+        model.setMatrixAt(model.count++, M);
+        continue;
+      }
+      if (k >= 16) continue;
+      Q.setFromAxisAngle(UP, time * 9);
       M.compose(P, Q, S);
       this.grenadeMesh.setMatrixAt(k, M);
       this.grenadeMesh.setColorAt(k, rgbOf(g.type === 'frag' ? '#59616b' : g.type === 'cryo' ? '#8fd4ff' : '#c76a2a'));
       k++;
     }
+    for (const id in gm) { const m = gm[id]; m.visible = m.count > 0; if (m.count > 0) m.instanceMatrix.needsUpdate = true; }
     this.grenadeMesh.count = k;
     this.grenadeMesh.visible = k > 0;
     if (k > 0) {
@@ -1136,8 +1171,12 @@ export class Renderer3D {
     for (const gl of run.globs) {
       if (gn >= MAX_GLOBS) break;
       const t = Math.min(1, Math.max(0, (time - gl.t0) / (gl.t1 - gl.t0)));
-      const H = 60 + Math.hypot(gl.x1 - gl.x0, gl.y1 - gl.y0) * 0.25;
-      P.set(gl.x0 + (gl.x1 - gl.x0) * t, 26 + 4 * H * t * (1 - t) + 40 * t, gl.y0 + (gl.y1 - gl.y0) * t);
+      if (gl.keeper) { // D62 spit at the keeper: low and straight (chest height), drops at the end of its flight
+        P.set(gl.x0 + (gl.x1 - gl.x0) * t, 24 + 4 * 6 * t * (1 - t) - 18 * t * t, gl.y0 + (gl.y1 - gl.y0) * t);
+      } else {
+        const H = 60 + Math.hypot(gl.x1 - gl.x0, gl.y1 - gl.y0) * 0.25;
+        P.set(gl.x0 + (gl.x1 - gl.x0) * t, 26 + 4 * H * t * (1 - t) + 40 * t, gl.y0 + (gl.y1 - gl.y0) * t);
+      }
       Q.setFromAxisAngle(UP, -Math.atan2(gl.y1 - gl.y0, gl.x1 - gl.x0));
       S.setScalar(1 + 0.15 * Math.sin(time * 20 + gn));
       M.compose(P, Q, S);

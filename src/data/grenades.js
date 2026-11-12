@@ -11,6 +11,8 @@ export const GRENADES = {
   cryo: {
     id: 'cryo', nameKey: 'grenade.cryo', price: 20, requiredPlayerLevel: 2,
     radius: 90,
+    damage: 16,               // D62 (user decision): 35 % of the frag (45) on the blast
+    critChance: 0, critMultiplier: 1,
     slow: 0.55, slowDuration: 2.5,         // regular enemies
     bossSlow: 0.25, bossSlowDuration: 1.5, // the boss: weaker, never a freeze
   },

@@ -27,6 +27,11 @@ export class Player {
     this.dodgeDirX = 1;
     this.dodgeDirY = 0;
     this.invulnerableUntil = 0;
+    // D62 poison (Spitter spit): damage every poisonEvery s until poisonUntil
+    this.poisonUntil = 0;
+    this.poisonNextAt = 0;
+    this.poisonDamage = 0;
+    this.poisonEvery = 1;
     this.lastHitAt = -Infinity; // presentation: hurt flash
     this.damageTakenMult = 1;   // permanent ARMOR upgrade (−2% per rank), set from the loadout
   }
@@ -37,9 +42,9 @@ export class Player {
    * Incoming damage (02_SPEC §6): base → permanent Armor → (temporary armor, Phase 6) → invulnerability → HP.
    * @returns {number} damage actually applied (0 if ignored)
    */
-  applyDamage(amount, time, hitInvulnerability = PLAYER.hitInvulnerability) {
+  applyDamage(amount, time, hitInvulnerability = PLAYER.hitInvulnerability, ignoreInvulnerability = false) {
     if (!this.alive || !(amount > 0) || !Number.isFinite(amount)) return 0;
-    if (this.isInvulnerable(time)) return 0;
+    if (!ignoreInvulnerability && this.isInvulnerable(time)) return 0; // D62: poison ticks go through it
     const reduced = amount * (this.damageTakenMult > 0 ? this.damageTakenMult : 1);
     const applied = Math.min(this.hp, reduced);
     this.hp -= applied;

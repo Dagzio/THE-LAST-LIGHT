@@ -32,6 +32,13 @@ export const ENEMY_GLB = {
     rig: { hipY: 0.42, shoulderY: 0.69, shoulderZ: 0.11, armZ: 99, armMinY: 0.9, legSwing: 0.35 } },
 };
 
+/** D62: the user's grenade models in flight (height in game units; the old procedural ball was ≈ 11). */
+export const GRENADE_GLB = {
+  frag: { file: `${DIR}grenade.min.glb`, height: 11 },
+  cryo: { file: `${DIR}ice-grenade.min.glb`, height: 12 },
+  molotov: { file: `${DIR}molotov.min.glb`, height: 15 },
+};
+
 /** Rig in game units for a model entry (the shader works in the baked frame). */
 export function enemyRig(entry) {
   const H = entry.height, r = entry.rig;

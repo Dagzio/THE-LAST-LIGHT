@@ -70,6 +70,12 @@ function wireCombatSounds(events, game) {
   events.on('levelUp', () => Sfx.play('levelUp'));
   events.on('grenadeThrow', () => Sfx.play('throw'));
   events.on('grenadeBlast', (type) => Sfx.play(type === 'frag' ? 'boom' : type === 'cryo' ? 'freeze' : 'fire'));
+  // D62: the molotov fire crackles while it burns, fades when it goes out (oldest fire first)
+  const fires = [];
+  events.on('grenadeBlast', (type) => { if (type === 'molotov') { const h = Sfx.play('molotovFire', 1, { cut: true }); if (h) fires.push(h); } });
+  events.on('molotovOut', () => { const h = fires.shift(); if (h) h.stop(0.5); });
+  events.on('mapDefeat', () => { while (fires.length) fires.shift().stop(0.3); });
+  events.on('mapVictory', () => { while (fires.length) fires.shift().stop(0.3); });
   events.on('crateSpawn', () => Sfx.play('crate'));
   events.on('crateOpened', () => Sfx.play('crateOpen'));
   let lastRicochetAt = 0;
@@ -143,7 +149,7 @@ function wireCameraShake(game) {
   ev.on('grenadeBlast', (type) => shake(type === 'frag' ? 7 : 3, type === 'frag' ? 0.28 : 0.2));
   ev.on('bossImpact', (kind) => shake(kind === 'slam' ? 8 : 11, kind === 'slam' ? 0.3 : 0.42));
   ev.on('bossSummon', () => shake(5, 0.3));
-  ev.on('playerHit', () => shake(3, 0.15));
+  ev.on('playerHit', (x, y, amount, kind) => { if (kind !== 'poison') shake(3, 0.15); }); // D62: poison ticks do not shake
 }
 
 /** @param {{loaded: Promise<void>, shownAt: number}} boot */

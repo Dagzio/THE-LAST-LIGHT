@@ -12,6 +12,6 @@ export const PLAYER = {
   },
   // Short invulnerability after taking a hit, so one contact cannot drain HP every step.
   // PROVISIONAL (GDD: "короткое окно" without a number) — confirm with the enemy table before Phase 4.
-  hitInvulnerability: 0.6,
+  hitInvulnerability: 0.2, // D62 (user decision): was 0.6
   muzzleOffset: 24,         // px from the center to the pistol muzzle (visual + projectile origin)
 };

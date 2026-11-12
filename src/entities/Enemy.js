@@ -71,6 +71,8 @@ export class Enemy {
     this.globCount = 0;
     // D54 melee on the keeper: time of the next strike (0 = not fighting him)
     this.meleeAt = 0;
+    // D62 Spitter: time of the next spit at the keeper (0 = not spitting at him)
+    this.spitAt = 0;
   }
 
   isStunned(time) { return time < this.stunUntil; }

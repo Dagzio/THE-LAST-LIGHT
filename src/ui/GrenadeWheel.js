@@ -9,7 +9,10 @@ import { T } from '../i18n/i18n.js';
 import { Sfx } from '../platform/Sfx.js';
 
 export const WHEEL_TIME_SCALE = 0.05;      // the game runs at 5 % while the wheel is open
-const ANGLES = { frag: 180, cryo: -135, molotov: -90 }; // screen degrees from the button: left, up-left, up
+// screen degrees from the button. Touch: left, up-left, up (the button sits bottom-right, other buttons to its right);
+// desktop (D62): up-left, up, up-right — the button is in the middle of the action bar (DASH left, FLARE right)
+const TOUCH_ANGLES = { frag: 180, cryo: -135, molotov: -90 };
+const DESK_ANGLES = { frag: -140, cryo: -90, molotov: -40 };
 const DEAD = 16;                           // CSS px of slide before a direction counts (less = a tap)
 const CONE = 50;                           // degrees around a cell's direction that pick it
 
@@ -81,9 +84,10 @@ export class GrenadeWheel {
     const g = this.game, run = g.run;
     if (!g.sm.is(STATES.RUNNING) || !run) return false;
     if (run.grenades.total() === 0) { btn.classList.add('denied'); Sfx.play('deny'); return false; }
+    this.angles = btn.id === 'hudGrenade' ? DESK_ANGLES : TOUCH_ANGLES;
     const r = btn.getBoundingClientRect();
     this.cx = r.left + r.width / 2; this.cy = r.top + r.height / 2;
-    this.radius = Math.max(84, r.width * 1.45);
+    this.radius = Math.max(84, r.width * (btn.id === 'hudGrenade' ? 1.75 : 1.45)); // desktop: clear of DASH / FLARE below
     this.root.style.left = `${this.cx}px`;
     this.root.style.top = `${this.cy}px`;
     this.root.style.setProperty('--gw-r', `${this.radius}px`);
@@ -91,13 +95,16 @@ export class GrenadeWheel {
     this.root.style.setProperty('--gw-cell', `${size}px`);
     for (const t of GRENADE_ORDER) {
       const n = run.grenades.stock[t] | 0, c = this.cells[t];
-      const a = (ANGLES[t] * Math.PI) / 180; // cells fan out up / left of the button (it sits bottom-right)
+      const a = (this.angles[t] * Math.PI) / 180; // cells fan out up / left of the button (it sits bottom-right)
       c.el.style.left = `${Math.round(Math.cos(a) * this.radius - size / 2)}px`;
       c.el.style.top = `${Math.round(Math.sin(a) * this.radius - size / 2)}px`;
       c.count.textContent = String(n);
       c.el.classList.toggle('empty', n === 0);
       c.el.classList.remove('sel');
     }
+    const mid = (this.angles.cryo * Math.PI) / 180, nd = this.radius + size * 0.95; // the name: past the middle cell
+    this.name.style.left = `${Math.round(Math.cos(mid) * nd)}px`;
+    this.name.style.top = `${Math.round(Math.sin(mid) * nd)}px`;
     this.anchor = btn; this.via = via; this.sx = x; this.sy = y;
     this.sel = null; this.moved = false;
     this.open = true;
@@ -118,7 +125,7 @@ export class GrenadeWheel {
     // straight onto a cell (the mouse goes there) …
     const size = this.radius * 0.42;
     for (const t of GRENADE_ORDER) {
-      const a = (ANGLES[t] * Math.PI) / 180;
+      const a = (this.angles[t] * Math.PI) / 180;
       if (Math.hypot(x - (this.cx + Math.cos(a) * this.radius), y - (this.cy + Math.sin(a) * this.radius)) < size) pick = t;
     }
     // … or the direction of the slide (a thumb does not travel the whole way)
@@ -126,7 +133,7 @@ export class GrenadeWheel {
       const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
       let best = CONE;
       for (const t of GRENADE_ORDER) {
-        const d = Math.abs(((ang - ANGLES[t] + 540) % 360) - 180);
+        const d = Math.abs(((ang - this.angles[t] + 540) % 360) - 180);
         if (d < best) { best = d; pick = t; }
       }
     }
