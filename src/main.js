@@ -161,6 +161,8 @@ export function startGame(boot) {
 
   const game = new Game(document.getElementById('world'), document.getElementById('world3d'));
   const ui = new UIManager(game);
+  // D76: the menu beam waits for the background work — and for the menu itself (under the splash it is not seen yet)
+  game.menuBusy = () => game.sm.is(STATES.BOOT) || game.sm.is(STATES.TAP_TO_PLAY) || !!ui.prerendering || Sfx.busy;
   new HUD(game);
   new TouchControls(game);
   new GrenadeWheel(game); // D61

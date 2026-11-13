@@ -8,6 +8,13 @@ import { SeededRandom } from '../core/SeededRandom.js';
 import { beaconGeometry, beaconLanternGeometry, mergeParts } from './models.js';
 
 const HORIZON = new THREE.Color('#1a2638');
+// D76: the menu beam waits for the background work (map previews, sounds) — its sweep stuttered for 3–5 s on phones
+const BEAM_START = {
+  calmFrame: 0.05,  // s: a frame longer than this is not calm (the 30 FPS cap is 0.033)
+  calmTime: 0.4,    // s of calm frames after the work before the sweep starts
+  maxWait: 4,       // s after the work: start anyway on a device that never gets calm frames
+  ramp: 1.2,        // s to reach the full sweep speed
+};
 const MOON_DIR = new THREE.Vector3(-0.35, 0.32, -1).normalize();
 
 /** Sky: vertical gradient + stars + a faint milky band, painted once (screen background). */
@@ -214,6 +221,11 @@ export class MenuScene {
   /** @param {string} quality resolved preset @param {object} mats shared materials (models use vertex colours) */
   constructor(quality, mats) {
     const low = quality === 'low';
+    // D76: the beam starts sweeping only when the background work is over and the frames are calm (BEAM_START)
+    this.beamOn = false;
+    this.beamAngle = 0;
+    this.calm = 0;       // s of calm frames since the background work ended
+    this.beamRamp = 0;   // 0 → 1: the sweep speeds up softly instead of jumping to full speed
     this.scene = new THREE.Scene();
     this.scene.background = skyTexture();
     this.scene.fog = new THREE.FogExp2(HORIZON.getHex(), 0.00045);
@@ -328,9 +340,19 @@ export class MenuScene {
   }
 
   /** @param {number} t presentation seconds */
-  update(t) {
+  update(t, frameDt = 0, busy = false) {
     this.seaMat.uniforms.uTime.value = t;
-    this.beam.rotation.y = -t * (Math.PI * 2 / 14);
+    const dt = Math.min(0.1, Math.max(0, frameDt || 0));
+    if (!this.beamOn) {
+      this.calm = busy || dt > BEAM_START.calmFrame ? 0 : this.calm + dt;
+      this.idle = busy ? 0 : (this.idle || 0) + dt;
+      if (this.calm >= BEAM_START.calmTime || this.idle >= BEAM_START.maxWait) this.beamOn = true;
+    } else {
+      this.beamRamp = Math.min(1, this.beamRamp + dt / BEAM_START.ramp);
+      const k = this.beamRamp * this.beamRamp * (3 - 2 * this.beamRamp); // smoothstep
+      this.beamAngle += dt * k * (Math.PI * 2 / 14);
+    }
+    this.beam.rotation.y = -this.beamAngle;
     for (let i = 0; i < this.clouds.length; i++) {
       const c = this.clouds[i];
       c.position.x = ((-1600 + i * 1200 + t * (6 + i * 2)) % 5200) - 2000;

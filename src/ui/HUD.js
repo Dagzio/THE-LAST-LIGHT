@@ -252,8 +252,11 @@ export class HUD {
     this.introId = id;
     this.introUntil = time + INTRO_SECONDS;
     this._fillIntro(id);
-    const top = document.querySelector('#screen-game .hud-top'); // under the wave header (one layout read per card)
-    this.el.intro.style.top = `${Math.round((top ? top.getBoundingClientRect().bottom : 120) + 10)}px`;
+    if (this.game.touchMode) this.el.intro.style.top = ''; // D76: at the bottom on touch (CSS), off the hero
+    else {
+      const top = document.querySelector('#screen-game .hud-top'); // under the wave header (one layout read per card)
+      this.el.intro.style.top = `${Math.round((top ? top.getBoundingClientRect().bottom : 120) + 10)}px`;
+    }
     this.el.intro.classList.add('show');
     this.game.economy.markIntroSeen(id); // stored on show: it never repeats, even after a retry
   }

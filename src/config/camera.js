@@ -13,5 +13,6 @@ export const CAMERA = {
 };
 
 /** D74 (user decision): the mobile version sees the hero closer (≈ 1.28×) — phones are small and wide (20:9 saw
- *  937 × 422 units with the desktop numbers). The same camera otherwise. */
-export const CAMERA_TOUCH = { ...CAMERA, minViewWidth: 586, minViewHeight: 330 };
+ *  937 × 422 units with the desktop numbers). The same camera otherwise.
+ *  D76: +10 % closer again (586 × 330 → 533 × 300). */
+export const CAMERA_TOUCH = { ...CAMERA, minViewWidth: 533, minViewHeight: 300 };

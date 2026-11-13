@@ -268,6 +268,7 @@ export class UIManager {
   /** D53: renders every map preview in the background (one per tick, menus only); stops when a map starts. */
   _prerenderThumbs() {
     if (this.prerendering) return;
+    if (MAPS.every((m) => this.thumbs.get(m.id) && this.thumbs.get(m.id).dataset.ready)) return; // all done before
     this.prerendering = true;
     let i = 0;
     const next = () => {

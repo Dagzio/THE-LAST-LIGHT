@@ -17,6 +17,7 @@ export const Sfx = (() => {
   const muted = new Set(); // reasons: 'focus', 'orientation'
   const bufs = {};
   const files = {};        // name → {trim, gain} of a loaded recorded file
+  let warming = false, loading = 0; // D76: background audio work in progress (Sfx.busy)
   const voices = {};       // name → playing [{s, g}] (only for sounds with a voice limit)
   const loops = new Set(); // D56: playing loops (footsteps) — stopped on mute / sound off / rebuild
   const stopLoops = () => { for (const h of [...loops]) h.stop(); };
@@ -125,7 +126,13 @@ export const Sfx = (() => {
      * Loads recorded files (data/sounds.js → SFX_FILES). Until a file is decoded (or if it fails) the synthesized
      * sound of the same name — if any — keeps playing, so a missing file never silences the game.
      */
+    /** D76: true while sounds are still decoded / synthesized in the background (the menu waits with its beam). */
+    get busy() { return warming || loading > 0; },
     async loadFiles(map, dir) {
+      loading++;
+      try { await this._loadFiles(map, dir); } finally { loading--; }
+    },
+    async _loadFiles(map, dir) {
       const C = window.OfflineAudioContext || window.webkitOfflineAudioContext;
       let dec = null;
       try { dec = C ? new C(2, 1, 44100) : null; } catch (e) { dec = null; }
@@ -148,9 +155,10 @@ export const Sfx = (() => {
     prewarm() {
       const todo = SFX_NAMES.filter((n) => !bufs[n]);
       const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 16));
+      warming = true;
       const next = () => {
         const name = todo.shift();
-        if (!name) return;
+        if (!name) { warming = false; return; }
         if (!bufs[name]) bufs[name] = buildSfxBuffer(name, null) || undefined;
         idle(next);
       };

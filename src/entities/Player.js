@@ -19,6 +19,9 @@ export class Player {
     this.aimX = x;             // aim point on the ground (reticle), valid while hasAim
     this.aimY = y;
     this.hasAim = false;
+    // D76: where the body faces — the movement direction; the aim while shooting / aiming a grenade (FACING)
+    this.bodyAngle = 0;
+    this.faceAimUntil = 0;     // game-clock time until which the body keeps facing the aim after a shot
 
     this.dodging = false;
     this.dodgeEndsAt = 0;

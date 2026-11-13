@@ -22,6 +22,15 @@ export const PLAYER = {
  * D75 (user decision): no manual fire on mobile at all (the aim side only throws an armed grenade); the auto fire
  * shoots only at enemies already on the screen (the zoomed-in mobile camera shows less than the pistol's range).
  */
+/**
+ * D76 (user decision): the hero walks front first — the body faces the movement direction (stick / WASD) and turns
+ * to the aim only while shooting or aiming a grenade (and a moment after the last shot, so it does not flicker
+ * between the shots of a semi-auto gun). Standing still on PC he faces the cursor as before.
+ */
+export const FACING = {
+  aimHold: 0.35,            // s the body keeps facing the aim after the trigger is let go / the auto fire stops
+};
+
 export const AUTO_AIM = {
   rangeFactor: 0.95,        // of the weapon's range (the bullet starts at the muzzle, ahead of the keeper)
   switchRatio: 0.7,         // keep the current target unless another one is this much closer (no jitter)

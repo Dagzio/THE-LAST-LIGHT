@@ -369,6 +369,7 @@ export class Renderer3D {
     this.map = map;
     // A new run restarts the game clock at 0: drop every clock-based presentation state of the previous run
     // (an old shake end time made the camera fly off after RETRY).
+    this.bodyYaw = undefined; this.bodyYawTime = undefined; // D76
     this.shakeUntil = 0;
     this.lastSyncTime = 0;
     this.walk.lastTime = 0;
@@ -544,7 +545,11 @@ export class Renderer3D {
    * Menu backdrop in 3D (D46): splash, main menu and map select. Built on first use, kept for later visits.
    * @returns {boolean} false while the renderer is busy (context lost / warm-up) — the 2D backdrop is drawn instead
    */
-  renderMenu(t, frameDt) {
+  /**
+   * @param {boolean} busy D76: background work (map previews, sounds) is running — the lighthouse beam waits (its
+   *   sweep stuttered for 3–5 s on phones) and the frame rate is not measured (those slow frames are not the menu's).
+   */
+  renderMenu(t, frameDt, busy = false) {
     if (this.guard.busy() || this.env) return false;
     if (!this.menu) {
       this.menu = new MenuScene(this.quality, this.mats);
@@ -552,9 +557,9 @@ export class Renderer3D {
     }
     this._resize(false);
     this.menu.setAspect(this.camera.aspect);
-    this.menu.update(t);
+    this.menu.update(t, frameDt, busy);
     this.renderer.render(this.menu.scene, this.menu.camera);
-    this._adapt(frameDt);
+    if (busy || !this.menu.beamOn) { this.fpsAcc = 0; this.fpsFrames = 0; } else this._adapt(frameDt);
     return true;
   }
 
@@ -771,7 +776,13 @@ export class Renderer3D {
     const preset = QUALITY_PRESETS[this.quality];
 
     // Player (D52: the textured keeper falls when he dies — presentation time, the world is already stopped)
-    const aim = p.aimAngle;
+    // D76: the body faces where he walks (the aim while shooting) — p.bodyAngle, smoothed (turns in ~0.05 s)
+    const tgt = Number.isFinite(p.bodyAngle) ? p.bodyAngle : p.aimAngle;
+    const ydt = Math.min(0.1, Math.max(0, time - (this.bodyYawTime ?? time)));
+    this.bodyYawTime = time;
+    if (this.bodyYaw === undefined || !p.alive) this.bodyYaw = tgt;
+    else this.bodyYaw += Math.atan2(Math.sin(tgt - this.bodyYaw), Math.cos(tgt - this.bodyYaw)) * Math.min(1, ydt * 22);
+    const aim = this.bodyYaw;
     this.player.visible = p.alive || !!this.keeper;
     const ppx = this._lerpX(p), ppy = this._lerpY(p);
     this.player.position.set(ppx, 0, ppy);

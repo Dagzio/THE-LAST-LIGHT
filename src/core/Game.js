@@ -54,6 +54,8 @@ export class Game {
     this.loop.fpsCap = QUALITY_PRESETS[this.quality].fpsCap;
 
     this.presentationTime = 0;   // real time for menu decoration only (not simulation)
+    /** @type {(() => boolean) | null} D76: set by main.js — background work (map previews, sounds) still running */
+    this.menuBusy = null;
     /** @type {((run: MapRun, time: number) => void) | null} set by main.js: called after every simulation step */
     this.onSimStep = null;
     this.selectedMapId = MAPS[0].id;
@@ -125,7 +127,7 @@ export class Game {
     this.presentationTime += frameDt;
     if (this.sm.inMap && this.run && this.renderer3d) {
       this.renderer3d.render(this.run, frameDt, this.clock.time, !this.sm.is(STATES.RUNNING), alpha);
-    } else if (this.renderer3d && this.renderer3d.renderMenu(this.presentationTime, frameDt)) {
+    } else if (this.renderer3d && this.renderer3d.renderMenu(this.presentationTime, frameDt, !!(this.menuBusy && this.menuBusy()))) {
       document.body.classList.add('menu3d'); // D46: the 3D lighthouse scene is the menu backdrop
     } else {
       document.body.classList.remove('menu3d');

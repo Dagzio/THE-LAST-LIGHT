@@ -28,7 +28,7 @@ export const MAPS = [
     completionReward: 50, // coins, once on victory (03_ECONOMY §4)
     crateWaves: [2, 3], // D52: the first map has a crate on wave 3 and on wave 4, no other (learns the basics first)
     enemyHpMult: 0.8,     // D75: the first map is a little easier — enemy HP and damage −20 %
-    enemyDamageMult: 0.8,
+    enemyDamageMult: 0.72, // D76: damage another −10 % (0.8 × 0.9)
     bossHpMult: 1,
     rewardMult: 1.0,
     artSeed: 7331, // cosmetic decoration layout of the arena ground

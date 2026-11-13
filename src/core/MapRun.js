@@ -25,6 +25,7 @@ import { getEnemyType, scaledEnemyType } from '../data/enemies.js';
 import { getWaves } from '../data/waves.js';
 import { CAPS, ENEMY_FX } from '../data/balance.js';
 import { KIOSK } from '../data/kiosk.js';
+import { FACING } from '../data/player.js';
 import { WAVE_TIMING } from '../data/waves.js';
 import { BEACON } from '../data/beacon.js';
 import { defaultLoadout } from '../systems/Loadout.js';
@@ -320,6 +321,20 @@ export class MapRun {
   /** Leaving RUNNING (pause, shop, crate): an aim in progress is dropped, never thrown on resume (it stays armed). */
   cancelGrenadeAim() { this._gFire = false; this._gWaitUp = true; this.holdFire = false; this.grenadePreview.active = false; }
 
+  /**
+   * D76 (user decision): the body faces the movement direction; while shooting / aiming a grenade (and FACING.aimHold
+   * after) it faces the aim. Standing with a cursor (PC) it faces the cursor; standing on touch it keeps its facing.
+   * On touch without a target the aim follows the body (the reticle and the tap-throw point go where he looks).
+   */
+  _updateFacing(p, shooting, time) {
+    if (!p.alive) return;
+    if (shooting || this.grenadePreview.active) p.faceAimUntil = time + FACING.aimHold;
+    const moving = p.dodging || Math.hypot(p.vx, p.vy) > 1;
+    if (time < p.faceAimUntil || (!moving && p.hasAim && !this.autoFire)) p.bodyAngle = p.aimAngle;
+    else if (moving) p.bodyAngle = p.dodging ? Math.atan2(p.dodgeDirY, p.dodgeDirX) : Math.atan2(p.facingY, p.facingX);
+    if (this.autoFire && !this.autoAim.target && !this.grenadeArmed && time >= p.faceAimUntil) p.aimAngle = p.bodyAngle;
+  }
+
   /** Radius in which the keeper can open the shop (base × INTERACT RANGE). */
   get interactRadius() { return KIOSK.interactRadius * this.interactMult; }
 
@@ -543,9 +558,11 @@ export class MapRun {
     let fire = this.autoFire ? false : input.isDown('fire');
     if (this.autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, this.enemies, this.weapon.stats.range);
     else this.autoAim.reset();
-    this.weapons.update(this.weapon, p, fire && !this.holdFire && !this.grenadeArmed, input.consumePressed('reload'), time);
+    const shooting = fire && !this.holdFire && !this.grenadeArmed;
+    this.weapons.update(this.weapon, p, shooting, input.consumePressed('reload'), time);
     if (input.consumePressed('flare')) this.useFlare(time);
     this._grenadeInput(input, time);
+    this._updateFacing(p, shooting, time);
     this.light.update(this.beacon, this.enemies, time);
     if (this.ai.update(this.enemies, this.beacon, dt, time, p)) this._setDefeat('beacon');
     if (this.bossSystem.update(p, this.beacon, time)) this._setDefeat('beacon');
