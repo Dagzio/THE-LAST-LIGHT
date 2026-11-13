@@ -3,6 +3,7 @@
 import { STATES } from '../core/GameStateMachine.js';
 import { T, applyTranslations, onLanguageChange } from '../i18n/i18n.js';
 import { MAPS, getMap } from '../data/maps.js';
+import { WAVES } from '../data/waves.js';
 import { drawMapPreview } from '../render/MapPainter.js';
 import { layoutProps } from '../systems/Props.js';
 import { Sfx } from '../platform/Sfx.js';
@@ -362,7 +363,11 @@ export class UIManager {
     document.getElementById('mapName').textContent = T(map.nameKey);
     document.getElementById('mapDesc').textContent = T(map.descKey);
     document.getElementById('mapWaves').textContent = T('map.waves', { n: map.waveCount });
-    document.getElementById('mapBoss').textContent = T(map.finalWaveBoss ? 'map.boss' : 'map.elite');
+    // D75: a regular last wave (the first map) has no "final wave" fact
+    const last = (WAVES[map.id] || []).at(-1), lastKey = map.finalWaveBoss ? 'map.boss' : last && last.elite ? 'map.elite' : '';
+    const bossFact = document.getElementById('mapBoss');
+    bossFact.textContent = lastKey ? T(lastKey) : '';
+    bossFact.hidden = !lastKey;
     document.querySelector('[data-action="beginMap"]').disabled = locked;
   }
 

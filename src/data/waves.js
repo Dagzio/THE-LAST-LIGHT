@@ -12,51 +12,53 @@ export const WAVE_TIMING = {
 
 export const WAVES = {
   ashen_coast: [
-    { // 1 — 8 Grunt: learn to shoot and move
+    // D75 (user decision): the first map is a little easier — fewer enemies (was 8 / 11 / 13 / 17 + the boss wave),
+    // HP and damage −20 % (maps.js), and the 5th wave is a regular one instead of the Gloam Warden.
+    { // 1 — 6 Grunt: learn to shoot and move
       reward: 15,
       groups: [
-        { enemyId: 'grunt', count: 4, spawnInterval: 2.0, spawnPointGroup: 'north', initialDelay: 1.0 },
-        { enemyId: 'grunt', count: 4, spawnInterval: 2.0, spawnPointGroup: 'east', initialDelay: 5.0 },
+        { enemyId: 'grunt', count: 3, spawnInterval: 2.0, spawnPointGroup: 'north', initialDelay: 1.0 },
+        { enemyId: 'grunt', count: 3, spawnInterval: 2.0, spawnPointGroup: 'east', initialDelay: 5.0 },
       ],
     },
-    { // 2 — 8 Grunt + 3 Runner: pressure by speed
+    { // 2 — 6 Grunt + 2 Runner: pressure by speed
       reward: 20,
       groups: [
-        { enemyId: 'grunt', count: 4, spawnInterval: 1.8, spawnPointGroup: 'west', initialDelay: 1.0 },
-        { enemyId: 'grunt', count: 4, spawnInterval: 1.8, spawnPointGroup: 'south', initialDelay: 3.0 },
-        { enemyId: 'runner', count: 3, spawnInterval: 2.5, spawnPointGroup: 'north', initialDelay: 7.0 },
+        { enemyId: 'grunt', count: 3, spawnInterval: 1.8, spawnPointGroup: 'west', initialDelay: 1.0 },
+        { enemyId: 'grunt', count: 3, spawnInterval: 1.8, spawnPointGroup: 'south', initialDelay: 3.0 },
+        { enemyId: 'runner', count: 2, spawnInterval: 2.5, spawnPointGroup: 'north', initialDelay: 7.0 },
       ],
     },
-    { // 3 — 8 Grunt + 4 Runner + 1 Brute: target priority
+    { // 3 — 6 Grunt + 3 Runner + 1 Brute: target priority
       reward: 25,
       groups: [
-        { enemyId: 'grunt', count: 4, spawnInterval: 1.6, spawnPointGroup: 'north', initialDelay: 1.0 },
-        { enemyId: 'grunt', count: 4, spawnInterval: 1.6, spawnPointGroup: 'east', initialDelay: 2.5 },
+        { enemyId: 'grunt', count: 3, spawnInterval: 1.6, spawnPointGroup: 'north', initialDelay: 1.0 },
+        { enemyId: 'grunt', count: 3, spawnInterval: 1.6, spawnPointGroup: 'east', initialDelay: 2.5 },
         { enemyId: 'runner', count: 2, spawnInterval: 2.0, spawnPointGroup: 'south', initialDelay: 5.0 },
-        { enemyId: 'runner', count: 2, spawnInterval: 2.0, spawnPointGroup: 'west', initialDelay: 7.0 },
+        { enemyId: 'runner', count: 1, spawnInterval: 2.0, spawnPointGroup: 'west', initialDelay: 7.0 },
         { enemyId: 'brute', count: 1, spawnInterval: 1.0, spawnPointGroup: 'west', initialDelay: 9.0 },
       ],
     },
-    { // 4 — 10 Grunt + 5 Runner + 2 Brute: tests the shop / defenses
+    { // 4 — 8 Grunt + 4 Runner + 1 Brute: tests the shop / defenses
       reward: 30,
       groups: [
-        { enemyId: 'grunt', count: 5, spawnInterval: 1.5, spawnPointGroup: 'north', initialDelay: 1.0 },
-        { enemyId: 'grunt', count: 5, spawnInterval: 1.5, spawnPointGroup: 'south', initialDelay: 2.0 },
-        { enemyId: 'runner', count: 3, spawnInterval: 1.8, spawnPointGroup: 'east', initialDelay: 5.0 },
+        { enemyId: 'grunt', count: 4, spawnInterval: 1.5, spawnPointGroup: 'north', initialDelay: 1.0 },
+        { enemyId: 'grunt', count: 4, spawnInterval: 1.5, spawnPointGroup: 'south', initialDelay: 2.0 },
+        { enemyId: 'runner', count: 2, spawnInterval: 1.8, spawnPointGroup: 'east', initialDelay: 5.0 },
         { enemyId: 'runner', count: 2, spawnInterval: 1.8, spawnPointGroup: 'west', initialDelay: 8.0 },
-        { enemyId: 'brute', count: 1, spawnInterval: 1.0, spawnPointGroup: 'east', initialDelay: 6.0 },
-        { enemyId: 'brute', count: 1, spawnInterval: 1.0, spawnPointGroup: 'west', initialDelay: 14.0 },
+        { enemyId: 'brute', count: 1, spawnInterval: 1.0, spawnPointGroup: 'east', initialDelay: 10.0 },
       ],
     },
-    { // 5 — Gloam Warden + limited adds by boss HP
+    { // 5 — 9 Grunt + 4 Runner + 2 Brute: a regular last wave (no boss, no elite)
       reward: 50,
-      boss: true,
       groups: [
-        { enemyId: 'gloam_warden', count: 1, spawnInterval: 1.0, spawnPointGroup: 'north', initialDelay: 2.0 },
-        { enemyId: 'grunt', count: 4, spawnInterval: 1.5, spawnPointGroup: 'south', initialDelay: 4.0 },
-        { enemyId: 'runner', count: 3, spawnInterval: 1.5, spawnPointGroup: 'east', initialDelay: 0, bossHpBelow: 0.66 },
-        { enemyId: 'grunt', count: 4, spawnInterval: 1.5, spawnPointGroup: 'west', initialDelay: 0, bossHpBelow: 0.33 },
-        { enemyId: 'brute', count: 1, spawnInterval: 1.0, spawnPointGroup: 'north', initialDelay: 1.0, bossHpBelow: 0.33 },
+        { enemyId: 'grunt', count: 3, spawnInterval: 1.5, spawnPointGroup: 'north', initialDelay: 1.0 },
+        { enemyId: 'grunt', count: 3, spawnInterval: 1.5, spawnPointGroup: 'south', initialDelay: 2.5 },
+        { enemyId: 'grunt', count: 3, spawnInterval: 1.5, spawnPointGroup: 'west', initialDelay: 6.0 },
+        { enemyId: 'runner', count: 2, spawnInterval: 1.8, spawnPointGroup: 'east', initialDelay: 4.0 },
+        { enemyId: 'runner', count: 2, spawnInterval: 1.8, spawnPointGroup: 'north', initialDelay: 9.0 },
+        { enemyId: 'brute', count: 1, spawnInterval: 1.0, spawnPointGroup: 'east', initialDelay: 7.0 },
+        { enemyId: 'brute', count: 1, spawnInterval: 1.0, spawnPointGroup: 'west', initialDelay: 13.0 },
       ],
     },
   ],

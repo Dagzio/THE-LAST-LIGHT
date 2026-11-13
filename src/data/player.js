@@ -19,10 +19,12 @@ export const PLAYER = {
 /**
  * D74 (user decision): the mobile version shoots by itself — at the nearest enemy the equipped weapon can actually
  * reach (its range, the enemy's edge) and see (no tree / rock in the way). Only the gun: grenades stay manual.
- * A finger on the aim side still aims and fires by hand and wins over the auto aim.
+ * D75 (user decision): no manual fire on mobile at all (the aim side only throws an armed grenade); the auto fire
+ * shoots only at enemies already on the screen (the zoomed-in mobile camera shows less than the pistol's range).
  */
 export const AUTO_AIM = {
   rangeFactor: 0.95,        // of the weapon's range (the bullet starts at the muzzle, ahead of the keeper)
   switchRatio: 0.7,         // keep the current target unless another one is this much closer (no jitter)
   lineOfSight: true,        // never shoot into a tree while the enemy is behind it
+  viewInset: 12,            // CSS px: the enemy's centre must be this far inside the screen edge
 };

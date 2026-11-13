@@ -19,6 +19,7 @@ import { getDefense, upgradeBasePrice, MAX_DEVICE_LEVEL } from '../data/defenses
 import { shopPrice, sellRefund } from '../data/upgrades.js';
 import { getGrenade, GRENADE_RULES } from '../data/grenades.js';
 import { HEALS } from '../data/heals.js';
+import { AUTO_AIM } from '../data/player.js';
 import { SaveManager } from './SaveManager.js';
 import { Economy, REASON } from '../systems/Economy.js';
 import { nextMapId, isLastMap, defaultMapSelection, campaignSummary } from '../systems/Campaign.js';
@@ -40,6 +41,12 @@ export class Game {
     try {
       this.renderer3d = new Renderer3D(canvas3d, this.quality);
       this.renderer3d.aimClient = () => this.input.aim; // live cursor / finger for the reticle (read-only)
+      // D75: mobile auto fire — only at an enemy already on the screen (as of the last drawn frame; read-only)
+      const r3 = this.renderer3d, pt = { x: 0, y: 0 }, inset = AUTO_AIM.viewInset;
+      this.inView = (x, y) => {
+        r3.projectToScreen(x, y, 16, pt);
+        return pt.x >= inset && pt.x <= r3.viewW - inset && pt.y >= inset && pt.y <= r3.viewH - inset;
+      };
     } catch (e) {
       console.error('WebGL renderer could not be created', e); // the menus keep working; a map cannot start
     }
@@ -107,6 +114,7 @@ export class Game {
     }
     if (this.run) {
       this.run.autoFire = !!this.touchMode; // D74: the mobile version shoots by itself
+      this.run.autoAim.inView = this.inView || null; // D75: …at enemies on the screen only
       this.run.update(this.input, dt, this.clock.time);
       if (this.onSimStep) this.onSimStep(this.run, this.clock.time); // presentation on the sim clock (weapon audio)
     }

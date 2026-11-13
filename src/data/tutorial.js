@@ -18,7 +18,8 @@ export const TUTORIAL = {
     device: { icon: 'device', text: 'tut.device', target: { desk: null, touch: null } },
     crate: { icon: 'crate', text: 'tut.crate', target: { desk: null, touch: null } },
     flare: { icon: 'flare', text: 'tut.flare', touchText: 'tut.flare.touch', target: { desk: '.flare-hud', touch: '.flare-neon' } },
-    boss: { icon: 'boss', text: 'tut.boss', target: { desk: '#hudBoss', touch: '#hudBoss' } },
+    // D75: the first map has no boss any more — the boss hint shows at the first boss met in any map
+    boss: { icon: 'boss', text: 'tut.boss', target: { desk: '#hudBoss', touch: '#hudBoss' }, anyMap: true },
   },
 };
 

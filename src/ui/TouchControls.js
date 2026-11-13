@@ -72,6 +72,9 @@ export class TouchControls {
 
   _aimDown(e) {
     if (this.aimPointer !== null) return;
+    // D75 (user decision): no manual fire on mobile — the gun shoots by itself; a tap here only throws an armed grenade
+    const run = this.game.run;
+    if (!run || !run.grenadeArmed) return;
     this.aimPointer = e.pointerId;
     this.input.setAimClient(e.clientX, e.clientY);
     this.input.setSourceAction(SOURCE, 'fire', true);

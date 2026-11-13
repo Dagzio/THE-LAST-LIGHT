@@ -818,9 +818,8 @@ body.map-over .crate-prompt { display: none; }
 .kiosk-prompt.near { border-color: #ffd27a; box-shadow: 0 0 14px rgba(255, 200, 110, 0.7); color: #fff; }
 .kiosk-key { min-width: 20px; padding: 0 4px; text-align: center; color: #1a1206; background: #ffd27a; border-radius: 3px; }
 body.touch .kiosk-key { display: none; }
-/* Touch: the kiosk label is a hint only (the glowing cart button opens the shop) — taps go through to the map */
-body.touch .kiosk-prompt:not(.crate-prompt) { padding-left: 10px; pointer-events: none; }
-body.touch .crate-prompt { padding-left: 10px; }
+/* Touch: no key hint. D75 (user decision): a tap on the SHOP label opens the shop, like the crate label (in reach) */
+body.touch .kiosk-prompt { padding-left: 10px; }
 body.map-over .kiosk-prompt { display: none; }
 
 .toast {

@@ -297,6 +297,7 @@
 [data-lang="ar"] .map-info-name, [data-lang="ja"] .map-info-name { line-height: 1.3; }
 .map-info-desc { font-size: calc(18px * var(--fs)); line-height: 1.35; color: #c3cad1; }
 .map-info-facts { display: flex; flex-direction: column; gap: 0.4em; }
+.map-info-facts li[hidden] { display: none; } /* D75: no "final wave" fact for a regular last wave */
 .map-info-facts li {
   padding: 0.45em 0.7em;
   font-family: var(--font-display);

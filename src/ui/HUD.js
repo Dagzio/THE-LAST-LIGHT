@@ -181,7 +181,7 @@ export class HUD {
       if (this.pt.y - this.labelH < this.hudTopBottom + 6) { r3.projectToScreen(run.kiosk.x, run.kiosk.y, 0, this.pt); below = true; }
       on = this.pt.x > 0 && this.pt.x < W && this.pt.y > 0 && this.pt.y < H;
       // D63: never under a HUD block (the keeper block, corner buttons, stick…) — the texts would mix; the label is
-      // only a hint (the glowing cart button / E open the shop)
+      // also a button (D75: a tap opens the shop in reach), but the glowing cart button / E open it too
       if (on && this._underHud(el, this.pt.x, this.pt.y, below ? 0.3 : -1)) on = false;
     }
     if (on !== c.kioskOn) { c.kioskOn = on; el.classList.toggle('on', on); }

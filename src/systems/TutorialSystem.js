@@ -1,7 +1,8 @@
 // Tutorial director (D11 / D43): listens to gameplay events and shows each hint ONCE (seen ids live in the profile).
 // A hint in a running map pauses the world (state TUTORIAL) until GOT IT; inside the open shop it overlays the shop
 // (the shop already freezes the world). Skipping (after the confirmation) turns the whole tutorial off for good.
-// Only the first map and only while the profile flag is not done. It never changes gameplay data.
+// Only the first map (D75: except the boss hint — `anyMap`) and only while the profile flag is not done. It never
+// changes gameplay data.
 import { STATES } from '../core/GameStateMachine.js';
 import { TUTORIAL, TUTORIAL_STEP_IDS } from '../data/tutorial.js';
 
@@ -27,9 +28,12 @@ export class TutorialSystem {
     game.onFrame(() => this._poll());
   }
 
-  get enabled() {
+  get enabled() { return this._on(false); }
+
+  /** D75: a step with `anyMap` (the boss hint — the first map has no boss now) may show in any map. */
+  _on(anyMap) {
     const g = this.game, t = g.economy.profile.tutorial;
-    return !t.done && !!g.run && g.run.mapId === TUTORIAL.mapId && !g.run.over;
+    return !t.done && !!g.run && (anyMap || g.run.mapId === TUTORIAL.mapId) && !g.run.over;
   }
 
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
@@ -40,20 +44,20 @@ export class TutorialSystem {
 
   /** Queues a step if the tutorial is on and the step was never shown (`first`: ahead of the queue). */
   trigger(id, first = false) {
-    if (!TUTORIAL.steps[id] || !this.enabled || this._seen(id) || this.active === id || this.queue.includes(id)) return;
+    const step = TUTORIAL.steps[id];
+    if (!step || !this._on(!!step.anyMap) || this._seen(id) || this.active === id || this.queue.includes(id)) return;
     if (first) this.queue.unshift(id); else this.queue.push(id);
     this._next();
   }
 
   /** Conditions that are states, not events (checked each frame while the map runs). */
   _poll() {
-    if (!this.enabled) return;
     const g = this.game, r = g.run;
-    if (g.sm.is(STATES.RUNNING)) {
+    if (this.enabled && g.sm.is(STATES.RUNNING)) {
       if (!this._seen('light') && r.enemies.some((e) => e.alive && e.illuminated)) this.trigger('light');
       if (!this._seen('grenade') && r.grenades.total() > 0 && r.waves.phase === 'ACTIVE') this.trigger('grenade');
     }
-    if (!this.active && this.queue.length) this._next();
+    if (!this.active && this.queue.length) this._next(); // the queue is emptied when the map is left
   }
 
   _next() {

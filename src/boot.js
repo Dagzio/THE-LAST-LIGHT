@@ -16,7 +16,7 @@ const pct = document.getElementById('loadPct');
 // the picture itself: the logo between the lamp (left) and the moon, its bottom above the ground, never wider than the
 // gap between them; the bar low in the centre — kept on screen when the bottom of the picture is cut.
 // D74 (user decision): on screens wider than 16:9 the cut is shared — top and bottom evenly — but the top never goes
-// below the lighthouse lantern (`maxTop` of the picture height): more of the ground shows on wide phones.
+// below the lighthouse lantern (`maxTop` of the picture height): more of the ground shows on wide phones. D75: phones only.
 const ART = { w: 2500, h: 1407, x: 0.4, y: 0.335, ground: 0.55, gap: 0.41, barY: 0.857, barW: 0.465, maxTop: 0.065 };
 const inner = document.getElementById('splashInner');
 const bg = document.getElementById('splashBg');
@@ -27,7 +27,8 @@ function placeSplash() {
   const W = innerWidth, H = innerHeight, k = Math.max(W / ART.w, H / ART.h);
   const iw = ART.w * k, ih = ART.h * k, ox = (W - iw) / 2;
   const over = ih - H;                                               // > 0: wider than 16:9 — the height is cut
-  const top = over > 0.5 ? Math.min(over / 2, ART.maxTop * ih) : 0;
+  // D75: the shared cut is for phones only; the PC version keeps the picture anchored at the top (as before D74)
+  const top = MOBILE && over > 0.5 ? Math.min(over / 2, ART.maxTop * ih) : 0;
   const oy = -top;
   bg.style.objectPosition = over > 0.5 ? `50% ${((top / over) * 100).toFixed(2)}%` : '50% 0%';
   const bw = Math.min(iw * ART.barW, W * 0.8, 900);

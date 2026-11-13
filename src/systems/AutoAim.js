@@ -1,6 +1,7 @@
 // D74: auto aim for the mobile version — picks the nearest enemy within the weapon's range (to its edge) and in line
 // of sight, keeps it while it stays valid (switches only to a clearly closer one) and aims the keeper at it.
-// Pure simulation (no DOM): MapRun calls it on touch devices when no finger aims by hand.
+// Pure simulation (no DOM): MapRun calls it on touch devices. D75: only enemies already on the screen (inView), and
+// the mobile version has no manual fire at all.
 import { AUTO_AIM } from '../data/player.js';
 import { ENEMY_STATES } from '../entities/Enemy.js';
 
@@ -10,6 +11,8 @@ export class AutoAim {
     this.target = null;
     /** @type {import('./Collision.js').CollisionWorld|null} */
     this.world = null;
+    /** D75: (x, y) → true when that ground point is on the screen; set by Game (the camera is presentation) */
+    this.inView = null;
   }
 
   reset() { this.target = null; }
@@ -18,6 +21,7 @@ export class AutoAim {
     if (!e || !e.alive || e.state === ENEMY_STATES.SPAWNING) return false;
     const d = Math.hypot(e.x - p.x, e.y - p.y) - (e.radius || 0);
     if (!(d <= reach)) return false;
+    if (this.inView && !this.inView(e.x, e.y)) return false; // D75: never at an enemy still off the screen
     return !this.cfg.lineOfSight || !this.world || this.world.clear(p.x, p.y, e.x, e.y);
   }
 

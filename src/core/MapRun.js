@@ -538,9 +538,10 @@ export class MapRun {
     if (this.hpRegen > 0 && p.alive && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + this.hpRegen * dt);
     if (this.beaconRegen > 0) this.beacon.repair(this.beaconRegen * dt);
     // D61: no shooting while the grenade wheel is open or a grenade is armed (that shot throws it)
-    // D74: a finger aiming by hand wins; otherwise (touch) the gun aims and fires at the nearest reachable enemy
-    let fire = input.isDown('fire');
-    if (!fire && this.autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, this.enemies, this.weapon.stats.range);
+    // D74: on touch the gun aims and fires by itself at the nearest reachable enemy.
+    // D75 (user decision): the mobile version has no manual fire — the trigger there only throws an armed grenade.
+    let fire = this.autoFire ? false : input.isDown('fire');
+    if (this.autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, this.enemies, this.weapon.stats.range);
     else this.autoAim.reset();
     this.weapons.update(this.weapon, p, fire && !this.holdFire && !this.grenadeArmed, input.consumePressed('reload'), time);
     if (input.consumePressed('flare')) this.useFlare(time);
