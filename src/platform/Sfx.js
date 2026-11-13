@@ -152,17 +152,22 @@ export const Sfx = (() => {
      * Synthesizes every recipe ahead of time, one per idle slice (perf 2026-11-09): a sound used for the first time
      * (first hit, first kill, a boss slam…) was synthesized in the middle of the fight — a visible hitch.
      */
-    prewarm() {
+    prewarm(onProgress) {
       const todo = SFX_NAMES.filter((n) => !bufs[n]);
-      const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 16));
+      const total = todo.length || 1;
+      // D77: runs under the splash (after the recorded files), so it may take whole idle slices; resolves when done
+      const idle = window.requestIdleCallback ? (fn) => window.requestIdleCallback(fn, { timeout: 50 }) : (fn) => setTimeout(fn, 4);
       warming = true;
-      const next = () => {
-        const name = todo.shift();
-        if (!name) { warming = false; return; }
-        if (!bufs[name]) bufs[name] = buildSfxBuffer(name, null) || undefined;
+      return new Promise((resolve) => {
+        const next = () => {
+          const name = todo.shift();
+          if (!name) { warming = false; resolve(); return; }
+          if (!bufs[name]) bufs[name] = buildSfxBuffer(name, null) || undefined;
+          if (onProgress) onProgress(1 - todo.length / total);
+          idle(next);
+        };
         idle(next);
-      };
-      idle(next);
+      });
     },
     /** Rebuild: close the context; buffers stay (AudioBuffer plays in any context). */
     reset() { stopLoops(); closeCtx(ac); ac = null; for (const k in voices) voices[k].length = 0; },

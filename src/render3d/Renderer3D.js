@@ -764,6 +764,7 @@ export class Renderer3D {
     const fps = this.fpsFrames / this.fpsAcc;
     this.fpsAcc = 0;
     this.fpsFrames = 0;
+    this.adaptWindows = (this.adaptWindows || 0) + 1; // D77: the splash waits for one measured window on the menu
     const floor = QUALITY_PRESETS[this.quality].minPR;
     if (fps < 45 && this.pixelRatio > floor) {
       this.pixelRatio = Math.max(floor, this.pixelRatio - 0.25);

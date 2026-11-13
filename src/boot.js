@@ -2,7 +2,7 @@
 // then starts it. TAP TO PLAY replaces the bar only when everything is loaded; taps before that are ignored.
 import { installBrowserHygiene } from './platform/BrowserHygiene.js';
 import { applyTranslations } from './i18n/i18n.js';
-import { startPreload, onProgress, loaded, gameStarted, gameReady } from './loader.js';
+import { startPreload, onProgress, loaded, gameStarted, gameReady, warmProgress } from './loader.js';
 
 installBrowserHygiene();
 applyTranslations();
@@ -61,5 +61,5 @@ onProgress((p) => {
 
 startPreload()
   .then(() => import('./main.js'))
-  .then((m) => { gameStarted(); m.startGame({ loaded, shownAt }); gameReady(); })
+  .then((m) => { gameStarted(); m.startGame({ loaded, shownAt, warmProgress }); gameReady(); })
   .catch((e) => console.error('Game failed to start', e));

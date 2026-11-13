@@ -156,13 +156,11 @@ function wireCameraShake(game) {
 export function startGame(boot) {
   installBrowserHygiene();
   Music.init(MUSIC_FILES, MUSIC_BED);
-  Sfx.loadFiles(SFX_FILES, AUDIO_DIR); // recorded SFX (~120 KB) decode in the background; synth until then
-  Sfx.prewarm(); // synthesize the rest in idle time (no first-use hitch in a fight)
 
   const game = new Game(document.getElementById('world'), document.getElementById('world3d'));
   const ui = new UIManager(game);
-  // D76: the menu beam waits for the background work — and for the menu itself (under the splash it is not seen yet)
-  game.menuBusy = () => game.sm.is(STATES.BOOT) || game.sm.is(STATES.TAP_TO_PLAY) || !!ui.prerendering || Sfx.busy;
+  // D76: the menu beam waits for the background work (D77: that work runs under the splash now — warmUp)
+  game.menuBusy = () => !!ui.prerendering || Sfx.busy;
   new HUD(game);
   new TouchControls(game);
   new GrenadeWheel(game); // D61
@@ -186,4 +184,39 @@ export function startGame(boot) {
 
   game.start();
   ui.runSplash(boot);
+  warmUp(game, ui, boot.warmProgress || (() => {}));
+}
+
+/**
+ * D77 (user decision): everything the main menu would otherwise do in its first seconds runs under the splash, on the
+ * loading bar — the recorded sounds, then the synthesized rest; every map preview; the menu scene (it is already
+ * drawn behind the splash) with its beam started; one frame-rate window measured on it (adaptive resolution).
+ * Steps that cannot run (no WebGL) are skipped; a stalled step never blocks TAP TO PLAY (WARM.maxSeconds).
+ */
+const WARM = { sounds: 0.3, previews: 0.45, menu: 0.25, maxSeconds: 25, tuneSeconds: 4 };
+async function warmUp(game, ui, progress) {
+  const t0 = performance.now();
+  const late = () => (performance.now() - t0) / 1000 > WARM.maxSeconds;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  try {
+    await Sfx.loadFiles(SFX_FILES, AUDIO_DIR);                       // recorded files first: no wasted synthesis
+    progress(WARM.sounds * 0.4);
+    await Sfx.prewarm((k) => progress(WARM.sounds * (0.4 + 0.6 * k)));
+    progress(WARM.sounds);
+    const r3 = game.renderer3d;
+    if (r3) {
+      await ui._prerenderThumbs((k) => progress(WARM.sounds + WARM.previews * k));
+      progress(WARM.sounds + WARM.previews);
+      // the menu scene: its beam starts after calm frames, then one 2 s frame-rate window is measured on it
+      const w0 = r3.adaptWindows || 0, s0 = performance.now();
+      while (!late() && (performance.now() - s0) / 1000 < WARM.tuneSeconds && !((r3.adaptWindows || 0) > w0)) {
+        const k = Math.min(1, (performance.now() - s0) / 1000 / 2.6);
+        progress(WARM.sounds + WARM.previews + WARM.menu * 0.95 * k);
+        await sleep(100);
+      }
+    }
+  } catch (e) {
+    console.error('Warm-up step failed (the game still starts)', e);
+  }
+  progress(1);
 }

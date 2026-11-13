@@ -265,16 +265,23 @@ export class UIManager {
     return true;
   }
 
-  /** D53: renders every map preview in the background (one per tick, menus only); stops when a map starts. */
-  _prerenderThumbs() {
-    if (this.prerendering) return;
-    if (MAPS.every((m) => this.thumbs.get(m.id) && this.thumbs.get(m.id).dataset.ready)) return; // all done before
-    this.prerendering = true;
+  /**
+   * D53: renders every map preview in the background (one per tick, menus only); stops when a map starts.
+   * D77: called under the splash (warm-up) — resolves when done; `onProgress(0…1)` per map. Opening the main menu
+   * calls it again: a no-op when every preview is ready (a preview the renderer could not draw is retried there).
+   */
+  _prerenderThumbs(onProgress) {
+    if (this.prerendering) return this.prerendering;
+    if (MAPS.every((m) => this.thumbs.get(m.id) && this.thumbs.get(m.id).dataset.ready)) return Promise.resolve();
+    let finish;
+    this.prerendering = new Promise((res) => { finish = res; });
+    const done = () => { this.prerendering = null; finish(); };
     let i = 0;
     const next = () => {
-      if (this.game.sm.inMap) { this.prerendering = false; return; } // resumes the next time the menu opens
+      if (onProgress) onProgress(i / MAPS.length);
+      if (this.game.sm.inMap) { done(); return; } // resumes the next time the menu opens
       while (i < MAPS.length && this.thumbs.get(MAPS[i].id) && this.thumbs.get(MAPS[i].id).dataset.ready) i++;
-      if (i >= MAPS.length) { this.prerendering = false; return; }
+      if (i >= MAPS.length) { done(); return; }
       const map = MAPS[i++];
       let c = this.thumbs.get(map.id);
       if (!c) {
@@ -286,6 +293,7 @@ export class UIManager {
       setTimeout(next, 40);
     };
     setTimeout(next, 200); // after the menu's first frames
+    return this.prerendering;
   }
 
   /** Rebuilt when map select opens / the language changes: starts on the game's selected (unlocked) map. */

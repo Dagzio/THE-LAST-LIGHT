@@ -2,10 +2,13 @@
 // the engine (three.js is most of the bytes) with real byte progress, then the game modules are evaluated and the
 // game reports "ready". TAP TO PLAY appears only after 100%. Files that fail do not stall the bar.
 
-const CODE = [['lib/three.module.js', 80]];   // [url, share of the bar]
-const W_GAME = 20;                            // game modules evaluated (½) + renderer created / UI built (1)
+// D77 (user decision): the splash also waits for the warm-up — sounds, every map preview, the menu scene and the
+// adaptive resolution measured on it — so the main menu runs smoothly at once (a longer bar is fine).
+const CODE = [['lib/three.module.js', 50]];   // [url, share of the bar]
+const W_GAME = 10;                            // game modules evaluated (½) + renderer created / UI built (1)
+const W_WARM = 40;                            // warm-up (main.js warmUp → warmProgress)
 
-const S = { tasks: [], subs: new Set(), gameTask: null };
+const S = { tasks: [], subs: new Set(), gameTask: null, warmTask: null };
 S.loaded = new Promise((resolve) => { S.finish = resolve; });
 
 export const loaded = S.loaded;
@@ -47,10 +50,13 @@ async function get(url, t) {
 
 export const gameStarted = () => S.gameTask && set(S.gameTask, 0.5);
 export const gameReady = () => S.gameTask && set(S.gameTask, 1);
+/** D77: warm-up progress 0…1 (1 = done; the bar reaches 100 % and TAP TO PLAY may appear). */
+export const warmProgress = (p) => S.warmTask && set(S.warmTask, p);
 
 /** Starts the downloads; resolves when the code is in the cache. */
 export function startPreload() {
   const code = Promise.all(CODE.map(([url, w]) => get(url, task(w))));
   S.gameTask = task(W_GAME);
+  S.warmTask = task(W_WARM);
   return code;
 }
