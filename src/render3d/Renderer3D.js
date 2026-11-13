@@ -32,8 +32,8 @@ import { getEnemyType } from '../data/enemies.js';
 import { bakeGun, bakeTurret } from './glbModels.js';
 import { FLARE } from '../data/balance.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
-import { CAMERA } from '../config/camera.js';
-import { QUALITY_PRESETS, antialiasFor } from '../config/settings.js';
+import { CAMERA, CAMERA_TOUCH } from '../config/camera.js';
+import { QUALITY_PRESETS, antialiasFor, TOUCH } from '../config/settings.js';
 import { ENEMY_FX } from '../data/balance.js';
 import { PLAYER } from '../data/player.js';
 
@@ -161,7 +161,7 @@ export class Renderer3D {
     this.scene.background = new THREE.Color(0x070a12);
     this.scene.fog = new THREE.Fog(0x070a12, 1100, 2300);
     this.camera = new THREE.PerspectiveCamera(CAMERA.fov, 16 / 9, CAMERA.near, CAMERA.far);
-    this.rig = new CameraRig();
+    this.rig = new CameraRig(TOUCH ? CAMERA_TOUCH : CAMERA); // D74: closer on touch devices
     this.mats = createMaterials();
 
     // Lights: cold night sky + moon (shadows) + the keeper's amber lantern.

@@ -34,6 +34,7 @@ import { GrenadeSystem } from '../systems/GrenadeSystem.js';
 import { PoisonSystem } from '../systems/PoisonSystem.js';
 import { CrateSystem } from '../systems/CrateSystem.js';
 import { GRENADE_RULES } from '../data/grenades.js';
+import { AutoAim } from '../systems/AutoAim.js';
 import { CRATE, PERKS } from '../data/perks.js';
 
 const MAX_ENEMIES = 80; // hard cap of live entities (performance guard; waves stay far below it)
@@ -113,6 +114,9 @@ export class MapRun {
     this._gWaitUp = false;
     this._gFire = false;
     this.holdFire = false; // D61: the grenade wheel is open (no shooting)
+    // D74: the mobile version fires by itself at the nearest enemy in range (Game sets autoFire on touch devices)
+    this.autoFire = false;
+    this.autoAim = new AutoAim();
     this.lastTime = 0;
     this.waves = new WaveSystem(getWaves(map.id) || [], map.spawnPoints, this.rng, events,
       (id, x, y, time) => this._spawnEnemy(id, x, y, time));
@@ -177,6 +181,7 @@ export class MapRun {
     this.ai.world = this.world;
     this.projectileSystem.world = this.world;
     this.defenses.world = this.world;
+    this.autoAim.world = this.world;
     this.crates.world = this.world;
     this.world.pushOut(this.player);
     this.waves.start(0);
@@ -533,7 +538,11 @@ export class MapRun {
     if (this.hpRegen > 0 && p.alive && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + this.hpRegen * dt);
     if (this.beaconRegen > 0) this.beacon.repair(this.beaconRegen * dt);
     // D61: no shooting while the grenade wheel is open or a grenade is armed (that shot throws it)
-    this.weapons.update(this.weapon, p, input.isDown('fire') && !this.holdFire && !this.grenadeArmed, input.consumePressed('reload'), time);
+    // D74: a finger aiming by hand wins; otherwise (touch) the gun aims and fires at the nearest reachable enemy
+    let fire = input.isDown('fire');
+    if (!fire && this.autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, this.enemies, this.weapon.stats.range);
+    else this.autoAim.reset();
+    this.weapons.update(this.weapon, p, fire && !this.holdFire && !this.grenadeArmed, input.consumePressed('reload'), time);
     if (input.consumePressed('flare')) this.useFlare(time);
     this._grenadeInput(input, time);
     this.light.update(this.beacon, this.enemies, time);

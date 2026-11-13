@@ -6,7 +6,7 @@ import { STATES } from '../core/GameStateMachine.js';
 
 const SOURCE = 'touch';
 const STICK_ZONE = 0.45;     // left 45% of the screen width starts the stick
-const STICK_RADIUS = 56;     // CSS px of thumb travel for full speed
+const STICK_RADIUS = 50;     // CSS px of thumb travel for full speed (D74: the stick is 10 % smaller)
 const DEAD_ZONE = 0.12;
 
 export class TouchControls {
@@ -23,7 +23,7 @@ export class TouchControls {
     this.baseY = 0;
 
     const coarse = matchMedia('(pointer: coarse)');
-    const markTouch = () => document.body.classList.add('touch');
+    const markTouch = () => { document.body.classList.add('touch'); game.touchMode = true; }; // D74: auto fire on touch
     if (coarse.matches) markTouch();
     window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') markTouch(); }, true);
 

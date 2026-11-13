@@ -106,6 +106,7 @@ export class Game {
       if (this.run.canShop) { this.openShop(); return; }
     }
     if (this.run) {
+      this.run.autoFire = !!this.touchMode; // D74: the mobile version shoots by itself
       this.run.update(this.input, dt, this.clock.time);
       if (this.onSimStep) this.onSimStep(this.run, this.clock.time); // presentation on the sim clock (weapon audio)
     }

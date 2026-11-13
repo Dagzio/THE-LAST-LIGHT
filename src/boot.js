@@ -15,14 +15,21 @@ const pct = document.getElementById('loadPct');
 // bottom, a narrower one the sides evenly), so the logo column, the loading bar and TAP TO PLAY are placed by points of
 // the picture itself: the logo between the lamp (left) and the moon, its bottom above the ground, never wider than the
 // gap between them; the bar low in the centre — kept on screen when the bottom of the picture is cut.
-const ART = { w: 2500, h: 1407, x: 0.4, y: 0.335, ground: 0.55, gap: 0.41, barY: 0.857, barW: 0.465 };
+// D74 (user decision): on screens wider than 16:9 the cut is shared — top and bottom evenly — but the top never goes
+// below the lighthouse lantern (`maxTop` of the picture height): more of the ground shows on wide phones.
+const ART = { w: 2500, h: 1407, x: 0.4, y: 0.335, ground: 0.55, gap: 0.41, barY: 0.857, barW: 0.465, maxTop: 0.065 };
 const inner = document.getElementById('splashInner');
+const bg = document.getElementById('splashBg');
 // D70: the mobile version has a 20 % bigger logo (styles/ui.css) — it may reach a little past the lamp-moon gap
 const MOBILE = typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
 function placeSplash() {
   if (!splash.classList.contains('active')) return;
   const W = innerWidth, H = innerHeight, k = Math.max(W / ART.w, H / ART.h);
-  const iw = ART.w * k, ih = ART.h * k, ox = (W - iw) / 2, oy = 0;   // object-position: 50% 0%
+  const iw = ART.w * k, ih = ART.h * k, ox = (W - iw) / 2;
+  const over = ih - H;                                               // > 0: wider than 16:9 — the height is cut
+  const top = over > 0.5 ? Math.min(over / 2, ART.maxTop * ih) : 0;
+  const oy = -top;
+  bg.style.objectPosition = over > 0.5 ? `50% ${((top / over) * 100).toFixed(2)}%` : '50% 0%';
   const bw = Math.min(iw * ART.barW, W * 0.8, 900);
   const bh = Math.max(14, bw * 0.052);
   const barY = Math.min(oy + ih * ART.barY, H * 0.875);              // on screen even when the bottom is cut
