@@ -67,11 +67,12 @@ export class Renderer3D {
     this.mats = createMaterials();
 
     // office lighting: cool ambient from above + one key light with shadows (follows the camera)
-    this.hemi = new THREE.HemisphereLight(0xdde6f5, 0x2b2722, 1.05);
-    this.sun = new THREE.DirectionalLight(0xfff1de, 1.25);
+    this.hemi = new THREE.HemisphereLight(0xdde6f5, 0x2b2722, 0.9);
+    this.sun = new THREE.DirectionalLight(0xfff1de, 1.6); // D79: a stronger key light — the furniture shadows read
     this.sun.shadow.camera.near = 50;
     this.sun.shadow.camera.far = 2000;
-    this.sun.shadow.bias = -0.0006;
+    this.sun.shadow.bias = -0.0005;
+    this.sun.shadow.radius = 3;
     this.sun.shadow.normalBias = 0.5;
     this.scene.add(this.hemi, this.sun, this.sun.target);
 
@@ -160,10 +161,10 @@ export class Renderer3D {
     return m;
   }
 
-  _newView(key, tint, gunId, scale = 1) {
+  _newView(key, tint, gunId, scale = 1, variant = 0) {
     const tpl = this.templates && this.templates[key];
     if (!tpl) return null;
-    const v = tpl.instantiate(this._material(tpl, tint));
+    const v = tpl.instantiate(this._material(tpl, tint), variant);
     if (scale !== 1) v.wrap.scale.multiplyScalar(scale);
     for (const [id, g] of Object.entries(this.gunGeos || {})) v.addGun(id, g.geometry, g.material, g.length);
     const flash = new THREE.Mesh(this.flashGeo, this.flashMat);
@@ -363,6 +364,7 @@ export class Renderer3D {
     this.unloadMap();
     this.map = level;
     this.bodyYaw = undefined;
+    this.gAimAt = undefined;
     this.shakeUntil = 0;
     this.lastSyncTime = 0;
     this.heroDeadAge = 0;
@@ -541,9 +543,8 @@ export class Renderer3D {
     let v = this.views.get(e.id);
     if (!v) {
       const L = e.type;
-      v = this._newView('enemy', L.tint ?? 0xffffff, gunModelOf(e.gun ? e.gun.stats.id : 'enemy_rifle'), L.scale || 1);
+      v = this._newView('enemy', L.tint ?? 0xffffff, gunModelOf(e.gun ? e.gun.stats.id : 'enemy_rifle'), L.scale || 1, Math.abs(e.id));
       if (!v) return null;
-      v.relaxedWalk = 'walk';
       if (e.id >= 0) this.views.set(e.id, v);
     }
     return v;
@@ -566,13 +567,20 @@ export class Renderer3D {
     const moveDir = Math.atan2(p.vy, p.vx);
     const w = run.weapon;
     if (!p.alive) this.heroDeadAge += this.frameDt || 0; else this.heroDeadAge = 0;
+    const gAim = run.grenadePreview.active;
+    if (gAim && this.gAimAt === undefined) this.gAimAt = time;
+    if (!gAim) this.gAimAt = undefined;
     h.update(p.alive ? dt : (this.frameDt || 0), {
       speed: p.dodging ? 0 : Math.min(speed, 200),
-      moveDot: speed > 1 ? Math.cos(moveDir - this.bodyYaw) : 1,
-      aim: run.heroAiming || run.grenadePreview.active,
+      moveRel: speed > 1 ? moveDir - this.bodyYaw : 0,
+      aim: run.heroAiming,
       reload: w.reloading ? w.reloadProgress(time) : -1,
       hitAge: time - p.lastHitAt,
       deadAge: p.alive ? -1 : this.heroDeadAge,
+      shotAge: time - w.lastShotAt,
+      throwAim: gAim,
+      throwAimAge: gAim ? time - this.gAimAt : 0,
+      throwAge: time - run.grenades.lastThrowAt,
     });
     h.group.position.set(hx, 0, hy);
     h.group.rotation.y = -(this.bodyYaw - h.aimYaw);
@@ -603,7 +611,9 @@ export class Renderer3D {
       const sp = e.alive ? Math.hypot(e.vx, e.vy) : 0;
       v.update(dt, {
         speed: sp,
-        moveDot: sp > 1 ? Math.cos(Math.atan2(e.vy, e.vx) - e.faceAngle) : 1,
+        moveRel: sp > 1 ? Math.atan2(e.vy, e.vx) - e.faceAngle : 0,
+        shotAge: time - g.lastShotAt,
+        throwAge: Infinity,
         aim: e.alive && ai.mode === 'combat',
         reload: g.reloading ? Math.min(1, (time - g.reloadStartedAt) / Math.max(0.01, g.reloadEndsAt - g.reloadStartedAt)) : -1,
         hitAge: time - e.lastHitAt,
@@ -655,7 +665,7 @@ export class Renderer3D {
     for (const pr0 of run.projectiles.items) {
       if (!pr0.active || b >= MAX_BULLETS) continue;
       Q.setFromAxisAngle(UP, -pr0.angle);
-      P.set(pr0.x, 42, pr0.y); S.setScalar(1);
+      P.set(pr0.x, 41, pr0.y); S.setScalar(1);
       M.compose(P, Q, S);
       this.bullets.setColorAt(b, pr0.hostile ? ENEMY_TRACER : HERO_TRACER);
       this.bullets.setMatrixAt(b++, M);

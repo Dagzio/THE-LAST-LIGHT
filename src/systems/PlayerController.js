@@ -53,7 +53,8 @@ export class PlayerController {
       player.vx = player.dodgeDirX * PLAYER.dodge.speed;
       player.vy = player.dodgeDirY * PLAYER.dodge.speed;
     } else {
-      const speed = PLAYER.moveSpeed * this.speedMult;
+      const aiming = time < player.faceAimUntil; // D79: slower while shooting / aiming
+      const speed = PLAYER.moveSpeed * this.speedMult * (aiming ? PLAYER.aimMoveMult : 1);
       player.vx = move.x * speed; // |move| ≤ 1 → diagonal is never faster
       player.vy = move.y * speed;
     }

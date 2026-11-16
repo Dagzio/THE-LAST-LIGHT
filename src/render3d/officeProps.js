@@ -111,6 +111,23 @@ function monitor(b, x, z, tile, w = 18, ry = 0, y = 23) {
   b.quad('screen', tile, w - 1.4, 9.6, x + s * 0.8, y + 11.5, z - 1.5 + c * 0.8, { ry });
 }
 
+/** A stable small number from a prop's position (desk clutter, monitor layout variety). */
+function variant(p) { return p ? Math.abs(Math.round(p.x * 7 + p.y * 13)) % 7 : 0; }
+
+/** Things on a desk (the catalogue: mugs, papers, lamps, small plants, photos). */
+function deskClutter(b, v) {
+  const mug = (x, z) => { b.cyl('white', 1.6, 1.4, 3.2, x, 23, z, 8); b.quad('decal', TILE.mug, 3, 3, x, 26.3, z, { rx: -Math.PI / 2 }); };
+  switch (v) {
+    case 0: mug(-22, 6); b.decal('decal', TILE.papers, 12, 9, 17, -1, 23.3, 0.4); break;
+    case 1: b.cyl('pot', 2.4, 2, 4, -24, 23, -6, 8); b.blob('plantLight', 3, 1.2, 1, 1.2, -24, 29, -6); mug(20, -4); break;
+    case 2: b.box('black', 6, 5, 1, 21, 23, -8, { rx: -0.25 }); b.quad('decal', TILE.photo, 5, 4, 21, 26, -7.4, { rx: -0.25 }); mug(-21, 5); break;
+    case 3: b.box('metalDark', 4, 1, 4, -23, 23, -8).box('chrome', 1, 10, 1, -23, 24, -8).box('lightstrip', 5, 1.5, 3, -21, 33, -6); break;
+    case 4: b.box('white', 9, 4, 6, 24, 23, -9).box('binder', 2.5, 8, 7, -25, 23, -8); break;
+    case 5: b.decal('decal', TILE.papers, 14, 10, -16, 3, 23.3, -0.5); mug(23, 4); break;
+    default: b.box('white', 9, 4, 6, 25, 23, -9); break;
+  }
+}
+
 function swivelChair(b, color = 'leather') {
   for (let k = 0; k < 5; k++) b.box('metalDark', 1.4, 1.4, 9, 0, 1, 0, { ry: (k * Math.PI * 2) / 5 }).box('black', 2, 2, 2, Math.sin((k * Math.PI * 2) / 5) * 8, 0, Math.cos((k * Math.PI * 2) / 5) * 8);
   b.cyl('chrome', 1, 1, 10, 0, 2, 0, 6);
@@ -133,14 +150,16 @@ function meetingChair(b) {
 const BUILD = {
   desk(b) { deskFrame(b, 60, 30, 23); },
 
-  workstation(b) {
+  workstation(b, p) {
     deskFrame(b, 60, 30, 23);
-    monitor(b, -9, -9, TILE.screenMap); monitor(b, 10, -9, TILE.screenCode, 18, -0.25);
+    const v = variant(p);
+    if (v % 3 === 2) monitor(b, 0, -9, TILE.screenMap, 22);     // one big screen
+    else { monitor(b, -9, -9, TILE.screenMap); monitor(b, 10, -9, TILE.screenCode, 18, -0.25); }
     b.quad('decal', TILE.keyboard, 22, 7, 0, 23.2, 3, { rx: -Math.PI / 2 });
     b.box('black', 3, 1.2, 4.5, 15, 23, 3);                     // mouse
     b.box('black', 9, 20, 22, 22, 0, -2).quad('screen', TILE.serverFront, 1.2, 1.2, 22, 16, 9.1); // PC tower + LED
     b.box('metalDark', 14, 16, 22, -20, 0, 2);                  // drawer unit
-    b.box('white', 9, 4, 6, 25, 23, -9);                        // document tray
+    deskClutter(b, v);
   },
 
   exec_desk(b) {
@@ -373,6 +392,30 @@ const BUILD = {
     b.box('metalDark', 8, 3, 6, 9, 0, -9);
   },
 
+  partition(b) {
+    b.box('metalDark', 124, 1.6, 2.4, 0, 22, 0);
+    b.box('frost', 122, 13, 1.2, 0, 23.5, 0);
+    b.box('metalDark', 124, 1.4, 2.4, 0, 36, 0);
+  },
+
+  lockers(b) {
+    b.box('metal', 60, 60, 18, 0, 0, 0);
+    b.quad('decal', TILE.lockers, 58, 56, 0, 30, 9.1);
+    b.box('metalDark', 60, 2, 18, 0, 60, 0);
+  },
+
+  floor_lamp(b) {
+    b.cyl('metalDark', 6, 6, 1.4, 0, 0, 0, 12);
+    b.cyl('chrome', 0.8, 0.8, 52, 0, 1, 0, 6);
+    b.cyl('cream', 5, 8, 9, 0, 52, 0, 12);
+    b.cyl('lightstrip', 6.6, 6.6, 0.4, 0, 52.2, 0, 12);
+  },
+
+  rug_large(b) { b.decal('rug', TILE.rugRed, 170, 110, 0, 0, 0.3); },
+  rug_small(b) { b.decal('rug', TILE.rugGrey, 100, 66, 0, 0, 0.3); },
+
+  wall_clock(b) { b.cyl('black', 7, 7, 1.6, 0, 55, 0, 16, { rx: Math.PI / 2 }); b.quad('decal', TILE.clock, 13, 13, 0, 55, 1.75); },
+
   stairs(b) {
     for (let k = 0; k < 6; k++) b.box('concrete', 120, 1 + k * 0.2, 11, 0, 0, -30 + k * 11.6, { tile: 40 });
     b.box('lightstrip', 120, 0.6, 1.2, 0, 0.8, -35);
@@ -386,5 +429,5 @@ export function buildProp(b, p) {
   const fn = BUILD[p.type];
   if (!fn) { console.warn('office prop without a model', p.type); return; }
   b.place(p.x, p.y, p.rot | 0);
-  fn(b);
+  fn(b, p);
 }

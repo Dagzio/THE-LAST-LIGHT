@@ -5,9 +5,9 @@
 import * as THREE from '../../lib/three.module.js';
 import { PropBuilder, PROP_BUILDERS } from '../render3d/officeProps.js';
 import { officeMaterials } from '../render3d/OfficeScene.js';
-import { PROP_TYPES } from '../data/props.js';
+import { PROP_TYPES, propBlocks } from '../data/props.js';
 
-const CLIPS = ['idle', 'walk', 'walkFire', 'reload', 'hit', 'die'];
+const CLIPS = ['idle', 'walk', 'run', 'back', 'strafeL', 'strafeR', 'fire', 'reload', 'hit', 'throw', 'pIdle', 'pWalk', 'pRun', 'die', 'die2'];
 const CSS = `
 #dbg-models-btn { position: fixed; right: max(30px, env(safe-area-inset-right)); bottom: 30px; z-index: 9000;
   font: 800 13px/1 system-ui, sans-serif; color: #fff; background: rgba(10, 20, 40, .82); border: 1px dashed #ffd166;
@@ -100,18 +100,19 @@ async function open() {
       if (!tpl) { info.textContent = 'model not loaded'; return; }
       view = tpl.instantiate(new THREE.MeshLambertMaterial({ map: tpl.texture }));
       for (const [id, g] of Object.entries(r3.gunGeos || {})) view.addGun(id, g.geometry, g.material, g.length);
-      view.setGun(e.key === 'hero' ? 'pistol' : 'rifle');
-      for (const a of Object.values(view.a)) a.setEffectiveWeight(0);
+      view.setGun(e.clip.startsWith('p') ? 'pistol' : e.key === 'hero' ? 'smg' : 'rifle');
+      for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die]) a.setEffectiveWeight(0);
       const C = tpl.clips[e.clip];
       const act = view.mixer.clipAction(C.full);
       act.reset().play();
+      act.timeScale = 1;
       act.setEffectiveWeight(1);
       clipName = e.clip;
       current = view.group;
       scene.add(current);
       orbit.target.set(0, 28, 0); orbit.dist = 150;
       const tris = (view.mesh.geometry.index ? view.mesh.geometry.index.count : view.mesh.geometry.attributes.position.count) / 3;
-      info.textContent = `${e.name}\nheight ${tpl.height} units · ${Math.round(tris)} triangles · ${tpl.skeleton.bones.length} bones\nclip ${C.duration.toFixed(2)} s · root speed ${(tpl.rootSpeed[e.clip] || 0).toFixed(1)} units/s · gun yaw ${(tpl.mount.yaw * 57.3).toFixed(1)}°`;
+      info.textContent = `${e.name}\nheight ${tpl.height} units · ${Math.round(tris)} triangles · ${tpl.skeleton.bones.length} bones\nclip ${C.duration.toFixed(2)} s · root speed ${(tpl.rootSpeed[e.clip] || 0).toFixed(1)} units/s · gun yaw ${(tpl.mounts[view.set].yaw * 57.3).toFixed(1)}°`;
     } else {
       const b = new PropBuilder();
       b.place(0, 0, 0);
@@ -124,7 +125,7 @@ async function open() {
       scene.add(g);
       const T = PROP_TYPES[e.type] || { w: 40, d: 40, h: 40 };
       orbit.target.set(0, T.h / 2, 0); orbit.dist = Math.max(80, Math.max(T.w, T.d, T.h) * 2.4);
-      info.textContent = `${e.name}\nfootprint ${T.w} × ${T.d}, height ${T.h} units · blocks ${T.blocks} · ${Math.round(tris)} triangles · ${b.parts.size} materials`;
+      info.textContent = `${e.name}\nfootprint ${T.w} × ${T.d}, height ${T.h} units · blocks ${['—', 'move', '', 'move+bullets', '', '', '', 'move+bullets+sight'][propBlocks(T)] || propBlocks(T)} · ${Math.round(tris)} triangles · ${b.parts.size} materials`;
     }
   }
 

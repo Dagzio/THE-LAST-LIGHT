@@ -106,11 +106,11 @@
   #screen-splash .logo { width: min(calc(var(--logo-w) * 1.15 * 1.2), var(--splash-logo-max, 9999px)); }
 }
 #screen-splash .tap-prompt { margin: 0; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85); } /* D65: on the bar's spot */
-/* Game logo (assets/graphics/logo.webp, 1200×439): the box has a fixed size before the image arrives — no shift. */
+/* Game logo (assets/graphics/logo.webp, 1200×424): the box has a fixed size before the image arrives — no shift. */
 .logo-img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
 .logo {
-  width: min(calc(640px * var(--fs)), 82vw, calc(40dvh * 2.733));
-  aspect-ratio: 1200 / 439;
+  width: min(calc(640px * var(--fs)), 82vw, calc(40dvh * 2.83));
+  aspect-ratio: 1200 / 424;
   margin: 0 auto;
 }
 .fade { opacity: 0; transition: opacity 1.5s ease; }
@@ -135,12 +135,12 @@
 /* Logo top-centre (user request 2026-11-09): as wide as it can be between the corner buttons, ≤ 26 % of the height. */
 #screen-menu, #screen-splash { /* D64: the splash logo has the menu logo's size */
   --logo-side: calc(var(--safe-r) + 2 * var(--ring) + var(--gap) + 16px); /* the corner buttons + air, both sides */
-  --logo-w: min(calc(560px * var(--fs)), calc(100vw - 2 * var(--logo-side)), calc(26dvh * 2.733));
-  --logo-h: calc(var(--logo-w) / 2.733);
+  --logo-w: min(calc(560px * var(--fs)), calc(100vw - 2 * var(--logo-side)), calc(26dvh * 2.83));
+  --logo-h: calc(var(--logo-w) / 2.83);
 }
 /* ≤ 320 px high: a smaller logo so the three 48 px menu items fit under it */
 @media (max-height: 320px) {
-  #screen-menu, #screen-splash { --logo-w: min(calc(560px * var(--fs)), calc(100vw - 2 * var(--logo-side)), calc(21dvh * 2.733)); }
+  #screen-menu, #screen-splash { --logo-w: min(calc(560px * var(--fs)), calc(100vw - 2 * var(--logo-side)), calc(21dvh * 2.83)); }
 }
 .menu-logo {
   position: absolute;
@@ -148,7 +148,7 @@
   left: 50%;
   width: var(--logo-w);
   height: var(--logo-h);
-  translate: calc(-50% - 30px) 0; /* D64: 30 px left of the centre (user request) */
+  translate: -50% 0; /* D79: centred (user request) */
 }
 /* The list is centred in the space under the logo (never under it on short phones). */
 .menu-list {

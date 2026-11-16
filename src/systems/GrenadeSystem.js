@@ -20,6 +20,7 @@ export class GrenadeSystem {
     this.selected = GRENADE_ORDER[0];
     this.flying = [];   // { type, x0, y0, x1, y1, t0, t1 }
     this.blasts = [];   // presentation: { type, x, y, r, at }
+    this.lastThrowAt = -Infinity; // presentation: the hero's toss animation
     /** @type {import('./Collision.js').CollisionWorld|null} */
     this.world = null;
   }
@@ -66,6 +67,7 @@ export class GrenadeSystem {
     const land = GrenadeSystem.landing(player.x, player.y, tx, ty);
     this.flying.push({ type, x0: player.x, y0: player.y, x1: land.x, y1: land.y, t0: time, t1: time + GRENADE_RULES.flightTime });
     this.stock[type] -= 1;
+    this.lastThrowAt = time;
     this.ensureSelection();
     this.events.emit('grenadeThrow', type, player.x, player.y);
     return true;

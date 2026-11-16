@@ -3,7 +3,7 @@
 // connected by doors / openings — a breadth-first walk over ~10 rooms, not A* / navmesh: CLAUDE.md rule 14 keeps
 // full pathfinding out; inside a room walkers slide around furniture).
 import { CollisionWorld, BLOCK } from '../systems/Collision.js';
-import { PROP_TYPES, propBox } from '../data/props.js';
+import { PROP_TYPES, propBox, propBlocks } from '../data/props.js';
 
 export const DOOR = {
   openDist: 62,       // units from the door centre (+ half its width) at which a door opens for a character
@@ -31,11 +31,14 @@ export class LevelWorld {
       }
     }
     // furniture
+    // furniture: every standing object collides; bullets / sight by its height (data/props.js propBlocks)
     for (const p of level.props) {
       const t = PROP_TYPES[p.type];
-      if (!t || !t.blocks) continue;
+      const blocks = propBlocks(t);
+      if (!blocks) continue;
+      if (t.shape === 'circle') { this.world.add(p.x, p.y, t.r, 'prop', blocks); continue; }
       const [x0, y0, x1, y1] = propBox(p);
-      this.world.addBox(x0, y0, x1, y1, 'prop', t.blocks);
+      this.world.addBox(x0, y0, x1, y1, 'prop', blocks);
     }
     // doors
     this.doors = level.doors.map((d) => {

@@ -17,7 +17,9 @@ const pct = document.getElementById('loadPct');
 // gap between them; the bar low in the centre — kept on screen when the bottom of the picture is cut.
 // D74 (user decision): on screens wider than 16:9 the cut is shared — top and bottom evenly — but the top never goes
 // below the lighthouse lantern (`maxTop` of the picture height): more of the ground shows on wide phones. D75: phones only.
-const ART = { w: 2500, h: 1407, x: 0.4, y: 0.335, ground: 0.55, gap: 0.41, barY: 0.857, barW: 0.465, maxTop: 0.065 };
+// D79 (ORPHEUS: GHOST INDEX splash, user request): the logo sits at the top, right of the hero (centre at x 0.70,
+// y 0.16 of the picture), never wider than `gap` of it; the bar low in the centre over the walkway.
+const ART = { w: 1672, h: 941, x: 0.7, y: 0.16, ground: 0.42, gap: 0.44, gapMobile: 0.46, barY: 0.88, barW: 0.4, maxTop: 0 };
 const inner = document.getElementById('splashInner');
 const bg = document.getElementById('splashBg');
 // D70: the mobile version has a 20 % bigger logo (styles/ui.css) — it may reach a little past the lamp-moon gap
@@ -34,7 +36,7 @@ function placeSplash() {
   const bw = Math.min(iw * ART.barW, W * 0.8, 900);
   const bh = Math.max(14, bw * 0.052);
   const barY = Math.min(oy + ih * ART.barY, H * 0.875);              // on screen even when the bottom is cut
-  splash.style.setProperty('--splash-logo-max', `${Math.round(Math.min(iw * (MOBILE ? 0.5 : ART.gap), W - 24))}px`);
+  splash.style.setProperty('--splash-logo-max', `${Math.round(Math.min(iw * (MOBILE ? ART.gapMobile : ART.gap), W - 24))}px`);
   splash.style.setProperty('--splash-bw', `${Math.round(bw)}px`);
   splash.style.setProperty('--bar-x', `${Math.round(W / 2)}px`);
   splash.style.setProperty('--bar-y', `${Math.round(barY)}px`);

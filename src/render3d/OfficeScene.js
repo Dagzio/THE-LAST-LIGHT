@@ -8,6 +8,8 @@ import { PropBuilder, buildProp } from './officeProps.js';
 import { paintOfficeAtlas } from './officeAtlas.js';
 import { cpuCanvas } from './render-guard.js';
 import { wallPieces } from '../core/LevelWorld.js';
+import { PROP_TYPES, propBox } from '../data/props.js';
+import { TILE, tileUV } from './officeAtlas.js';
 
 const TEX_DIR = 'assets/textures/office/';
 // floor / wall material → texture file + tile size (world units per repeat)
@@ -24,7 +26,7 @@ const SHINY = { leather: 0x34373d, cushion: 0x41444a, chrome: 0xbfc5cc, black: 0
 const COLORS = {
   metalDark: 0x2a2e35, metal: 0x7f858d, chrome: 0xc4c9d0, black: 0x16181c, leather: 0x26282c, fabric: 0x4f555e,
   white: 0xe4e2dd, cream: 0xd6cdbe, stone: 0x36373c, pot: 0x8c8c88, soil: 0x3a2a1c, plant: 0x2c6629, plantLight: 0x4b8a35,
-  cardboard: 0xb08559, tape: 0xd4c39a, red: 0xae2a22, binder: 0x2c4b76,
+  cardboard: 0xb08559, tape: 0xd4c39a, red: 0xae2a22, binder: 0x2c4b76, baseboard: 0x26282c,
 };
 
 const texCache = new Map();
@@ -81,6 +83,15 @@ export function officeMaterials(aniso = 4) {
   m.screen = new THREE.MeshBasicMaterial({ map: atlas });
   m.decal = new THREE.MeshLambertMaterial({ map: atlas, alphaTest: 0.4 });
   m.wallTop = new THREE.MeshLambertMaterial({ color: 0x1b1e23 });
+  // D79: frosted desk partitions, rugs (atlas), soft contact shadows under furniture and along the walls
+  m.frost = new THREE.MeshLambertMaterial({ color: 0xdfe8ee, transparent: true, opacity: 0.6, depthWrite: false });
+  m.rug = new THREE.MeshLambertMaterial({ map: atlas, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  const soft = (paint) => { const c = cpuCanvas(128, 128); paint(c.g); const t = new THREE.CanvasTexture(c.canvas); return t; };
+  // alpha masks: white on black (alphaMap reads the green channel)
+  const aoBox = soft((g) => { g.fillStyle = '#000'; g.fillRect(0, 0, 128, 128); for (let i = 0; i < 24; i++) { g.fillStyle = 'rgba(255,255,255,0.075)'; const k = i * 2.4; roundRect(g, k, k, 128 - 2 * k, 128 - 2 * k, 26 - i); } });
+  const aoEdge = soft((g) => { const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, '#e6e6e6'); gr.addColorStop(0.35, '#595959'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); });
+  m.aoBox = new THREE.MeshBasicMaterial({ alphaMap: aoBox, color: 0x000000, transparent: true, opacity: 0.62, depthWrite: false });
+  m.aoEdge = new THREE.MeshBasicMaterial({ alphaMap: aoEdge, color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
   for (const [k, [file]] of Object.entries(FLOORS)) m[`floor_${k}`] = new THREE.MeshLambertMaterial({ map: officeTexture(file, aniso) });
   for (const [k, [file]] of Object.entries(WALLS)) m[`wall_${k}`] = new THREE.MeshLambertMaterial({ map: officeTexture(file, aniso) });
   m.outside = new THREE.MeshLambertMaterial({ color: 0x0c0f14 });
@@ -101,6 +112,12 @@ export function officeMaterials(aniso = 4) {
 /** Sets the anisotropy of every office texture (graphics preset, applied live). */
 export function setOfficeAnisotropy(aniso) {
   for (const t of texCache.values()) if (t.anisotropy !== aniso) { t.anisotropy = aniso; if (t.image) t.needsUpdate = true; }
+}
+
+function roundRect(g, x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2, h / 2));
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); g.fill();
 }
 
 /** Merges non-indexed geometries (position / normal / uv) into one. */
@@ -191,6 +208,47 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     }
   }
 
+  // D79: baseboards, soft shadow strips along the walls, night windows on the outer walls
+  const [bx0, by0, bx1, by1] = buildingRect(level);
+  for (const w of level.walls) {
+    if (w.style === 'glass') continue;
+    const horiz = w.y0 === w.y1;
+    const outer = horiz ? (w.y0 === by0 || w.y0 === by1) : (w.x0 === bx0 || w.x0 === bx1);
+    for (const [a, b] of wallPieces(w, h)) {
+      const len = b - a, mid = (a + b) / 2;
+      const bb = new THREE.BoxGeometry(horiz ? len : T + 2.4, 4, horiz ? T + 2.4 : len);
+      bb.translate(horiz ? mid : w.x0, 2, horiz ? w.y0 : mid);
+      put('baseboard', bb.toNonIndexed());
+      for (const side of [-1, 1]) {
+        const g = new THREE.PlaneGeometry(len, 30);
+        g.rotateX(-Math.PI / 2);                    // v = 1 (the dark edge) on −z
+        if (side < 0) g.rotateY(Math.PI);           // dark edge on +z
+        if (!horiz) g.rotateY(Math.PI / 2);
+        const off = h + 15;
+        g.translate(horiz ? mid : w.x0 + side * off, 0.22, horiz ? w.y0 + side * off : mid);
+        put('aoEdge', g.toNonIndexed());
+      }
+      if (!outer) continue;
+      // which side faces into the building
+      const inward = horiz ? Math.sign((by0 + by1) / 2 - w.y0) : Math.sign((bx0 + bx1) / 2 - w.x0);
+      const lo = horiz ? bx0 : by0, hi = horiz ? bx1 : by1;
+      const s0 = Math.max(a + 14, lo + 18), s1 = Math.min(b - 14, hi - 18);
+      if (s1 - s0 < 40) continue;
+      const n = Math.max(1, Math.round((s1 - s0) / 96)), pw = (s1 - s0) / n;
+      const [u0, v0, u1, v1] = tileUV(TILE.window);
+      for (let i = 0; i < n; i++) {
+        const c = s0 + pw * (i + 0.5);
+        const g = new THREE.PlaneGeometry(pw - 10, 52);
+        const uv = g.attributes.uv;
+        for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) ? u1 : u0, uv.getY(k) ? v1 : v0);
+        if (horiz) { if (inward < 0) g.rotateY(Math.PI); } else g.rotateY(inward > 0 ? Math.PI / 2 : -Math.PI / 2);
+        const off = h + 0.5;
+        g.translate(horiz ? c : w.x0 + inward * off, 44, horiz ? w.y0 + inward * off : c);
+        put('screen', g.toNonIndexed());
+      }
+    }
+  }
+
   // props + door frames
   const pb = new PropBuilder();
   for (const p of level.props) buildProp(pb, p);
@@ -204,6 +262,23 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     pb.box('metalDark', d.width + 6, 6, T + 2, 0, H - 8, 0);
   }
   for (const [k, list] of pb.parts) for (const g of list) put(k, g);
+  // D79: a soft contact shadow under every standing object (ambient occlusion look), lamps light the floor
+  for (const p of level.props) {
+    const t = PROP_TYPES[p.type];
+    if (!t || t.flat || t.wall || !(t.h > 2)) continue;
+    const [x0, y0, x1, y1] = propBox(p);
+    const pad = 6 + Math.min(16, t.h * 0.22);
+    const ao = new THREE.PlaneGeometry(x1 - x0 + 2 * pad, y1 - y0 + 2 * pad);
+    ao.rotateX(-Math.PI / 2);
+    ao.translate((x0 + x1) / 2, 0.45, (y0 + y1) / 2);
+    put('aoBox', ao.toNonIndexed());
+    if (p.type === 'floor_lamp') {
+      const g = new THREE.PlaneGeometry(150, 150);
+      g.rotateX(-Math.PI / 2);
+      g.translate(p.x, 0.36, p.y);
+      put('lightPool', g.toNonIndexed());
+    }
+  }
 
   // light pools: a grid of soft spots per room
   for (const z of level.zones) {
@@ -240,10 +315,11 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     const mat = mats[k];
     if (!mat) { console.warn('office material missing', k); continue; }
     const mesh = new THREE.Mesh(merge(list), mat);
-    const flat = k.startsWith('floor_') || k === 'outside' || k === 'lightPool';
+    const flat = k.startsWith('floor_') || k === 'outside' || k === 'lightPool' || k === 'rug' || k === 'frost';
     mesh.receiveShadow = shadows && k !== 'lightPool' && k !== 'screen';
     mesh.castShadow = shadows && !flat && k !== 'glass' && k !== 'screen' && k !== 'decal';
     if (k === 'lightPool') mesh.renderOrder = 1;
+    if (k === 'aoEdge' || k === 'aoBox') { mesh.renderOrder = 2; mesh.receiveShadow = false; mesh.castShadow = false; }
     if (k === 'glass') mesh.renderOrder = 5;
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
@@ -330,4 +406,14 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
       for (const c of [...group.children]) group.remove(c);
     },
   };
+}
+
+/** The building's outer rectangle: the walls that bound most rooms (the stairwell sticks out of it). */
+function buildingRect(level) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const z of level.zones) {
+    if (z.id === 'stairs') continue;
+    x0 = Math.min(x0, z.rect[0]); y0 = Math.min(y0, z.rect[1]); x1 = Math.max(x1, z.rect[2]); y1 = Math.max(y1, z.rect[3]);
+  }
+  return [x0, y0, x1, y1];
 }

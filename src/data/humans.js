@@ -1,13 +1,13 @@
 // KILL LIST (D78): armed human enemies. Location 1 (office) — the terrorists who took the floor. One user model for all
 // of them (assets/models/enemy.glb); the types differ by weapon, stats, a tint and a size. Police / SWAT / guards of the
 // later locations are added here as new types (their own models when the user provides them).
-// Speeds in units/s (the hero walks 72), view in units / degrees, times in s.
+// Speeds in units/s (the hero runs 95), view in units / degrees, times in s.
 
 export const HUMAN_TYPES = {
   thug: {
     id: 'thug', nameKey: 'enemy.thug', model: 'enemy', weapon: 'enemy_pistol',
     hp: 45, armor: 0, radius: 15, scale: 1,
-    speed: { patrol: 30, combat: 60 },
+    speed: { patrol: 30, combat: 76 },
     view: { range: 430, fov: 120, near: 80 },   // near: noticed at any angle this close
     reaction: 0.6,                              // s from first sight to the first shot
     keepRange: 220,                             // likes to fight from about here
@@ -16,7 +16,7 @@ export const HUMAN_TYPES = {
   gunman: {
     id: 'gunman', nameKey: 'enemy.gunman', model: 'enemy', weapon: 'enemy_rifle',
     hp: 60, armor: 0, radius: 15, scale: 1,
-    speed: { patrol: 30, combat: 56 },
+    speed: { patrol: 30, combat: 70 },
     view: { range: 470, fov: 110, near: 80 },
     reaction: 0.65,
     keepRange: 280,
@@ -25,7 +25,7 @@ export const HUMAN_TYPES = {
   heavy: {
     id: 'heavy', nameKey: 'enemy.heavy', model: 'enemy', weapon: 'enemy_heavy',
     hp: 150, armor: 2, radius: 17, scale: 1.08,
-    speed: { patrol: 26, combat: 44 },
+    speed: { patrol: 26, combat: 54 },
     view: { range: 450, fov: 110, near: 90 },
     reaction: 0.5,
     keepRange: 200,

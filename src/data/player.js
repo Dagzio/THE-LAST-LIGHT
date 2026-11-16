@@ -1,11 +1,11 @@
-// Hero base stats (KILL LIST D78). The movement speed is lower than THE LAST LIGHT's 95: the user's Mixamo set has a
-// walk only (no run) — faster than ≈ 2.7 × the clip's own speed the feet slide (data/humanModels.js walkRateMax).
-// With a run animation from the user it can go back up.
+// Hero base stats. D79: the user's run clips are in — the speed is back at 95 (the run clip's own pace ≈ 92). While he
+// shoots / aims (and a moment after) he moves × aimMoveMult: the strafe / back clips are slow, faster they would slide.
 
 export const PLAYER = {
   radius: 15,
   maxHp: 100,
-  moveSpeed: 72,            // units/s
+  moveSpeed: 95,            // units/s
+  aimMoveMult: 0.75,        // × while shooting / aiming
   dodge: {                  // a short roll / dash (Space)
     duration: 0.22,         // s
     speed: 420,             // units/s
@@ -17,13 +17,13 @@ export const PLAYER = {
 
 /**
  * Muzzle of each gun in the hero's frame with the aim pose: f forward, s right, h height (game units). Measured from
- * the user's model + the "walkFire" pose (render3d/humans.js HumanTemplate.muzzle, gun lengths of data/humanModels.js),
+ * the user's model + the aim poses (render3d/humans.js HumanTemplate.muzzle, gun lengths of data/humanModels.js),
  * so the bullets start where the renderer draws the barrel tip. Enemies use the same table.
  */
 export const MUZZLE = {
-  pistol: { f: 9, s: 7, h: 41.5 },
-  smg: { f: 15, s: 7, h: 41.8 },
-  rifle: { f: 24, s: 7, h: 42.2 },
+  pistol: { f: 16.5, s: 6.6, h: 41 },  // D79: the Pistol Idle pose (two hands, arms forward)
+  smg: { f: 17, s: 7.2, h: 40.6 },   // D79: the standing Firing Rifle pose
+  rifle: { f: 26, s: 7.2, h: 40.5 },
 };
 export const muzzleOf = (gun) => MUZZLE[gun] || MUZZLE.pistol;
 
