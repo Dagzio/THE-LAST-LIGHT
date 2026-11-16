@@ -4,7 +4,11 @@
 
 // D77 (user decision): the splash also waits for the warm-up — sounds, every map preview, the menu scene and the
 // adaptive resolution measured on it — so the main menu runs smoothly at once (a longer bar is fine).
-const CODE = [['lib/three.module.js', 50]];   // [url, share of the bar]
+// KILL LIST (D78): the user's character models (≈ 5 MB each, unchanged) and the animations are fetched here too, with
+// byte progress; the renderer then reads them from the HTTP cache.
+const CODE = [
+  ['lib/three.module.js', 26], ['assets/models/hero.glb', 14], ['assets/models/enemy.glb', 14], ['assets/anims/human.json', 3],
+]; // [url, share of the bar]
 const W_GAME = 10;                            // game modules evaluated (½) + renderer created / UI built (1)
 const W_WARM = 40;                            // warm-up (main.js warmUp → warmProgress)
 

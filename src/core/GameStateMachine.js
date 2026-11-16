@@ -1,7 +1,5 @@
-// Top-level game state machine (02_SPEC §2 + H5 TAP_TO_PLAY).
-// In a map, RUNNING is the simulating state; the wave flow (MAP_INTRO / WAVE_ACTIVE / INTERMISSION of the spec)
-// is the run's own phase (MapRun.waves.phase), because all three advance the same game clock. States that freeze
-// the clock (PAUSED; SHOP_OPEN / CRATE_REWARD_OPEN from Phases 5–6) are top-level states here.
+// Top-level game state machine (02_SPEC §2 + H5 TAP_TO_PLAY). KILL LIST (D78): no shop / crate-choice / tutorial
+// states — a level is RUNNING, PAUSED or over (MAP_DEFEAT / MAP_VICTORY; "map" = level in the code names).
 
 export const STATES = Object.freeze({
   BOOT: 'BOOT',
@@ -12,9 +10,6 @@ export const STATES = Object.freeze({
   PAUSED: 'PAUSED',
   MAP_DEFEAT: 'MAP_DEFEAT',
   MAP_VICTORY: 'MAP_VICTORY',
-  SHOP_OPEN: 'SHOP_OPEN',   // world + intermission timer frozen (02_SPEC §12)
-  CRATE_REWARD_OPEN: 'CRATE_REWARD_OPEN', // perk choice: the world is frozen until a choice is made (02_SPEC §14)
-  TUTORIAL: 'TUTORIAL',                   // a tutorial hint is on screen: the world waits for GOT IT (D11)
 });
 
 const TRANSITIONS = {
@@ -22,11 +17,8 @@ const TRANSITIONS = {
   TAP_TO_PLAY: ['MAIN_MENU'],
   MAIN_MENU: ['MAP_SELECT'],
   MAP_SELECT: ['MAIN_MENU', 'RUNNING'],
-  RUNNING: ['PAUSED', 'MAIN_MENU', 'MAP_DEFEAT', 'MAP_VICTORY', 'SHOP_OPEN', 'CRATE_REWARD_OPEN', 'TUTORIAL'],
-  SHOP_OPEN: ['RUNNING', 'PAUSED', 'MAIN_MENU'],
-  CRATE_REWARD_OPEN: ['RUNNING', 'PAUSED', 'MAIN_MENU'],
-  TUTORIAL: ['RUNNING', 'PAUSED', 'MAIN_MENU'],
-  PAUSED: ['RUNNING', 'SHOP_OPEN', 'CRATE_REWARD_OPEN', 'TUTORIAL', 'MAIN_MENU'], // resume returns to where the pause started
+  RUNNING: ['PAUSED', 'MAIN_MENU', 'MAP_DEFEAT', 'MAP_VICTORY'],
+  PAUSED: ['RUNNING', 'MAIN_MENU'],
   MAP_DEFEAT: ['RUNNING', 'MAIN_MENU'],  // RETRY → a fresh run; or back to the main menu
   MAP_VICTORY: ['RUNNING', 'MAIN_MENU'], // PLAY AGAIN → a fresh run; or back to the main menu
 };
@@ -34,8 +26,8 @@ const TRANSITIONS = {
 /** States in which the world simulation (GameClock) advances. */
 const SIMULATING = new Set([STATES.RUNNING]);
 
-/** In-map states: the game scene is on screen. */
-const IN_MAP = new Set([STATES.RUNNING, STATES.PAUSED, STATES.MAP_DEFEAT, STATES.MAP_VICTORY, STATES.SHOP_OPEN, STATES.CRATE_REWARD_OPEN, STATES.TUTORIAL]);
+/** In-level states: the game scene is on screen. */
+const IN_MAP = new Set([STATES.RUNNING, STATES.PAUSED, STATES.MAP_DEFEAT, STATES.MAP_VICTORY]);
 
 export class GameStateMachine {
   constructor(initial = STATES.BOOT) {
@@ -61,7 +53,7 @@ export class GameStateMachine {
 
   get inMap() { return IN_MAP.has(this.state); }
 
-  /** The map is over (defeat or victory screen). */
+  /** The level is over (defeat or victory screen). */
   get mapOver() { return this.state === STATES.MAP_DEFEAT || this.state === STATES.MAP_VICTORY; }
 
   onChange(fn) {

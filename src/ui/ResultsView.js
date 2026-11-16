@@ -1,6 +1,6 @@
-// Results (Phase 7, D42): the keeper's journal page instead of Underlords' newspaper. Shown on MAP_DEFEAT /
-// MAP_VICTORY; after the last map of the campaign it is the Congrats page (D19 — no "next map"). Lines count up one
-// after another, then the VICTORY / DEFEAT stamp lands; tapping the page finishes the animation at once.
+// Results (Phase 7, D42; KILL LIST D78): the case-file page. Shown on MAP_DEFEAT / MAP_VICTORY (level over); after
+// the last level of the campaign it has no CONTINUE. Lines count up one after another, then the stamp lands;
+// tapping the page finishes the animation at once.
 // Presentation only: it reads Game.resultSummary() — opening it again never grants anything.
 import { T, onLanguageChange } from '../i18n/i18n.js';
 import { Sfx } from '../platform/Sfx.js';
@@ -46,24 +46,20 @@ export class ResultsView {
     el.journal.classList.toggle('won', s.won);
     el.journal.classList.toggle('congrats', congrats);
     el.kicker.textContent = T('result.kicker', { map: T(s.mapNameKey) });
-    el.title.textContent = congrats ? T('congrats.title')
-      : s.won ? T('victory.title') : T(s.reason === 'player' ? 'defeat.player' : 'defeat.beacon');
-    el.sub.textContent = congrats ? T('congrats.text') : s.won ? T('result.wonText') : T('result.lostText');
-    el.stamp.textContent = T(congrats ? 'result.campaign' : s.won ? 'result.victory' : 'result.defeat');
+    el.title.textContent = s.won ? T('victory.title') : T('defeat.player');
+    el.sub.textContent = s.won ? T(congrats ? 'congrats.text' : 'result.wonText') : T('result.lostText');
+    el.stamp.textContent = T(s.won ? 'result.victory' : 'result.defeat');
 
-    // lines: [labelKey, target, format]
+    // lines: [labelKey, target, format] — KILL LIST (D78): time, kills, accuracy, damage taken (+ best time on a win)
+    const clock = (v) => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
+    const acc = s.shots > 0 ? Math.round((Math.min(s.hits, s.shots) / s.shots) * 100) : 0;
     const rows = [
-      ['result.waves', s.waves, (v) => `${v}/${s.wavesTotal}`],
+      ['result.time', Math.round(s.time), clock],
       ['result.kills', s.kills, (v) => String(v)],
-      ['result.coins', s.coins, (v) => `+${v}`],
-      ['result.xp', s.xp, (v) => `+${v}`],
+      ['result.accuracy', acc, (v) => `${v}%`],
+      ['result.damage', s.damageTaken, (v) => String(v)],
     ];
-    if (congrats) {
-      rows.push(null); // divider: campaign totals
-      rows.push(['result.mapsCleared', s.campaign.mapsCleared, (v) => `${v}/${s.campaign.mapsTotal}`]);
-      rows.push(['result.totalKills', s.campaign.totalKills, (v) => String(v)]);
-      rows.push(['result.level', s.campaign.level, (v) => String(v)]);
-    }
+    if (s.won && s.best > 0) rows.push(['result.best', Math.round(s.best), clock]);
     el.lines.replaceChildren();
     this.items = [];
     for (const row of rows) {
@@ -78,7 +74,7 @@ export class ResultsView {
       this.items.push({ li, value, target: Math.max(0, target | 0), fmt });
     }
 
-    // buttons: defeat → RETRY; victory → CONTINUE (if a next map exists) + PLAY AGAIN; Congrats → PLAY AGAIN
+    // buttons: defeat → RETRY; victory → CONTINUE (if a next level exists) + PLAY AGAIN; the last level → PLAY AGAIN
     el.retry.textContent = T(s.won ? 'victory.again' : 'defeat.retry');
     el.cont.hidden = !s.won || congrats;
 

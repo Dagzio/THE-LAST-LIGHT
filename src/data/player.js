@@ -1,39 +1,51 @@
-// Player base stats (02_SPEC §4, 01_GDD §8.3–8.4). Permanent/temporary multipliers are applied by systems.
+// Hero base stats (KILL LIST D78). The movement speed is lower than THE LAST LIGHT's 95: the user's Mixamo set has a
+// walk only (no run) — faster than ≈ 2.7 × the clip's own speed the feet slide (data/humanModels.js walkRateMax).
+// With a run animation from the user it can go back up.
 
 export const PLAYER = {
-  radius: 18,
+  radius: 15,
   maxHp: 100,
-  moveSpeed: 95,            // px/s — D54: 190 − 35 % = 124; D56: − 10 % → 112; D59 (user decision): − 15 % → 95; MOBILITY / FLEET FOOTED are % of it
-  dodge: {
-    duration: 0.2,          // s
-    speed: 530,             // px/s (GDD 500–560)
-    cooldown: 4.0,          // s, counted from the dodge start
-    invulnerability: 0.2,   // s; equals the dodge duration (PROJECT_AUDIT.md C9)
+  moveSpeed: 72,            // units/s
+  dodge: {                  // a short roll / dash (Space)
+    duration: 0.22,         // s
+    speed: 420,             // units/s
+    cooldown: 2.5,          // s, counted from the dodge start
+    invulnerability: 0.22,  // s (= the duration)
   },
-  // Short invulnerability after taking a hit, so one contact cannot drain HP every step.
-  // PROVISIONAL (GDD: "короткое окно" without a number) — confirm with the enemy table before Phase 4.
-  hitInvulnerability: 0.2, // D62 (user decision): was 0.6
-  muzzleOffset: 24,         // px from the center to the pistol muzzle (visual + projectile origin)
+  hitInvulnerability: 0.08, // s after a hit (bullets: no long i-frames)
 };
 
 /**
- * D74 (user decision): the mobile version shoots by itself — at the nearest enemy the equipped weapon can actually
- * reach (its range, the enemy's edge) and see (no tree / rock in the way). Only the gun: grenades stay manual.
- * D75 (user decision): no manual fire on mobile at all (the aim side only throws an armed grenade); the auto fire
- * shoots only at enemies already on the screen (the zoomed-in mobile camera shows less than the pistol's range).
+ * Muzzle of each gun in the hero's frame with the aim pose: f forward, s right, h height (game units). Measured from
+ * the user's model + the "walkFire" pose (render3d/humans.js HumanTemplate.muzzle, gun lengths of data/humanModels.js),
+ * so the bullets start where the renderer draws the barrel tip. Enemies use the same table.
  */
+export const MUZZLE = {
+  pistol: { f: 9, s: 7, h: 41.5 },
+  smg: { f: 15, s: 7, h: 41.8 },
+  rifle: { f: 24, s: 7, h: 42.2 },
+};
+export const muzzleOf = (gun) => MUZZLE[gun] || MUZZLE.pistol;
+
 /**
- * D76 (user decision): the hero walks front first — the body faces the movement direction (stick / WASD) and turns
- * to the aim only while shooting or aiming a grenade (and a moment after the last shot, so it does not flicker
- * between the shots of a semi-auto gun). Standing still on PC he faces the cursor as before.
+ * D76 (kept): the hero walks front first — the body faces the movement direction and turns to the aim while shooting /
+ * aiming a grenade (and a moment after the last shot).
  */
 export const FACING = {
-  aimHold: 0.35,            // s the body keeps facing the aim after the trigger is let go / the auto fire stops
+  aimHold: 0.6,             // s the body keeps facing the aim after the trigger is let go
 };
 
+/** D74 / D75 (kept): the mobile version aims and shoots by itself at the nearest visible enemy on the screen. */
 export const AUTO_AIM = {
-  rangeFactor: 0.95,        // of the weapon's range (the bullet starts at the muzzle, ahead of the keeper)
-  switchRatio: 0.7,         // keep the current target unless another one is this much closer (no jitter)
-  lineOfSight: true,        // never shoot into a tree while the enemy is behind it
-  viewInset: 12,            // CSS px: the enemy's centre must be this far inside the screen edge
+  rangeFactor: 0.9,
+  switchRatio: 0.7,
+  lineOfSight: true,
+  viewInset: 12,
+};
+
+/** Interaction (crates, pickups) and the hero's own noise. */
+export const INTERACT = {
+  radius: 46,               // units from the hero's centre to a crate's centre (E / the touch button)
+  pickupRadius: 30,         // medkits, key card, drive: picked up by walking over them
+  medkitHeal: 50,
 };

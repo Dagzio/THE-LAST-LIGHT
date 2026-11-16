@@ -1,6 +1,6 @@
 // Keyboard bindings → abstract actions (02_SPEC §3). Game code reads actions, never keys.
 // No pause/close key: the H5 standard forbids keyboard pause (PROJECT_AUDIT.md C1).
-// 'flare' — Emergency Flare (Phase 4b, D38).
+// KILL LIST (D78): E opens a crate, G arms a grenade (the next shot throws it), Q / 1 / 2 change the weapon.
 
 export const KEY_BINDINGS = {
   moveUp: ['KeyW', 'ArrowUp'],
@@ -11,10 +11,9 @@ export const KEY_BINDINGS = {
   interact: ['KeyE'],
   reload: ['KeyR'],
   throwGrenade: ['KeyG'],
-  flare: ['KeyQ'],
-  grenade1: ['Digit1', 'Numpad1'],
-  grenade2: ['Digit2', 'Numpad2'],
-  grenade3: ['Digit3', 'Numpad3'],
+  switchWeapon: ['KeyQ'],
+  weapon1: ['Digit1', 'Numpad1'],
+  weapon2: ['Digit2', 'Numpad2'],
 };
 
 export const ACTIONS = Object.keys(KEY_BINDINGS);

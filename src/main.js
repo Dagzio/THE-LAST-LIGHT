@@ -14,21 +14,18 @@ import { Game } from './core/Game.js';
 import { UIManager } from './ui/UIManager.js';
 import { HUD } from './ui/HUD.js';
 import { TouchControls } from './ui/TouchControls.js';
-import { GrenadeWheel } from './ui/GrenadeWheel.js';
-import { OffscreenIndicators } from './ui/OffscreenIndicators.js';
-import { DeviceTags } from './ui/DeviceTags.js';
 import { preloadIcons } from './data/icons.js';
 import { initDebugOverlay } from './ui/DebugOverlay.js';
 
-/** Gameplay facts → sounds. Repeated shots get a small cosmetic pitch variation (GDD §18). */
+const ENEMY_SHOT_SFX = { enemy_pistol: 'pistol.shot', enemy_rifle: 'assault_rifle.shot', enemy_heavy: 'assault_rifle.shot' };
+
+/** Gameplay facts → sounds. Repeated sounds get a small cosmetic pitch variation. */
 function wireCombatSounds(events, game) {
-  let lastHitSoundAt = 0, lastHitIdx = -1;
-  // Shots and reloads: platform/WeaponAudio.js (recorded files + reload cues on the sim clock)
+  const throttle = (ms) => { let last = 0; return () => { const now = performance.now(); if (now - last < ms) return false; last = now; return true; }; };
+  const hitOk = throttle(70), killOk = throttle(30), ricOk = throttle(60), enemyShotOk = throttle(45);
+  let lastHitIdx = -1;
   events.on('hit', () => {
-    const now = performance.now();
-    if (now - lastHitSoundAt < 70) return; // avoid sound mush on multi-pellet hits (the recorded hits have tails)
-    lastHitSoundAt = now;
-    // one of the recorded hits, never the same twice in a row (synth fallback while they load)
+    if (!hitOk()) return;
     let i = Math.floor(Math.random() * ENEMY_HIT_SFX.length);
     if (i === lastHitIdx) i = (i + 1) % ENEMY_HIT_SFX.length;
     lastHitIdx = i;
@@ -36,95 +33,36 @@ function wireCombatSounds(events, game) {
     if (Sfx.duration(name) > 0) Sfx.play(name, 0.95 + Math.random() * 0.1, { voices: 1 });
     else Sfx.play('hit', 0.9 + Math.random() * 0.2);
   });
-  let lastKillSoundAt = 0;
-  events.on('kill', () => { // a shotgun blast / grenade kills several at once: one crunch, not a stack of them
-    const now = performance.now();
-    if (now - lastKillSoundAt < 30) return;
-    lastKillSoundAt = now;
-    Sfx.play('kill', 0.92 + Math.random() * 0.16, { voices: 3 });
+  events.on('kill', () => { if (killOk()) Sfx.play('kill', 0.92 + Math.random() * 0.16, { voices: 3 }); });
+  // enemy shots: the gun's recorded shot, quieter with distance from the hero
+  events.on('enemyShot', (x, y, a, weaponId) => {
+    const p = game.run && game.run.player;
+    if (!p || !enemyShotOk()) return;
+    const d = Math.hypot(x - p.x, y - p.y);
+    const gain = Math.max(0.12, Math.min(0.75, 1 - d / 900));
+    Sfx.play(ENEMY_SHOT_SFX[weaponId] || 'pistol.shot', 0.9 + Math.random() * 0.12, { gain, voices: 3 });
   });
   events.on('dash', () => Sfx.play('dash'));
-  events.on('beaconHit', () => Sfx.play('beaconHit', 0.9 + Math.random() * 0.2));
-  // Turrets (D50): one sound per volley (a double barrel fires two rounds in the same step); D53: the same recorded
-  // shot for every turret type (synth per type only while the file loads)
-  let lastTurretSound = 0;
-  events.on('turretShot', (x, y, a, id) => {
-    const now = performance.now();
-    if (now - lastTurretSound < 30) return;
-    lastTurretSound = now;
-    const name = Sfx.duration('turretShot') > 0 ? 'turretShot' : id === 'frost_coil' ? 'frostShot' : id === 'poison_turret' ? 'poisonShot' : 'turretShot';
-    Sfx.play(name, 0.92 + Math.random() * 0.16, { voices: 2 });
-  });
-  // Killed by a boss (user decision 2026-11-09): its own sting first, the defeat jingle right after it
-  let lastHitBy = '';
-  events.on('playerHit', (x, y, amount, by) => { lastHitBy = by || ''; });
-  events.on('mapDefeat', (reason) => {
-    const byBoss = reason === 'player' && BOSS_HITS.has(lastHitBy) && Sfx.duration('bossKillPlayer') > 0;
-    if (!byBoss) { Sfx.play('defeat'); return; }
-    Sfx.play('bossKillPlayer');
-    setTimeout(() => Sfx.play('defeat'), 1500); // presentation only (the results screen is already up)
-  });
+  events.on('mapDefeat', () => Sfx.play('defeat'));
   events.on('mapVictory', () => Sfx.play('victory'));
-  events.on('flare', () => Sfx.play('flare'));
-  events.on('flareReady', () => Sfx.play('flareReady'));
-  events.on('levelUp', () => Sfx.play('levelUp'));
   events.on('grenadeThrow', () => Sfx.play('throw'));
-  events.on('grenadeBlast', (type) => Sfx.play(type === 'frag' ? 'boom' : type === 'cryo' ? 'freeze' : 'fire'));
-  // D62: the molotov fire crackles while it burns, fades when it goes out (oldest fire first)
-  const fires = [];
-  events.on('grenadeBlast', (type) => { if (type === 'molotov') { const h = Sfx.play('molotovFire', 1, { cut: true }); if (h) fires.push(h); } });
-  events.on('molotovOut', () => { const h = fires.shift(); if (h) h.stop(0.5); });
-  events.on('mapDefeat', () => { while (fires.length) fires.shift().stop(0.3); });
-  events.on('mapVictory', () => { while (fires.length) fires.shift().stop(0.3); });
-  events.on('crateSpawn', () => Sfx.play('crate'));
+  events.on('grenadeBlast', () => Sfx.play('boom'));
   events.on('crateOpened', () => Sfx.play('crateOpen'));
-  let lastRicochetAt = 0;
+  events.on('pickup', (kind) => Sfx.play(kind === 'medkit' ? 'buy' : 'levelUp'));
+  events.on('doorUnlocked', () => Sfx.play('buy', 0.8));
+  events.on('reinforcements', () => Sfx.play('waveStart')); // synthesized horn: the alarm of the turn
+  events.on('spotted', () => Sfx.play('deny', 1.3, { voices: 1 }));
+  events.on('weaponSwitch', () => Sfx.play('click', 0.8));
   events.on('bulletBlocked', () => {
-    const now = performance.now();
-    if (now - lastRicochetAt < 60) return; // SMG bursts into a wall must not turn into noise
-    lastRicochetAt = now;
-    if (Sfx.duration('ricochet') > 0) Sfx.play('ricochet', 0.92 + Math.random() * 0.16, { voices: 2 }); // D52 file
+    if (!ricOk()) return;
+    if (Sfx.duration('ricochet') > 0) Sfx.play('ricochet', 0.92 + Math.random() * 0.16, { voices: 2, gain: 0.6 });
     else Sfx.play('hit', 1.6 + Math.random() * 0.3);
   });
-  // D52 device health: a hit clanks (throttled — several enemies can hit at once), a breaking device bangs
-  let lastDeviceHitAt = 0;
-  events.on('deviceHit', () => {
-    const now = performance.now();
-    if (now - lastDeviceHitAt < 120) return;
-    lastDeviceHitAt = now;
-    if (Sfx.duration('turretHit') > 0) Sfx.play('turretHit', 0.94 + Math.random() * 0.12, { voices: 2 }); // user file
-    else Sfx.play('beaconHit', 1.35 + Math.random() * 0.15);
-  });
-  events.on('deviceBroken', () => Sfx.play(Sfx.duration('turretBroken') > 0 ? 'turretBroken' : 'boom', Sfx.duration('turretBroken') > 0 ? 1 : 1.35));
-  // Wave start (user decision 2026-11-09): START NEXT WAVE pressed → wave-start1 at once; wave-start2 when the first
-  // enemy of the wave is out AND wave-start1 has finished. Timer ran out (no press) → only wave-start2 on the first
-  // enemy. Timed on the game clock (a pause does not let it fire early). Synth fog horn if the files are missing.
-  const wave = { pending: false, spawned: false, until: 0 };
-  events.on('waveStart', () => {
-    if (Sfx.duration('waveStart2') <= 0) { Sfx.play('waveStart'); return; }
-    wave.pending = true; wave.spawned = false; wave.until = 0;
-  });
-  events.on('earlyStart', () => {
-    if (Sfx.duration('waveStart1') <= 0) return;
-    Sfx.play('waveStart1');
-    wave.until = game.clock.time + Sfx.duration('waveStart1') - 0.15;
-  });
-  events.on('enemySpawn', () => { if (wave.pending) wave.spawned = true; });
-  events.on('mapDefeat', () => { wave.pending = false; });
-  events.on('waveCleared', (i, reward, final) => { if (!final) Sfx.play('waveClear'); });
-  events.on('playerHit', () => { // D53: the user's two takes at random
+  events.on('playerHit', () => {
     const name = PLAYER_HURT_SFX[Math.floor(Math.random() * PLAYER_HURT_SFX.length)];
     Sfx.play(Sfx.duration(name) > 0 ? name : 'playerHurt', 0.96 + Math.random() * 0.08, { voices: 1 });
   });
-  events.on('bossTelegraph', () => Sfx.play('bossWarn'));
-  events.on('bossImpact', (kind) => Sfx.play(kind === 'slam' ? 'bossSlam' : 'bossTide'));
-  events.on('bossSummon', () => Sfx.play('bossSlam', 0.7)); // D45: Fog Mother summon
-  events.on('glob', () => { // D45: Spitter (D52: its own recorded spit)
-    if (Sfx.duration('spitterAttack') > 0) Sfx.play('spitterAttack', 0.94 + Math.random() * 0.12, { voices: 2 });
-    else Sfx.play('throw', 0.62 + Math.random() * 0.1);
-  });
-  // D56 footsteps: the whole recorded loop while the keeper walks, at his speed; off at once when he stops, dashes,
-  // dies or the game is not running (checked every frame — a pause stops it too; mute / hidden tab: Sfx stops loops)
+  // footsteps: the recorded loop while the hero walks, at his speed; off when he stops, rolls, dies or the game is not running
   const steps = { h: null };
   game.onFrame(() => {
     const run = game.run, p = run && run.player;
@@ -135,21 +73,14 @@ function wireCombatSounds(events, game) {
     if (!steps.h || steps.h.done) steps.h = Sfx.loop(FOOTSTEPS.sfx, rate);
     else steps.h.rate(rate);
   });
-  return (time) => { // called after every simulation step
-    if (wave.pending && wave.spawned && time >= wave.until) { wave.pending = false; Sfx.play('waveStart2'); }
-  };
 }
 
-const BOSS_HITS = new Set(['slam', 'tide', 'gloam_warden', 'fog_mother']);
-
-/** D45: light camera shake for heavy impacts (presentation only, on the game clock). */
+/** Light camera shake for heavy impacts (presentation only, on the game clock). */
 function wireCameraShake(game) {
   const ev = game.events;
   const shake = (a, d) => { if (game.renderer3d) game.renderer3d.shake(a, d); };
-  ev.on('grenadeBlast', (type) => shake(type === 'frag' ? 7 : 3, type === 'frag' ? 0.28 : 0.2));
-  ev.on('bossImpact', (kind) => shake(kind === 'slam' ? 8 : 11, kind === 'slam' ? 0.3 : 0.42));
-  ev.on('bossSummon', () => shake(5, 0.3));
-  ev.on('playerHit', (x, y, amount, kind) => { if (kind !== 'poison') shake(3, 0.15); }); // D62: poison ticks do not shake
+  ev.on('grenadeBlast', () => shake(7, 0.3));
+  ev.on('playerHit', () => shake(2.5, 0.12));
 }
 
 /** @param {{loaded: Promise<void>, shownAt: number}} boot */
@@ -159,17 +90,13 @@ export function startGame(boot) {
 
   const game = new Game(document.getElementById('world'), document.getElementById('world3d'));
   const ui = new UIManager(game);
-  // D76: the menu beam waits for the background work (D77: that work runs under the splash now — warmUp)
   game.menuBusy = () => !!ui.prerendering || Sfx.busy;
   new HUD(game);
   new TouchControls(game);
-  new GrenadeWheel(game); // D61
-  new OffscreenIndicators(game);
-  new DeviceTags(game); // D52
   preloadIcons();
-  const waveSoundStep = wireCombatSounds(game.events, game);
+  wireCombatSounds(game.events, game);
   const weaponAudio = new WeaponAudio(game.events);
-  game.onSimStep = (run, time) => { weaponAudio.update(run, time); waveSoundStep(time); };
+  game.onSimStep = (run, time) => weaponAudio.update(run, time);
   wireCameraShake(game);
 
   // Hidden tab / lost focus / wrong orientation → real pause (same path as the pause button).
@@ -188,30 +115,30 @@ export function startGame(boot) {
 }
 
 /**
- * D77 (user decision): everything the main menu would otherwise do in its first seconds runs under the splash, on the
- * loading bar — the recorded sounds, then the synthesized rest; every map preview; the menu scene (it is already
- * drawn behind the splash) with its beam started; one frame-rate window measured on it (adaptive resolution).
- * Steps that cannot run (no WebGL) are skipped; a stalled step never blocks TAP TO PLAY (WARM.maxSeconds).
+ * D77 (kept): what the main menu would otherwise do in its first seconds runs under the splash, on the loading bar —
+ * the recorded sounds, the characters / textures, the level preview, the menu scene with one frame-rate window
+ * measured on it. Steps that cannot run (no WebGL) are skipped; a stalled step never blocks TAP TO PLAY.
  */
-const WARM = { sounds: 0.3, previews: 0.45, menu: 0.25, maxSeconds: 25, tuneSeconds: 4 };
+const WARM = { sounds: 0.25, assets: 0.35, previews: 0.15, menu: 0.25, maxSeconds: 30, tuneSeconds: 4 };
 async function warmUp(game, ui, progress) {
   const t0 = performance.now();
   const late = () => (performance.now() - t0) / 1000 > WARM.maxSeconds;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   try {
-    await Sfx.loadFiles(SFX_FILES, AUDIO_DIR);                       // recorded files first: no wasted synthesis
+    await Sfx.loadFiles(SFX_FILES, AUDIO_DIR);
     progress(WARM.sounds * 0.4);
     await Sfx.prewarm((k) => progress(WARM.sounds * (0.4 + 0.6 * k)));
     progress(WARM.sounds);
     const r3 = game.renderer3d;
     if (r3) {
-      await ui._prerenderThumbs((k) => progress(WARM.sounds + WARM.previews * k));
-      progress(WARM.sounds + WARM.previews);
-      // the menu scene: its beam starts after calm frames, then one 2 s frame-rate window is measured on it
+      await Promise.race([r3.assetsReady, sleep(WARM.maxSeconds * 1000)]);
+      progress(WARM.sounds + WARM.assets);
+      await ui._prerenderThumbs((k) => progress(WARM.sounds + WARM.assets + WARM.previews * k));
+      progress(WARM.sounds + WARM.assets + WARM.previews);
       const w0 = r3.adaptWindows || 0, s0 = performance.now();
       while (!late() && (performance.now() - s0) / 1000 < WARM.tuneSeconds && !((r3.adaptWindows || 0) > w0)) {
         const k = Math.min(1, (performance.now() - s0) / 1000 / 2.6);
-        progress(WARM.sounds + WARM.previews + WARM.menu * 0.95 * k);
+        progress(WARM.sounds + WARM.assets + WARM.previews + WARM.menu * 0.95 * k);
         await sleep(100);
       }
     }

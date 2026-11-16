@@ -1,37 +1,25 @@
-// Campaign (Phase 7): map order and unlock state from data/maps.js + the profile. Pure helpers — the Economy is the
-// only code that writes the profile (completedMaps / unlockedMaps). Adding a map = adding an entry to MAPS
-// (optional `next` id; otherwise the next map in the list).
-import { MAPS, getMap } from '../data/maps.js';
+// Campaign: level order and unlock state from data/levels + the profile. Pure helpers — core/Progress.js is the only
+// code that writes the profile (completedLevels / unlockedLevels).
+import { LEVELS, getLevel } from '../data/levels/index.js';
 
-/** Id of the map unlocked by winning `id`, or null if it is the last one. */
-export function nextMapId(id) {
-  const m = getMap(id);
+/** Id of the level unlocked by winning `id`, or null if it is the last one. */
+export function nextLevelId(id) {
+  const m = getLevel(id);
   if (!m) return null;
-  if (m.next) return getMap(m.next) ? m.next : null;
-  const i = MAPS.findIndex((x) => x.id === id);
-  return i >= 0 && i < MAPS.length - 1 ? MAPS[i + 1].id : null;
+  if (m.next) return getLevel(m.next) ? m.next : null;
+  const i = LEVELS.findIndex((x) => x.id === id);
+  return i >= 0 && i < LEVELS.length - 1 ? LEVELS[i + 1].id : null;
 }
 
-export const isLastMap = (id) => !nextMapId(id);
+export const isLastLevel = (id) => !nextLevelId(id);
 
-/** Maps the player can open (H5: locked / non-existing maps are not shown). */
-export function unlockedMaps(profile) {
-  return MAPS.filter((m) => profile.unlockedMaps.includes(m.id));
+export function unlockedLevels(profile) {
+  return LEVELS.filter((m) => profile.unlockedLevels.includes(m.id));
 }
 
-/** H5 §11: map select opens on the newest unlocked map that is not cleared yet (else the last unlocked). */
-export function defaultMapSelection(profile) {
-  const open = unlockedMaps(profile);
-  const fresh = open.find((m) => !profile.completedMaps.includes(m.id));
-  return (fresh || open[open.length - 1] || MAPS[0]).id;
-}
-
-/** Campaign totals for the Congrats screen. */
-export function campaignSummary(profile) {
-  return {
-    mapsCleared: profile.completedMaps.length,
-    mapsTotal: MAPS.length,
-    totalKills: profile.statistics.totalKills,
-    level: profile.playerLevel,
-  };
+/** H5 §11: level select opens on the newest unlocked level that is not cleared yet (else the last unlocked). */
+export function defaultLevelSelection(profile) {
+  const open = unlockedLevels(profile);
+  const fresh = open.find((m) => !profile.completedLevels.includes(m.id));
+  return (fresh || open[open.length - 1] || LEVELS[0]).id;
 }

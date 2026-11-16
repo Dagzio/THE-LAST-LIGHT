@@ -16,7 +16,8 @@ class Projectile {
     this.hitIds = new Array(PROJECTILES.maxHitsCap).fill(0);
     this.hitCount = 0;
     this.weaponId = '';
-    this.stats = null;       // a device's level stats (turrets); weapons use weaponId → MapRun stats
+    this.stats = null;       // explicit stats (else weaponId → the run's stats)
+    this.hostile = false;    // KILL LIST: an enemy round (hits the hero only)
     this.spawnedAt = 0;
   }
 
@@ -66,6 +67,7 @@ export class ProjectilePool {
     p.hitCount = 0;
     p.travelled = 0;
     p.stats = null;
+    p.hostile = false;
     return p;
   }
 }

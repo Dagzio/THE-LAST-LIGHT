@@ -1,7 +1,9 @@
-// Projectile movement and hits (04_ARCH §8): swept segment–circle test (no tunnelling at high speed),
-// nearest hit along the segment first, each enemy at most once per bullet, limited distinct targets
-// (1 + penetration). Damage goes through DamageCalculator only.
+// Projectile movement and hits (04_ARCH §8): swept segment–circle test (no tunnelling at high speed), nearest hit along
+// the segment first, each target at most once per bullet, limited distinct targets (1 + penetration). Damage goes
+// through DamageCalculator only. KILL LIST (D78): enemy rounds (`hostile`) hit only the hero — never other enemies —
+// and fly through him while he rolls (dodge invulnerability). Walls / closed doors / tall furniture stop every round.
 import { computeDamage, hitDirectionMult, NEUTRAL_MODIFIERS } from './DamageCalculator.js';
+import { PLAYER } from '../data/player.js';
 
 export class ProjectileSystem {
   /**
@@ -16,10 +18,10 @@ export class ProjectileSystem {
     this.events = events;
     this.getWeaponStats = getWeaponStats;
     this.modifiers = NEUTRAL_MODIFIERS;
-    /** @type {((amount:number)=>void)|null} damage dealt by the keeper's own bullets (D52 vampirism), set by the map run */
-    this.onKeeperHit = null;
-    /** @type {import('./Collision.js').CollisionWorld|null} bullets stop at decor / beacon / pads / kiosk (D40) */
+    /** @type {import('./Collision.js').CollisionWorld|null} */
     this.world = null;
+    /** @type {import('../entities/Player.js').Player|null} target of hostile rounds */
+    this.player = null;
   }
 
   update(enemies, dt, time) {
@@ -32,23 +34,53 @@ export class ProjectileSystem {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.travelled += Math.hypot(p.vx, p.vy) * dt;
-      this._collide(p, enemies, time);
+      if (p.hostile) this._collideHero(p, time);
+      else this._collide(p, enemies, time);
       if (p.active && p.travelled >= p.maxDistance) this.pool.release(p);
     }
+  }
+
+  _wall(p) {
+    return this.world ? this.world.segmentHit(p.prevX, p.prevY, p.x, p.y, p.radius) : Infinity;
+  }
+
+  _blocked(p, t) {
+    const ex = p.x - p.prevX, ey = p.y - p.prevY;
+    this.events.emit('bulletBlocked', p.prevX + ex * t, p.prevY + ey * t, p.angle);
+    this.pool.release(p);
+  }
+
+  /** An enemy round: the hero (unless rolling) or the first wall on this step's segment. */
+  _collideHero(p, time) {
+    const wallT = this._wall(p);
+    const h = this.player;
+    if (h && h.alive && !h.isInvulnerable(time)) {
+      const sx = p.prevX, sy = p.prevY, ex = p.x - sx, ey = p.y - sy;
+      const l2 = ex * ex + ey * ey;
+      let t = l2 > 0 ? ((h.x - sx) * ex + (h.y - sy) * ey) / l2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const cx = sx + ex * t - h.x, cy = sy + ey * t - h.y, rr = h.radius + p.radius;
+      if (cx * cx + cy * cy <= rr * rr && t < wallT) {
+        const stats = p.stats || this.getWeaponStats(p.weaponId);
+        const applied = h.applyDamage(stats.damage, time, PLAYER.hitInvulnerability);
+        if (applied > 0) this.events.emit('playerHit', sx + ex * t, sy + ey * t, applied, p.weaponId, p.angle);
+        this.pool.release(p);
+        return;
+      }
+    }
+    if (wallT !== Infinity) this._blocked(p, wallT);
   }
 
   _collide(p, enemies, time) {
     const sx = p.prevX, sy = p.prevY;
     const ex = p.x - sx, ey = p.y - sy;
     const segLen2 = ex * ex + ey * ey;
-    // First static obstacle on this step's segment: enemies behind it are not hit.
-    const wallT = this.world ? this.world.segmentHit(sx, sy, p.x, p.y, p.radius) : Infinity;
+    const wallT = this._wall(p); // first static obstacle: enemies behind it are not hit
     while (p.hitsLeft > 0) {
       let hit = null, hitT = wallT;
       for (let j = 0; j < enemies.length; j++) {
         const e = enemies[j];
         if (!e.alive || p.hasHit(e.id)) continue;
-        // closest point of the segment to the enemy center
         let t = segLen2 > 0 ? ((e.x - sx) * ex + (e.y - sy) * ey) / segLen2 : 0;
         t = t < 0 ? 0 : t > 1 ? 1 : t;
         const cx = sx + ex * t - e.x, cy = sy + ey * t - e.y;
@@ -58,27 +90,13 @@ export class ProjectileSystem {
       if (!hit) break;
       p.markHit(hit.id);
       const stats = p.stats || this.getWeaponStats(p.weaponId);
-      const r = computeDamage(stats.damage, stats, hit, this.modifiers, this.rng, hitDirectionMult(hit, p.vx, p.vy)); // D52 side / back
+      const r = computeDamage(stats.damage, stats, hit, this.modifiers, this.rng, hitDirectionMult(hit, p.vx, p.vy));
       const killed = hit.applyDamage(r.amount, time);
       const hx = sx + ex * hitT, hy = sy + ey * hitT;
-      this.events.emit('hit', hx, hy, r.amount, r.crit);
-      if (!p.stats && this.onKeeperHit) this.onKeeperHit(r.amount); // D52 VAMPIRISM (turret rounds carry their own stats)
+      this.events.emit('hit', hx, hy, r.amount, r.crit, hit, p.angle);
       if (killed) this.events.emit('kill', hit, time);
-      else {
-        if (stats.slowOnHit > 0) hit.applySlow(stats.slowOnHit, stats.slowDuration, time); // Frost Coil rounds (D50)
-        if (stats.poisonDps > 0) hit.applyPoison(stats.poisonDps, stats.poisonDuration, stats.poisonTick, time); // D51
-        if (stats.knockback > 0 && !hit.type.boss) { // HEAVY_IMPACT perk: a small shove along the bullet
-          const v = Math.hypot(p.vx, p.vy) || 1;
-          hit.pushVX = (p.vx / v) * (stats.knockback / 0.12);
-          hit.pushVY = (p.vy / v) * (stats.knockback / 0.12);
-          hit.pushUntil = time + 0.12;
-        }
-      }
       if (p.hitsLeft <= 0) { this.pool.release(p); return; }
     }
-    if (wallT !== Infinity && p.active) { // still flying and the segment reaches an obstacle → it stops there
-      this.events.emit('bulletBlocked', sx + ex * wallT, sy + ey * wallT, p.angle);
-      this.pool.release(p);
-    }
+    if (wallT !== Infinity && p.active) this._blocked(p, wallT);
   }
 }

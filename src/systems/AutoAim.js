@@ -3,7 +3,6 @@
 // Pure simulation (no DOM): MapRun calls it on touch devices. D75: only enemies already on the screen (inView), and
 // the mobile version has no manual fire at all.
 import { AUTO_AIM } from '../data/player.js';
-import { ENEMY_STATES } from '../entities/Enemy.js';
 
 export class AutoAim {
   constructor(cfg = AUTO_AIM) {
@@ -18,7 +17,7 @@ export class AutoAim {
   reset() { this.target = null; }
 
   _valid(e, p, reach) {
-    if (!e || !e.alive || e.state === ENEMY_STATES.SPAWNING) return false;
+    if (!e || !e.alive) return false;
     const d = Math.hypot(e.x - p.x, e.y - p.y) - (e.radius || 0);
     if (!(d <= reach)) return false;
     if (this.inView && !this.inView(e.x, e.y)) return false; // D75: never at an enemy still off the screen

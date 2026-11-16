@@ -1,6 +1,7 @@
 // Game: owns the runtime (state machine, clock, loop, input, renderers) and exposes domain commands for the UI.
 // The UI never changes state directly — it calls these commands.
-// Rendering: menus use the 2D canvas backdrop (#world); a map run is drawn in top-down 3D by three.js (#world3d).
+// Rendering: menus use the 3D office flyover (or the 2D canvas backdrop without WebGL); a level run is drawn in
+// top-down 3D by three.js (#world3d). KILL LIST (D78): story levels (data/levels) instead of the wave maps.
 import { GameStateMachine, STATES } from './GameStateMachine.js';
 import { GameClock } from './GameClock.js';
 import { GameLoop } from './GameLoop.js';
@@ -11,23 +12,17 @@ import { Prefs } from '../platform/Prefs.js';
 import { Renderer } from '../render/Renderer.js';
 import { Renderer3D } from '../render3d/Renderer3D.js';
 import { GameEvents } from './GameEvents.js';
-import { MapRun } from './MapRun.js';
+import { MissionRun } from './MissionRun.js';
+import { Progress } from './Progress.js';
 import { createRunSeed } from './SeededRandom.js';
 import { QUALITY_LEVELS, QUALITY_PRESETS, resolveAutoQuality } from '../config/settings.js';
-import { getMap, MAPS } from '../data/maps.js';
-import { getDefense, upgradeBasePrice, MAX_DEVICE_LEVEL } from '../data/defenses.js';
-import { shopPrice, sellRefund } from '../data/upgrades.js';
-import { getGrenade, GRENADE_RULES } from '../data/grenades.js';
-import { HEALS } from '../data/heals.js';
+import { getLevel, LEVELS } from '../data/levels/index.js';
 import { AUTO_AIM } from '../data/player.js';
-import { SaveManager } from './SaveManager.js';
-import { Economy, REASON } from '../systems/Economy.js';
-import { nextMapId, isLastMap, defaultMapSelection, campaignSummary } from '../systems/Campaign.js';
-import { TutorialSystem } from '../systems/TutorialSystem.js';
-import { CHEATS, CHEAT_COINS } from '../config/constants.js';
+import { nextLevelId, isLastLevel, defaultLevelSelection } from '../systems/Campaign.js';
+import { CHEATS } from '../config/constants.js';
 
 export class Game {
-  /** @param {HTMLCanvasElement} canvas2d menu backdrop @param {HTMLCanvasElement} canvas3d map run */
+  /** @param {HTMLCanvasElement} canvas2d menu backdrop @param {HTMLCanvasElement} canvas3d level run */
   constructor(canvas2d, canvas3d) {
     this.sm = new GameStateMachine(STATES.BOOT);
     this.clock = new GameClock();
@@ -48,49 +43,41 @@ export class Game {
         return pt.x >= inset && pt.x <= r3.viewW - inset && pt.y >= inset && pt.y <= r3.viewH - inset;
       };
     } catch (e) {
-      console.error('WebGL renderer could not be created', e); // the menus keep working; a map cannot start
+      console.error('WebGL renderer could not be created', e); // the menus keep working; a level cannot start
     }
     this.loop = new GameLoop({ update: (dt) => this.update(dt), render: (a, fdt) => this.render(a, fdt) });
     this.loop.fpsCap = QUALITY_PRESETS[this.quality].fpsCap;
 
     this.presentationTime = 0;   // real time for menu decoration only (not simulation)
-    /** @type {(() => boolean) | null} D76: set by main.js — background work (map previews, sounds) still running */
+    /** @type {(() => boolean) | null} set by main.js — background work (previews, sounds) still running */
     this.menuBusy = null;
-    /** @type {((run: MapRun, time: number) => void) | null} set by main.js: called after every simulation step */
+    /** @type {((run: MissionRun, time: number) => void) | null} set by main.js: called after every simulation step */
     this.onSimStep = null;
-    this.selectedMapId = MAPS[0].id;
+    this.selectedMapId = LEVELS[0].id;
     this.mapId = null;
     this.events = new GameEvents();  // presentation hooks: sound, particles, HUD
-    this.run = null;                 // MapRun of the current map attempt
+    this.run = null;                 // MissionRun of the current level attempt
     this._view = { scene: 'backdrop', realTime: 0, simTime: 0, quality: this.quality };
     this.frameListeners = new Set();
-    // Permanent progression: the economy is the only owner of the PlayerProfile (saved after every change).
-    this.economy = new Economy(new SaveManager(), this.events);
-    this.resumeState = STATES.RUNNING; // where PAUSED returns to (RUNNING or SHOP_OPEN)
+    this.progress = new Progress();  // the only owner of the profile
+    this.economy = this.progress;    // (legacy name read by a few UI parts: loadStatus)
 
-    // Defeat / victory are reported once by the MapRun; the state machine ignores repeats.
-    // The profile is updated first, so the results / Congrats screen shown on the state change reads final numbers.
+    // Defeat / victory are reported once by the run; the profile is updated first, then the state changes.
     this.events.on('mapDefeat', () => {
-      if (this.run) this.economy.recordMapResult(this.run.mapId, false);
+      if (this.run) this.progress.recordLevelResult(this.run);
       this.sm.set(STATES.MAP_DEFEAT);
     });
-    this.events.on('mapVictory', (mapId) => {
-      this.economy.recordMapResult(mapId, true);
+    this.events.on('mapVictory', () => {
+      if (this.run) this.progress.recordLevelResult(this.run);
       this.sm.set(STATES.MAP_VICTORY);
     });
-    // Rewards: the MapRun reports each kill / wave / map completion exactly once.
-    this.events.on('killReward', (reward) => this.economy.grantKill(reward));
-    this.events.on('coinReward', (amount) => this.economy.grantCoins(amount));
-
-    this.tutorial = new TutorialSystem(this); // hints for the first map (D11 / D43)
 
     this.sm.onChange((next) => {
-      // Edge presses made while the world was frozen must not fire on resume.
-      if (next === STATES.RUNNING) this.input.clearPressed();
-      if (next === STATES.PAUSED || next === STATES.SHOP_OPEN || next === STATES.CRATE_REWARD_OPEN || next === STATES.TUTORIAL) this.input.releaseAll();
-      if (next !== STATES.RUNNING && this.run) this.run.cancelGrenadeAim(); // never thrown on resume
-      if (next !== STATES.RUNNING) this.setTimeScale(1); // D61: the grenade wheel closes with the pause
-      if (this.renderer3d) this.renderer3d.pausedDrawn = false; // redraw once with the new overlay state
+      if (next === STATES.RUNNING) this.input.clearPressed(); // edge presses made while frozen must not fire on resume
+      if (next === STATES.PAUSED) this.input.releaseAll();
+      if (next !== STATES.RUNNING && this.run) this.run.cancelGrenadeAim();
+      if (next !== STATES.RUNNING) this.setTimeScale(1);
+      if (this.renderer3d) this.renderer3d.pausedDrawn = false;
     });
   }
 
@@ -106,19 +93,13 @@ export class Game {
   // ---------------- simulation ----------------
   update(dt) {
     if (!this.sm.simulating) return;
-    // Shaders still compiling or the WebGL context is lost: the game waits (H5 3D guide §5.3).
-    if (this.renderer3d && this.renderer3d.busy()) return;
+    if (this.renderer3d && this.renderer3d.busy()) return; // shaders compiling / context lost: the game waits
     this.clock.advance(dt);
-    // E: open the crate in reach, else the shop at the kiosk (prep / intermission) — top-level state changes.
-    if (this.run && this.input.consumePressed('interact')) {
-      if (this.run.canOpenCrate) { this.openCrate(); return; }
-      if (this.run.canShop) { this.openShop(); return; }
-    }
     if (this.run) {
-      this.run.autoFire = !!this.touchMode; // D74: the mobile version shoots by itself
-      this.run.autoAim.inView = this.inView || null; // D75: …at enemies on the screen only
+      this.run.autoFire = !!this.touchMode;              // D74: the mobile version shoots by itself
+      this.run.autoAim.inView = this.inView || null;      // D75: at enemies on the screen only
       this.run.update(this.input, dt, this.clock.time);
-      if (this.onSimStep) this.onSimStep(this.run, this.clock.time); // presentation on the sim clock (weapon audio)
+      if (this.onSimStep) this.onSimStep(this.run, this.clock.time);
     }
   }
 
@@ -128,7 +109,7 @@ export class Game {
     if (this.sm.inMap && this.run && this.renderer3d) {
       this.renderer3d.render(this.run, frameDt, this.clock.time, !this.sm.is(STATES.RUNNING), alpha);
     } else if (this.renderer3d && this.renderer3d.renderMenu(this.presentationTime, frameDt, !!(this.menuBusy && this.menuBusy()))) {
-      document.body.classList.add('menu3d'); // D46: the 3D lighthouse scene is the menu backdrop
+      document.body.classList.add('menu3d');
     } else {
       document.body.classList.remove('menu3d');
       this.viewport.ensure();
@@ -164,369 +145,92 @@ export class Game {
 
   showTapToPlay() { return this.sm.set(STATES.TAP_TO_PLAY); }
 
-  /** Map select opens on the newest unlocked, not yet cleared map (H5 §11). */
+  /** Level select opens on the newest unlocked, not yet cleared level (H5 §11). */
   openMapSelect() {
-    this.selectedMapId = defaultMapSelection(this.economy.profile);
+    this.selectedMapId = defaultLevelSelection(this.progress.profile);
     return this.sm.set(STATES.MAP_SELECT);
   }
 
   backToMenu() { return this.sm.set(STATES.MAIN_MENU); }
 
-  isMapUnlocked(id) { return this.economy.profile.unlockedMaps.includes(id); }
+  isMapUnlocked(id) { return this.progress.profile.unlockedLevels.includes(id); }
 
-  // ---------------- test cheats (constants.js → CHEATS = false in a release) ----------------
-  /** Main menu logo tap: every map opens. @returns {boolean} something changed */
-  cheatUnlockAllMaps() { return CHEATS && this.economy.cheatUnlockAllMaps() > 0; }
+  isMapCleared(id) { return this.progress.profile.completedLevels.includes(id); }
 
-  /** Coin balance tap (HUD / shop): +CHEAT_COINS; the HUD shows the "+N" pop. */
-  cheatCoins() {
-    if (!CHEATS) return false;
-    this.economy.grantCoins(CHEAT_COINS);
-    this.events.emit('cheatCoins', CHEAT_COINS);
-    return true;
-  }
+  /** Test cheat (CHEATS): main menu logo tap → every level opens. @returns {boolean} something changed */
+  cheatUnlockAllMaps() { return CHEATS && this.progress.cheatUnlockAll() > 0; }
 
-  selectMap(id) { if (getMap(id) && this.isMapUnlocked(id)) this.selectedMapId = id; }
+  selectMap(id) { if (getLevel(id) && this.isMapUnlocked(id)) this.selectedMapId = id; }
 
-  /** Starts the selected (unlocked) map with a fresh MapRun. Guarded against double start. */
+  /** Starts the selected (unlocked) level with a fresh run. Guarded against a double start. */
   beginMap() {
-    const map = getMap(this.selectedMapId);
-    if (!this.sm.is(STATES.MAP_SELECT) || !map || !this.renderer3d || !this.isMapUnlocked(map.id)) return false;
-    return this._startRun(map);
+    const level = getLevel(this.selectedMapId);
+    if (!this.sm.is(STATES.MAP_SELECT) || !level || !this.renderer3d || !this.isMapUnlocked(level.id)) return false;
+    return this._startRun(level);
   }
 
-  /** CONTINUE after a victory (not the last map): back to map select with the next map selected. */
+  /** CONTINUE after a victory (not the last level): back to level select with the next level selected. */
   continueCampaign() {
     if (!this.sm.is(STATES.MAP_VICTORY) || !this.run) return false;
-    const next = nextMapId(this.run.mapId);
+    const next = nextLevelId(this.run.mapId);
     this.exitToMenu();
-    this.selectedMapId = next && this.isMapUnlocked(next) ? next : defaultMapSelection(this.economy.profile);
+    this.selectedMapId = next && this.isMapUnlocked(next) ? next : defaultLevelSelection(this.progress.profile);
     return this.sm.set(STATES.MAP_SELECT);
   }
 
-  /**
-   * Read-only summary of the finished map run for the results / Congrats screen. Rewards were already booked once
-   * during the run — showing (or re-opening) this screen never grants anything.
-   */
+  /** Read-only summary of the finished level for the results screen (recording happened once already). */
   resultSummary() {
     const r = this.run;
     if (!r || !r.over) return null;
     return {
-      won: r.victory, reason: r.defeat, mapId: r.mapId, mapNameKey: r.map.nameKey,
-      waves: r.stats.wavesCleared, wavesTotal: r.waves.total, kills: r.stats.kills,
-      coins: r.rewards.coins, xp: r.rewards.xp, last: r.victory && isLastMap(r.mapId),
-      campaign: campaignSummary(this.economy.profile),
+      won: r.victory, reason: r.defeat, mapId: r.mapId, mapNameKey: r.level.nameKey,
+      time: r.stats.time, kills: r.stats.kills, shots: r.stats.shotsFired, hits: r.stats.hits,
+      damageTaken: Math.round(r.stats.damageTaken), ghost: !r.stats.spotted,
+      best: this.progress.profile.bestTimes[r.mapId] || 0,
+      last: r.victory && isLastLevel(r.mapId),
     };
   }
 
-  /** RETRY / PLAY AGAIN after the map is over: a completely fresh run of the same map (01_GDD §15). */
+  /** RETRY / PLAY AGAIN after the level is over: a completely fresh run of the same level. */
   retryMap() {
-    const map = getMap(this.mapId);
-    if (!this.sm.mapOver || !map) return false;
-    return this._startRun(map);
+    const level = getLevel(this.mapId);
+    if (!this.sm.mapOver || !level) return false;
+    return this._startRun(level);
   }
 
-  /** Emergency Flare from the HUD button (desktop click); keyboard Q / touch go through the input actions. */
-  /** D61: game speed while the grenade wheel is open (1 = normal). Presentation-side controller, sim stays fixed-step. */
+  /** Game speed (1 = normal). Presentation-side controller, the simulation stays fixed-step. */
   setTimeScale(k) { this.loop.timeScale = Number.isFinite(k) && k > 0 ? Math.min(1, k) : 1; }
 
-  /** D61: arm a grenade type for the next shot (the next fire press aims it, the release throws). */
-  armGrenade(type) { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.armGrenade(type)); }
-  disarmGrenade() { if (this.run) this.run.grenadeArmed = null; }
+  /** G / the grenade button: arm a frag grenade (a second press puts it away). */
+  armGrenade(type = 'frag') { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.armGrenade(type)); }
 
-  useFlare() {
-    if (!this.sm.is(STATES.RUNNING) || !this.run) return false;
-    return this.run.useFlare(this.clock.time);
-  }
+  /** Q / the HUD weapon block: the next carried weapon. */
+  switchWeapon(id = null) { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.switchWeapon(id)); }
 
-  /** START NEXT WAVE (HUD): only while the map runs; the run ignores it outside the intro / intermission. */
-  startNextWave() {
-    if (!this.run) return false;
-    if (this.sm.is(STATES.SHOP_OPEN)) { if (!this.run.betweenWaves) return false; this.closeShop(); } // from inside the shop
-    if (!this.sm.is(STATES.RUNNING)) return false;
-    return this.run.startNextWave(this.clock.time);
-  }
+  /** E / the touch button / the label: open the crate in reach. */
+  interact() { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.interact(this.clock.time)); }
 
-  _startRun(map) {
-    this.mapId = map.id;
+  _startRun(level) {
+    this.mapId = level.id;
     this.clock.reset();
     this._disposeRun();
-    this.run = new MapRun(map, createRunSeed(), this.events, this.economy.loadout());
+    this.run = new MissionRun(level, createRunSeed(), this.events);
     this.run.particles.setQualityFactor(QUALITY_PRESETS[this.quality].particles);
-    this.renderer3d.loadMap(map, this.run.player.x, this.run.player.y); // warm-up: no step until shaders are ready
+    this.renderer3d.loadMap(level, this.run.player.x, this.run.player.y); // warm-up: no step until shaders are ready
     this.input.pointerMapper = (cx, cy, out) => this.renderer3d.screenToGround(cx, cy, out);
     this.input.releaseAll();
     this.loop.resetTiming();
     const ok = this.sm.set(STATES.RUNNING);
-    if (ok) this.events.emit('mapStarted', map.id); // tutorial: the first hint (beacon)
+    if (ok) this.events.emit('mapStarted', level.id);
     return ok;
   }
 
-  /** Pause from the map or from the open shop; resume returns exactly there (02_SPEC §2, C3). */
-  pause() {
-    if ([STATES.RUNNING, STATES.SHOP_OPEN, STATES.CRATE_REWARD_OPEN, STATES.TUTORIAL].includes(this.sm.state)) this.resumeState = this.sm.state;
-    return this.sm.set(STATES.PAUSED);
-  }
+  /** Pause from the level; resume returns there (02_SPEC §2, C3). */
+  pause() { return this.sm.set(STATES.PAUSED); }
 
-  resume() {
-    const back = [STATES.SHOP_OPEN, STATES.CRATE_REWARD_OPEN, STATES.TUTORIAL].includes(this.resumeState) ? this.resumeState : STATES.RUNNING;
-    return this.sm.set(back);
-  }
+  resume() { return this.sm.set(STATES.RUNNING); }
 
-  // ---------------- crate (02_SPEC §14): the world is frozen until ONE perk is chosen ----------------
-  openCrate() {
-    if (!this.sm.is(STATES.RUNNING) || !this.run || !this.run.canOpenCrate) return false;
-    if (!this.run.openCrate(this.clock.time)) return false;
-    return this.sm.set(STATES.CRATE_REWARD_OPEN);
-  }
-
-  chooseCratePerk(id) {
-    if (!this.sm.is(STATES.CRATE_REWARD_OPEN) || !this.run) return false;
-    if (!this.run.choosePerk(id)) return false;
-    return this.sm.set(STATES.RUNNING);
-  }
-
-  // ---------------- grenades (shop, one at a time, cap per type) ----------------
-  grenadeOffer(type) {
-    const G = getGrenade(type);
-    const run = this.run;
-    const o = { type, price: G ? shopPrice(G.price) : 0, requiredLevel: G ? G.requiredPlayerLevel : 1,
-      stock: run ? run.grenades.stock[type] | 0 : 0, cap: GRENADE_RULES.capPerType, canBuy: false, reason: null };
-    if (!G) o.reason = REASON.UNKNOWN;
-    else if (!this.shopOpen || !run || !run.betweenWaves) o.reason = REASON.CLOSED;
-    else if (this.economy.level < G.requiredPlayerLevel) o.reason = REASON.LEVEL;
-    else if (o.stock >= o.cap) o.reason = 'cap';
-    else if (this.economy.coins < o.price) o.reason = REASON.COINS;
-    else o.canBuy = true;
-    return o;
-  }
-
-  shopBuyGrenade(type) {
-    const o = this.grenadeOffer(type);
-    if (!o.canBuy) return { ok: false, reason: o.reason };
-    if (!this.economy.spend(o.price)) return { ok: false, reason: REASON.COINS };
-    this.run.grenades.add(type, 1);
-    this.events.emit('purchase', 'grenade', type);
-    return { ok: true };
-  }
-
-  /** HUD grenade slot tap / click: select a type that is in stock. */
-  selectGrenade(type) { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.grenades.select(type)); }
-
-  // ---------------- shop (02_SPEC §12): opening freezes the world and the intermission timer ----------------
-  openShop() {
-    if (!this.sm.is(STATES.RUNNING) || !this.run || !this.run.canShop) return false;
-    return this.sm.set(STATES.SHOP_OPEN);
-  }
-
-  closeShop() { return this.sm.is(STATES.SHOP_OPEN) && this.sm.set(STATES.RUNNING); }
-
-  get shopOpen() { return this.sm.is(STATES.SHOP_OPEN); }
-
-  /** After a profile purchase/equip: the current run gets the new stats (between waves). */
-  _afterProfileChange(result) {
-    if (result.ok && this.run) this.run.applyLoadout(this.economy.loadout());
-    return result;
-  }
-
-  shopBuyWeapon(id) { return this.shopOpen ? this._afterProfileChange(this.economy.buyWeapon(id)) : { ok: false, reason: REASON.CLOSED }; }
-
-  shopEquipWeapon(id) { return this.shopOpen ? this._afterProfileChange(this.economy.equipWeapon(id)) : { ok: false, reason: REASON.CLOSED }; }
-
-  shopBuyWeaponUpgrade(weaponId, nodeId) {
-    return this.shopOpen ? this._afterProfileChange(this.economy.buyWeaponUpgrade(weaponId, nodeId)) : { ok: false, reason: REASON.CLOSED };
-  }
-
-  shopBuyPlayerUpgrade(id) { return this.shopOpen ? this._afterProfileChange(this.economy.buyPlayerUpgrade(id)) : { ok: false, reason: REASON.CLOSED }; }
-
-  /**
-   * Defense device on a pad for this map run (D50): a device already bought on this pad is installed for free;
-   * a new one is validate → debit (profile coins) → place (the installed one goes to the pad's storage).
-   */
-  shopBuyDefense(padIndex, defenseId) {
-    const offer = this.defenseOffer(padIndex, defenseId);
-    if (!offer.canBuy) return { ok: false, reason: offer.reason };
-    const ds = this.run.defenses;
-    if (offer.owned) return { ok: ds.equip(padIndex, defenseId, this.clock.time), equip: true };
-    if (!this.economy.spend(offer.price)) return { ok: false, reason: REASON.COINS };
-    const placed = ds.place(padIndex, defenseId, this.clock.time);
-    if (!placed) { this.economy.grantCoins(offer.price); return { ok: false, reason: REASON.UNKNOWN }; } // never lose coins
-    ds.addSpent(padIndex, defenseId, offer.price);
-    this.events.emit('purchase', 'defense', defenseId, padIndex);
-    return { ok: true };
-  }
-
-  /** UPGRADE of the installed device (D50): validate → debit → level + 1 (stats and model change). */
-  shopUpgradeDefense(padIndex) {
-    const o = this.defenseUpgradeOffer(padIndex);
-    if (!o.canBuy) return { ok: false, reason: o.reason };
-    if (!this.economy.spend(o.price)) return { ok: false, reason: REASON.COINS };
-    if (!this.run.defenses.upgrade(padIndex, this.clock.time)) { this.economy.grantCoins(o.price); return { ok: false, reason: REASON.UNKNOWN }; }
-    this.run.defenses.addSpent(padIndex, o.defenseId, o.price);
-    this.events.emit('purchase', 'defenseUpgrade', o.defenseId, padIndex);
-    return { ok: true };
-  }
-
-  /**
-   * D63: selling a device bought on a pad (installed or in the pad's storage) returns half of the coins spent on it in
-   * this map run (buy + upgrades + repairs). Only in the shop, between waves.
-   * @returns {{padIndex, defenseId, refund, canSell, reason}}
-   */
-  defenseSellOffer(padIndex, defenseId) {
-    const ds = this.run && this.run.defenses;
-    const o = { padIndex, defenseId, refund: 0, canSell: false, reason: null };
-    if (!this.shopOpen || !this.run || !this.run.betweenWaves) o.reason = REASON.CLOSED;
-    else if (!ds.ownedLevel(padIndex, defenseId)) o.reason = REASON.NOT_OWNED;
-    else { o.refund = sellRefund(ds.spentOn(padIndex, defenseId)); o.canSell = true; }
-    return o;
-  }
-
-  shopSellDefense(padIndex, defenseId) {
-    const o = this.defenseSellOffer(padIndex, defenseId);
-    if (!o.canSell) return { ok: false, reason: o.reason };
-    if (this.run.defenses.sell(padIndex, defenseId) < 0) return { ok: false, reason: REASON.UNKNOWN };
-    this.economy.grantCoins(o.refund);
-    this.events.emit('sale', 'defense', defenseId, o.refund);
-    return { ok: true, refund: o.refund };
-  }
-
-  /** D63: sell an owned weapon (not the starting pistol) for half of what was spent on it. */
-  shopSellWeapon(id) { return this.shopOpen ? this._afterProfileChange(this.economy.sellWeapon(id)) : { ok: false, reason: REASON.CLOSED }; }
-
-  /** @returns {{padIndex, defenseId, level, max, price, canBuy, reason}} upgrade of the device installed on a pad */
-  defenseUpgradeOffer(padIndex) {
-    const pad = this.run && this.run.defenses.pads[padIndex];
-    const d = pad && pad.device;
-    const o = { padIndex, defenseId: d ? d.id : null, level: d ? d.level : 0, max: MAX_DEVICE_LEVEL, price: 0, canBuy: false, reason: null };
-    if (!this.shopOpen || !this.run || !this.run.betweenWaves) o.reason = REASON.CLOSED;
-    else if (!d) o.reason = REASON.UNKNOWN;
-    else if (d.level >= MAX_DEVICE_LEVEL) o.reason = REASON.MAX;
-    else {
-      o.price = shopPrice(upgradeBasePrice(d.id, d.level));
-      if (this.economy.coins < o.price) o.reason = REASON.COINS;
-      else o.canBuy = true;
-    }
-    return o;
-  }
-
-  /** Beacon repair to full (D40): validate → debit → repair. Not discounted (its price is set directly). */
-  repairOffer() {
-    const run = this.run;
-    const cost = run ? run.beaconRepairCost() : 0;
-    const o = { cost, canBuy: false, reason: null };
-    if (!this.shopOpen || !run || !run.betweenWaves) o.reason = REASON.CLOSED;
-    else if (cost <= 0) o.reason = 'full';
-    else if (this.economy.coins < cost) o.reason = REASON.COINS;
-    else o.canBuy = true;
-    return o;
-  }
-
-  shopRepairBeacon() {
-    const o = this.repairOffer();
-    if (!o.canBuy) return { ok: false, reason: o.reason };
-    return this._repairBeacon(o.cost);
-  }
-
-  /**
-   * HUD repair button (D46): the same full repair at the same price, available any time while the map runs
-   * (also during a wave), without going to the kiosk.
-   */
-  hudRepairOffer() {
-    const run = this.run;
-    const cost = run ? run.beaconRepairCost() : 0;
-    const o = { cost, canBuy: false, reason: null };
-    if (!run || run.over || !this.sm.is(STATES.RUNNING)) o.reason = REASON.CLOSED;
-    else if (cost <= 0) o.reason = 'full';
-    else if (this.economy.coins < cost) o.reason = REASON.COINS;
-    else o.canBuy = true;
-    return o;
-  }
-
-  hudRepairBeacon() {
-    const o = this.hudRepairOffer();
-    if (!o.canBuy) return { ok: false, reason: o.reason };
-    return this._repairBeacon(o.cost);
-  }
-
-  _repairBeacon(cost) {
-    if (!this.economy.spend(cost)) return { ok: false, reason: REASON.COINS };
-    const b = this.run.beacon;
-    b.repair(b.maxIntegrity - b.integrity);
-    this.events.emit('purchase', 'repair', cost);
-    return { ok: true };
-  }
-
-  /**
-   * D52 device repair to full (price like the beacon, data/defenses.js DEVICE_HP). `anyTime` — the small wrench next
-   * to the device's world HP bar works while the map runs (also during a wave); the shop card only between waves.
-   */
-  deviceRepairOffer(padIndex, anyTime = false) {
-    const run = this.run;
-    const cost = run ? run.deviceRepairCost(padIndex) : 0;
-    const o = { padIndex, cost, canBuy: false, reason: null };
-    const open = anyTime ? run && !run.over && this.sm.is(STATES.RUNNING) : this.shopOpen && run && run.betweenWaves;
-    if (!open) o.reason = REASON.CLOSED;
-    else if (cost <= 0) o.reason = 'full';
-    else if (this.economy.coins < cost) o.reason = REASON.COINS;
-    else o.canBuy = true;
-    return o;
-  }
-
-  shopRepairDevice(padIndex) { return this._repairDevice(this.deviceRepairOffer(padIndex, false)); }
-
-  hudRepairDevice(padIndex) { return this._repairDevice(this.deviceRepairOffer(padIndex, true)); }
-
-  _repairDevice(o) {
-    if (!o.canBuy) return { ok: false, reason: o.reason };
-    if (!this.economy.spend(o.cost)) return { ok: false, reason: REASON.COINS };
-    const dev = this.run.defenses.pads[o.padIndex].device;
-    if (!this.run.defenses.repair(o.padIndex, this.clock.time)) { this.economy.grantCoins(o.cost); return { ok: false, reason: REASON.UNKNOWN }; }
-    this.run.defenses.addSpent(o.padIndex, dev.id, o.cost); // D63: a repair counts as coins put into the device
-    this.events.emit('purchase', 'deviceRepair', o.padIndex, o.cost);
-    return { ok: true };
-  }
-
-  /** D52 shop heal: validate (kiosk open, between waves, keeper hurt, coins) → debit → heal pct of max HP. */
-  healOffer(id) {
-    const H = HEALS[id], run = this.run, p = run && run.player;
-    const o = { id, price: H ? H.price : 0, canBuy: false, reason: null };
-    if (!H) o.reason = REASON.UNKNOWN;
-    else if (!this.shopOpen || !run || !run.betweenWaves || !p.alive) o.reason = REASON.CLOSED;
-    else if (p.hp >= p.maxHp) o.reason = 'fullHp';
-    else if (this.economy.coins < o.price) o.reason = REASON.COINS;
-    else o.canBuy = true;
-    return o;
-  }
-
-  shopHeal(id) {
-    const o = this.healOffer(id);
-    if (!o.canBuy) return { ok: false, reason: o.reason };
-    if (!this.economy.spend(o.price)) return { ok: false, reason: REASON.COINS };
-    const p = this.run.player;
-    p.hp = Math.min(p.maxHp, p.hp + p.maxHp * HEALS[id].pct);
-    this.events.emit('purchase', 'heal', id);
-    return { ok: true };
-  }
-
-  /**
-   * @returns {{padIndex, defenseId, price, owned, level, installed, canBuy, reason}} buy (new on this pad) or a free
-   * install (already bought on this pad, D50). `installed` — it is the pad's active device (nothing to do).
-   */
-  defenseOffer(padIndex, defenseId) {
-    const d = getDefense(defenseId);
-    const pad = this.run && this.run.defenses.pads[padIndex];
-    const level = pad ? pad.owned[defenseId] | 0 : 0;
-    const installed = !!(pad && pad.device && pad.device.id === defenseId);
-    const o = { padIndex, defenseId, price: d && !level ? shopPrice(d.price) : 0, owned: level > 0, level, installed, canBuy: false, reason: null };
-    if (!this.shopOpen || !this.run || !this.run.betweenWaves) o.reason = REASON.CLOSED;
-    else if (!d || !pad) o.reason = REASON.UNKNOWN;
-    else if (installed) o.reason = REASON.OWNED;
-    else if (!o.owned && this.economy.coins < o.price) o.reason = REASON.COINS;
-    else o.canBuy = true;
-    return o;
-  }
-
-  /** Leaves the map (after the exit confirmation). The map run is discarded. */
+  /** Leaves the level (after the exit confirmation). The run is discarded. */
   exitToMenu() {
     if (!this.sm.inMap) return false;
     this.mapId = null;
@@ -538,11 +242,11 @@ export class Game {
     return this.sm.set(STATES.MAIN_MENU);
   }
 
-  /** Pause → EXIT (confirmed, D46): leave the map straight to map select, the same map stays selected. */
+  /** Pause → EXIT (confirmed): leave the level straight to level select, the same level stays selected. */
   exitToMapSelect() {
     const id = this.mapId;
     if (!this.exitToMenu()) return false;
-    this.selectedMapId = id && this.isMapUnlocked(id) ? id : defaultMapSelection(this.economy.profile);
+    this.selectedMapId = id && this.isMapUnlocked(id) ? id : defaultLevelSelection(this.progress.profile);
     return this.sm.set(STATES.MAP_SELECT);
   }
 

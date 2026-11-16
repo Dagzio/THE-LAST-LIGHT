@@ -4,7 +4,7 @@
 // One trigger pull = one round from the magazine; pelletsPerShot projectiles per pull (shotgun).
 // All timers are game-clock timestamps: they freeze with the simulation.
 import { PROJECTILES } from '../data/balance.js';
-import { muzzlePoint } from '../data/keeperRig.js';
+import { muzzleOf } from '../data/player.js';
 
 const MIN_CONVERGE = 40; // world units: an aim point closer than this to the muzzle keeps the plain aim direction
 
@@ -81,10 +81,10 @@ export class WeaponSystem {
     w.ammo -= 1;
     w.nextShotAt = time + s.fireInterval;
     w.lastShotAt = time;
-    // D52: rounds leave the barrel tip of the gun in the keeper's raised right hand (data/keeperRig.js — the same point
-    // the renderer puts the flash on), and fly to the aim point (they converge on the reticle, not parallel beside it)
+    // rounds leave the barrel tip of the gun in the hero's hands (data/player.js MUZZLE — the same point the renderer
+    // puts the flash on), and fly to the aim point (they converge on the reticle, not parallel beside it)
     const aim = player.aimAngle;
-    const mz = muzzlePoint(w.weaponId);
+    const mz = muzzleOf(s.gun);
     const c = Math.cos(aim), sn = Math.sin(aim);
     const mx = player.x + c * mz.f - sn * mz.s;
     const my = player.y + sn * mz.f + c * mz.s;

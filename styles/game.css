@@ -691,8 +691,6 @@ body.cheats [data-cheat] { pointer-events: auto; cursor: pointer; }
 .gico { display: inline-block; width: 74%; height: 74%; background: center / contain no-repeat; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
 /* D52: the user's grenade art (assets/ui/guns) */
 .gico-frag { background-image: url("../assets/ui/guns/frag_grenade.webp"); }
-.gico-cryo { background-image: url("../assets/ui/guns/freeze_grenade.webp"); }
-.gico-molotov { background-image: url("../assets/ui/guns/molotov.webp"); }
 
 .grenade-slots {
   position: absolute;
@@ -1272,3 +1270,77 @@ body.paused .act-grenade.armed, body.paused .grenade-neon.armed { animation-play
   white-space: nowrap;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.8);
 }
+
+/* ===================== KILL LIST (D78): level HUD ===================== */
+/* the current objective (top centre) */
+.hud-objective {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: calc(100vw - 2 * (var(--safe-l) + var(--ring) + 24px));
+  padding: calc(6px * var(--fs)) calc(18px * var(--fs)) calc(7px * var(--fs));
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-stretch: condensed;
+  text-transform: uppercase;
+  line-height: 1.15;
+  white-space: nowrap;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
+  background: linear-gradient(180deg, rgba(9, 11, 15, 0.82), rgba(9, 11, 15, 0.55));
+  border: 1px solid rgba(255, 207, 58, 0.35);
+  border-top: 0;
+}
+.hud-obj-kicker { font-size: calc(12px * var(--fs)); letter-spacing: 0.18em; color: #ffcf3a; }
+.hud-obj-text { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: calc(19px * var(--fs)); letter-spacing: 0.05em; color: #fff; }
+.hud-objective.pop { animation: objPop 0.6s ease-out; }
+@keyframes objPop { 0% { transform: scale(1.12); filter: brightness(1.7); } 100% { transform: none; filter: none; } }
+body.map-over .hud-objective { display: none; }
+/* the phone-call card: same paper card as the old intro cards, a phone icon */
+.call-card .intro-ico svg { fill: #ffd27a; stroke: none; }
+/* arrow towards an off-screen objective */
+.obj-arrow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  display: none;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(10, 9, 12, 0.9);
+  box-shadow: 0 0 0 2.5px #ffcf3a, 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 14px rgba(255, 207, 58, 0.5);
+  will-change: transform;
+  pointer-events: none;
+}
+.obj-arrow.on { display: grid; }
+.obj-arrow svg { width: 60%; height: 60%; fill: none; stroke: #ffcf3a; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+body.map-over .obj-arrow { display: none; }
+/* the weapon block is a button (tap / click = the next weapon) with the carried slots under it */
+button.hud-weapon { pointer-events: auto; background: none; border: 0; padding: 0; margin: 0; color: inherit; cursor: pointer; text-shadow: inherit; }
+.hud-weapon { grid-template-areas: "gun ammo" "name name" "reload reload" "slots slots"; }
+.hud-slots { grid-area: slots; display: flex; gap: 4px; }
+.hud-slots .slot {
+  min-width: 1.5em;
+  padding: 1px 4px;
+  font-style: normal;
+  font-size: calc(12px * var(--fs));
+  text-align: center;
+  color: #9aa3b5;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+}
+.hud-slots .slot.on { color: #1a1206; background: #ffd27a; border-color: #ffd27a; text-shadow: none; }
+.hud-slots .slot.none { opacity: 0.25; }
+.hud-weapon:not(.multi) .hud-slots { display: none; }
+/* carried key items (key card, drive) under the HP bar */
+.hud-items { grid-column: 1 / -1; display: flex; gap: 6px; }
+.hud-items i { display: block; width: calc(24px * var(--fs)); height: calc(16px * var(--fs)); border-radius: 3px; }
+.item-keycard { background: linear-gradient(135deg, #8fe0ff, #2f86c8); box-shadow: 0 0 8px rgba(88, 200, 255, 0.7); }
+.item-drive { background: linear-gradient(135deg, #ffbf6a, #d26a12); box-shadow: 0 0 8px rgba(255, 154, 42, 0.7); }
+/* touch: the crate button shows only while a crate is in reach */
+.interact-neon { visibility: hidden; }
+.interact-neon.on { visibility: visible; animation: interactPulse 1s ease-in-out infinite alternate; }
+@keyframes interactPulse { from { filter: brightness(1); } to { filter: brightness(1.35); } }
+/* the armed grenade glows (the next shot throws it) */
+.act-grenade.armed, .grenade-neon.armed { box-shadow: 0 0 0 2px #ffcf3a, 0 0 16px rgba(255, 207, 58, 0.75); }
+.act-grenade.empty, .grenade-neon.empty { opacity: 0.45; }

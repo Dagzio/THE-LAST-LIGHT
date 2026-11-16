@@ -25,8 +25,6 @@ export const MUSIC_BED = { file: `${DIR}bg-bass.mp3`, gain: 1, loopStart: 0.058,
 export const SFX_FILES = {
   click: { file: 'click.mp3', trim: 0.025, gain: 1 },
   buy: { file: 'buy.mp3', trim: 0.045, gain: 1 },
-  shopOpen: { file: 'shop-open.mp3', trim: 0.13, gain: 1 },
-  flare: { file: 'flash-cast.mp3', trim: 0.1, gain: 1 },          // Emergency Flare
   defeat: { file: 'game-over.mp3', trim: 0.07, gain: 1 },
   victory: { file: 'game-win.mp3', trim: 0.05, gain: 1 },
   boom: { file: 'grenade.mp3', trim: 0.015, gain: 1 },            // frag grenade blast
@@ -37,33 +35,18 @@ export const SFX_FILES = {
   kill: { file: 'enemies/enemy-killed1.mp3', trim: 0.03, gain: 1 },
   // D52 new files
   ricochet: { file: 'bullet.mp3', trim: 0.04, gain: 1 },               // a bullet stopped by a rock / wall / pad
-  turretShot: { file: 'turret/turret_shot.mp3', trim: 0.035, gain: 1 },  // every turret (D53: one sound for all)
-  turretHit: { file: 'turret/turret_hitted.mp3', trim: 0.02, gain: 1 },    // a device takes damage (D52 health)
-  turretBroken: { file: 'turret/turret_killed.mp3', trim: 0.05, gain: 1 }, // a device breaks (0 HP)
   // keeper (user files, player/): D56 footsteps — one whole walking loop (FOOTSTEPS below); hurt — 2 takes (D53)
   steps: { file: 'player/steps.mp3', gain: 1 },
   playerHurt1: { file: 'player/player-hitted1.mp3', gain: 1 },
   playerHurt2: { file: 'player/player-hitted2.mp3', trim: 0.025, gain: 1 },
   // D53 replacements of synthesized sounds: CC0 packs (sfx/CREDITS.txt), mixed / levelled into the file (gain 1)
-  beaconHit: { file: 'sfx/beacon-hit.mp3', gain: 1 }, // D57: the user's request — the recorded beacon hit is back
-  freeze: { file: 'sfx/cryo-blast.mp3', gain: 1 },       // Cryo grenade
-  fire: { file: 'sfx/molotov.mp3', gain: 1 },            // Molotov: bottle breaks + flames
-  molotovFire: { file: 'grenades/molotov.mp3', trim: 0.2, gain: 1 }, // D62 user file: the fire crackle while it burns
-  bossWarn: { file: 'sfx/boss-warn.mp3', gain: 1 },      // a boss telegraphs an attack (roar)
-  bossSlam: { file: 'sfx/boss-slam.mp3', gain: 1 },
-  bossTide: { file: 'sfx/boss-tide.mp3', gain: 1 },
-  flareReady: { file: 'sfx/flare-ready.mp3', gain: 1 },
   deny: { file: 'sfx/deny.mp3', gain: 1 },
   stamp: { file: 'sfx/stamp.mp3', gain: 1 },             // results journal stamp
   crateOpen: { file: 'sfx/crate-open.mp3', trim: 0.06, gain: 1 }, // D56 user file: the crate is opened
-  spitterAttack: { file: 'enemies/spitter-attack.mp3', gain: 1 },     // Spitter lobs a glob
   'assault_rifle.shot': { file: 'rifle/rifle_shot.mp3', gain: 1 },
   'assault_rifle.reload1': { file: 'rifle/rifle_reload1.mp3', trim: 0.015, gain: 1 },
   'assault_rifle.reload2': { file: 'rifle/rifle_reload2.mp3', trim: 0.015, gain: 1 },
   'assault_rifle.reload3': { file: 'rifle/rifle_reload3.mp3', trim: 0.015, gain: 1 },
-  waveStart1: { file: 'enemies/wave-start1.mp3', trim: 0.05, gain: 1 }, // START NEXT WAVE pressed
-  waveStart2: { file: 'enemies/wave-start2.mp3', trim: 0.05, gain: 1 }, // the first enemy of the wave is out
-  bossKillPlayer: { file: 'enemies/boss-kill-player.mp3', trim: 0.02, gain: 1 },
   'pistol.shot': { file: 'pistol/pistol-shot.mp3', trim: 0.044, gain: 1 },
   'pistol.reload1': { file: 'pistol/pistol-reload1.mp3', gain: 1 },
   'pistol.reload2': { file: 'pistol/pistol-reload2.mp3', gain: 1 },
@@ -72,9 +55,6 @@ export const SFX_FILES = {
   'smg.reload1': { file: 'smg/smg-reload1.mp3', gain: 1 },
   'smg.reload2': { file: 'smg/smg-reload2.mp3', gain: 1 },
   'smg.reload3': { file: 'smg/smg-reload3.mp3', gain: 1 },
-  'shotgun.shot': { file: 'shotgun/shotgun-shot.mp3', trim: 0.044, gain: 1 },
-  'shotgun.reload1': { file: 'shotgun/shotgun-reload1.mp3', gain: 1 },
-  'shotgun.reload2': { file: 'shotgun/shotgun-reload2.mp3', gain: 1 },
 };
 
 /**
@@ -138,18 +118,6 @@ export const WEAPON_SOUNDS = {
         { sfx: 'assault_rifle.reload1', hit: 0.01, at: 0.2 },  // magazine out
         { sfx: 'assault_rifle.reload2', hit: 0.15, at: 0.62 }, // new magazine in
         { sfx: 'assault_rifle.reload3', hit: 0.01, at: 1.0 },  // bolt released = ready to fire
-      ],
-    },
-  },
-  shotgun: {
-    shot: { sfx: 'shotgun.shot', pitch: 0.03, vol: 0, voices: 2 },
-    reload: {
-      refDuration: 2.1,
-      maxRate: 1.1,
-      cues: [
-        // shells go in one by one — the clip (3.1 s) is longer than the reload, so it fades out when the pump starts
-        { sfx: 'shotgun.reload1', hit: 0.03, at: 0, cut: true },
-        { sfx: 'shotgun.reload2', hit: 0.47, at: 1.0 }, // pump forward = ready to fire
       ],
     },
   },

@@ -3,7 +3,7 @@
 
 export const CAMERA = {
   fov: 30,               // vertical field of view, degrees (narrow → little perspective distortion)
-  tilt: 15,              // degrees from the vertical: the camera sits a bit "south" and looks slightly north
+  tilt: 24,              // degrees from the vertical (KILL LIST D78: 15 → 24 — people and furniture read better from a 3/4 view)
   minViewWidth: 750,     // world units always visible horizontally (16:9 → 750 × 422)
   minViewHeight: 422,    // world units always visible vertically (wider screens see more to the sides)
   followHalfLife: 0.1,   // s — smoothing of the follow (0 = rigid)

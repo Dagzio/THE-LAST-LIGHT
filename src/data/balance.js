@@ -1,23 +1,10 @@
-// Cross-system tuning values (04_ARCH §9, 02_SPEC §5–6).
-
-export const TARGETING = {
-  searchInterval: 0.12,        // s — full search is throttled (spec: 0.10–0.15)
-  // Single-pass threat score; higher wins. Order of the spec priorities is kept by the weights.
-  weights: {
-    attackingBeacon: 1000,     // 1. enemy currently attacking the beacon (Phase 4)
-    beaconThreat: 500,         // 2. enemy in the beacon danger zone, scaled 0..1 by closeness (Phase 4)
-    illuminated: 200,          // 3. enemy lit by the beam (Phase 3)
-    proximity: 100,            // 4. closer to the player = higher, scaled 0..1 inside weapon range
-  },
-  stickiness: 15,              // keep the current target unless another one scores this much higher
-};
+// Cross-system tuning values (04_ARCH §9, 02_SPEC §5–6). KILL LIST (D78): only what the mission systems use.
 
 export const DAMAGE = {
-  minDamage: 1,                // step 8: clamp
-  illuminatedBonus: 0.15,      // step 6: +15% (GDD §9.2), used once Illuminated exists (Phase 3)
-  // D52 (user decision): where a bullet lands relative to the enemy's facing. Front (within frontCos of the facing)
-  // takes full damage, the sides × sideMult for everyone; the back × backMult for bosses and armoured types
-  // (type.rearArmor — the Husk); for the others the back counts as the front.
+  minDamage: 1,                // clamp
+  illuminatedBonus: 0,         // no light beam in KILL LIST
+  // where a bullet lands relative to the target's facing: the sides take × sideMult (D52), the back × backMult only
+  // for types with rearArmor / boss
   directional: { frontCos: 0.5, backCos: -0.5, sideMult: 0.85, backMult: 0.65 },
 };
 
@@ -28,55 +15,6 @@ export const PROJECTILES = {
 };
 
 export const CAPS = {
-  projectiles: 160,            // gameplay entities: oldest is recycled only if the pool is full
-  particles: 220,              // decorative; scaled by the quality preset
-};
-
-// Emergency Flare (01_GDD §9.3, approved before Phase 4b — PROJECT_AUDIT.md D38). No direct damage.
-export const FLARE = {
-  maxCharge: 100,
-  chargePerKill: { grunt: 5, runner: 5, brute: 12, gloam_warden: 0 }, // ≈ 3 uses per map
-  illuminate: 4.0,          // s of Illuminated for regular enemies (same +15% bonus, no stacking)
-  bossIlluminate: 2.0,      // s for the boss; its telegraphs / attacks are never interrupted
-  stun: 1.2,                // s regular enemies stand still and do not attack (beacon attack timer restarts)
-  knockbackRadius: 220,     // enemies this close to the beacon are thrown outwards…
-  knockbackDistance: 80,    // …by this many world units…
-  knockbackTime: 0.25,      // …over this time
-  pulseFx: 1.0,             // s of the expanding light ring (presentation)
-  pulseRadius: 1100,        // world units the ring reaches (covers the arena from the beacon)
-};
-
-// Enemy body tuning (EnemyAISystem): contact reach and crowd separation.
-export const AI = {
-  contactPad: 2,            // world units of extra reach for contact damage
-  // D54 (user decision): no damage on touch — an enemy next to the keeper stops, winds up and strikes (the same lunge
-  // as on the beacon). The first strike after it reaches him comes after firstDelay (time to dodge away); then one
-  // every attackInterval of the type (never faster than firstDelay). A strike hits only if he is still within reach
-  // + slack; stepping out of it cancels the swing. Damage = the type's contactDamage.
-  melee: { reach: 6, firstDelay: 0.6, slack: 10 },
-  // D54: the keeper and the enemies are solid to each other — overlaps are resolved every step (the enemy gives
-  // way more than the keeper; a boss never moves; during a dash he shoves through)
-  bodyPushKeeper: 0.35,
-  separation: 0.5,          // share of an overlap between two bodies resolved per step
-  // Steering around decor (no pathfinding, rule 14): a short look-ahead ray; when it is blocked, side headings are
-  // tried (radians, the last chosen side first). Re-checked on a timer, not every step (weak phones).
-  steerLook: 60,            // look-ahead = 2 × radius + this (world units)
-  steerAngles: [0.35, 0.7, 1.05, 1.4, 1.75],
-  steerInterval: 0.15,      // s between re-checks
-  // Last resort: no progress towards the beacon for progressWindow → squeeze past decor for phaseTime.
-  progressWindow: 1.6,      // s
-  progressMin: 12,          // world units the enemy must gain per window
-  phaseTime: 1.0,           // s
-};
-
-// Static collision circles (D40, systems/Collision.js); decor circles come from systems/Props.js.
-export const COLLIDERS = {
-  beacon: 60,               // the stone plinth of the lighthouse (model radius 58–64)
-  pad: 36,                  // build pad disc (devices stand on it)
-  kiosk: 28,
-};
-
-export const ENEMY_FX = {
-  deathFade: 0.7,              // s — dead body tips over and crumbles to ash (D45 animation), then it is removed
-  hitFlash: 0.08,              // s
+  projectiles: 200,            // hero + enemy rounds; the oldest is recycled only if the pool is full
+  particles: 240,              // decorative; scaled by the quality preset
 };

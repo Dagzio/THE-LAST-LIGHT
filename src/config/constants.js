@@ -7,16 +7,15 @@ export const DEBUG_ENABLED = false;
 export const DEBUG_MODELS = true;
 
 /**
- * Test cheats (user request 2026-11-09): tap the menu logo → all maps unlocked; tap the coin balance (HUD / shop) →
- * +CHEAT_COINS. TRUE while the game is being tested — MUST be false in a release.
+ * Test cheats (user request 2026-11-09): tap the menu logo → every level unlocked. TRUE while the game is being
+ * tested — MUST be false in a release.
  */
 export const CHEATS = true;
-export const CHEAT_COINS = 1000;
 
-export const BUILD_VERSION = '0.11.0-polish';
+export const BUILD_VERSION = '0.12.0-killlist-office';
 
-/** Prefix for every localStorage key of the game (H5 §9). */
-export const STORAGE_PREFIX = 'tll.';
+/** Prefix for every localStorage key of the game (H5 §9). KILL LIST (D78): its own prefix, a new profile schema. */
+export const STORAGE_PREFIX = 'kl.';
 
 /** Logical world size (CSS-independent). The whole arena always fits on screen (fit + extended surround). */
 export const WORLD_WIDTH = 1280;

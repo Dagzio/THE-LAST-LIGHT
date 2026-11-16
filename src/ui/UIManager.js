@@ -2,20 +2,14 @@
 // to Game commands. It never computes game rules and never touches storage directly.
 import { STATES } from '../core/GameStateMachine.js';
 import { T, applyTranslations, onLanguageChange } from '../i18n/i18n.js';
-import { MAPS, getMap } from '../data/maps.js';
-import { WAVES } from '../data/waves.js';
-import { drawMapPreview } from '../render/MapPainter.js';
-import { layoutProps } from '../systems/Props.js';
+import { LEVELS as MAPS } from '../data/levels/index.js';
 import { Sfx } from '../platform/Sfx.js';
 import { Music } from '../platform/Music.js';
 import { AC } from '../platform/AudioUnlock.js';
 import { toggleFullscreen, initFullscreenButtons } from '../platform/Fullscreen.js';
 import { SPLASH_TAP_DELAY_MS, CHEATS } from '../config/constants.js';
 import { SettingsView } from './SettingsView.js';
-import { ShopView } from './ShopView.js';
-import { CrateView } from './CrateView.js';
 import { ResultsView } from './ResultsView.js';
-import { TutorialView } from './TutorialView.js';
 
 const SCREEN_BY_STATE = {
   BOOT: 'splash',
@@ -26,12 +20,9 @@ const SCREEN_BY_STATE = {
   PAUSED: 'game',
   MAP_DEFEAT: 'game',
   MAP_VICTORY: 'game',
-  SHOP_OPEN: 'game',
-  CRATE_REWARD_OPEN: 'game',
-  TUTORIAL: 'game',
 };
 
-const CONFIRM_TEXT = { reset: 'confirm.reset', exit: 'confirm.exit', skipTutorial: 'confirm.skipTutorial' };
+const CONFIRM_TEXT = { reset: 'confirm.reset', exit: 'confirm.exit' };
 
 const SAVE_NOTICE = { 'restored-backup': 'save.restored', 'reset-corrupt': 'save.reset', repaired: 'save.repaired' };
 
@@ -40,14 +31,11 @@ export class UIManager {
   constructor(game) {
     this.game = game;
     this.settings = new SettingsView(game);
-    this.shop = new ShopView(game);
-    this.crate = new CrateView(game);
     this.toast = document.getElementById('toast');
     this.openPopups = [];          // stack of open popup names (top = last)
     this.confirmKind = null;       // 'reset' | 'exit'
     this.confirmText = document.getElementById('confirmText');
     this.results = new ResultsView(game);
-    this.tutorialView = new TutorialView(game);
 
     document.addEventListener('click', (e) => this._onClick(e));
     document.body.classList.toggle('cheats', CHEATS); // makes the cheat taps reachable (styles/game.css)
@@ -143,7 +131,7 @@ export class UIManager {
   /** Page hidden / focus lost / phone rotated: a real pause, the same path as the Pause button (H5 §5, C3). */
   autoPause() {
     const sm = this.game.sm;
-    if (sm.is(STATES.RUNNING) || sm.is(STATES.SHOP_OPEN) || sm.is(STATES.CRATE_REWARD_OPEN) || sm.is(STATES.TUTORIAL)) this.openSettings();
+    if (sm.is(STATES.RUNNING)) this.openSettings();
   }
 
   /** Short notice at the bottom (not a gameplay timer — presentation only). */
@@ -171,9 +159,6 @@ export class UIManager {
     } else if (kind === 'exit') {
       this._closeAll();
       this.game.exitToMapSelect(); // D46: back to map select, not the main menu
-    } else if (kind === 'skipTutorial') {
-      this._close('confirm');
-      this.game.tutorial.skip();
     }
   }
 
@@ -202,23 +187,16 @@ export class UIManager {
       case 'mapNext': this._turnMap(1); break;
       case 'retryMap': this.game.retryMap(); break;
       case 'continueCampaign': this.game.continueCampaign(); break;
-      case 'tutorialOk': this.game.tutorial.dismiss(); break;
-      case 'skipTutorial': this._ask('skipTutorial'); break;
-      case 'resultMenu': this.game.exitToMenu(); break; // the map is already over: nothing to lose, no confirmation
-      case 'startNextWave': this.game.startNextWave(); break;
-      case 'flare': this.game.useFlare(); break;
-      case 'repairBeacon': Sfx.play(this.game.hudRepairBeacon().ok ? 'buy' : 'deny'); break; // D46: HUD wrench
-      case 'openShop': if (!this.game.openShop()) Sfx.play('deny'); break; // glows only when it can open
-      case 'closeShop': this.game.closeShop(); break;
-      case 'openCrate': if (!this.game.openCrate()) Sfx.play('deny'); break;
-      case 'selectGrenade': if (this.game.selectGrenade(btn.dataset.type)) Sfx.play('click'); else Sfx.play('deny'); break;
+      case 'resultMenu': this.game.exitToMenu(); break; // the level is already over: nothing to lose, no confirmation
+      case 'interact': if (!this.game.interact()) Sfx.play('deny'); break;
+      case 'armGrenade': Sfx.play(this.game.armGrenade('frag') ? 'click' : 'deny'); break;
+      case 'switchWeapon': if (this.game.switchWeapon()) Sfx.play('click'); break;
       default: break;
     }
   }
 
   _cheat(kind) {
     if (kind === 'maps' && this.game.sm.is(STATES.MAIN_MENU)) Sfx.play(this.game.cheatUnlockAllMaps() ? 'buy' : 'click');
-    else if (kind === 'coins') Sfx.play(this.game.cheatCoins() ? 'buy' : 'deny');
   }
 
   // ---------------- map select: carousel (user decision D45) ----------------
@@ -246,7 +224,8 @@ export class UIManager {
       this.thumbs.set(map.id, c);
     }
     if (!c.dataset.ready && !this._render3dThumb(map, c) && !c.dataset.painted) {
-      drawMapPreview(c, map, layoutProps(map)); // no 3D renderer (or busy): the painted version
+      const g = c.getContext('2d'); // no 3D renderer (or busy): a plain dark card
+      g.fillStyle = '#10141b'; g.fillRect(0, 0, c.width, c.height);
       c.dataset.painted = '1';
     }
     return c;
@@ -320,9 +299,8 @@ export class UIManager {
     const vis = this._visibleMaps();
     this.viewIndex = Math.max(0, Math.min(vis.length - 1, this.viewIndex));
     const map = MAPS[this.viewIndex];
-    const profile = this.game.economy.profile;
-    const locked = !profile.unlockedMaps.includes(map.id);
-    const cleared = profile.completedMaps.includes(map.id);
+    const locked = !this.game.isMapUnlocked(map.id);
+    const cleared = this.game.isMapCleared(map.id);
 
     const grid = document.getElementById('mapGrid');
     const card = document.createElement('div');
@@ -359,7 +337,7 @@ export class UIManager {
       const m = MAPS[i];
       dots[i].className = [
         i === this.viewIndex ? 'on' : '',
-        profile.completedMaps.includes(m.id) ? 'cleared' : profile.unlockedMaps.includes(m.id) ? 'open' : '',
+        this.game.isMapCleared(m.id) ? 'cleared' : this.game.isMapUnlocked(m.id) ? 'open' : '',
       ].join(' ');
     }
 
@@ -371,12 +349,11 @@ export class UIManager {
     state.classList.toggle('locked', locked);
     document.getElementById('mapName').textContent = T(map.nameKey);
     document.getElementById('mapDesc').textContent = T(map.descKey);
-    document.getElementById('mapWaves').textContent = T('map.waves', { n: map.waveCount });
-    // D75: a regular last wave (the first map) has no "final wave" fact
-    const last = (WAVES[map.id] || []).at(-1), lastKey = map.finalWaveBoss ? 'map.boss' : last && last.elite ? 'map.elite' : '';
-    const bossFact = document.getElementById('mapBoss');
-    bossFact.textContent = lastKey ? T(lastKey) : '';
-    bossFact.hidden = !lastKey;
+    document.getElementById('mapWaves').textContent = T('map.objectives', { n: map.objectives.length });
+    const best = this.game.progress.profile.bestTimes[map.id];
+    const bestFact = document.getElementById('mapBoss');
+    bestFact.textContent = best ? T('map.best', { t: `${Math.floor(best / 60)}:${String(Math.round(best) % 60).padStart(2, '0')}` }) : '';
+    bestFact.hidden = !best;
     document.querySelector('[data-action="beginMap"]').disabled = locked;
   }
 
