@@ -156,6 +156,7 @@ export class HumanTemplate {
       yaw: Math.atan2(-barrel.x, barrel.z),
       grip: { f: gripR.z * s, s: -gripR.x * s, h: gripR.y * s },
       dir: { f: barrel.z, s: -barrel.x, h: barrel.y },
+      up: { f: up.z, s: -up.x, h: up.y },
     };
     restore();
     // the left-hand carry for the grenade toss: where the right-hand gun is at the hand-off moment, in LeftHand space
@@ -169,11 +170,12 @@ export class HumanTemplate {
     return out;
   }
 
-  /** Muzzle of a gun `length` long in the character frame with the aim compensation (body turned by −yaw). */
-  muzzle(gunId, length) {
+  /** Muzzle of a gun (tip { x along the barrel, y up } in its baked frame) in the character frame, aim-compensated. */
+  muzzle(gunId, tip) {
     const m = this.mounts[setOf(gunId)];
     if (!m) return { f: 20, s: 4, h: 34 };
-    const f = m.grip.f + m.dir.f * length, sd = m.grip.s + m.dir.s * length, h = m.grip.h + m.dir.h * length;
+    const t = typeof tip === 'number' ? { x: tip, y: 0 } : tip;
+    const f = m.grip.f + m.dir.f * t.x + m.up.f * t.y, sd = m.grip.s + m.dir.s * t.x + m.up.s * t.y, h = m.grip.h + m.dir.h * t.x + m.up.h * t.y;
     const c = Math.cos(-m.yaw), sn = Math.sin(-m.yaw);
     return { f: f * c - sd * sn, s: f * sn + sd * c, h };
   }
@@ -240,13 +242,13 @@ export class HumanView {
   }
 
   /** Adds a gun model (shared geometry, baked: grip at 0, barrel +X, game units) for weapon key `id`. */
-  addGun(id, geometry, material, length) {
+  addGun(id, geometry, material) {
     if (!this.hand) return;
     const g = new THREE.Mesh(geometry, material);
     g.scale.setScalar(1 / this.tpl.scale);
     g.castShadow = true;
     g.visible = false;
-    g.userData.length = length;
+    g.userData.tip = geometry.userData.tip || { x: 10, y: 0 };
     this.hand.add(g);
     this.guns[id] = g;
   }
@@ -272,14 +274,14 @@ export class HumanView {
     if (g) {
       g.visible = true;
       this._mountGun(false);
-      if (this.muzzle) { g.add(this.muzzle); this.muzzle.position.set(g.userData.length + 1, 0.6, 0); }
+      if (this.muzzle) { g.add(this.muzzle); this.muzzle.position.set(g.userData.tip.x + 0.6, g.userData.tip.y, 0); }
     }
   }
 
   /** A flash object that sits on the muzzle of the current gun. */
   attachMuzzle(obj) {
     this.muzzle = obj;
-    if (this.gun) { this.gun.add(obj); obj.position.set(this.gun.userData.length + 1, 0.6, 0); }
+    if (this.gun) { this.gun.add(obj); obj.position.set(this.gun.userData.tip.x + 0.6, this.gun.userData.tip.y, 0); }
   }
 
   update(dt, st) {
@@ -412,7 +414,10 @@ export class HumanView {
   }
 }
 
-/** Gun model → baked geometry: grip at the origin, muzzle on +X at `length`, up +Y (game units). */
+/**
+ * Gun model → baked geometry (game units): barrel along +X, up +Y, the palm point (entry.hand) at the origin, scaled to
+ * its real size (entry.size). geometry.userData.tip = the muzzle { x, y } in that frame.
+ */
 export function bakeGunGeometry(geometry, entry) {
   geometry.rotateY(entry.rotY);
   const [gx, gy, gz] = entry.grip, [tx, ty] = entry.tip;
@@ -420,6 +425,10 @@ export function bakeGunGeometry(geometry, entry) {
   geometry.rotateZ(-Math.atan2(ty - gy, tx - gx));
   const s = entry.length / Math.hypot(tx - gx, ty - gy);
   geometry.scale(s, s, s);
+  const [hx, hy] = entry.hand || [0, 0], k = entry.size || 1;
+  geometry.translate(-hx, -hy, 0);
+  geometry.scale(k, k, k);
   geometry.computeBoundingSphere();
+  geometry.userData.tip = { x: (entry.length - hx) * k, y: -hy * k };
   return geometry;
 }

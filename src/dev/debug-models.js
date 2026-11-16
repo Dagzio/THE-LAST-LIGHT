@@ -99,7 +99,7 @@ async function open() {
       const tpl = r3 && r3.templates && r3.templates[e.key];
       if (!tpl) { info.textContent = 'model not loaded'; return; }
       view = tpl.instantiate(new THREE.MeshLambertMaterial({ map: tpl.texture }));
-      for (const [id, g] of Object.entries(r3.gunGeos || {})) view.addGun(id, g.geometry, g.material, g.length);
+      for (const [id, g] of Object.entries(r3.gunGeos || {})) view.addGun(id, g.geometry, g.material);
       view.setGun(e.clip.startsWith('p') ? 'pistol' : e.key === 'hero' ? 'smg' : 'rifle');
       for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die]) a.setEffectiveWeight(0);
       const C = tpl.clips[e.clip];

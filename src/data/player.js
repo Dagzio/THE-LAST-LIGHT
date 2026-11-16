@@ -21,9 +21,9 @@ export const PLAYER = {
  * so the bullets start where the renderer draws the barrel tip. Enemies use the same table.
  */
 export const MUZZLE = {
-  pistol: { f: 16.5, s: 6.6, h: 41 },  // D79: the Pistol Idle pose (two hands, arms forward)
-  smg: { f: 17, s: 7.2, h: 40.6 },   // D79: the standing Firing Rifle pose
-  rifle: { f: 26, s: 7.2, h: 40.5 },
+  pistol: { f: 15, s: 6.6, h: 41.4 },  // D80: real-size guns held at their grips (Pistol Idle pose)
+  smg: { f: 17.7, s: 7.2, h: 40.5 },   // standing Firing Rifle pose
+  rifle: { f: 24, s: 7.2, h: 41.7 },   // (enemies' rifles)
 };
 export const muzzleOf = (gun) => MUZZLE[gun] || MUZZLE.pistol;
 

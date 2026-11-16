@@ -36,13 +36,16 @@ export const HUMAN_ANIM = {
 };
 
 /**
- * Guns in the hands (the existing user models). rotY turns the raw mesh barrel to +X; grip / tip — hand point and
- * muzzle in that rotated raw frame (measured, D54). length — grip → muzzle in game units.
+ * Guns in the hands (the existing user models). rotY turns the raw mesh barrel to +X; grip / tip — reference points in
+ * that rotated raw frame (D54) that set the barrel line; length — grip → tip in the baked frame. D80 (user request:
+ * real sizes, held right): hand — where the right palm holds it in that baked frame (the pistol grip found from the
+ * mesh profile: behind the magazine); size — the final scale, so the whole gun is about its real length
+ * (1 m ≈ 30 units: pistol ≈ 22 cm, SMG ≈ 57 cm, rifle ≈ 86 cm).
  */
 export const GUN_MODELS = {
-  pistol: { file: `${DIR}pistol.min.glb`, rotY: 0.0059, grip: [-0.2992, 0.4963, 0.0017], tip: [0.5002, 0.6218, 0.0017], length: 7.5 },
-  smg: { file: `${DIR}smg.min.glb`, rotY: Math.PI - 0.0018, grip: [-0.26, 0.34, 0.0138], tip: [0.46, 0.55, 0.0138], length: 15 },
-  rifle: { file: `${DIR}rifle.min.glb`, rotY: 0.8881, grip: [-0.2395, 0.2103, -0.004], tip: [0.6341, 0.2806, -0.004], length: 23 },
+  pistol: { file: `${DIR}pistol.min.glb`, rotY: 0.0059, grip: [-0.2992, 0.4963, 0.0017], tip: [0.5002, 0.6218, 0.0017], length: 7.5, hand: [-0.9, -1.4], size: 0.67 },
+  smg: { file: `${DIR}smg.min.glb`, rotY: Math.PI - 0.0018, grip: [-0.26, 0.34, 0.0138], tip: [0.46, 0.55, 0.0138], length: 15, hand: [-5.0, 0.2], size: 0.78 },
+  rifle: { file: `${DIR}rifle.min.glb`, rotY: 0.8881, grip: [-0.2395, 0.2103, -0.004], tip: [0.6341, 0.2806, -0.004], length: 23, hand: [-2.1, -1.6], size: 0.79 },
 };
 
 /** Weapon id (player / enemy weapon data) → gun model. */

@@ -166,7 +166,7 @@ export class Renderer3D {
     if (!tpl) return null;
     const v = tpl.instantiate(this._material(tpl, tint), variant);
     if (scale !== 1) v.wrap.scale.multiplyScalar(scale);
-    for (const [id, g] of Object.entries(this.gunGeos || {})) v.addGun(id, g.geometry, g.material, g.length);
+    for (const [id, g] of Object.entries(this.gunGeos || {})) v.addGun(id, g.geometry, g.material);
     const flash = new THREE.Mesh(this.flashGeo, this.flashMat);
     flash.visible = false;
     flash.renderOrder = 7;
