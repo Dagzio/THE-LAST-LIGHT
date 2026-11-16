@@ -90,7 +90,6 @@ export function startGame(boot) {
 
   const game = new Game(document.getElementById('world'), document.getElementById('world3d'));
   const ui = new UIManager(game);
-  game.menuBusy = () => !!ui.prerendering || Sfx.busy;
   new HUD(game);
   new TouchControls(game);
   preloadIcons();

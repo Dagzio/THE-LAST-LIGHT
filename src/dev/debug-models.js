@@ -6,6 +6,7 @@ import * as THREE from '../../lib/three.module.js';
 import { PropBuilder, PROP_BUILDERS } from '../render3d/officeProps.js';
 import { officeMaterials } from '../render3d/OfficeScene.js';
 import { PROP_TYPES, propBlocks } from '../data/props.js';
+import { HUMAN_ANIM } from '../data/humanModels.js';
 
 const CLIPS = ['idle', 'walk', 'run', 'back', 'strafeL', 'strafeR', 'fire', 'reload', 'hit', 'throw', 'pIdle', 'pWalk', 'pRun', 'die', 'die2'];
 const CSS = `
@@ -71,7 +72,7 @@ async function open() {
   scene.add(grid);
   const cam = new THREE.PerspectiveCamera(35, 1, 1, 5000);
   const orbit = { yaw: 0.7, pitch: 0.35, dist: 180, target: new THREE.Vector3(0, 25, 0) };
-  let current = null, view = null, clipName = '', last = performance.now(), raf = 0;
+  let current = null, view = null, clipName = '', last = performance.now(), raf = 0, act = null;
 
   const entries = [];
   for (const key of ['hero', 'enemy']) for (const c of CLIPS) entries.push({ group: key === 'hero' ? 'Hero (player.glb)' : 'Enemy (enemy.glb)', name: `${key} · ${c}`, kind: 'human', key, clip: c });
@@ -103,7 +104,7 @@ async function open() {
       view.setGun(e.clip.startsWith('p') ? 'pistol' : e.key === 'hero' ? 'smg' : 'rifle');
       for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die]) a.setEffectiveWeight(0);
       const C = tpl.clips[e.clip];
-      const act = view.mixer.clipAction(C.full);
+      act = view.mixer.clipAction(C.full);
       act.reset().play();
       act.timeScale = 1;
       act.setEffectiveWeight(1);
@@ -135,7 +136,11 @@ async function open() {
     last = now;
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (canvas.width !== Math.round(w * renderer.getPixelRatio())) { renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
-    if (view) view.mixer.update(dt);
+    if (view) {
+      view.mixer.update(dt);
+      // as in the game: the gun sits in the LEFT hand while the right arm tosses the grenade
+      if (clipName === 'throw' && act) { const t = act.time; const left = t >= HUMAN_ANIM.throwHandOff && t < HUMAN_ANIM.throwHandBack; if (left !== view.inLeft) view._mountGun(left); }
+    }
     const cp = Math.cos(orbit.pitch);
     cam.position.set(orbit.target.x + Math.sin(orbit.yaw) * cp * orbit.dist, orbit.target.y + Math.sin(orbit.pitch) * orbit.dist, orbit.target.z + Math.cos(orbit.yaw) * cp * orbit.dist);
     cam.lookAt(orbit.target);

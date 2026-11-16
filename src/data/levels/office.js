@@ -6,6 +6,9 @@
 // Flow: lobby (start, pistol) → corridor → security room (key card) → secure door → server room (the ORPHEUS drive)
 // → reinforcements arrive → open-space → stairwell exit. Two crates: the SMG (archive) and 2 grenades (manager's
 // office). Prop rotation `rot` = quarter turns: the prop's front faces south at 0, west at 1, north at 2, east at 3.
+// D81: the furniture is drawn with the user's sprites (painted from the front) — big pieces face the camera (south),
+// types without art were replaced by ones with art; `drawn: false` — a chair already painted in its table's / desk's
+// sprite (it still collides).
 const W = (x0, y0, x1, y1, style, gaps = []) => ({ x0, y0, x1, y1, style, gaps });
 
 export const OFFICE = {
@@ -81,33 +84,32 @@ export const OFFICE = {
   props: [
     // --- lobby
     { type: 'reception', x: 1200, y: 1360, rot: 0 },
-    { type: 'chair', x: 1200, y: 1322, rot: 0 },
-    { type: 'sofa', x: 800, y: 1500, rot: 3 }, { type: 'coffee_table', x: 862, y: 1500 },
+    { type: 'chair', x: 1200, y: 1322, rot: 0, drawn: false },
+    { type: 'armchair', x: 800, y: 1474, rot: 3 }, { type: 'armchair', x: 800, y: 1526, rot: 3 }, { type: 'coffee_table', x: 862, y: 1500 },
     { type: 'armchair', x: 925, y: 1458, rot: 1 }, { type: 'armchair', x: 925, y: 1542, rot: 1 },
-    { type: 'sofa', x: 1600, y: 1500, rot: 1 }, { type: 'coffee_table', x: 1538, y: 1500 },
+    { type: 'armchair', x: 1600, y: 1474, rot: 1 }, { type: 'armchair', x: 1600, y: 1526, rot: 1 }, { type: 'coffee_table', x: 1538, y: 1500 },
     { type: 'armchair', x: 1475, y: 1458, rot: 3 }, { type: 'armchair', x: 1475, y: 1542, rot: 3 },
     { type: 'plant', x: 782, y: 1162 }, { type: 'plant', x: 1618, y: 1162 }, { type: 'plant', x: 782, y: 1668 },
     { type: 'plant', x: 1618, y: 1668 }, { type: 'plant', x: 1100, y: 1668 }, { type: 'plant', x: 1300, y: 1668 },
     { type: 'turnstile', x: 1060, y: 1140 }, { type: 'turnstile', x: 1150, y: 1140 },
     { type: 'turnstile', x: 1250, y: 1140 }, { type: 'turnstile', x: 1340, y: 1140 },
-    { type: 'water_cooler', x: 1622, y: 1300 },
+    { type: 'plant', x: 1622, y: 1300 },
     { type: 'rug_large', x: 862, y: 1500 }, { type: 'rug_large', x: 1538, y: 1500 },
-    { type: 'floor_lamp', x: 790, y: 1425 }, { type: 'floor_lamp', x: 1610, y: 1425 },
     { type: 'papers', x: 1150, y: 1450, rot: 1 }, { type: 'overturned_chair', x: 1290, y: 1300, rot: 3 },
     // --- corridor
     { type: 'elevator', x: 1500, y: 1118.5, rot: 2 }, { type: 'extinguisher', x: 700, y: 1121, rot: 2 },
     { type: 'plant', x: 272, y: 972 }, { type: 'plant', x: 2128, y: 972 }, { type: 'plant', x: 2128, y: 1108 },
-    { type: 'plant', x: 900, y: 1108 }, { type: 'bin', x: 1640, y: 1118 },
+    { type: 'plant', x: 900, y: 1108 },
     { type: 'wall_clock', x: 1590, y: 1121, rot: 2 }, { type: 'notice_board', x: 820, y: 1121, rot: 2 },
     // --- break room
-    { type: 'kitchen_counter', x: 272, y: 1290, rot: 3 }, { type: 'fridge', x: 274, y: 1172, rot: 3 },
+    { type: 'vending', x: 300, y: 1158, rot: 0 }, { type: 'boxes', x: 352, y: 1155 },
     { type: 'coffee_counter', x: 650, y: 1152, rot: 0 }, { type: 'vending', x: 712, y: 1160, rot: 0 },
     { type: 'round_table', x: 450, y: 1290 },
     { type: 'chair_meeting', x: 450, y: 1258, rot: 0 }, { type: 'chair_meeting', x: 450, y: 1322, rot: 2 },
     { type: 'chair_meeting', x: 418, y: 1290, rot: 3 }, { type: 'chair_meeting', x: 482, y: 1290, rot: 1 },
     { type: 'round_table', x: 620, y: 1360 },
     { type: 'chair_meeting', x: 620, y: 1328, rot: 0 }, { type: 'overturned_chair', x: 660, y: 1400, rot: 1 },
-    { type: 'plant', x: 722, y: 1422 }, { type: 'bin', x: 300, y: 1230 },
+    { type: 'plant', x: 722, y: 1422 },
     { type: 'wall_clock', x: 400, y: 1141.5, rot: 0 },
     // --- archive
     { type: 'archive_shelf', x: 420, y: 1540, rot: 0 }, { type: 'archive_shelf', x: 420, y: 1620, rot: 0 },
@@ -116,43 +118,45 @@ export const OFFICE = {
     { type: 'boxes', x: 290, y: 1670 }, { type: 'boxes_tall', x: 722, y: 1478 }, { type: 'trolley', x: 700, y: 1672 },
     { type: 'papers', x: 500, y: 1580 },
     // --- security
-    { type: 'console', x: 2112, y: 1290, rot: 1 }, { type: 'chair', x: 2066, y: 1290, rot: 3 },
+    { type: 'console', x: 2050, y: 1158, rot: 0 }, { type: 'chair', x: 2050, y: 1198, rot: 2, drawn: false },
     { type: 'filing_cabinet', x: 1672, y: 1380, rot: 3 }, { type: 'filing_cabinet', x: 1672, y: 1404, rot: 3 },
     { type: 'server_rack', x: 1675, y: 1170, rot: 3 }, { type: 'tv_wall', x: 1760, y: 1141.5, rot: 0 },
-    { type: 'boxes', x: 2110, y: 1420 }, { type: 'broken_monitor', x: 1990, y: 1200, rot: 2 },
-    { type: 'lockers', x: 1780, y: 1431, rot: 2 },
+    { type: 'boxes', x: 2110, y: 1420 }, { type: 'broken_monitor', x: 1840, y: 1250, rot: 2 },
+    { type: 'filing_cabinet', x: 1758, y: 1428, rot: 2 }, { type: 'filing_cabinet', x: 1780, y: 1428, rot: 2 },
+    { type: 'filing_cabinet', x: 1802, y: 1428, rot: 2 },
     // --- manager
-    { type: 'exec_desk', x: 1950, y: 1600, rot: 0 }, { type: 'chair', x: 1950, y: 1640, rot: 2 },
-    { type: 'armchair', x: 1915, y: 1545, rot: 0 }, { type: 'armchair', x: 1985, y: 1545, rot: 0 },
-    { type: 'bookcase', x: 2133, y: 1540, rot: 1 }, { type: 'bookcase', x: 2133, y: 1610, rot: 1 },
-    { type: 'sofa', x: 1673, y: 1580, rot: 3 }, { type: 'plant', x: 2125, y: 1675 }, { type: 'plant', x: 1680, y: 1478 },
-    { type: 'rug_small', x: 1950, y: 1570 }, { type: 'floor_lamp', x: 2116, y: 1478 }, { type: 'wall_clock', x: 2000, y: 1461.5, rot: 0 },
-    // --- open space: six clusters of four workstations (back to back), chairs facing the screens
+    { type: 'exec_desk', x: 1950, y: 1600, rot: 0 }, { type: 'chair', x: 1950, y: 1566, rot: 0 },
+    { type: 'armchair', x: 1912, y: 1652, rot: 2 }, { type: 'armchair', x: 1988, y: 1652, rot: 2 },
+    { type: 'bookcase', x: 1735, y: 1467, rot: 0 }, { type: 'bookcase', x: 1790, y: 1467, rot: 0 },
+    { type: 'armchair', x: 1674, y: 1555, rot: 3 }, { type: 'armchair', x: 1674, y: 1607, rot: 3 },
+    { type: 'plant', x: 2125, y: 1675 }, { type: 'plant', x: 1680, y: 1478 }, { type: 'plant', x: 2125, y: 1478 },
+    { type: 'rug_small', x: 1950, y: 1570 }, { type: 'wall_clock', x: 2000, y: 1461.5, rot: 0 },
+    // --- open space: six blocks of four workstations in two rows facing the camera (D81: the art shows their fronts)
     ...cluster(450, 400), ...cluster(750, 400), ...cluster(1050, 400),
     ...cluster(450, 680), ...cluster(750, 680), ...cluster(1050, 680),
     { type: 'whiteboard', x: 880, y: 268, rot: 0 }, { type: 'notice_board', x: 600, y: 261.5, rot: 0 },
-    { type: 'printer', x: 1272, y: 860, rot: 1 }, { type: 'water_cooler', x: 1280, y: 780 },
+    { type: 'printer', x: 1272, y: 860, rot: 1 }, { type: 'plant', x: 1278, y: 780 },
     { type: 'plant', x: 272, y: 272 }, { type: 'plant', x: 1278, y: 272 }, { type: 'plant', x: 272, y: 928 },
     { type: 'plant', x: 760, y: 928 }, { type: 'boxes', x: 300, y: 830 }, { type: 'boxes_tall', x: 300, y: 870 },
     { type: 'overturned_chair', x: 700, y: 545, rot: 2 }, { type: 'papers', x: 790, y: 560 },
     { type: 'broken_monitor', x: 620, y: 520, rot: 1 }, { type: 'exit_sign', x: 261.5, y: 400, rot: 3 },
-    { type: 'lockers', x: 269, y: 620, rot: 3 }, { type: 'lockers', x: 269, y: 690, rot: 3 },
+    ...[600, 622, 644, 670, 692, 714].map((y) => ({ type: 'filing_cabinet', x: 272, y, rot: 3 })),
     { type: 'wall_clock', x: 1100, y: 261.5, rot: 0 },
     // --- conference
     { type: 'conf_table', x: 1550, y: 435, rot: 0 },
-    { type: 'chair_meeting', x: 1480, y: 385, rot: 0 }, { type: 'chair_meeting', x: 1550, y: 385, rot: 0 },
-    { type: 'chair_meeting', x: 1620, y: 385, rot: 0 }, { type: 'chair_meeting', x: 1480, y: 485, rot: 2 },
-    { type: 'chair_meeting', x: 1550, y: 485, rot: 2 }, { type: 'chair_meeting', x: 1620, y: 485, rot: 2 },
-    { type: 'chair_meeting', x: 1432, y: 435, rot: 3 }, { type: 'chair_meeting', x: 1668, y: 435, rot: 1 },
+    { type: 'chair_meeting', x: 1480, y: 385, rot: 0, drawn: false }, { type: 'chair_meeting', x: 1550, y: 385, rot: 0, drawn: false },
+    { type: 'chair_meeting', x: 1620, y: 385, rot: 0, drawn: false }, { type: 'chair_meeting', x: 1480, y: 485, rot: 2, drawn: false },
+    { type: 'chair_meeting', x: 1550, y: 485, rot: 2, drawn: false }, { type: 'chair_meeting', x: 1620, y: 485, rot: 2, drawn: false },
+    { type: 'chair_meeting', x: 1432, y: 435, rot: 3, drawn: false }, { type: 'chair_meeting', x: 1668, y: 435, rot: 1, drawn: false },
     { type: 'tv_wall', x: 1550, y: 261.5, rot: 0 }, { type: 'plant', x: 1322, y: 272 }, { type: 'plant', x: 1778, y: 272 },
     { type: 'wall_clock', x: 1700, y: 261.5, rot: 0 },
     // --- print room
     { type: 'printer', x: 1323, y: 700, rot: 3 }, { type: 'printer', x: 1323, y: 780, rot: 3 },
-    { type: 'archive_shelf', x: 1781, y: 720, rot: 1 }, { type: 'archive_shelf', x: 1781, y: 850, rot: 1 },
+    { type: 'archive_shelf', x: 1660, y: 639, rot: 0 }, { type: 'archive_shelf', x: 1740, y: 639, rot: 0 },
     { type: 'boxes', x: 1650, y: 700 }, { type: 'trolley', x: 1440, y: 900 }, { type: 'boxes_tall', x: 1322, y: 920 },
     // --- server room
     ...rackRow(1890, 2112, 360), ...rackRow(1890, 2112, 520), ...rackRow(1890, 1994, 680),
-    { type: 'terminal', x: 2124, y: 860, rot: 1 }, { type: 'chair', x: 2088, y: 860, rot: 3 },
+    { type: 'terminal', x: 2097, y: 828, rot: 0 }, { type: 'chair', x: 2097, y: 800, rot: 0 },
     { type: 'boxes', x: 1830, y: 920 },
     // --- stairwell
     { type: 'stairs', x: 175, y: 400, rot: 1 },
@@ -206,12 +210,11 @@ export const OFFICE = {
   exit: { rect: [110, 310, 240, 490], x: 175, y: 400 },
 };
 
-/** Four workstations back to back around (cx, cy) with their chairs and a frosted partition between them. */
+/** Four workstations in two rows around (cx, cy), all facing the camera (south), each chair behind its desk. */
 function cluster(cx, cy) {
-  const out = [{ type: 'partition', x: cx, y: cy, rot: 0 }];
-  for (const dx of [-31, 31]) {
-    out.push({ type: 'workstation', x: cx + dx, y: cy - 16, rot: 2 }, { type: 'chair', x: cx + dx, y: cy - 46, rot: 0 });
-    out.push({ type: 'workstation', x: cx + dx, y: cy + 16, rot: 0 }, { type: 'chair', x: cx + dx, y: cy + 46, rot: 2 });
+  const out = [];
+  for (const dy of [-36, 36]) for (const dx of [-31, 31]) {
+    out.push({ type: 'workstation', x: cx + dx, y: cy + dy, rot: 0 }, { type: 'chair', x: cx + dx, y: cy + dy - 28, rot: 0 });
   }
   return out;
 }

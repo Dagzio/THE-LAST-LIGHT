@@ -14,8 +14,12 @@ import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { CAMERA, CAMERA_TOUCH } from '../config/camera.js';
 import { QUALITY_PRESETS, antialiasFor, TOUCH } from '../config/settings.js';
-import { OFFICE } from '../data/levels/office.js';
 
+// the key light's fixed offset from what it lights and its shadow camera's axes (texel snapping, D81)
+const SUN_DIR = new THREE.Vector3(-260, 820, 300);
+const SUN_Z = SUN_DIR.clone().normalize();
+const SUN_X = new THREE.Vector3(0, 1, 0).cross(SUN_Z).normalize();
+const SUN_Y = SUN_Z.clone().cross(SUN_X);
 const MAX_BULLETS = 200;
 const MAX_BARS = 32;
 const MAX_POOLS = 40;
@@ -123,17 +127,20 @@ export class Renderer3D {
     this.templates = {};
     // phones: the 4K body textures are drawn at 2K (the files stay unchanged — user request: no compression)
     const maxTex = TOUCH ? 2048 : 4096;
-    const make = async (key, buf) => {
-      if (!buf || !animRes) return;
+    const make = (key, buf, ref) => {
+      if (!buf || !animRes) return null;
       try {
         const m = parseSkinnedGLB(buf);
-        const tpl = new HumanTemplate(m, animRes, HUMAN_MODELS[key].height);
-        tpl.texture = await bodyTexture(m.image, maxTex);
+        const tpl = new HumanTemplate(m, animRes, HUMAN_MODELS[key].height, ref);
         tpl.materials = new Map();
         this.templates[key] = tpl;
-      } catch (e) { console.error('character model failed', key, e); }
+        return bodyTexture(m.image, maxTex).then((t) => { tpl.texture = t; });
+      } catch (e) { console.error('character model failed', key, e); return null; }
     };
-    await Promise.all([make('hero', heroBuf), make('enemy', enemyBuf)]);
+    // D81: the clips fit the hero's rig; the enemy's bones are retargeted against the hero's rest pose
+    const heroTex = make('hero', heroBuf, null);
+    const enemyTex = make('enemy', enemyBuf, this.templates.hero ? this.templates.hero.rest : null);
+    await Promise.all([heroTex, enemyTex]);
     this.gunGeos = {};
     for (const [id, m] of guns) {
       if (!m) continue;
@@ -464,8 +471,13 @@ export class Renderer3D {
     }
     this.camera.position.set(x, d * Math.cos(TILT), z + d * Math.sin(TILT));
     this.camera.lookAt(x, 0, z);
-    this.sun.position.set(x - 260, 820, z + 300);
-    this.sun.target.position.set(x, 0, z);
+    // D81: the shadow map moves in whole texels (shadow edges no longer crawl / flicker while the camera follows)
+    const sh = this.sun.shadow, texel = (sh.camera.right - sh.camera.left) / Math.max(1, sh.mapSize.x);
+    const r = x * SUN_X.x + z * SUN_X.z, u = x * SUN_Y.x + z * SUN_Y.z;
+    const dr = Math.round(r / texel) * texel - r, du = Math.round(u / texel) * texel - u;
+    const tx = x + SUN_X.x * dr + SUN_Y.x * du, ty = SUN_X.y * dr + SUN_Y.y * du, tz = z + SUN_X.z * dr + SUN_Y.z * du;
+    this.sun.target.position.set(tx, ty, tz);
+    this.sun.position.set(tx + SUN_DIR.x, ty + SUN_DIR.y, tz + SUN_DIR.z);
   }
 
   /** Client (CSS px) → ground point in world units. */
@@ -747,41 +759,6 @@ export class Renderer3D {
     this.shakeAmp = amount;
     this.shakeDur = duration;
     this.shakeUntil = t + duration;
-  }
-
-  // ---------------- menu backdrop: a slow flight over the office (no characters, no shadows) ----------------
-  /** @returns {boolean} false while the renderer is busy — the 2D backdrop is drawn instead */
-  renderMenu(t, frameDt, busy = false) {
-    if (this.guard.busy() || this.office) return false;
-    if (!this.menu) {
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x07090d);
-      scene.fog = new THREE.Fog(0x07090d, 900, 2200);
-      scene.add(new THREE.HemisphereLight(0xe2ebff, 0x2b2722, 1.5));
-      const sun = new THREE.DirectionalLight(0xfff1de, 1.3);
-      sun.position.set(600, 900, 1400);
-      scene.add(sun);
-      const office = buildOfficeScene(OFFICE, { aniso: QUALITY_PRESETS[this.quality].aniso, shadows: false });
-      scene.add(office.group);
-      const cam = new THREE.PerspectiveCamera(38, 16 / 9, 20, 5000);
-      this.menu = { scene, cam, office };
-      this.renderer.compile(scene, cam);
-    }
-    this._resize(false);
-    const { scene, cam } = this.menu;
-    cam.aspect = this.camera.aspect;
-    cam.updateProjectionMatrix();
-    // a slow pan over the floor plan, looking down at ~50°
-    const k = (t * 0.018) % 1, a = k * Math.PI * 2;
-    const cx = 1150 + Math.cos(a) * 520, cz = 950 + Math.sin(a) * 320;
-    cam.position.set(cx - 200, 760, cz + 640);
-    cam.lookAt(cx, 0, cz);
-    const prevShadow = this.renderer.shadowMap.enabled;
-    this.renderer.shadowMap.enabled = false;
-    this.renderer.render(scene, cam);
-    this.renderer.shadowMap.enabled = prevShadow;
-    if (busy) { this.fpsAcc = 0; this.fpsFrames = 0; } else this._adapt(frameDt);
-    return true;
   }
 
   /**

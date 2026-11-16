@@ -148,7 +148,6 @@ function meetingChair(b) {
 }
 
 const BUILD = {
-  desk(b) { deskFrame(b, 60, 30, 23); },
 
   workstation(b, p) {
     deskFrame(b, 60, 30, 23);
@@ -191,12 +190,6 @@ const BUILD = {
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box('chrome', 1.5, 3, 1.5, sx * 13, 0, sz * 11);
   },
 
-  sofa(b) {
-    b.box('leather', 76, 8, 28, 0, 3, 0);
-    b.box('leather', 76, 15, 7, 0, 8, -10.5);
-    for (const sx of [-1, 1]) b.box('leather', 6, 10, 28, sx * 35, 8, 0);
-    for (const sx of [-1, 0, 1]) b.box('cushion', 21, 3, 19, sx * 22, 11, 2.5);
-  },
 
   coffee_table(b) {
     b.cyl('stone', 16, 16, 2, 0, 12, 0, 18);
@@ -307,13 +300,6 @@ const BUILD = {
     for (const sx of [-1, 1]) b.box('metalDark', 0.8, 18, 0.6, sx * 3, 4, 12.2);
   },
 
-  kitchen_counter(b) {
-    b.box('white', 100, 26, 24, 0, 0, 0);
-    b.box('stone', 102, 2, 25, 0, 26, 0);
-    b.box('metal', 22, 1, 14, -20, 27.6, 0).cyl('chrome', 1, 1, 8, -20, 28, -8, 6);
-    b.box('black', 22, 13, 14, 30, 28, -2).quad('decal', TILE.keyboard, 12, 8, 26, 34.5, 5.1);
-    for (let k = -2; k <= 2; k++) b.box('metal', 0.8, 18, 0.6, k * 20, 4, 12.2);
-  },
 
   vending(b) {
     b.box('black', 32, 60, 26, 0, 0, 0);
@@ -321,16 +307,7 @@ const BUILD = {
     b.box('metalDark', 32, 4, 26, 0, 60, 0);
   },
 
-  fridge(b) {
-    b.box('chrome', 26, 60, 26, 0, 0, 0);
-    b.box('metalDark', 26, 0.8, 0.6, 0, 40, 13.1).box('metalDark', 1.4, 14, 1.2, -10, 44, 13.4).box('metalDark', 1.4, 18, 1.2, -10, 16, 13.4);
-  },
 
-  water_cooler(b) {
-    b.box('white', 12, 26, 12, 0, 0, 0);
-    b.cyl('glass', 6, 6, 12, 0, 26, 0, 12);
-    b.box('chrome', 3, 2, 2, -2, 18, 6.5).box('red', 1.5, 1.5, 1, 2, 19, 6.4);
-  },
 
   boxes(b) {
     b.box('cardboard', 16, 13, 14, -8, 0, 4).box('cardboard', 14, 12, 12, 9, 0, -3).box('cardboard', 12, 9, 11, -6, 13, 3, { ry: 0.3 });
@@ -364,7 +341,6 @@ const BUILD = {
     for (const sx of [-1, 1]) { b.box('chrome', 1.4, 47, 1.4, sx * 26, 0, 0); b.box('chrome', 1.4, 1.4, 10, sx * 26, 0.5, 0); }
   },
 
-  bin(b) { b.cyl('metalDark', 5, 4, 13, 0, 0, 0, 10); b.cyl('black', 4.6, 4.6, 0.5, 0, 12.6, 0, 10); },
 
   notice_board(b) { b.box('walnut', 52, 32, 1.4, 0, 18, -0.6, { tile: 50 }); b.quad('decal', TILE.notice, 48, 28, 0, 34, 0.3); },
 
@@ -392,24 +368,8 @@ const BUILD = {
     b.box('metalDark', 8, 3, 6, 9, 0, -9);
   },
 
-  partition(b) {
-    b.box('metalDark', 124, 1.6, 2.4, 0, 22, 0);
-    b.box('frost', 122, 13, 1.2, 0, 23.5, 0);
-    b.box('metalDark', 124, 1.4, 2.4, 0, 36, 0);
-  },
 
-  lockers(b) {
-    b.box('metal', 60, 60, 18, 0, 0, 0);
-    b.quad('decal', TILE.lockers, 58, 56, 0, 30, 9.1);
-    b.box('metalDark', 60, 2, 18, 0, 60, 0);
-  },
 
-  floor_lamp(b) {
-    b.cyl('metalDark', 6, 6, 1.4, 0, 0, 0, 12);
-    b.cyl('chrome', 0.8, 0.8, 52, 0, 1, 0, 6);
-    b.cyl('cream', 5, 8, 9, 0, 52, 0, 12);
-    b.cyl('lightstrip', 6.6, 6.6, 0.4, 0, 52.2, 0, 12);
-  },
 
   rug_large(b) { b.decal('rug', TILE.rugRed, 170, 110, 0, 0, 0.3); },
   rug_small(b) { b.decal('rug', TILE.rugGrey, 100, 66, 0, 0, 0.3); },

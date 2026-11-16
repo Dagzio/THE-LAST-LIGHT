@@ -236,8 +236,10 @@ body.paused #screen-game.flare-ready .flare-neon { animation-play-state: paused;
 body[data-screen="game"] #world3d { display: block; }
 body[data-screen="game"] #world { display: none; }
 /* D46: the menus use the 3D lighthouse scene once WebGL is ready (the 2D backdrop stays as the fallback) */
-body.menu3d #world3d { display: block; }
-body.menu3d #world { display: none; }
+/* D81: the menus show the user's still picture (cover) instead of the 3D flyover */
+.menu-bg { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; object-fit: cover; object-position: 60% 50%;
+  z-index: 0; display: none; pointer-events: none; user-select: none; -webkit-user-drag: none; background: #07090d; }
+body[data-screen="menu"] .menu-bg, body[data-screen="mapSelect"] .menu-bg { display: block; }
 
 /* ===================== Splash loading bar (H5 3D guide §7) ===================== */
 /* D65 (the user's reference): low in the centre, about half the screen wide; a steel frame with pointed ends, a dark

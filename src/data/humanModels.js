@@ -30,6 +30,7 @@ export const HUMAN_ANIM = {
   throwRelease: 1.05,   // s the rest of the toss plays after the throw
   throwHandOff: 0.7,    // the gun is in the LEFT hand between these clip times (the right arm throws)
   throwHandBack: 2.5,
+  carryForeEnd: 8,      // units from the grip: where the LEFT palm holds a long gun meanwhile (D81; a pistol — by its grip)
   recoilTime: 0.09,     // s of the procedural kick per shot
   recoilPistol: 0.22,   // rad (hand) — pistols kick more
   recoilRifle: 0.08,

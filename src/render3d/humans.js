@@ -33,7 +33,7 @@ export class HumanTemplate {
    * @param {object} anims assets/anims/human.json
    * @param {number} height game units
    */
-  constructor(model, anims, height) {
+  constructor(model, anims, height, ref = null) {
     this.root = model.root;
     this.mesh = model.mesh;
     this.root.traverse((o) => { o.name = clean(o.name); });
@@ -41,11 +41,14 @@ export class HumanTemplate {
     this.bones = model.bones;
     this.mesh.frustumCulled = false;
     this.root.updateMatrixWorld(true);
+    // rest pose (world + local rotation per bone): the reference other models are retargeted against
+    this.rest = { world: new Map(), local: new Map() };
+    for (const [name, b] of this.bones) { this.rest.world.set(name, b.getWorldQuaternion(new THREE.Quaternion())); this.rest.local.set(name, b.quaternion.clone()); }
     const headTop = this.bones.get('HeadTop_End') ? this.bones.get('HeadTop_End').getWorldPosition(_v).y : 1;
     this.scale = height / (headTop + 0.02);
     this.height = height;
     this.anims = anims;
-    this.clips = this._buildClips(anims);
+    this.clips = this._buildClips(anims, ref);
     this.rootSpeed = {};
     const unitsPerCm = this.hipsK * this.scale;
     for (const id in anims.clips) this.rootSpeed[id] = anims.clips[id].rootSpeed * unitsPerCm;
@@ -53,35 +56,83 @@ export class HumanTemplate {
     this.mount = this.mounts.rifle; // (dev viewer info)
   }
 
-  _buildClips(anims) {
+  /**
+   * D81: per-bone rest correction against a reference model whose bones match the clips (the hero): C = Rref⁻¹ · Rthis
+   * (world rest rotations). null when every bone matches (then the clip rotations are copied as is).
+   */
+  _corrections(ref) {
+    if (!ref) return null;
+    const out = new Map();
+    let differs = false;
+    for (const [name, w] of this.rest.world) {
+      const r = ref.world.get(name);
+      if (!r) continue;
+      const c = r.clone().invert().multiply(w);
+      if (2 * Math.acos(Math.min(1, Math.abs(c.w))) > 0.035) differs = true; // > 2°
+      out.set(name, c);
+    }
+    return differs ? out : null;
+  }
+
+  /**
+   * Retargets one clip onto this skeleton (D81: the enemy's right arm bones are rolled up to 166° against the hero's):
+   * the clip's world rotations on the reference rig (S) carry this rig's rest offset: T = S · C, local = Tparent⁻¹ · T
+   * (Hips: into its parent frame). → name → Float32Array of local quaternions.
+   */
+  _retarget(c, corr, ref, pqInv) {
+    const n = c.frames, hips = this.bones.get('Hips');
+    const order = [];
+    const visit = (b) => { order.push(b); for (const ch of b.children) if (ch.isBone) visit(ch); };
+    visit(hips);
+    const S = new Map(), T = new Map(), out = {};
+    for (const b of order) { S.set(b.name, new THREE.Quaternion()); T.set(b.name, new THREE.Quaternion()); if (c.q[b.name]) out[b.name] = new Float32Array(n * 4); }
+    const lq = new THREE.Quaternion(), loc = new THREE.Quaternion(), I = new THREE.Quaternion();
+    for (let i = 0; i < n; i++) {
+      for (const b of order) {
+        const name = b.name, tr = c.q[name];
+        if (tr) lq.fromArray(tr, i * 4); else lq.copy(ref.local.get(name) || this.rest.local.get(name) || I);
+        const s = S.get(name), t = T.get(name);
+        if (b === hips) s.copy(lq); else s.copy(S.get(b.parent.name)).multiply(lq);
+        t.copy(s).multiply(corr.get(name) || I);
+        if (!tr) continue;
+        if (b === hips) loc.copy(pqInv).multiply(t); else loc.copy(T.get(b.parent.name)).invert().multiply(t);
+        loc.toArray(out[name], i * 4);
+      }
+    }
+    return out;
+  }
+
+  _buildClips(anims, ref) {
     const hips = this.bones.get('Hips');
     const parent = hips.parent;
     parent.updateMatrixWorld(true);
     const pInv = parent.matrixWorld.clone().invert();
     const pqInv = parent.getWorldQuaternion(new THREE.Quaternion()).invert();
     this.hipsK = hips.getWorldPosition(_v).y / HUMAN_ANIM.srcHipsCm;
+    const corr = this._corrections(ref);
+    this.retargeted = !!corr;
     this.hipsLocal = {};
     this.hipsPos = {};
+    this.localQ = {};
     const out = {};
     for (const [id, c] of Object.entries(anims.clips)) {
       const n = c.frames;
       const times = new Float32Array(n);
       for (let i = 0; i < n; i++) times[i] = Math.min(c.duration, i / anims.fps);
       const full = [], upper = [], lower = [];
+      const re = corr ? this._retarget(c, corr, ref, pqInv) : null;
+      this.localQ[id] = {};
       for (const [name, vals] of Object.entries(c.q)) {
         if (!this.bones.has(name)) continue;
-        const values = Float32Array.from(vals);
-        if (name === 'Hips') {
-          for (let i = 0; i < n; i++) {
-            _q.fromArray(values, i * 4).premultiply(pqInv);
-            if (i > 0) {
-              const d = _q.x * values[i * 4 - 4] + _q.y * values[i * 4 - 3] + _q.z * values[i * 4 - 2] + _q.w * values[i * 4 - 1];
-              if (d < 0) _q.set(-_q.x, -_q.y, -_q.z, -_q.w);
-            }
-            _q.toArray(values, i * 4);
-          }
-          this.hipsLocal[id] = values;
+        const values = re ? re[name] : Float32Array.from(vals);
+        if (name === 'Hips' && !re) for (let i = 0; i < n; i++) _q.fromArray(values, i * 4).premultiply(pqInv).toArray(values, i * 4);
+        // keep each track on one hemisphere (no flips when the mixer interpolates)
+        for (let i = 1; i < n; i++) {
+          const d = values[i * 4] * values[i * 4 - 4] + values[i * 4 + 1] * values[i * 4 - 3] + values[i * 4 + 2] * values[i * 4 - 2] + values[i * 4 + 3] * values[i * 4 - 1];
+          if (d < 0) for (let k = 0; k < 4; k++) values[i * 4 + k] = -values[i * 4 + k];
         }
+        this.localQ[id][name] = values;
+        if (name === 'Hips') this.hipsLocal[id] = values;
         const tr = new THREE.QuaternionKeyframeTrack(`${name}.quaternion`, times, values);
         full.push(tr);
         (LOWER.has(name) ? lower : upper).push(tr);
@@ -111,10 +162,10 @@ export class HumanTemplate {
     const f = Math.max(0, Math.min(c.frames - 1, Math.round(time * this.anims.fps)));
     const rest = [];
     for (const b of this.skeleton.bones) rest.push([b, b.quaternion.clone(), b.position.clone()]);
-    for (const [name, vals] of Object.entries(c.q)) {
+    for (const [name, vals] of Object.entries(this.localQ[id])) {
       const b = this.bones.get(name);
-      if (!b) continue;
-      if (name === 'Hips') { b.quaternion.fromArray(this.hipsLocal[id], f * 4); b.position.fromArray(this.hipsPos[id], f * 3); } else b.quaternion.fromArray(vals, f * 4);
+      b.quaternion.fromArray(vals, f * 4);
+      if (name === 'Hips') b.position.fromArray(this.hipsPos[id], f * 3);
     }
     this.root.updateMatrixWorld(true);
     return () => { for (const [b, q, p] of rest) { b.quaternion.copy(q); b.position.copy(p); } this.root.updateMatrixWorld(true); };
@@ -159,9 +210,15 @@ export class HumanTemplate {
       up: { f: up.z, s: -up.x, h: up.y },
     };
     restore();
-    // the left-hand carry for the grenade toss: where the right-hand gun is at the hand-off moment, in LeftHand space
+    // the left-hand carry for the grenade toss: the gun keeps its direction of the hand-off moment, and the LEFT palm
+    // holds it (D81) — a pistol by its grip, a long gun by the fore-end — in LeftHand space
     restore = this._pose('throw', HUMAN_ANIM.throwHandOff);
-    const gunM = new THREE.Matrix4().compose(pos, quat, new THREE.Vector3(1, 1, 1)).premultiply(R.matrixWorld);
+    const one = new THREE.Vector3(1, 1, 1);
+    const gunM = new THREE.Matrix4().compose(pos, quat, one).premultiply(R.matrixWorld);
+    const gq = new THREE.Quaternion().setFromRotationMatrix(_m.extractRotation(gunM));
+    const barrelW = new THREE.Vector3(1, 0, 0).applyQuaternion(gq);
+    const held = this._palm('Left', new THREE.Vector3()).addScaledVector(barrelW, -(set === 'pistol' ? 0 : HUMAN_ANIM.carryForeEnd) / this.scale);
+    gunM.compose(held, gq, one);
     const local = L.matrixWorld.clone().invert().multiply(gunM);
     const cp = new THREE.Vector3(), cq = new THREE.Quaternion(), cs = new THREE.Vector3();
     local.decompose(cp, cq, cs);

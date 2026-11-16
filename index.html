@@ -14,9 +14,11 @@
   <link rel="stylesheet" href="styles/game.css">
 </head>
 <body data-screen="splash">
-  <!-- Menu backdrop (Canvas 2D) and the map run (three.js WebGL, top-down 3D). Every screen below is a DOM overlay. -->
+  <!-- Menu input surface (Canvas 2D) and the map run (three.js WebGL, top-down 3D). Every screen below is a DOM overlay. -->
   <canvas id="world" class="game-canvas"></canvas>
   <canvas id="world3d" class="game-canvas"></canvas>
+  <!-- D81: the user's main-menu picture (main menu + level select), instead of the 3D flyover -->
+  <img class="menu-bg" id="menuBg" src="assets/graphics/menu.webp" width="1672" height="941" alt="" draggable="false">
 
   <!-- ===== Splash → TAP TO PLAY (H5 §1) ===== -->
   <section class="screen active" id="screen-splash">

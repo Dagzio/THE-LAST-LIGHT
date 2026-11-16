@@ -7,9 +7,10 @@ import * as THREE from '../../lib/three.module.js';
 import { PropBuilder, buildProp } from './officeProps.js';
 import { paintOfficeAtlas } from './officeAtlas.js';
 import { cpuCanvas } from './render-guard.js';
-import { wallPieces } from '../core/LevelWorld.js';
 import { PROP_TYPES, propBox } from '../data/props.js';
 import { TILE, tileUV } from './officeAtlas.js';
+import { buildPropCards, hasSprite, propAtlasTexture, preloadPropAtlas } from './propSprites.js';
+
 
 const TEX_DIR = 'assets/textures/office/';
 // floor / wall material → texture file + tile size (world units per repeat)
@@ -46,12 +47,12 @@ function officeTexture(name, aniso) {
 /** Resolves when every office texture has loaded (or failed — a missing file must not block the game). */
 export function preloadOfficeTextures() {
   const names = new Set([...Object.values(FLOORS), ...Object.values(WALLS)].map((e) => e[0]));
-  return Promise.all([...names].map((n) => new Promise((res) => {
+  return Promise.all([preloadPropAtlas(), ...[...names].map((n) => new Promise((res) => {
     const t = new THREE.TextureLoader().load(`${TEX_DIR}${n}.png`, () => res(), undefined, () => res());
     t.colorSpace = THREE.SRGBColorSpace;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     texCache.set(n, t);
-  })));
+  }))]);
 }
 
 let sharedMats = null;
@@ -83,8 +84,7 @@ export function officeMaterials(aniso = 4) {
   m.screen = new THREE.MeshBasicMaterial({ map: atlas });
   m.decal = new THREE.MeshLambertMaterial({ map: atlas, alphaTest: 0.4 });
   m.wallTop = new THREE.MeshLambertMaterial({ color: 0x1b1e23 });
-  // D79: frosted desk partitions, rugs (atlas), soft contact shadows under furniture and along the walls
-  m.frost = new THREE.MeshLambertMaterial({ color: 0xdfe8ee, transparent: true, opacity: 0.6, depthWrite: false });
+  // D79: rugs (atlas), soft contact shadows under furniture and along the walls
   m.rug = new THREE.MeshLambertMaterial({ map: atlas, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   const soft = (paint) => { const c = cpuCanvas(128, 128); paint(c.g); const t = new THREE.CanvasTexture(c.canvas); return t; };
   // alpha masks: white on black (alphaMap reads the green channel)
@@ -105,6 +105,10 @@ export function officeMaterials(aniso = 4) {
   // door leaves
   m.door_wood = m.walnut; m.door_metal = m.metal; m.door_secure = new THREE.MeshLambertMaterial({ color: 0x3b4048 }); m.door_glass = m.glass;
   m.lockLight = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  // D81: the user's furniture sprites (pre-lit art: unlit, a touch darker to sit in the night office) and the
+  // invisible material of their shadow casters
+  m.propCards = new THREE.MeshBasicMaterial({ map: propAtlasTexture(aniso), color: 0xe6e6e6, transparent: true, alphaTest: 0.04, depthWrite: true, side: THREE.DoubleSide });
+  m.shadowOnly = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
   sharedMats = m;
   return m;
 }
@@ -112,6 +116,7 @@ export function officeMaterials(aniso = 4) {
 /** Sets the anisotropy of every office texture (graphics preset, applied live). */
 export function setOfficeAnisotropy(aniso) {
   for (const t of texCache.values()) if (t.anisotropy !== aniso) { t.anisotropy = aniso; if (t.image) t.needsUpdate = true; }
+  propAtlasTexture(aniso);
 }
 
 function roundRect(g, x, y, w, h, r) {
@@ -156,6 +161,44 @@ function floorRect(x0, z0, x1, z1, tile, y = 0) {
   return g.toNonIndexed();
 }
 
+/**
+ * Wall pieces for DRAWING (D81 — the flickering / see-through joints): like wallPieces() (collision), but no two walls
+ * overlap, so no faces lie in one plane and fight: a wall that ends on another wall's body stops at its face, at an L
+ * corner the horizontal wall owns the corner square, collinear walls meet end to end. Glass never owns a joint (a solid
+ * wall ignores glass; glass stops at the solid wall's face).
+ */
+export function drawPieces(level, w, h) {
+  const horiz = w.y0 === w.y1, glass = w.style === 'glass';
+  const lo = horiz ? Math.min(w.x0, w.x1) : Math.min(w.y0, w.y1), hi = horiz ? Math.max(w.x0, w.x1) : Math.max(w.y0, w.y1);
+  const line = horiz ? w.y0 : w.x0;
+  const ext = (p, atStart) => {
+    let corner = false, stem = false, collinear = false;
+    for (const o of level.walls) {
+      if (o === w || (!glass && o.style === 'glass')) continue;
+      const oh = o.y0 === o.y1;
+      const olo = oh ? Math.min(o.x0, o.x1) : Math.min(o.y0, o.y1), ohi = oh ? Math.max(o.x0, o.x1) : Math.max(o.y0, o.y1);
+      const oline = oh ? o.y0 : o.x0;
+      if (oh === horiz) { if (oline === line && (atStart ? ohi === p : olo === p)) collinear = true; continue; }
+      if (oline !== p || line < olo || line > ohi) continue; // the other wall's line does not pass this end
+      if (line === olo || line === ohi) corner = true; else stem = true;
+    }
+    if (glass) return corner || stem ? -h : h;
+    if (collinear) return 0;
+    if (stem) return -h;
+    if (corner) return horiz ? h : -h;
+    return h;
+  };
+  let a = lo - ext(lo, true);
+  const end = hi + ext(hi, false);
+  const out = [];
+  for (const [g0, g1] of [...(w.gaps || [])].sort((p, q) => p[0] - q[0])) {
+    if (g0 > a) out.push([a, g0]);
+    a = Math.max(a, g1);
+  }
+  if (end > a) out.push([a, end]);
+  return out;
+}
+
 /** Builds the 3D office of a level. @returns {{group, doors, update(run, time), dispose()}} */
 export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   const mats = officeMaterials(aniso);
@@ -176,7 +219,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   // walls
   for (const w of level.walls) {
     const horiz = w.y0 === w.y1;
-    for (const [a, b] of wallPieces(w, h)) {
+    for (const [a, b] of drawPieces(level, w, h)) {
       const len = b - a;
       if (w.style === 'glass') {
         const glass = new THREE.BoxGeometry(horiz ? len : 3, H - 8, horiz ? 3 : len);
@@ -214,7 +257,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     if (w.style === 'glass') continue;
     const horiz = w.y0 === w.y1;
     const outer = horiz ? (w.y0 === by0 || w.y0 === by1) : (w.x0 === bx0 || w.x0 === bx1);
-    for (const [a, b] of wallPieces(w, h)) {
+    for (const [a, b] of drawPieces(level, w, h)) {
       const len = b - a, mid = (a + b) / 2;
       const bb = new THREE.BoxGeometry(horiz ? len : T + 2.4, 4, horiz ? T + 2.4 : len);
       bb.translate(horiz ? mid : w.x0, 2, horiz ? w.y0 : mid);
@@ -249,9 +292,14 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     }
   }
 
-  // props + door frames
-  const pb = new PropBuilder();
-  for (const p of level.props) buildProp(pb, p);
+  // props + door frames. D81: props with the user's sprite art are drawn as sprite cards (propSprites.js); their 3D
+  // build only casts the shadow (an invisible mesh)
+  const pb = new PropBuilder(), shadowOnly = new PropBuilder();
+  for (const p of level.props) {
+    if (!hasSprite(p)) { buildProp(pb, p); continue; }
+    const t = PROP_TYPES[p.type];
+    if (shadows && t && !t.flat && !t.wall) buildProp(shadowOnly, p);
+  }
   for (const d of level.doors) {
     const hw = d.width / 2;
     for (const s of [-1, 1]) {
@@ -262,7 +310,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     pb.box('metalDark', d.width + 6, 6, T + 2, 0, H - 8, 0);
   }
   for (const [k, list] of pb.parts) for (const g of list) put(k, g);
-  // D79: a soft contact shadow under every standing object (ambient occlusion look), lamps light the floor
+  // D79: a soft contact shadow under every standing object (ambient occlusion look)
   for (const p of level.props) {
     const t = PROP_TYPES[p.type];
     if (!t || t.flat || t.wall || !(t.h > 2)) continue;
@@ -272,12 +320,6 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     ao.rotateX(-Math.PI / 2);
     ao.translate((x0 + x1) / 2, 0.45, (y0 + y1) / 2);
     put('aoBox', ao.toNonIndexed());
-    if (p.type === 'floor_lamp') {
-      const g = new THREE.PlaneGeometry(150, 150);
-      g.rotateX(-Math.PI / 2);
-      g.translate(p.x, 0.36, p.y);
-      put('lightPool', g.toNonIndexed());
-    }
   }
 
   // light pools: a grid of soft spots per room
@@ -315,8 +357,9 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     const mat = mats[k];
     if (!mat) { console.warn('office material missing', k); continue; }
     const mesh = new THREE.Mesh(merge(list), mat);
-    const flat = k.startsWith('floor_') || k === 'outside' || k === 'lightPool' || k === 'rug' || k === 'frost';
-    mesh.receiveShadow = shadows && k !== 'lightPool' && k !== 'screen';
+    const flat = k.startsWith('floor_') || k === 'outside' || k === 'lightPool' || k === 'rug';
+    // D81: walls take no shadows — at the grazing angles of their sides the shadow map drew moving stripes (acne)
+    mesh.receiveShadow = shadows && k !== 'lightPool' && k !== 'screen' && !k.startsWith('wall');
     mesh.castShadow = shadows && !flat && k !== 'glass' && k !== 'screen' && k !== 'decal';
     if (k === 'lightPool') mesh.renderOrder = 1;
     if (k === 'aoEdge' || k === 'aoBox') { mesh.renderOrder = 2; mesh.receiveShadow = false; mesh.castShadow = false; }
@@ -325,6 +368,26 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     mesh.updateMatrix();
     group.add(mesh);
     meshes.push(mesh);
+  }
+
+  // D81: the sprite cards (one mesh) + the invisible shadow casters of those props
+  const cardGeo = buildPropCards(level);
+  if (cardGeo) {
+    const cards = new THREE.Mesh(cardGeo, mats.propCards);
+    cards.renderOrder = 3; // after the floor decals (pools, contact shadows), before glass
+    cards.matrixAutoUpdate = false;
+    group.add(cards);
+    meshes.push(cards);
+  }
+  const casters = [];
+  for (const list of shadowOnly.parts.values()) casters.push(...list);
+  if (casters.length) {
+    const sm = new THREE.Mesh(merge(casters), mats.shadowOnly);
+    sm.castShadow = true;
+    // invisible on screen (writes neither colour nor depth); the shadow map draws it with its own depth material
+    sm.matrixAutoUpdate = false;
+    group.add(sm);
+    meshes.push(sm);
   }
 
   // doors: one instanced mesh per kind (sliding leaves)

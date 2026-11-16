@@ -1,7 +1,7 @@
 // Game: owns the runtime (state machine, clock, loop, input, renderers) and exposes domain commands for the UI.
 // The UI never changes state directly — it calls these commands.
-// Rendering: menus use the 3D office flyover (or the 2D canvas backdrop without WebGL); a level run is drawn in
-// top-down 3D by three.js (#world3d). KILL LIST (D78): story levels (data/levels) instead of the wave maps.
+// Rendering: the menus show the user's still picture (D81, #menuBg — no 3D flyover, nothing drawn per frame); a level
+// run is drawn in top-down 3D by three.js (#world3d). KILL LIST (D78): story levels (data/levels) instead of the wave maps.
 import { GameStateMachine, STATES } from './GameStateMachine.js';
 import { GameClock } from './GameClock.js';
 import { GameLoop } from './GameLoop.js';
@@ -9,7 +9,6 @@ import { Viewport } from '../platform/Viewport.js';
 import { InputManager } from '../platform/InputManager.js';
 import { Storage } from '../platform/StorageService.js';
 import { Prefs } from '../platform/Prefs.js';
-import { Renderer } from '../render/Renderer.js';
 import { Renderer3D } from '../render3d/Renderer3D.js';
 import { GameEvents } from './GameEvents.js';
 import { MissionRun } from './MissionRun.js';
@@ -22,7 +21,7 @@ import { nextLevelId, isLastLevel, defaultLevelSelection } from '../systems/Camp
 import { CHEATS } from '../config/constants.js';
 
 export class Game {
-  /** @param {HTMLCanvasElement} canvas2d menu backdrop @param {HTMLCanvasElement} canvas3d level run */
+  /** @param {HTMLCanvasElement} canvas2d input surface of the menus @param {HTMLCanvasElement} canvas3d level run */
   constructor(canvas2d, canvas3d) {
     this.sm = new GameStateMachine(STATES.BOOT);
     this.clock = new GameClock();
@@ -31,7 +30,6 @@ export class Game {
     this.quality = this._resolveQuality();
     this.viewport = new Viewport(canvas2d, () => QUALITY_PRESETS[this.quality].dprCap);
     this.input = new InputManager(this.viewport);
-    this.renderer = new Renderer(canvas2d, this.viewport);
     this.renderer3d = null;
     try {
       this.renderer3d = new Renderer3D(canvas3d, this.quality);
@@ -49,15 +47,12 @@ export class Game {
     this.loop.fpsCap = QUALITY_PRESETS[this.quality].fpsCap;
 
     this.presentationTime = 0;   // real time for menu decoration only (not simulation)
-    /** @type {(() => boolean) | null} set by main.js — background work (previews, sounds) still running */
-    this.menuBusy = null;
     /** @type {((run: MissionRun, time: number) => void) | null} set by main.js: called after every simulation step */
     this.onSimStep = null;
     this.selectedMapId = LEVELS[0].id;
     this.mapId = null;
     this.events = new GameEvents();  // presentation hooks: sound, particles, HUD
     this.run = null;                 // MissionRun of the current level attempt
-    this._view = { scene: 'backdrop', realTime: 0, simTime: 0, quality: this.quality };
     this.frameListeners = new Set();
     this.progress = new Progress();  // the only owner of the profile
     this.economy = this.progress;    // (legacy name read by a few UI parts: loadStatus)
@@ -108,16 +103,8 @@ export class Game {
     this.presentationTime += frameDt;
     if (this.sm.inMap && this.run && this.renderer3d) {
       this.renderer3d.render(this.run, frameDt, this.clock.time, !this.sm.is(STATES.RUNNING), alpha);
-    } else if (this.renderer3d && this.renderer3d.renderMenu(this.presentationTime, frameDt, !!(this.menuBusy && this.menuBusy()))) {
-      document.body.classList.add('menu3d');
     } else {
-      document.body.classList.remove('menu3d');
-      this.viewport.ensure();
-      const v = this._view;
-      v.realTime = this.presentationTime;
-      v.simTime = this.clock.time;
-      v.quality = this.quality;
-      this.renderer.render(v);
+      this.viewport.ensure(); // menus: the still picture is CSS (#menuBg); only the input surface follows the size
     }
     for (const fn of this.frameListeners) fn(frameDt);
   }
