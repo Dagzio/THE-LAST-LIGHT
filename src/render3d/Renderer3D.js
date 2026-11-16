@@ -597,6 +597,7 @@ export class Renderer3D {
       moveRel: speed > 1 ? moveDir - this.bodyYaw : 0,
       aim: run.heroAiming,
       reload: w.reloading ? w.reloadProgress(time) : -1,
+      reloadClip: pistolReloadOf(w.reloadStartedAt), // D84: one of the user's two pistol reloads, per reload
       hitAge: time - p.lastHitAt,
       deadAge: p.alive ? -1 : this.heroDeadAge,
       shotAge: time - w.lastShotAt,
@@ -637,6 +638,7 @@ export class Renderer3D {
         throwAge: Infinity,
         aim: e.alive && ai.mode === 'combat',
         reload: g.reloading ? Math.min(1, (time - g.reloadStartedAt) / Math.max(0.01, g.reloadEndsAt - g.reloadStartedAt)) : -1,
+        reloadClip: pistolReloadOf(g.reloadStartedAt + e.id),
         hitAge: time - e.lastHitAt,
         deadAge: e.alive ? -1 : time - e.deathAt,
         busy: !!e.busy && e.alive && ai.mode === 'idle' && sp < 2, // D83: going through the files until alerted
@@ -813,6 +815,11 @@ export class Renderer3D {
     const r = this.renderer.info.render;
     return { calls: r.calls, triangles: r.triangles, pixelRatio: this.pixelRatio };
   }
+}
+
+/** D84: which of the user's two pistol reload clips a reload plays — from its start time (stable, presentation only). */
+function pistolReloadOf(startedAt) {
+  return (Math.floor((Number(startedAt) || 0) * 997) & 1) ? 'pReload' : 'pReload2';
 }
 
 /** Looks of the enemy types for the warm-up views (the run's enemies carry their own type). */
