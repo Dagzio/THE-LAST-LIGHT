@@ -10,7 +10,9 @@ import { HUMAN_ANIM } from '../data/humanModels.js';
 
 // D82: + the roll, the crouch, the enemies' variants and the pistol reload as the game draws it (Pistol Idle + IK hand)
 const CLIPS = ['idle', 'walk', 'run', 'back', 'strafeL', 'strafeR', 'fire', 'reload', 'pReload (game)', 'hit', 'throw', 'pIdle', 'pWalk', 'pRun', 'die', 'die2',
-  'dodge', 'crouchIdle', 'crouchWalk', 'idle2', 'run2', 'run3', 'hit2', 'reload2', 'die3'];
+  'dodge', 'crouchIdle', 'crouchWalk', 'idle2', 'run2', 'run3', 'hit2', 'reload2', 'die3',
+  // D83: the enemies' rifle walk, the second roll, the cover set, the busy idle
+  'rwalk', 'dodge2', 'crouchIdle2', 'pKneel', 'crouchFire', 'crouchL', 'crouchR', 'toCrouch', 'toStand', 'coverL', 'coverR', 'coverTurn', 'peek', 'files'];
 const GAME_RELOAD = 'pReload (game)';
 const CSS = `
 #dbg-models-btn { position: fixed; right: max(30px, env(safe-area-inset-right)); bottom: 30px; z-index: 9000;
@@ -105,7 +107,7 @@ async function open() {
       view = tpl.instantiate(new THREE.MeshLambertMaterial({ map: tpl.texture }));
       for (const [id, g] of Object.entries(r3.gunGeos || {})) view.addGun(id, g.geometry, g.material);
       view.setGun(e.clip.startsWith('p') ? 'pistol' : e.key === 'hero' ? 'smg' : 'rifle');
-      for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die, view.dodge, view.crouchIdle, view.crouchWalk]) if (a) a.setEffectiveWeight(0);
+      for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die, view.dodge, view.crouchIdle, view.crouchWalk, ...Object.values(view.cv || {}), view.busy, ...Object.values(view.dodges || {}).map((d) => d.a)]) if (a) a.setEffectiveWeight(0);
       clipName = e.clip;
       gameT = 0;
       const C = tpl.clips[e.clip === GAME_RELOAD ? 'pIdle' : e.clip];
@@ -143,9 +145,9 @@ async function open() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (canvas.width !== Math.round(w * renderer.getPixelRatio())) { renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
     if (view && clipName === GAME_RELOAD) {
-      // the game's pistol reload: 1.3 s reload + 0.5 s pause, looped, through the same update as in a level
-      gameT = (gameT + dt) % 1.8;
-      view.update(dt, { speed: 0, moveRel: 0, aim: gameT > 1.3, reload: gameT <= 1.3 ? gameT / 1.3 : -1, hitAge: 99, deadAge: -1, shotAge: 99, throwAim: false, throwAge: Infinity, dodge: -1, crouch: false });
+      // the game's pistol reload: 1.6 s reload + 0.5 s pause, looped, through the same update as in a level
+      gameT = (gameT + dt) % 2.1;
+      view.update(dt, { speed: 0, moveRel: 0, aim: gameT > 1.6, reload: gameT <= 1.6 ? gameT / 1.6 : -1, hitAge: 99, deadAge: -1, shotAge: 99, throwAim: false, throwAge: Infinity, dodge: -1, crouch: false });
     } else if (view) {
       view.mixer.update(dt);
       // as in the game: the gun sits in the LEFT hand while the right arm tosses the grenade

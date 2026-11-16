@@ -1,6 +1,7 @@
 // Keyboard bindings → abstract actions (02_SPEC §3). Game code reads actions, never keys.
 // No pause/close key: the H5 standard forbids keyboard pause (PROJECT_AUDIT.md C1).
-// KILL LIST (D78): E opens a crate, G arms a grenade (the next shot throws it), Q / 1 / 2 change the weapon.
+// KILL LIST (D78): E opens a crate, G arms a grenade (the next shot throws it), 1 / 2 change the weapon.
+// D83 (user request): Q = take / leave cover (it no longer changes the weapon: 1 / 2 and the HUD weapon block do).
 
 export const KEY_BINDINGS = {
   moveUp: ['KeyW', 'ArrowUp'],
@@ -11,7 +12,8 @@ export const KEY_BINDINGS = {
   interact: ['KeyE'],
   reload: ['KeyR'],
   throwGrenade: ['KeyG'],
-  switchWeapon: ['KeyQ'],
+  switchWeapon: [],
+  cover: ['KeyQ'],
   weapon1: ['Digit1', 'Numpad1'],
   weapon2: ['Digit2', 'Numpad2'],
 };

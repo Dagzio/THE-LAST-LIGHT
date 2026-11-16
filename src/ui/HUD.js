@@ -27,6 +27,7 @@ export class HUD {
       banner: $('waveBanner'), bannerText: $('waveBannerText'), screen: $('screen-game'),
       call: $('introCard'), callKicker: $('introKicker'), callTitle: $('introTitle'), callText: $('introText'),
       crate: $('cratePrompt'), arrow: $('objArrow'), interactBtn: $('interactBtn'),
+      coverPrompt: $('coverPrompt'), coverBtn: $('coverBtn'),
       gBtns: [[$('grenadeBtn'), $('grenadeBtnCount')], [$('hudGrenade'), $('hudGrenadeCount')]].filter((b) => b[0]),
     };
     this.labelSize = new Map();
@@ -77,6 +78,7 @@ export class HUD {
       hp: -1, maxHp: -1, ammo: -1, mag: -1, weaponId: '', reloading: null, reloadPct: -1, hurt: null, lowAmmo: null,
       hitFlash: null, lastHitAt: null, objKey: '', objIdx: -1, levelKey: '', items: '', slots: '', gKey: '', dashPct: -1,
       dashCooling: false, crateOn: null, cx: -1, cy: -1, arrowOn: null, ax: -1, ay: -1, aa: -1, interact: null,
+      coverOn: null, kx: -1, ky: -1, coverBtn: '',
     };
   }
 
@@ -138,6 +140,21 @@ export class HUD {
     if (!on) return;
     const x = Math.round(PT.x), y = Math.round(PT.y);
     if (x !== c.cx || y !== c.cy) { c.cx = x; c.cy = y; el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`; }
+  }
+
+  /** D83: "Q · COVER" over the hero while an object to hide behind is in reach (a button: click takes cover). */
+  _coverLabel(run, want) {
+    const c = this.cache, el = this.el.coverPrompt, r3 = this.game.renderer3d, p = run.player;
+    if (!el) return;
+    let on = want && !!r3;
+    if (on) {
+      r3.projectToScreen(r3._lx(p), r3._ly(p), 66, PT);
+      on = !this._underHud(el, PT.x, PT.y, -1);
+    }
+    if (on !== c.coverOn) { c.coverOn = on; el.classList.toggle('on', on); el.classList.toggle('near', on); }
+    if (!on) return;
+    const x = Math.round(PT.x), y = Math.round(PT.y);
+    if (x !== c.kx || y !== c.ky) { c.kx = x; c.ky = y; el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`; }
   }
 
   /** An arrow at the screen edge pointing at the objective while it is off screen. */
@@ -253,6 +270,12 @@ export class HUD {
     // touch interact button: only while a crate is in reach
     const canInteract = running && run.canInteract;
     if (canInteract !== c.interact) { c.interact = canInteract; if (el.interactBtn) el.interactBtn.classList.toggle('on', canInteract); }
+
+    // D83 cover: touch — the button (shown next to cover, lit in cover); PC — "Q · COVER" over the hero
+    const offer = running ? run.coverOffer : null;
+    const btnKey = offer || '';
+    if (btnKey !== c.coverBtn && el.coverBtn) { c.coverBtn = btnKey; el.coverBtn.classList.toggle('on', !!offer); el.coverBtn.classList.toggle('active', offer === 'leave'); }
+    this._coverLabel(run, offer === 'take' && !this.game.touchMode && !run.interactTarget);
 
     this._crateLabel(run, running);
     this._objectiveArrow(run, running && !run.over);

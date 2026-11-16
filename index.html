@@ -148,6 +148,8 @@
 
     <!-- Above the crate in reach: E / tap opens it -->
     <button class="kiosk-prompt crate-prompt" id="cratePrompt" data-action="interact" data-nosfx><span class="kiosk-key">E</span><span data-i18n="hud.open"></span></button>
+    <!-- D83: next to an object one can hide behind (PC): Q / click takes cover -->
+    <button class="kiosk-prompt crate-prompt cover-prompt" id="coverPrompt" data-action="toggleCover" data-nosfx><span class="kiosk-key">Q</span><span data-i18n="hud.cover"></span></button>
 
     <!-- Bottom-right: action bar + weapon block (tap = next weapon) + HP plate -->
     <div class="hud-player">
@@ -195,6 +197,10 @@
         <div class="touch-col">
           <button class="neon-btn neon-small interact-neon" id="interactBtn" data-action="interact" data-nosfx data-i18n-aria="aria.interact">
             <svg class="ico" viewBox="0 0 24 24"><path d="M4 9h16v10H4z"/><path d="M4 9l2-4h12l2 4M10 13h4"/></svg>
+          </button>
+          <!-- D83: cover — shows next to an object one can hide behind; lit while in cover (tap again leaves it) -->
+          <button class="neon-btn neon-small cover-neon" id="coverBtn" data-action="toggleCover" data-nosfx data-i18n-aria="aria.cover">
+            <svg class="ico" viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M5 20v-7h14v7"/><circle cx="12" cy="7" r="2.6"/><path d="M9 13l1.5-3h3L15 13"/></svg>
           </button>
           <button class="neon-btn dash-neon" data-touch-action="dash" data-nosfx data-i18n-aria="aria.dash">
             <svg class="flare-ring dash-ring" viewBox="0 0 48 48"><circle class="flare-track" cx="24" cy="24" r="21"/><circle class="dash-fill" cx="24" cy="24" r="21" pathLength="100"/></svg>

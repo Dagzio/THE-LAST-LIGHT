@@ -189,6 +189,7 @@ export class UIManager {
       case 'continueCampaign': this.game.continueCampaign(); break;
       case 'resultMenu': this.game.exitToMenu(); break; // the level is already over: nothing to lose, no confirmation
       case 'interact': if (!this.game.interact()) Sfx.play('deny'); break;
+      case 'toggleCover': if (!this.game.toggleCover()) Sfx.play('deny'); break;
       case 'armGrenade': Sfx.play(this.game.armGrenade('frag') ? 'click' : 'deny'); break;
       case 'switchWeapon': if (this.game.switchWeapon()) Sfx.play('click'); break;
       default: break;

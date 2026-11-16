@@ -10,6 +10,11 @@ import { cpuCanvas } from './render-guard.js';
 import { PROP_TYPES, propBox } from '../data/props.js';
 import { TILE, tileUV } from './officeAtlas.js';
 import { buildPropCards, hasSprite, propAtlasTexture, preloadPropAtlas } from './propSprites.js';
+import { levelLights, LIGHT_KINDS } from './officeLights.js';
+
+const POOL_GAIN = 0.9;    // D83: floor pool brightness per unit of light power
+// D83: floor decal kinds → atlas tiles (render3d/officeAtlas.js)
+const DECAL_TILES = { blood: TILE.blood, bloodSmear: TILE.bloodSmear, coffee: TILE.coffee, scuff: TILE.scuff, hazard: TILE.hazard, marking: TILE.marking, prints: TILE.prints, dirt: TILE.dirt };
 
 
 const TEX_DIR = 'assets/textures/office/';
@@ -28,6 +33,7 @@ const COLORS = {
   metalDark: 0x2a2e35, metal: 0x7f858d, chrome: 0xc4c9d0, black: 0x16181c, leather: 0x26282c, fabric: 0x4f555e,
   white: 0xe4e2dd, cream: 0xd6cdbe, stone: 0x36373c, pot: 0x8c8c88, soil: 0x3a2a1c, plant: 0x2c6629, plantLight: 0x4b8a35,
   cardboard: 0xb08559, tape: 0xd4c39a, red: 0xae2a22, binder: 0x2c4b76, baseboard: 0x26282c,
+  yellow: 0x9c7420, cable: 0x2a5aa8, // D83 cable trays
 };
 
 const texCache = new Map();
@@ -101,13 +107,19 @@ export function officeMaterials(aniso = 4) {
   gr.addColorStop(0, 'rgba(255,255,255,0.55)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
   const pool = new THREE.CanvasTexture(canvas);
-  m.lightPool = new THREE.MeshBasicMaterial({ map: pool, color: 0xfff1dc, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.22 });
+  // D83: every light's pool carries its own colour / strength (vertex colours, render3d/officeLights.js)
+  m.lightPool = new THREE.MeshBasicMaterial({ map: pool, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  m.lampShade = new THREE.MeshBasicMaterial({ color: 0xffd9a0 });
+  m.alarm = new THREE.MeshBasicMaterial({ color: 0xff3a2a });
+  // D83: floor decals (blood, stains, scuffs, floor markings) — soft edges over the floor, under everything else
+  m.stain = new THREE.MeshLambertMaterial({ map: atlas, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   // door leaves
   m.door_wood = m.walnut; m.door_metal = m.metal; m.door_secure = new THREE.MeshLambertMaterial({ color: 0x3b4048 }); m.door_glass = m.glass;
   m.lockLight = new THREE.MeshBasicMaterial({ color: 0xffffff });
   // D81: the user's furniture sprites (pre-lit art: unlit, a touch darker to sit in the night office) and the
   // invisible material of their shadow casters
-  m.propCards = new THREE.MeshBasicMaterial({ map: propAtlasTexture(aniso), color: 0xe6e6e6, transparent: true, alphaTest: 0.04, depthWrite: true, side: THREE.DoubleSide });
+  // D83: lit by the baked lights near them (vertex colours: the night ambient + the lamps / screens around)
+  m.propCards = new THREE.MeshBasicMaterial({ map: propAtlasTexture(aniso), vertexColors: true, transparent: true, alphaTest: 0.04, depthWrite: true, side: THREE.DoubleSide });
   m.shadowOnly = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
   sharedMats = m;
   return m;
@@ -295,6 +307,10 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   // props + door frames. D81: props with the user's sprite art are drawn as sprite cards (propSprites.js); their 3D
   // build only casts the shadow (an invisible mesh)
   const pb = new PropBuilder(), shadowOnly = new PropBuilder();
+  // D83: render-only decor of the lighting (wall lights over each room's north wall) + the level's props
+  const extras = wallLights(level);
+  const allProps = [...level.props, ...extras];
+  for (const p of extras) buildProp(pb, p);
   for (const p of level.props) {
     if (!hasSprite(p)) { buildProp(pb, p); continue; }
     const t = PROP_TYPES[p.type];
@@ -313,7 +329,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   // D79: a soft contact shadow under every standing object (ambient occlusion look)
   for (const p of level.props) {
     const t = PROP_TYPES[p.type];
-    if (!t || t.flat || t.wall || !(t.h > 2)) continue;
+    if (!t || t.flat || t.wall || t.decor || p.solid === false || !(t.h > 2)) continue;
     const [x0, y0, x1, y1] = propBox(p);
     const pad = 6 + Math.min(16, t.h * 0.22);
     const ao = new THREE.PlaneGeometry(x1 - x0 + 2 * pad, y1 - y0 + 2 * pad);
@@ -322,18 +338,30 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     put('aoBox', ao.toNonIndexed());
   }
 
-  // light pools: a grid of soft spots per room
-  for (const z of level.zones) {
-    const [x0, y0, x1, y1] = z.rect;
-    const nx = Math.max(1, Math.round((x1 - x0) / 230)), ny = Math.max(1, Math.round((y1 - y0) / 230));
-    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
-      const cx = x0 + ((i + 0.5) * (x1 - x0)) / nx, cz = y0 + ((j + 0.5) * (y1 - y0)) / ny;
-      const r = Math.min(150, Math.min((x1 - x0) / nx, (y1 - y0) / ny) * 0.75);
-      const g = new THREE.PlaneGeometry(r * 2, r * 2);
-      g.rotateX(-Math.PI / 2);
-      g.translate(cx, 0.35, cz);
-      put('lightPool', g.toNonIndexed());
-    }
+  // D83: the baked lights — a soft additive pool per light, in its own colour / strength (render3d/officeLights.js)
+  const lights = levelLights({ ...level, props: allProps });
+  for (const l of lights) {
+    const K = LIGHT_KINDS[l.kind], R = K.radius;
+    const g = new THREE.PlaneGeometry(R * 2 * l.sx, R * 2 * l.sz);
+    g.rotateX(-Math.PI / 2);
+    g.translate(l.x, 0.35, l.z);
+    const ng = g.toNonIndexed(), n = ng.attributes.position.count, a = new Float32Array(n * 3);
+    const k = K.power * POOL_GAIN;
+    for (let i = 0; i < n; i++) { a[i * 3] = K.color[0] * k; a[i * 3 + 1] = K.color[1] * k; a[i * 3 + 2] = K.color[2] * k; }
+    ng.setAttribute('color', new THREE.BufferAttribute(a, 3));
+    put('lightPool', ng);
+  }
+  // D83: floor decals of the level (blood, stains, scuffs, floor markings)
+  for (const d of level.decals || []) {
+    const tile = DECAL_TILES[d.t];
+    if (tile === undefined) continue;
+    const g = new THREE.PlaneGeometry(d.w || 40, d.d || d.w || 40);
+    const [u0, v0, u1, v1] = tileUV(tile), uv = g.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) ? u1 : u0, uv.getY(i) ? v1 : v0);
+    g.rotateX(-Math.PI / 2);
+    g.rotateY(d.r || 0);
+    g.translate(d.x, 0.4, d.y);
+    put('stain', g.toNonIndexed());
   }
 
   // plain-colour parts → vertex colours in two shared buckets
@@ -357,11 +385,12 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     const mat = mats[k];
     if (!mat) { console.warn('office material missing', k); continue; }
     const mesh = new THREE.Mesh(merge(list), mat);
-    const flat = k.startsWith('floor_') || k === 'outside' || k === 'lightPool' || k === 'rug';
+    const flat = k.startsWith('floor_') || k === 'outside' || k === 'lightPool' || k === 'rug' || k === 'stain';
     // D81: walls take no shadows — at the grazing angles of their sides the shadow map drew moving stripes (acne)
     mesh.receiveShadow = shadows && k !== 'lightPool' && k !== 'screen' && !k.startsWith('wall');
-    mesh.castShadow = shadows && !flat && k !== 'glass' && k !== 'screen' && k !== 'decal';
+    mesh.castShadow = shadows && !flat && k !== 'glass' && k !== 'screen' && k !== 'decal' && k !== 'lampShade' && k !== 'lightstrip' && k !== 'alarm';
     if (k === 'lightPool') mesh.renderOrder = 1;
+    if (k === 'stain') { mesh.renderOrder = 1; mesh.castShadow = false; }
     if (k === 'aoEdge' || k === 'aoBox') { mesh.renderOrder = 2; mesh.receiveShadow = false; mesh.castShadow = false; }
     if (k === 'glass') mesh.renderOrder = 5;
     mesh.matrixAutoUpdate = false;
@@ -371,7 +400,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   }
 
   // D81: the sprite cards (one mesh) + the invisible shadow casters of those props
-  const cardGeo = buildPropCards(level);
+  const cardGeo = buildPropCards(level, lights);
   if (cardGeo) {
     const cards = new THREE.Mesh(cardGeo, mats.propCards);
     cards.renderOrder = 3; // after the floor decals (pools, contact shadows), before glass
@@ -469,6 +498,29 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
       for (const c of [...group.children]) group.remove(c);
     },
   };
+}
+
+/**
+ * D83: wall lights along the inside of every room's north wall (the face the camera sees) — one per ~260 units, kept
+ * clear of door gaps and of other things hung on that wall. Render-only props (render3d/officeLights.js lights them).
+ */
+function wallLights(level) {
+  const out = [], T = level.wallThickness;
+  for (const z of level.zones) {
+    if (z.wallLights === false) continue;
+    const [x0, y0, x1] = z.rect;
+    const wall = level.walls.find((w) => w.y0 === w.y1 && w.y0 === y0 && Math.min(w.x0, w.x1) <= x0 + 1 && Math.max(w.x0, w.x1) >= x1 - 1 && w.style !== 'glass');
+    if (!wall) continue;
+    const n = Math.max(1, Math.round((x1 - x0) / 260));
+    for (let i = 0; i < n; i++) {
+      const x = x0 + ((i + 0.5) * (x1 - x0)) / n;
+      const y = y0 + T / 2 + 1.5;
+      if ((wall.gaps || []).some(([a, b]) => x > a - 30 && x < b + 30)) continue;
+      if (level.props.some((p) => { const t = PROP_TYPES[p.type]; return t && t.wall && Math.abs(p.y - y) < 14 && Math.abs(p.x - x) < (t.w / 2 + 26); })) continue;
+      out.push({ type: 'wall_light', x, y, rot: 0 });
+    }
+  }
+  return out;
 }
 
 /** The building's outer rectangle: the walls that bound most rooms (the stairwell sticks out of it). */

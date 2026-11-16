@@ -59,6 +59,7 @@ export class MissionRun {
 
     this.controller = new PlayerController(events, { w: level.width, h: level.height });
     this.controller.world = this.world;
+    this.controller.rng = this.rng; // D83: which roll clip
     this.weapons = new WeaponSystem(this.projectiles, this.rng, events);
     this.weapons.world = this.world;
     this.projectileSystem = new ProjectileSystem(this.projectiles, this.rng, events, (id) => this._statsFor(id));
@@ -190,7 +191,7 @@ export class MissionRun {
 
   cancelGrenadeAim() { this._gFire = false; this._gWaitUp = true; this.holdFire = false; this.grenadePreview.active = false; }
 
-  /** D82: behind low cover he crouches — except while shooting and a moment after (he stands up to fire). */
+  /** D82 / D83: kneeling behind low cover he is shielded — except while firing over it and a moment after. */
   _updateCover(p, shooting, time) {
     if (shooting && p.cover && p.cover.kind === 'low') p.exposedUntil = time + COVER.popUp;
     p.crouched = !!p.cover && p.cover.kind === 'low' && p.alive && !p.dodging && time >= p.exposedUntil;
@@ -208,7 +209,7 @@ export class MissionRun {
     const moving = p.dodging || Math.hypot(p.vx, p.vy) > 1;
     const mouse = p.hasAim && !this.autoFire;
     const firing = time < p.faceAimUntil;
-    const cover = p.cover && !firing && !moving ? p.cover : null;
+    const cover = p.cover && !firing ? p.cover : null; // D83: in cover he keeps facing it while moving along it
     p.aimPose = false;
     if (p.dodging) p.bodyAngle = Math.atan2(p.dodgeDirY, p.dodgeDirX);
     else if (cover) p.bodyAngle = cover.kind === 'low' ? Math.atan2(-cover.ny, -cover.nx) : Math.atan2(cover.ny, cover.nx);
@@ -253,6 +254,19 @@ export class MissionRun {
     this.events.emit('crateOpened', d.item, d.count || 1, d.id);
     this.interactTarget = null;
     return true;
+  }
+
+  /** D83: take the cover offered here / leave the current one. */
+  toggleCover(time = this.lastTime) {
+    if (this.over || !this.player.alive) return false;
+    return this.controller.toggleCover(this.player, time);
+  }
+
+  /** D83: what the cover button / Q label shows: 'take' (an object to hide behind is here), 'leave' (in cover), or null. */
+  get coverOffer() {
+    const p = this.player;
+    if (this.over || !p.alive || p.dodging) return null;
+    return p.cover ? 'leave' : p.coverHere ? 'take' : null;
   }
 
   get canInteract() { return !!this.interactTarget && !this.over && this.player.alive; }

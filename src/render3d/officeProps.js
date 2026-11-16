@@ -21,8 +21,8 @@ export class PropBuilder {
   }
 
   /** Sets the prop transform for the following parts: position (x, y on the floor → X, Z) and quarter turns. */
-  place(x, y, rot = 0, extraYaw = 0) {
-    this.base.compose(P0.set(x, 0, y), Q.setFromAxisAngle(UP, -(rot * Math.PI) / 2 - extraYaw), SC);
+  place(x, y, rot = 0, extraYaw = 0, elev = 0) {
+    this.base.compose(P0.set(x, elev, y), Q.setFromAxisAngle(UP, -(rot * Math.PI) / 2 - extraYaw), SC);
     return this;
   }
 
@@ -371,6 +371,30 @@ const BUILD = {
 
 
 
+  // D83: the reference's lights and decor (their glow: render3d/officeLights.js)
+  floor_lamp(b) {
+    b.cyl('metalDark', 6, 6.5, 1.4, 0, 0, 0, 14);
+    b.cyl('chrome', 0.8, 0.8, 42, 0, 1.4, 0, 6);
+    b.cyl('lampShade', 4.5, 7, 10, 0, 40, 0, 16);          // a lit fabric shade (unlit material: it glows)
+  },
+  desk_lamp(b) {
+    b.cyl('black', 3, 3.4, 1, 0, 0, 0, 10);
+    b.box('chrome', 0.8, 10, 0.8, 0, 1, 0, { rx: 0.25 });
+    b.cyl('lampShade', 1.6, 3.6, 3.2, 0, 9.5, 2.6, 12);
+  },
+  wall_light(b) { b.box('metalDark', 42, 4, 3, 0, 66, -1.5); b.box('lightstrip', 38, 1.6, 0.6, 0, 66.6, 0.2); },
+  alarm_light(b) { b.box('black', 7, 7, 2.4, 0, 58, -1.2); b.box('alarm', 5, 5, 1, 0, 59, 0.4); },
+  planter(b) {
+    b.box('cream', 64, 18, 16, 0, 0, 0);                    // a light planter box, as in the reference
+    b.box('metalDark', 64, 1.2, 16.4, 0, 0, 0);
+    b.box('soil', 60, 1, 12, 0, 18, 0);
+  },
+  cable_tray(b, p) {
+    const len = p.len || 100;
+    b.box('metalDark', len, 1.2, 12, 0, 74, 0);
+    for (const [z, mat] of [[-3.5, 'yellow'], [-1.2, 'yellow'], [1.2, 'cable'], [3.5, 'yellow']]) b.box(mat, len - 2, 1.4, 1.4, 0, 75.2, z);
+  },
+
   rug_large(b) { b.decal('rug', TILE.rugRed, 170, 110, 0, 0, 0.3); },
   rug_small(b) { b.decal('rug', TILE.rugGrey, 100, 66, 0, 0, 0.3); },
 
@@ -388,6 +412,6 @@ export const PROP_BUILDERS = BUILD;
 export function buildProp(b, p) {
   const fn = BUILD[p.type];
   if (!fn) { console.warn('office prop without a model', p.type); return; }
-  b.place(p.x, p.y, p.rot | 0);
+  b.place(p.x, p.y, p.rot | 0, 0, p.elev || 0); // D83: elev — standing on something (a lamp on a desk)
   fn(b, p);
 }

@@ -22,19 +22,20 @@ export const OFFICE = {
   wallThickness: 20,
   playerSpawn: { x: 1200, y: 1630, angle: -Math.PI / 2 },
 
-  // rooms: floor material + the routing graph of the AI (zone → zone through doors / openings)
+  // rooms: floor material + the routing graph of the AI (zone → zone through doors / openings). D83: light — the
+  // room's night mood (render3d/officeLights.js: warm / cool / dim ceiling lights, dark = only its own lamps / screens)
   zones: [
-    { id: 'lobby', rect: [750, 1130, 1650, 1700], floor: 'marble' },
-    { id: 'corridor', rect: [250, 950, 2150, 1130], floor: 'tile_dark' },
-    { id: 'break', rect: [250, 1130, 750, 1450], floor: 'tile_light' },
-    { id: 'archive', rect: [250, 1450, 750, 1700], floor: 'concrete' },
-    { id: 'security', rect: [1650, 1130, 2150, 1450], floor: 'epoxy' },
-    { id: 'manager', rect: [1650, 1450, 2150, 1700], floor: 'walnut' },
-    { id: 'open', rect: [250, 250, 1300, 950], floor: 'carpet' },
-    { id: 'conference', rect: [1300, 250, 1800, 620], floor: 'oak' },
-    { id: 'print', rect: [1300, 620, 1800, 950], floor: 'tile_light' },
-    { id: 'server', rect: [1800, 250, 2150, 950], floor: 'access' },
-    { id: 'stairs', rect: [100, 300, 250, 500], floor: 'concrete' },
+    { id: 'lobby', rect: [750, 1130, 1650, 1700], floor: 'marble', light: 'warm' },
+    { id: 'corridor', rect: [250, 950, 2150, 1130], floor: 'tile_dark', light: 'dim' },
+    { id: 'break', rect: [250, 1130, 750, 1450], floor: 'tile_light', light: 'warm' },
+    { id: 'archive', rect: [250, 1450, 750, 1700], floor: 'concrete', light: 'dim' },
+    { id: 'security', rect: [1650, 1130, 2150, 1450], floor: 'epoxy', light: 'dark' },
+    { id: 'manager', rect: [1650, 1450, 2150, 1700], floor: 'walnut', light: 'dark' },
+    { id: 'open', rect: [250, 250, 1300, 950], floor: 'carpet', light: 'cool' },
+    { id: 'conference', rect: [1300, 250, 1800, 620], floor: 'oak', light: 'warm' },
+    { id: 'print', rect: [1300, 620, 1800, 950], floor: 'tile_light', light: 'dim' },
+    { id: 'server', rect: [1800, 250, 2150, 950], floor: 'access', light: 'dark' },
+    { id: 'stairs', rect: [100, 300, 250, 500], floor: 'concrete', light: 'dim', wallLights: false },
   ],
 
   // walls: axis-aligned lines (centre line, thickness above) with gaps [from, to] along the line for doors / openings
@@ -96,6 +97,11 @@ export const OFFICE = {
     { type: 'plant', x: 1622, y: 1300 },
     { type: 'rug_large', x: 862, y: 1500 }, { type: 'rug_large', x: 1538, y: 1500 },
     { type: 'papers', x: 1150, y: 1450, rot: 1 }, { type: 'overturned_chair', x: 1290, y: 1300, rot: 3 },
+    // D83 (the level reference): floor lamps by the lounge corners, a desk lamp on the reception, more papers
+    { type: 'floor_lamp', x: 862, y: 1430 }, { type: 'floor_lamp', x: 1538, y: 1430 },
+    { type: 'floor_lamp', x: 780, y: 1600 }, { type: 'floor_lamp', x: 1620, y: 1600 },
+    { type: 'desk_lamp', x: 1255, y: 1352, elev: 34 },
+    { type: 'papers', x: 1330, y: 1415, rot: 2 }, { type: 'papers', x: 1010, y: 1610, rot: 3 },
     // --- corridor
     { type: 'elevator', x: 1500, y: 1118.5, rot: 2 }, { type: 'extinguisher', x: 700, y: 1121, rot: 2 },
     { type: 'plant', x: 272, y: 972 }, { type: 'plant', x: 2128, y: 972 }, { type: 'plant', x: 2128, y: 1108 },
@@ -111,6 +117,7 @@ export const OFFICE = {
     { type: 'chair_meeting', x: 620, y: 1328, rot: 0 }, { type: 'overturned_chair', x: 660, y: 1400, rot: 1 },
     { type: 'plant', x: 722, y: 1422 },
     { type: 'wall_clock', x: 400, y: 1141.5, rot: 0 },
+    { type: 'papers', x: 560, y: 1400, rot: 1 },
     // --- archive
     { type: 'archive_shelf', x: 420, y: 1540, rot: 0 }, { type: 'archive_shelf', x: 420, y: 1620, rot: 0 },
     { type: 'archive_shelf', x: 590, y: 1540, rot: 0 }, { type: 'archive_shelf', x: 590, y: 1620, rot: 0 },
@@ -124,6 +131,7 @@ export const OFFICE = {
     { type: 'boxes', x: 2110, y: 1420 }, { type: 'broken_monitor', x: 1840, y: 1250, rot: 2 },
     { type: 'filing_cabinet', x: 1758, y: 1428, rot: 2 }, { type: 'filing_cabinet', x: 1780, y: 1428, rot: 2 },
     { type: 'filing_cabinet', x: 1802, y: 1428, rot: 2 },
+    { type: 'alarm_light', x: 1960, y: 1141.5, rot: 0 }, { type: 'papers', x: 1900, y: 1330, rot: 2 },
     // --- manager
     { type: 'exec_desk', x: 1950, y: 1600, rot: 0 }, { type: 'chair', x: 1950, y: 1566, rot: 0 },
     { type: 'armchair', x: 1912, y: 1652, rot: 2 }, { type: 'armchair', x: 1988, y: 1652, rot: 2 },
@@ -131,6 +139,8 @@ export const OFFICE = {
     { type: 'armchair', x: 1674, y: 1555, rot: 3 }, { type: 'armchair', x: 1674, y: 1607, rot: 3 },
     { type: 'plant', x: 2125, y: 1675 }, { type: 'plant', x: 1680, y: 1478 }, { type: 'plant', x: 2125, y: 1478 },
     { type: 'rug_small', x: 1950, y: 1570 }, { type: 'wall_clock', x: 2000, y: 1461.5, rot: 0 },
+    { type: 'floor_lamp', x: 2122, y: 1560 }, { type: 'floor_lamp', x: 1700, y: 1500 },
+    { type: 'desk_lamp', x: 1982, y: 1594, elev: 24 }, { type: 'papers', x: 1870, y: 1640, rot: 1 },
     // --- open space: six blocks of four workstations in two rows facing the camera (D81: the art shows their fronts)
     ...cluster(450, 400), ...cluster(750, 400), ...cluster(1050, 400),
     ...cluster(450, 680), ...cluster(750, 680), ...cluster(1050, 680),
@@ -142,6 +152,11 @@ export const OFFICE = {
     { type: 'broken_monitor', x: 620, y: 520, rot: 1 }, { type: 'exit_sign', x: 261.5, y: 400, rot: 3 },
     ...[600, 622, 644, 670, 692, 714].map((y) => ({ type: 'filing_cabinet', x: 272, y, rot: 3 })),
     { type: 'wall_clock', x: 1100, y: 261.5, rot: 0 },
+    // D83 (the reference): planters with plants between the desk blocks (low cover), more papers, a second printer
+    ...planter(600, 400), ...planter(900, 400), ...planter(600, 680), ...planter(900, 680),
+    { type: 'papers', x: 1000, y: 770, rot: 2 }, { type: 'papers', x: 560, y: 790, rot: 1 }, { type: 'papers', x: 1180, y: 470 },
+    { type: 'papers', x: 380, y: 520, rot: 3 }, { type: 'overturned_chair', x: 1150, y: 560, rot: 0 },
+    { type: 'printer', x: 1272, y: 330, rot: 1 },
     // --- conference
     { type: 'conf_table', x: 1550, y: 435, rot: 0 },
     { type: 'chair_meeting', x: 1480, y: 385, rot: 0, drawn: false }, { type: 'chair_meeting', x: 1550, y: 385, rot: 0, drawn: false },
@@ -150,16 +165,50 @@ export const OFFICE = {
     { type: 'chair_meeting', x: 1432, y: 435, rot: 3, drawn: false }, { type: 'chair_meeting', x: 1668, y: 435, rot: 1, drawn: false },
     { type: 'tv_wall', x: 1550, y: 261.5, rot: 0 }, { type: 'plant', x: 1322, y: 272 }, { type: 'plant', x: 1778, y: 272 },
     { type: 'wall_clock', x: 1700, y: 261.5, rot: 0 },
+    { type: 'floor_lamp', x: 1330, y: 590 }, { type: 'floor_lamp', x: 1770, y: 590 }, { type: 'papers', x: 1440, y: 545, rot: 1 },
     // --- print room
     { type: 'printer', x: 1323, y: 700, rot: 3 }, { type: 'printer', x: 1323, y: 780, rot: 3 },
     { type: 'archive_shelf', x: 1660, y: 639, rot: 0 }, { type: 'archive_shelf', x: 1740, y: 639, rot: 0 },
     { type: 'boxes', x: 1650, y: 700 }, { type: 'trolley', x: 1440, y: 900 }, { type: 'boxes_tall', x: 1322, y: 920 },
+    { type: 'papers', x: 1460, y: 740, rot: 2 }, { type: 'papers', x: 1600, y: 860 }, { type: 'boxes', x: 1760, y: 920 },
     // --- server room
     ...rackRow(1890, 2112, 360), ...rackRow(1890, 2112, 520), ...rackRow(1890, 1994, 680),
     { type: 'terminal', x: 2097, y: 828, rot: 0 }, { type: 'chair', x: 2097, y: 800, rot: 0 },
     { type: 'boxes', x: 1830, y: 920 },
+    // D83 (the reference): cable trays over the rack rows, red alarm lights
+    { type: 'cable_tray', x: 2001, y: 360, len: 240 }, { type: 'cable_tray', x: 2001, y: 520, len: 240 }, { type: 'cable_tray', x: 1942, y: 680, len: 130 },
+    { type: 'alarm_light', x: 1850, y: 261.5, rot: 0 }, { type: 'alarm_light', x: 2110, y: 261.5, rot: 0 },
     // --- stairwell
     { type: 'stairs', x: 175, y: 400, rot: 1 },
+  ],
+
+  // D83 (the level reference): signs of the attack and wear on the floors — t: atlas decal (render3d/OfficeScene.js
+  // DECAL_TILES), w × d units, r — turn (rad). Presentation only.
+  decals: [
+    // lobby: a body was dragged from the reception, bloody prints to the corridor, scuffs on the marble
+    { t: 'bloodSmear', x: 1330, y: 1440, w: 120, d: 60, r: 0.5 }, { t: 'blood', x: 1385, y: 1478, w: 70 },
+    { t: 'prints', x: 1300, y: 1250, w: 110, d: 55, r: 1.9 }, { t: 'scuff', x: 1000, y: 1520, w: 120 },
+    { t: 'scuff', x: 1420, y: 1610, w: 110, r: 1.2 }, { t: 'dirt', x: 1200, y: 1660, w: 160, d: 60 },
+    // corridor
+    { t: 'prints', x: 1150, y: 1060, w: 120, d: 55, r: 3.3 }, { t: 'blood', x: 1720, y: 1050, w: 55, r: 2 },
+    { t: 'dirt', x: 600, y: 1040, w: 200, d: 80 }, { t: 'dirt', x: 1900, y: 1030, w: 180, d: 70 },
+    // open space: the fight — blood by the overturned chairs, spilled coffee
+    { t: 'blood', x: 735, y: 552, w: 80, r: 0.8 }, { t: 'bloodSmear', x: 800, y: 590, w: 100, d: 50, r: -0.3 },
+    { t: 'coffee', x: 480, y: 525, w: 40 }, { t: 'coffee', x: 1110, y: 760, w: 34, r: 1 }, { t: 'scuff', x: 1000, y: 600, w: 110 },
+    // break room, conference, print room
+    { t: 'coffee', x: 520, y: 1380, w: 46 }, { t: 'blood', x: 640, y: 1420, w: 50, r: 2.5 }, { t: 'scuff', x: 420, y: 1200, w: 90 },
+    { t: 'coffee', x: 1620, y: 540, w: 36 }, { t: 'dirt', x: 1550, y: 800, w: 160, d: 90 },
+    // archive: the storage floor markings
+    { t: 'marking', x: 505, y: 1500, w: 300, d: 12 }, { t: 'marking', x: 505, y: 1660, w: 300, d: 12 },
+    { t: 'hazard', x: 285, y: 1580, w: 150, d: 36, r: Math.PI / 2 }, { t: 'hazard', x: 715, y: 1630, w: 100, d: 36, r: Math.PI / 2 },
+    // security, manager, server room
+    { t: 'blood', x: 2020, y: 1240, w: 60, r: 1.4 }, { t: 'scuff', x: 1800, y: 1300, w: 100 }, { t: 'coffee', x: 2050, y: 1660, w: 30 },
+    { t: 'hazard', x: 1975, y: 930, w: 90, d: 30 }, { t: 'dirt', x: 1960, y: 600, w: 200, d: 80 },
+  ],
+  // D83: extra lights (render3d/officeLights.js kinds); the rooms' ceiling lights and the props' own glow come by themselves
+  lights: [
+    { x: 1850, y: 300, kind: 'red' }, { x: 2110, y: 300, kind: 'red' }, { x: 1960, y: 1180, kind: 'red' },
+    { x: 1975, y: 920, kind: 'red', sx: 0.8, sz: 0.6 },
   ],
 
   // enemies: type (data/humans.js), post, facing (rad: 0 east, π/2 south, π west, −π/2 north), optional patrol loop
@@ -171,10 +220,10 @@ export const OFFICE = {
     { type: 'thug', x: 330, y: 1580, angle: 0, patrol: [[330, 1580], [690, 1580]] },
     { type: 'heavy', x: 1990, y: 1300, angle: Math.PI, carries: null },
     { type: 'gunman', x: 1750, y: 1250, angle: Math.PI / 2, patrol: [[1750, 1250], [1750, 1400]] },
-    { type: 'thug', x: 1850, y: 1610, angle: -Math.PI / 2 },
+    { type: 'thug', x: 1850, y: 1610, angle: -Math.PI / 2, busy: true }, // D83: going through the manager's files
     { type: 'thug', x: 300, y: 540, angle: 0, patrol: [[300, 540], [1200, 540]] },
     { type: 'gunman', x: 1150, y: 840, angle: Math.PI },
-    { type: 'thug', x: 350, y: 300, angle: 0 },
+    { type: 'thug', x: 350, y: 300, angle: 0, busy: true }, // D83: going through the files
     { type: 'gunman', x: 600, y: 840, angle: 0, patrol: [[600, 840], [1100, 840]] },
     { type: 'thug', x: 1700, y: 330, angle: Math.PI },
     { type: 'thug', x: 1380, y: 560, angle: -Math.PI / 4 },
@@ -217,6 +266,15 @@ function cluster(cx, cy) {
     out.push({ type: 'workstation', x: cx + dx, y: cy + dy, rot: 0 }, { type: 'chair', x: cx + dx, y: cy + dy - 28, rot: 0 });
   }
   return out;
+}
+
+/** D83: a planter (north–south, low cover) with two plants standing on it (drawn only: the planter collides). */
+function planter(x, y) {
+  return [
+    { type: 'planter', x, y, rot: 1 },
+    { type: 'plant', x, y: y - 16, elev: 20, solid: false },
+    { type: 'plant', x, y: y + 16, elev: 20, solid: false },
+  ];
 }
 
 /** A row of server racks facing south from x0 to x1 at y. */

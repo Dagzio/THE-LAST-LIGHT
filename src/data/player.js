@@ -6,23 +6,40 @@ export const PLAYER = {
   maxHp: 100,
   moveSpeed: 95,            // units/s
   aimMoveMult: 0.75,        // × while shooting / aiming
-  // D82 (user request): Space = the user's "Dodge" clip — a dive roll. Moving: rolls where he moves; standing: where
-  // his arms point. The hero travels along the clip's own path (curve: travelled fraction at every 1/13 of the roll,
-  // measured from the clip's Hips — no foot sliding), cannot shoot meanwhile and is untouchable while diving / rolling.
+  // D82 (user request): Space = a dive roll (the user's clips). Moving: rolls where he moves; standing: where his arms
+  // point. The hero travels along the clip's own path (curve: travelled fraction at every 1/13 of the roll, measured
+  // from the clip's Hips — no foot sliding), cannot shoot meanwhile and is untouchable while diving / rolling.
+  // D83: two rolls ("Dodge", "Dodge 2"), one picked at random (seeded) for every roll; both clips played × 1.37.
   dodge: {
-    duration: 0.95,         // s (the 1.3 s clip played × 1.37)
-    distance: 105,          // units (the clip's 193 cm at the hero's size)
-    curve: [0, 0.038, 0.116, 0.229, 0.374, 0.516, 0.640, 0.725, 0.795, 0.860, 0.915, 0.963, 0.992, 1],
-    invulnerableFrom: 0.33, // fraction of the roll: from the dive…
-    invulnerableTo: 0.8,    // …until he gets up
     cooldown: 2.5,          // s, counted from the roll start
+    variants: [
+      {
+        clip: 'dodge',
+        duration: 0.95,         // s (the 1.3 s clip)
+        distance: 105,          // units (the clip's 193 cm at the hero's size)
+        curve: [0, 0.038, 0.116, 0.229, 0.374, 0.516, 0.640, 0.725, 0.795, 0.860, 0.915, 0.963, 0.992, 1],
+        invulnerableFrom: 0.33, // fraction of the roll: from the dive…
+        invulnerableTo: 0.8,    // …until he gets up
+      },
+      {
+        clip: 'dodge2',
+        duration: 1.1,          // s (the 1.5 s clip)
+        distance: 131,          // units (242 cm)
+        curve: [0, 0.092, 0.218, 0.368, 0.527, 0.686, 0.792, 0.836, 0.890, 0.924, 0.954, 0.977, 0.993, 1],
+        invulnerableFrom: 0.31,
+        invulnerableTo: 0.73,
+      },
+    ],
   },
   hitInvulnerability: 0.08, // s after a hit (bullets: no long i-frames)
 };
 
-/** Travelled fraction of the roll at a fraction k (0…1) of its time. */
-export function dodgeTravel(k) {
-  const c = PLAYER.dodge.curve, n = c.length - 1;
+/** The roll variant (data) of a player's current / last roll. */
+export const dodgeOf = (p) => PLAYER.dodge.variants[p && p.dodgeVariant | 0] || PLAYER.dodge.variants[0];
+
+/** Travelled fraction of a roll (variant v) at a fraction k (0…1) of its time. */
+export function dodgeTravel(k, v = PLAYER.dodge.variants[0]) {
+  const c = v.curve, n = c.length - 1;
   if (!(k > 0)) return 0;
   if (k >= 1) return 1;
   const f = k * n, i = Math.floor(f), t = f - i;
@@ -30,18 +47,21 @@ export function dodgeTravel(k) {
 }
 
 /**
- * D82 cover (user request): the hero who walks INTO a cover object takes cover against it — crouched behind low cover
- * (desks, counters, boxes: data/props.js cover 'low'), pressed against high cover (walls, cabinets, shelves, racks:
- * 'high'). Chairs and small things are never cover. Crouched, the low objects stop the enemy rounds and hide him from
- * their eyes; he stands up to shoot (and stays up popUp s after the last shot). Walking away from the object leaves it.
+ * Cover (D82; D83 user design): near an object one can hide behind, the COVER button (touch) / Q (PC) appears; pressed,
+ * the hero steps up to it and takes cover — kneeling behind low cover (desks, counters, boxes: data/props.js cover
+ * 'low'), back to it behind high cover (walls, cabinets, shelves, racks: 'high'). Chairs and small things are never
+ * cover. In cover he moves only along the object (crouched / sneaking sideways) and stops at its end. Kneeling, the low
+ * objects stop the enemy rounds and hide him; shooting from it (kneeling fire) exposes him for popUp s. Q / the button
+ * again, pushing away from the object for a moment or a roll leaves the cover.
  */
 export const COVER = {
-  reach: 4,                 // units between the body's edge and the object's surface that still count as contact
-  enterTime: 0.15,          // s of pushing into the object before he takes cover
-  pushDot: 0.5,             // how directly he must push into it (cos)
-  exitDot: 0.35,            // moving away from it this directly leaves the cover
-  crouchSpeedMult: 0.55,    // × speed while crouched
-  popUp: 0.5,               // s he stays up after a shot from low cover
+  reach: 14,                // units between the body's edge and the object's surface: the button / Q appears
+  snapTime: 0.2,            // s to step up to the object
+  crouchSpeedMult: 0.45,    // × speed moving along low cover (kneeling strafe)
+  sneakSpeedMult: 0.5,      // × speed moving along high cover (back to it)
+  exitDot: 0.6,             // pushing away from the object this directly…
+  exitHold: 0.3,            // …for this long leaves the cover
+  popUp: 0.5,               // s he stays exposed after a shot from low cover
 };
 
 /**

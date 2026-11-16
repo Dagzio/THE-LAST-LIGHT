@@ -204,6 +204,9 @@ export class Game {
   /** Q / the HUD weapon block: the next carried weapon. */
   switchWeapon(id = null) { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.switchWeapon(id)); }
 
+  /** D83: the COVER button / the Q label: take the cover here, or leave it (Q itself goes through the input). */
+  toggleCover() { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.toggleCover(this.clock.time)); }
+
   /** E / the touch button / the label: open the crate in reach. */
   interact() { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.interact(this.clock.time)); }
 

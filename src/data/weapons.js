@@ -8,7 +8,7 @@
 export const WEAPONS = {
   pistol: {
     id: 'pistol', nameKey: 'weapon.pistol', gun: 'pistol',
-    damage: 22, fireInterval: 0.3, magazineSize: 12, reloadDuration: 1.3, range: 560,
+    damage: 22, fireInterval: 0.3, magazineSize: 12, reloadDuration: 1.6, range: 560, // D83: 1.3 → 1.6 s (a calmer reload, user)
     projectileSpeed: 1000, spreadAngle: 1.5, pelletsPerShot: 1, critChance: 0, critMultiplier: 1.5, penetrationCount: 0,
     noise: 520,
   },

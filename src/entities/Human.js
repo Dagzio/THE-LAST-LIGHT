@@ -26,6 +26,7 @@ export class Human {
     this.lastHitAt = -Infinity;
     this.faceAngle = Number.isFinite(spawn.angle) ? spawn.angle : 0; // where the body / eyes look
     this.illuminated = false; // DamageCalculator contract (no beam in KILL LIST)
+    this.busy = !!spawn.busy; // D83 presentation: a posted enemy going through the files until alerted
     this.gun = {
       stats: weapon,
       ammo: weapon.magazineSize,

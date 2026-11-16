@@ -1,6 +1,6 @@
 // Player movement and dodge (02_SPEC §4). Reads only abstract input (getMove / consumePressed / pointerWorld),
 // never keys or DOM — keyboard and touch drive it the same way.
-import { PLAYER, COVER, dodgeTravel } from '../data/player.js';
+import { PLAYER, COVER, dodgeTravel, dodgeOf } from '../data/player.js';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../config/constants.js';
 
 const move = { x: 0, y: 0 }; // reused
@@ -19,6 +19,8 @@ export class PlayerController {
     this.dodgeCooldownMult = 1;
     /** @type {import('./Collision.js').CollisionWorld|null} static obstacles (D40) */
     this.world = null;
+    /** @type {{next:()=>number}|null} D83: the run's seeded RNG (which roll clip) */
+    this.rng = null;
   }
 
   /**
@@ -47,20 +49,24 @@ export class PlayerController {
     }
 
     if (input.consumePressed('dash')) this._tryDodge(player, moving, time);
+    if (input.consumePressed('cover')) this.toggleCover(player, time);
     if (player.dodging && time >= player.dodgeEndsAt) player.dodging = false;
 
+    const x0 = player.x, y0 = player.y;
     if (player.dodging) {
       // D82: along the roll clip's own path (fast in the dive, slow while getting up); untouchable in the dive / roll
-      const D = PLAYER.dodge, k0 = (time - player.dodgeStartAt) / D.duration, k1 = k0 + dt / D.duration;
-      const step = (dodgeTravel(k1) - dodgeTravel(k0)) * D.distance;
+      const D = dodgeOf(player), k0 = (time - player.dodgeStartAt) / D.duration, k1 = k0 + dt / D.duration;
+      const step = (dodgeTravel(k1, D) - dodgeTravel(k0, D)) * D.distance;
       player.vx = dt > 0 ? (player.dodgeDirX * step) / dt : 0;
       player.vy = dt > 0 ? (player.dodgeDirY * step) / dt : 0;
       if (k1 > D.invulnerableFrom && k0 < D.invulnerableTo) {
         player.invulnerableUntil = Math.max(player.invulnerableUntil, player.dodgeStartAt + D.invulnerableTo * D.duration);
       }
+    } else if (player.cover) {
+      this._coverMove(player, dt, time);
     } else {
       const aiming = time < player.faceAimUntil; // D79: slower while shooting / aiming
-      const speed = PLAYER.moveSpeed * this.speedMult * (aiming ? PLAYER.aimMoveMult : 1) * (player.crouched ? COVER.crouchSpeedMult : 1);
+      const speed = PLAYER.moveSpeed * this.speedMult * (aiming ? PLAYER.aimMoveMult : 1);
       player.vx = move.x * speed; // |move| ≤ 1 → diagonal is never faster
       player.vy = move.y * speed;
     }
@@ -72,30 +78,58 @@ export class PlayerController {
       player.x = clamp(player.x, r, this.bounds.w - r);
       player.y = clamp(player.y, r, this.bounds.h - r);
     }
-    this._cover(player, moving, time);
+    this._coverAfterMove(player, x0, y0, dt, time);
   }
 
-  /**
-   * D82 cover: walking INTO a cover object for a moment takes cover against it; it is kept while he stands or moves
-   * along it, and left when he walks away from it, slides off its end or rolls.
-   */
-  _cover(p, moving, time) {
-    const C = COVER;
-    const c = this.world && !p.dodging ? this.world.coverAt(p.x, p.y, p.radius + C.reach, CONTACT) : null;
-    if (!c) { p.cover = null; p.coverSince = -1; return; }
-    const len = Math.hypot(move.x, move.y) || 1;
-    const into = moving ? -(move.x * c.nx + move.y * c.ny) / len : 0; // > 0: pushing into the object
-    if (p.cover) {
-      if (into < -C.exitDot) { p.cover = null; p.coverSince = -1; p.coverBlockUntil = time + 0.3; return; }
-      p.cover.kind = c.shape.cover; p.cover.nx = c.nx; p.cover.ny = c.ny; // sliding along it (or onto the next one)
-      return;
+  /** D83: Q / the COVER button — takes the cover offered here, or leaves the current one. */
+  toggleCover(p, time) {
+    if (!p.alive || p.dodging) return false;
+    if (p.cover) { this._leaveCover(p); return true; }
+    const c = this.world ? this.world.coverAt(p.x, p.y, p.radius + COVER.reach, CONTACT) : null;
+    if (!c) return false;
+    p.cover = { kind: c.shape.cover, nx: c.nx, ny: c.ny };
+    p.coverSnapUntil = time + COVER.snapTime;
+    p.coverAwayFor = 0;
+    this.events.emit('cover', c.shape.cover);
+    return true;
+  }
+
+  _leaveCover(p) { p.cover = null; p.crouched = false; p.coverAwayFor = 0; }
+
+  /** In cover: steps up to the object first, then moves only along it (kneeling / sneaking sideways). */
+  _coverMove(p, dt, time) {
+    const c = p.cover, C = COVER;
+    const tx = -c.ny, ty = c.nx;                          // along the object
+    const along = move.x * tx + move.y * ty, away = move.x * c.nx + move.y * c.ny;
+    const speed = PLAYER.moveSpeed * this.speedMult * (c.kind === 'low' ? C.crouchSpeedMult : C.sneakSpeedMult);
+    p.vx = tx * along * speed;
+    p.vy = ty * along * speed;
+    if (time < p.coverSnapUntil && dt > 0) {             // step up to it (the push-out stops him at its face)
+      const g = this.world ? this.world.coverAt(p.x, p.y, p.radius + C.reach, CONTACT) : null;
+      const go = g ? Math.max(0, g.gap - p.radius - 0.5) : 0;
+      const sp = Math.min(go / dt, go / Math.max(dt, p.coverSnapUntil - time) + 60);
+      p.vx -= c.nx * sp; p.vy -= c.ny * sp;
     }
-    if (into < C.pushDot || time < p.coverBlockUntil) { p.coverSince = -1; return; }
-    if (p.coverSince < 0) p.coverSince = time;
-    if (time - p.coverSince >= C.enterTime) {
-      p.cover = { kind: c.shape.cover, nx: c.nx, ny: c.ny };
-      this.events.emit('cover', c.shape.cover);
+    // pushing away from the object for a moment leaves the cover
+    p.coverAwayFor = away > C.exitDot ? p.coverAwayFor + dt : 0;
+    if (p.coverAwayFor >= C.exitHold) this._leaveCover(p);
+  }
+
+  /** After the move: keep the cover's normal / kind up to date, stop at the object's end; the button / Q offer. */
+  _coverAfterMove(p, x0, y0, dt, time) {
+    const reach = p.radius + COVER.reach;
+    if (p.cover && !p.dodging) {
+      const wasFace = Math.abs(p.cover.nx) >= 0.97 || Math.abs(p.cover.ny) >= 0.97;
+      let c = this.world ? this.world.coverAt(p.x, p.y, reach, CONTACT) : null;
+      // past the object's end (the nearest point is its corner): back to where he was — he stops at the edge
+      if (!c || (wasFace && time >= p.coverSnapUntil && c.shape.box && Math.abs(c.nx) < 0.97 && Math.abs(c.ny) < 0.97)) {
+        p.x = x0; p.y = y0; p.vx = 0; p.vy = 0;
+        c = this.world ? this.world.coverAt(p.x, p.y, reach, CONTACT) : null;
+      }
+      if (c) { p.cover.kind = c.shape.cover; p.cover.nx = c.nx; p.cover.ny = c.ny; } else this._leaveCover(p);
     }
+    const here = !p.cover && !p.dodging && p.alive && this.world ? this.world.coverAt(p.x, p.y, reach, CONTACT) : null;
+    p.coverHere = here ? here.shape.cover : null;
   }
 
   _tryDodge(player, moving, time) {
@@ -103,17 +137,19 @@ export class PlayerController {
     // D82 (user request): moving — the roll goes where he moves; standing — where his arms (the body) point
     let dx = Math.cos(player.bodyAngle), dy = Math.sin(player.bodyAngle);
     if (moving) { const l = Math.hypot(move.x, move.y) || 1; dx = move.x / l; dy = move.y / l; }
+    // D83: one of the two roll clips at random (seeded)
+    const n = PLAYER.dodge.variants.length;
+    player.dodgeVariant = this.rng ? Math.min(n - 1, Math.floor(this.rng.next() * n)) : 0;
     player.dodging = true;
     player.dodgeDirX = dx;
     player.dodgeDirY = dy;
     player.dodgeStartAt = time;
     player.dodgeFromX = player.x;
     player.dodgeFromY = player.y;
-    player.dodgeEndsAt = time + PLAYER.dodge.duration;
+    player.dodgeEndsAt = time + dodgeOf(player).duration;
     player.dodgeCooldown = PLAYER.dodge.cooldown * this.dodgeCooldownMult; // presentation: DASH button progress ring
     player.dodgeReadyAt = time + player.dodgeCooldown;
-    player.cover = null;
-    player.crouched = false;
+    this._leaveCover(player);
     this.events.emit('dash', player.x, player.y);
     return true;
   }

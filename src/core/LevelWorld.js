@@ -34,7 +34,7 @@ export class LevelWorld {
     for (const p of level.props) {
       const t = PROP_TYPES[p.type];
       const blocks = propBlocks(t);
-      if (!blocks) continue;
+      if (!blocks || p.solid === false) continue; // D83: solid: false — decor standing on something else (plants on a planter)
       let s;
       if (t.shape === 'circle') s = this.world.add(p.x, p.y, t.r, 'prop', blocks);
       else { const [x0, y0, x1, y1] = propBox(p); s = this.world.addBox(x0, y0, x1, y1, 'prop', blocks); }

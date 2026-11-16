@@ -25,14 +25,16 @@ export class Player {
 
     this.aimPose = false;      // D82: the arms hold the gun up at the aim (presentation reads it; set by the run)
 
-    // D82 cover (data/player.js COVER): the object he is pressed against, and whether he crouches behind it now
+    // D82 / D83 cover (data/player.js COVER): the object he is behind, and whether the low objects shield him now
     this.cover = null;         // { kind: 'low' | 'high', nx, ny } — n points from the object to him
-    this.coverSince = -1;      // game time he started pushing into a cover object (−1: not pushing)
-    this.coverBlockUntil = 0;  // just left a cover: no new one before this time
-    this.exposedUntil = 0;     // stands up from low cover until this time (shooting)
+    this.coverHere = null;     // the cover kind he could take right here ('low' / 'high'): the button / Q shows
+    this.coverSnapUntil = 0;   // steps up to the object until this time
+    this.coverAwayFor = 0;     // s he has pushed away from the object
+    this.exposedUntil = 0;     // kneeling fire from low cover: exposed until this time
     this.crouched = false;
 
     this.dodging = false;
+    this.dodgeVariant = 0;     // D83: which roll clip (data/player.js PLAYER.dodge.variants)
     this.dodgeStartAt = 0;
     this.dodgeFromX = x;       // D82: the roll follows the clip's path from here
     this.dodgeFromY = y;

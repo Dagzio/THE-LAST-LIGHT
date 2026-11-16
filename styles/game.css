@@ -1343,6 +1343,12 @@ button.hud-weapon { pointer-events: auto; background: none; border: 0; padding: 
 .interact-neon { visibility: hidden; }
 .interact-neon.on { visibility: visible; animation: interactPulse 1s ease-in-out infinite alternate; }
 @keyframes interactPulse { from { filter: brightness(1); } to { filter: brightness(1.35); } }
+/* D83 touch: the cover button — next to an object one can hide behind; lit (tap leaves) while in cover */
+.cover-neon { display: none; }
+.cover-neon.on { display: flex; animation: interactPulse 1s ease-in-out infinite alternate; }
+.cover-neon.active { animation: none; box-shadow: 0 0 0 2px #8fd8ff, 0 0 16px rgba(143, 216, 255, 0.75); }
+.interact-neon.on ~ .cover-neon.on:not(.active) { display: none; } /* a crate in reach comes first */
+body.map-over .cover-prompt { display: none; }
 /* the armed grenade glows (the next shot throws it) */
 .act-grenade.armed, .grenade-neon.armed { box-shadow: 0 0 0 2px #ffcf3a, 0 0 16px rgba(255, 207, 58, 0.75); }
 .act-grenade.empty, .grenade-neon.empty { opacity: 0.45; }

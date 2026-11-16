@@ -229,6 +229,8 @@ const ROWS = [
   ['shop.reason.cap', 'MAX 3 FOR THIS MAP', 'МАКС. 3 НА КАРТУ', 'МАКС. 3 НА КАРТУ', 'MAX. 3 PRO KARTE', 'MAX 3 PER MAPPA', 'MAX 3 PAR CARTE', 'MÁX. 3 POR MAPA', 'MÁX. 3 POR MAPA', '3 كحد أقصى لكل خريطة', 'マップごとに最大3'],
   ['aria.grenade', 'Grenade', 'Граната', 'Граната', 'Granate', 'Granata', 'Grenade', 'Granada', 'Granada', 'قنبلة', '手榴弾'],
   ['hud.open', 'OPEN', 'ВІДКРИТИ', 'ОТКРЫТЬ', 'ÖFFNEN', 'APRI', 'OUVRIR', 'ABRIR', 'ABRIR', 'افتح', '開ける'],
+  ['hud.cover', 'COVER', 'УКРИТТЯ', 'УКРЫТИЕ', 'DECKUNG', 'COPERTURA', 'COUVERT', 'CUBRIRSE', 'COBERTURA', 'احتماء', 'カバー'],
+  ['aria.cover', 'Take cover', 'Сховатися', 'Укрыться', 'In Deckung gehen', 'Mettiti al riparo', 'Se mettre à couvert', 'Cubrirse', 'Proteger-se', 'احتمِ', 'カバーする'],
   ['banner.crate', 'SUPPLY CRATE!', 'СКРИНЯ З ПРИПАСАМИ!', 'ЯЩИК С ПРИПАСАМИ!', 'VORRATSKISTE!', 'CASSA DI RIFORNIMENTI!', 'CAISSE DE RAVITAILLEMENT !', '¡CAJA DE SUMINISTROS!', 'CAIXA DE SUPRIMENTOS!', 'صندوق إمدادات!', '補給箱！'],
   ['crate.title', 'CHOOSE AN UPGRADE', 'ОБЕРИ ПОКРАЩЕННЯ', 'ВЫБЕРИ УЛУЧШЕНИЕ', 'WÄHLE EINE VERBESSERUNG', 'SCEGLI UN POTENZIAMENTO', 'CHOISIS UNE AMÉLIORATION', 'ELIGE UNA MEJORA', 'ESCOLHA UMA MELHORIA', 'اختر تحسينًا', '強化を選べ'],
   ['crate.untilEnd', 'UNTIL THE END OF THIS MAP', 'ДО КІНЦЯ ЦІЄЇ КАРТИ', 'ДО КОНЦА ЭТОЙ КАРТЫ', 'BIS ZUM ENDE DIESER KARTE', 'FINO ALLA FINE DELLA MAPPA', "JUSQU'À LA FIN DE LA CARTE", 'HASTA EL FINAL DE ESTE MAPA', 'ATÉ O FIM DESTE MAPA', 'حتى نهاية هذه الخريطة', 'このマップの終わりまで'],

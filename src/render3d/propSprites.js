@@ -8,6 +8,7 @@ import { PROP_ATLAS } from '../data/propAtlas.js';
 import { PROP_SPRITES } from '../data/propSprites.js';
 import { PROP_TYPES, propBox } from '../data/props.js';
 import { CAMERA } from '../config/camera.js';
+import { lightAt } from './officeLights.js';
 
 const TILT = (CAMERA.tilt * Math.PI) / 180;
 const SIN = Math.sin(TILT), COS = Math.cos(TILT);   // screen height of 1 unit up / of 1 unit north
@@ -65,17 +66,24 @@ function card(p) {
   let top;
   if (screenH > (zs - zn) * COS) top = (screenH - (zs - zn) * COS) / SIN;
   else { top = LIFT; zn = zs - screenH / COS; }
-  c.pts = [[cx - hw, LIFT, zs], [cx + hw, LIFT, zs], [cx + hw, top, zn], [cx - hw, top, zn]];
-  c.depth = zs;
+  // D83: standing on something (plants on a planter): the whole card is raised, pulled a little towards the camera
+  const el = p.elev || 0;
+  c.pts = [[cx - hw, LIFT + el, zs], [cx + hw, LIFT + el, zs], [cx + hw, top + el, zn], [cx - hw, top + el, zn]];
+  c.depth = zs + (el ? 0.5 : 0);
   return c;
 }
 
+const SPRITE_AMBIENT = 0.62;  // D83: the night office (sprites are pre-lit art; this darkens them like the room)…
+const SPRITE_GAIN = 0.8;      // …and the lights near them bring them back up
+const SPRITE_MAX = 1.12;
+const LT = [0, 0, 0];
+
 /** One geometry with the cards of every sprite prop of a level (back to front), or null when there are none. */
-export function buildPropCards(level) {
+export function buildPropCards(level, lights = null) {
   const cards = level.props.map(card).filter(Boolean).sort((a, b) => a.depth - b.depth);
   if (!cards.length) return null;
   const W = PROP_ATLAS.width, H = PROP_ATLAS.height;
-  const pos = new Float32Array(cards.length * 18), uv = new Float32Array(cards.length * 12);
+  const pos = new Float32Array(cards.length * 18), uv = new Float32Array(cards.length * 12), col = new Float32Array(cards.length * 18);
   let o = 0, u = 0;
   for (const c of cards) {
     const [rx, ry, rw, rh] = c.rect;
@@ -84,7 +92,14 @@ export function buildPropCards(level) {
     const vb = 1 - (ry + rh - 0.5) / H, vt = 1 - (ry + 0.5) / H;
     if (c.flip) [u0, u1] = [u1, u0];
     const uvs = [[u0, vb], [u1, vb], [u1, vt], [u0, vt]];
+    // the light at each corner's floor point (lit art: the night ambient + the lamps / screens around it)
+    const cc = c.pts.map((pt) => {
+      if (!lights) return [0.9, 0.9, 0.9];
+      lightAt(lights, pt[0], pt[2], LT);
+      return LT.map((v) => Math.min(SPRITE_MAX, SPRITE_AMBIENT + v * SPRITE_GAIN));
+    });
     for (const i of [0, 1, 2, 0, 2, 3]) {
+      col.set(cc[i], o);
       pos.set(c.pts[i], o); o += 3;
       uv.set(uvs[i], u); u += 2;
     }
@@ -92,6 +107,7 @@ export function buildPropCards(level) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.computeBoundingSphere();
   return g;
 }

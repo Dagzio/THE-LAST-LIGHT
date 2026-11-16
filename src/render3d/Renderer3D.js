@@ -12,6 +12,7 @@ import { parseSkinnedGLB, loadGLB, blobTexture } from './glb.js';
 import { HUMAN_MODELS, HUMAN_ANIM, GUN_MODELS, gunModelOf } from '../data/humanModels.js';
 import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
+import { dodgeOf } from '../data/player.js';
 import { CAMERA, CAMERA_TOUCH } from '../config/camera.js';
 import { QUALITY_PRESETS, antialiasFor, TOUCH } from '../config/settings.js';
 
@@ -20,6 +21,7 @@ const SUN_DIR = new THREE.Vector3(-260, 820, 300);
 const SUN_Z = SUN_DIR.clone().normalize();
 const SUN_X = new THREE.Vector3(0, 1, 0).cross(SUN_Z).normalize();
 const SUN_Y = SUN_Z.clone().cross(SUN_X);
+const LIGHTING = { hemi: 0.5, key: 1.12 }; // D83: the night mood (was 0.9 / 1.6) — the rooms' own lights bring them up
 const MAX_BULLETS = 200;
 const MAX_BARS = 32;
 const MAX_POOLS = 40;
@@ -71,8 +73,9 @@ export class Renderer3D {
     this.mats = createMaterials();
 
     // office lighting: cool ambient from above + one key light with shadows (follows the camera)
-    this.hemi = new THREE.HemisphereLight(0xdde6f5, 0x2b2722, 0.9);
-    this.sun = new THREE.DirectionalLight(0xfff1de, 1.6); // D79: a stronger key light — the furniture shadows read
+    // D83: the night office — a dimmer fill; the rooms are lit by their baked lamps / ceiling pools (OfficeScene)
+    this.hemi = new THREE.HemisphereLight(0xc9d6ec, 0x2b2722, LIGHTING.hemi);
+    this.sun = new THREE.DirectionalLight(0xffe6c8, LIGHTING.key); // D79: the key light — the furniture shadows read
     this.sun.shadow.camera.near = 50;
     this.sun.shadow.camera.far = 2000;
     this.sun.shadow.bias = -0.0005;
@@ -264,14 +267,6 @@ export class Renderer3D {
     }));
     this.objMarker.renderOrder = 15;
     this.objMarker.visible = false;
-    // D82: a shield over the hero while he is in cover
-    this.coverIcon = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), iconMat((g) => {
-      g.fillStyle = 'rgba(10,12,16,0.7)'; g.beginPath(); g.arc(32, 32, 28, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#8fd8ff'; g.strokeStyle = '#0d2a3a'; g.lineWidth = 3;
-      g.beginPath(); g.moveTo(32, 10); g.lineTo(50, 17); g.lineTo(48, 34); g.quadraticCurveTo(44, 47, 32, 54); g.quadraticCurveTo(20, 47, 16, 34); g.lineTo(14, 17); g.closePath(); g.fill(); g.stroke();
-    }));
-    this.coverIcon.renderOrder = 14;
-    this.coverIcon.visible = false;
     const objRing = new THREE.RingGeometry(0.82, 1, 40);
     objRing.rotateX(-Math.PI / 2);
     this.objRing = new THREE.Mesh(objRing, new THREE.MeshBasicMaterial({ color: 0xffcf3a, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -303,7 +298,7 @@ export class Renderer3D {
     this.particles = new THREE.Points(this.particleGeo, new THREE.PointsMaterial({ size: 4, vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true }));
     this.particles.frustumCulled = false;
     this.scene.add(this.bullets, this.reticle, this.aimDots, this.aimRing, this.grenadeMesh, ...this.blastRings, this.hpBack, this.hpFill,
-      this.iconAlert, this.iconCombat, this.objMarker, this.coverIcon, this.objRing, this.reachRing, this.pools, this.blobs, this.particles);
+      this.iconAlert, this.iconCombat, this.objMarker, this.objRing, this.reachRing, this.pools, this.blobs, this.particles);
   }
 
   _ensureParticleBuffers(capacity) {
@@ -609,13 +604,11 @@ export class Renderer3D {
       throwAimAge: gAim ? time - this.gAimAt : 0,
       throwAge: time - run.grenades.lastThrowAt,
       dodge: p.dodging ? Math.min(1, Math.max(0, (time - p.dodgeStartAt) / Math.max(0.01, p.dodgeEndsAt - p.dodgeStartAt))) : -1, // D82: the roll clip
-      crouch: p.crouched,                                                                                                         // D82: low cover
+      dodgeClip: dodgeOf(p).clip,                                                                                                 // D83: which roll
+      cover: p.alive && p.cover ? p.cover.kind : null,                                                                            // D83: cover poses
     });
     h.group.position.set(hx, 0, hy);
     h.group.rotation.y = -(this.bodyYaw - h.aimYaw);
-    // D82: a shield over the hero in cover
-    this.coverIcon.visible = p.alive && !!p.cover;
-    if (this.coverIcon.visible) { this.coverIcon.position.set(hx, (p.crouched ? 46 : 70) + Math.sin(time * 4) * 1.2, hy); this.coverIcon.quaternion.copy(FACE_CAM); }
     h.flash.visible = p.alive && time - w.lastShotAt >= 0 && time - w.lastShotAt < SHOT_FLASH;
     if (h.flash.visible) h.flash.rotation.x = (w.lastShotAt * 97.3) % (Math.PI * 2);
 
@@ -646,6 +639,7 @@ export class Renderer3D {
         reload: g.reloading ? Math.min(1, (time - g.reloadStartedAt) / Math.max(0.01, g.reloadEndsAt - g.reloadStartedAt)) : -1,
         hitAge: time - e.lastHitAt,
         deadAge: e.alive ? -1 : time - e.deathAt,
+        busy: !!e.busy && e.alive && ai.mode === 'idle' && sp < 2, // D83: going through the files until alerted
       });
       const sink = !e.alive ? Math.max(0, time - e.deathAt - DEATH_SINK) * 6 : 0;
       v.group.position.set(ex, -sink, ey);

@@ -10,8 +10,10 @@ export const TILE = {
   tvDash: 8, elevator: 9, exitSign: 10, books: 11, whiteboard: 12, papers: 13, brokenScreen: 14, keyboard: 15,
   // D79
   window: 16, rugRed: 17, rugGrey: 18, lockers: 19, photo: 20, clock: 21, poster: 22, mug: 23,
+  // D83 floor decals (the level reference: signs of the attack, wear, the storage floor markings)
+  blood: 24, bloodSmear: 25, coffee: 26, scuff: 27, hazard: 28, marking: 29, prints: 30, dirt: 31,
 };
-const N = 4, ROWS = 6, S = 256;
+const N = 4, ROWS = 8, S = 256;
 
 /** uv rect [u0, v0, u1, v1] of a tile (three.js uv: v up; the canvas is uploaded with flipY). */
 export function tileUV(i) {
@@ -211,6 +213,68 @@ export function paintOfficeAtlas() {
     fill('rgba(0,0,0,0)', 0, 0, S, S);
     g.fillStyle = '#f2efe9'; g.beginPath(); g.arc(S / 2, S / 2, 120, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#3b2416'; g.beginPath(); g.arc(S / 2, S / 2, 96, 0, Math.PI * 2); g.fill();
+  });
+
+  // ---- D83 floor decals (transparent around: drawn with soft edges)
+  const blob = (x, y, rx, ry, col) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, r() * Math.PI, 0, Math.PI * 2); g.fill(); };
+  // 24 blood splatter: a pool + droplets flung one way
+  at(TILE.blood, () => {
+    for (let k = 0; k < 6; k++) blob(118 + (r() - 0.5) * 40, 128 + (r() - 0.5) * 40, 26 + r() * 22, 18 + r() * 18, 'rgba(92,8,8,0.85)');
+    blob(124, 126, 30, 24, 'rgba(60,4,4,0.9)');
+    for (let k = 0; k < 26; k++) { const a = -0.6 + (r() - 0.5) * 1.4, d = 50 + r() * 70; blob(124 + Math.cos(a) * d, 126 + Math.sin(a) * d, 2 + r() * 6, 2 + r() * 4, 'rgba(110,10,10,0.8)'); }
+  });
+  // 25 a smear: something dragged across the floor
+  at(TILE.bloodSmear, () => {
+    for (let x = 24; x < 232; x += 3) {
+      const w = 26 - Math.abs(x - 128) * 0.14 + Math.sin(x * 0.11) * 4, y = 128 + Math.sin(x * 0.03) * 10;
+      g.fillStyle = `rgba(${80 + (x % 7) * 3},8,8,${0.22 + 0.5 * Math.min(1, (232 - x) / 90)})`;
+      g.fillRect(x, y - w / 2, 4, w);
+    }
+    for (let k = 0; k < 40; k++) fill('rgba(50,4,4,0.35)', 30 + r() * 200, 116 + r() * 24, 6 + r() * 14, 1.5);
+  });
+  // 26 coffee: a spilled cup's ring + splash
+  at(TILE.coffee, () => {
+    blob(128, 128, 70, 52, 'rgba(72,42,20,0.55)');
+    g.strokeStyle = 'rgba(48,26,12,0.7)'; g.lineWidth = 5; g.beginPath(); g.ellipse(128, 128, 68, 50, 0.2, 0, Math.PI * 2); g.stroke();
+    for (let k = 0; k < 10; k++) blob(128 + (r() - 0.5) * 200, 128 + (r() - 0.5) * 160, 3 + r() * 7, 3 + r() * 5, 'rgba(72,42,20,0.5)');
+  });
+  // 27 scuffs: dark arcs of shoe / chair-wheel marks
+  at(TILE.scuff, () => {
+    g.lineCap = 'round';
+    for (let k = 0; k < 6; k++) {
+      g.strokeStyle = `rgba(20,20,22,${0.07 + r() * 0.1})`; g.lineWidth = 2 + r() * 3;
+      g.beginPath(); g.arc(128 + (r() - 0.5) * 60, 128 + (r() - 0.5) * 60, 40 + r() * 70, r() * 6, r() * 6 + 0.8 + r() * 1.6); g.stroke();
+    }
+  });
+  // 28 hazard tape: yellow / black stripes (the storage floor)
+  at(TILE.hazard, () => {
+    fill('rgba(0,0,0,0)', 0, 0, S, S);
+    g.save(); g.beginPath(); g.rect(0, 96, S, 64); g.clip();
+    fill('#d9a520', 0, 96, S, 64);
+    g.fillStyle = '#16161a';
+    for (let x = -64; x < S + 64; x += 48) { g.beginPath(); g.moveTo(x, 96); g.lineTo(x + 24, 96); g.lineTo(x - 40, 160); g.lineTo(x - 64, 160); g.closePath(); g.fill(); }
+    for (let k = 0; k < 300; k++) fill('rgba(0,0,0,0.25)', r() * S, 96 + r() * 64, 2, 2);
+    g.restore();
+  });
+  // 29 floor marking: a worn yellow line
+  at(TILE.marking, () => {
+    fill('rgba(217,165,32,0.9)', 0, 112, S, 32);
+    for (let k = 0; k < 500; k++) g.clearRect(r() * S, 112 + r() * 32, 1 + r() * 3, 1 + r() * 3);
+  });
+  // 30 bloody footprints walking off
+  at(TILE.prints, () => {
+    for (let k = 0; k < 6; k++) {
+      const x = 40 + k * 34, y = 128 + (k % 2 ? 14 : -14), a = 0.05 * k;
+      g.save(); g.translate(x, y); g.rotate(Math.PI / 2 + a);
+      g.fillStyle = `rgba(90,8,8,${0.75 - k * 0.1})`;
+      g.beginPath(); g.ellipse(0, -6, 7, 11, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(0, 12, 6, 6, 0, 0, Math.PI * 2); g.fill();
+      g.restore();
+    }
+  });
+  // 31 dirt: a soft dark patch
+  at(TILE.dirt, () => {
+    for (let k = 0; k < 40; k++) blob(128 + (r() - 0.5) * 130, 128 + (r() - 0.5) * 130, 10 + r() * 30, 8 + r() * 24, 'rgba(25,22,20,0.06)');
   });
   return canvas;
 }

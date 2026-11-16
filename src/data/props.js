@@ -38,6 +38,14 @@ export const PROP_TYPES = {
   whiteboard: { w: 54, d: 10, h: 48, cover: 'high' },
   overturned_chair: { w: 24, d: 18, h: 16 },
   broken_monitor: { w: 26, d: 18, h: 8 },
+  // D83 lights and decor of the reference (render3d/officeLights.js lights them): a floor lamp stands (a thin pole —
+  // stops walkers only); a planter is low cover with plants on it; the rest blocks nothing
+  floor_lamp: { w: 12, d: 12, h: 52, shape: 'circle', r: 5, bullet: false, sight: false },
+  planter: { w: 64, d: 16, h: 20, cover: 'low' },
+  desk_lamp: { w: 8, d: 8, h: 14, decor: true },
+  cable_tray: { w: 100, d: 12, h: 0, decor: true },
+  wall_light: { w: 40, d: 3, h: 4, wall: true },
+  alarm_light: { w: 6, d: 3, h: 6, wall: true },
   // flat / wall-mounted (no collision)
   rug_large: { w: 170, d: 110, h: 0, flat: true },
   rug_small: { w: 100, d: 66, h: 0, flat: true },
@@ -55,7 +63,7 @@ const MOVE = 1, BULLET = 2, SIGHT = 4, LOW = 8;
 
 /** Collision mask of a prop type (Collision.js BLOCK bits) from its height and overrides. */
 export function propBlocks(t) {
-  if (!t || t.flat || t.wall) return 0;
+  if (!t || t.flat || t.wall || t.decor) return 0;
   let m = MOVE;
   if (t.bullet !== false && t.h > BULLET_HEIGHT) m |= BULLET;
   if (t.sight !== false && t.h > EYE_HEIGHT) m |= SIGHT;
