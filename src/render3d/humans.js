@@ -7,10 +7,12 @@
 // Layers (D79):
 //  - legs: idle / walk / run / walk back / strafe left / strafe right, mixed by the movement direction relative to the
 //    facing (pistol: its own walk / run legs);
-//  - upper body, two weapon sets — rifle (rifle, SMG) and pistol: relaxed (idle / run), aim (Firing Rifle / Pistol
-//    Idle), reload (Reloading; the pistol has no clip: Pistol Idle + procedural hand moves), hit, grenade toss (the gun
-//    goes to the left hand while the right arm throws — works with both sets);
-//  - death: one of two full-body clips.
+//  - upper body, two weapon sets — rifle (rifle, SMG) and pistol: relaxed (idle / run), aim (Firing Rifle held still /
+//    Pistol Idle), reload (Reloading; the pistol has no clip: Pistol Idle + the left hand by IK, D82), hit, grenade toss
+//    (the gun goes to the left hand while the right arm throws — works with both sets);
+//  - full body: death, the roll (Dodge, D82), crouching behind low cover (Idle Crouching / Crouch Walking, D82).
+// D82: standing, the legs + hips come from the aim clip itself, and the body is turned by the barrel's measured yaw —
+// the gun points exactly at the aim; the enemies pick random variants of idle / run / hit / reload / death.
 // The node tree is cloned per character; geometry, texture, material and clips are shared.
 import * as THREE from '../../lib/three.module.js';
 import { HUMAN_ANIM } from '../data/humanModels.js';
@@ -237,8 +239,11 @@ export class HumanTemplate {
     return { f: f * c - sd * sn, s: f * sn + sd * c, h };
   }
 
-  /** A new character: its own bones + mixer, shared geometry / clips. @param {THREE.Material} material */
-  instantiate(material, variant = 0) {
+  /**
+   * A new character: its own bones + mixer, shared geometry / clips. @param {THREE.Material} material
+   * @param {number} variant per-character number; with `mixed` (enemies, D82) it picks random clip variants
+   */
+  instantiate(material, variant = 0, mixed = false) {
     const root = this.root.clone(true);
     const byName = new Map();
     let mesh = null;
@@ -248,21 +253,46 @@ export class HumanTemplate {
     mesh.material = material;
     mesh.castShadow = true;
     mesh.frustumCulled = false;
-    return new HumanView(this, root, mesh, byName, variant);
+    return new HumanView(this, root, mesh, byName, pickClips(this.clips, variant, mixed));
   }
 }
 
-const LEGS = ['idle', 'walk', 'run', 'back', 'strafeL', 'strafeR', 'pWalk', 'pRun'];
-const UPPER = ['idle', 'run', 'fire', 'reload', 'hit', 'throw', 'pIdle', 'pWalk', 'pRun'];
+/**
+ * D82: the clip of each role for one character. The hero (mixed = false) keeps the base set; every enemy gets a random
+ * (per-character, stable) pick among the user's variants of the same action.
+ */
+function pickClips(C, variant, mixed) {
+  const base = { idle: 'idle', run: 'run', hit: 'hit', reload: 'reload', die: 'die' };
+  if (!mixed) return base;
+  let h = (Math.imul(Math.abs(variant | 0) + 1, 2654435761) >>> 0);
+  const pick = (list) => { const id = list[h % list.length]; h = (Math.imul(h ^ (h >>> 15), 2246822519) >>> 0) + 7; return C[id] ? id : list[0]; };
+  return {
+    idle: pick(['idle', 'idle2']),
+    run: pick(['run', 'run2', 'run3']),
+    hit: pick(['hit', 'hit2']),
+    reload: pick(['reload', 'reload2']),
+    die: pick(['die', 'die2', 'die3']),
+  };
+}
+
+// leg / upper-body layers by ROLE (the clip of a role comes from pickClips); the rest are fixed clips
+const LEGS = ['walk', 'back', 'strafeL', 'strafeR', 'pWalk', 'pRun'];
+const UPPER = ['fire', 'throw', 'pIdle', 'pWalk', 'pRun'];
+const FIRE_POSE_T = 0.33;   // the aim pose = "Firing Rifle" held at this time (the gun mount is measured on it)
+const _ik = { a: new THREE.Vector3(), f: new THREE.Vector3(), h: new THREE.Vector3(), t: new THREE.Vector3(), p: new THREE.Vector3(), e: new THREE.Vector3(), q: new THREE.Quaternion(), I: new THREE.Quaternion() };
+const _pt = new THREE.Vector3(), _pt2 = new THREE.Vector3(), _up = new THREE.Vector3();
+// D82 pistol reload: the left wrist's path (reload progress → point), points refreshed every frame
+const RELOAD_PTS = { cur: new THREE.Vector3(), belt: new THREE.Vector3(), under: new THREE.Vector3(), seated: new THREE.Vector3(), slide: new THREE.Vector3(), racked: new THREE.Vector3(), tgt: new THREE.Vector3(), pole: new THREE.Vector3() };
+const RELOAD_PATH = [[0.12, 'cur'], [0.3, 'belt'], [0.42, 'belt'], [0.58, 'under'], [0.66, 'seated'], [0.72, 'seated'], [0.78, 'slide'], [0.84, 'racked'], [0.9, 'cur']];
 
 /**
  * One character on screen. update(dt, st) — st: { speed (units/s), moveRel (movement direction minus facing, rad, sim
  * convention: + = to the right), aim (bool), reload (0…1 progress, < 0 = no), hitAge (s since the last hit), deadAge
  * (s since death, < 0 = alive), shotAge (s since the last shot), throwAim (bool: a grenade is being aimed), throwAge
- * (s since the last throw, Infinity = none) }.
+ * (s since the last throw, Infinity = none), dodge (0…1 roll progress, < 0 = none), crouch (bool: behind low cover) }.
  */
 export class HumanView {
-  constructor(tpl, root, mesh, bones, variant = 0) {
+  constructor(tpl, root, mesh, bones, pick) {
     this.tpl = tpl;
     this.mesh = mesh;
     this.bones = bones;
@@ -276,19 +306,36 @@ export class HumanView {
     this.leftHand = bones.get('LeftHand');
     this.mixer = new THREE.AnimationMixer(root);
     const C = tpl.clips;
+    this.pick = pick;
     const act = (clip) => { const a = this.mixer.clipAction(clip); a.play(); a.setEffectiveWeight(0); return a; };
     this.L = {};
     for (const k of LEGS) if (C[k]) this.L[k] = act(C[k].lower);
+    this.L.idle = act(C[pick.idle].lower);
+    this.L.run = act(C[pick.run].lower);
+    // D82: standing while aiming, the legs + hips come from the aim clip itself (Pistol Idle / Firing Rifle) — mixed
+    // with another clip's hips the torso turned away and the gun pointed 40–45° off the aim
+    this.L.pIdle = act(C.pIdle.lower);
+    this.L.fire = act(C.fire.lower);
+    this.L.fire.timeScale = 0;
+    this.L.fire.time = FIRE_POSE_T;
     this.U = {};
     for (const k of UPPER) if (C[k]) this.U[k] = act(C[k].upper);
-    for (const k of ['reload', 'hit', 'throw']) if (this.U[k]) this.U[k].timeScale = 0; // time set from the state
-    const dieId = variant % 2 && C.die2 ? 'die2' : 'die';
-    this.die = act(C[dieId].full);
-    this.dieDur = C[dieId].duration;
-    this.die.setLoop(THREE.LoopOnce, 1);
-    this.die.clampWhenFinished = true;
-    this.die.timeScale = 0;
-    this.w = { move: 0, run: 0, aim: 0, reload: 0, dead: 0, throw: 0, f: 1, b: 0, l: 0, r: 0 };
+    this.U.idle = act(C[pick.idle].upper);
+    this.U.run = act(C[pick.run].upper);
+    this.U.hit = act(C[pick.hit].upper);
+    this.U.reload = act(C[pick.reload].upper);
+    this.reloadDur = C[pick.reload].duration;
+    for (const k of ['reload', 'hit', 'throw', 'fire']) if (this.U[k]) this.U[k].timeScale = 0; // time set from the state
+    if (this.U.fire) this.U.fire.time = FIRE_POSE_T;
+    // full-body layers: the death, the roll (D82), crouching behind low cover (D82)
+    const once = (id) => { const a = act(C[id].full); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.timeScale = 0; return a; };
+    this.die = once(pick.die);
+    this.dieDur = C[pick.die].duration;
+    this.dodge = C.dodge ? once('dodge') : null;
+    this.dodgeDur = C.dodge ? C.dodge.duration : 1;
+    this.crouchIdle = C.crouchIdle ? act(C.crouchIdle.full) : null;
+    this.crouchWalk = C.crouchWalk ? act(C.crouchWalk.full) : null;
+    this.w = { move: 0, run: 0, aim: 0, reload: 0, dead: 0, throw: 0, dodge: 0, crouch: 0, f: 1, b: 0, l: 0, r: 0 };
     this.guns = {};
     this.gun = null;
     this.gunId = '';
@@ -348,6 +395,14 @@ export class HumanView {
     const pistol = this.set === 'pistol';
     const ease = (key, target, rate = 1) => { w[key] += (target - w[key]) * Math.min(1, k * rate); return w[key]; };
 
+    // ---- full-body layers: death, the roll (D82), crouching behind low cover (D82)
+    const live = 1 - ease('dead', dead ? 1 : 0, 1.2);
+    const rolling = !dead && st.dodge >= 0 && !!this.dodge;
+    if (rolling) w.dodge = 1; else ease('dodge', 0, 2.5); // the roll starts at once and blends out as he gets up
+    const dg = w.dodge;
+    const cr = ease('crouch', !dead && st.crouch && !rolling && this.crouchIdle ? 1 : 0, 1.3) * (1 - dg);
+    const normal = live * (1 - dg) * (1 - cr);   // what is left for the leg + upper-body layers
+
     // ---- legs: direction weights (forward / back / left / right) and walk → run by speed
     const sp = dead ? 0 : st.speed;
     const move = ease('move', Math.min(1, sp / 12));
@@ -357,18 +412,20 @@ export class HumanView {
     const sum = f + b + r + l || 1;
     f = ease('f', f / sum); b = ease('b', b / sum); r = ease('r', r / sum); l = ease('l', l / sum);
     const run = ease('run', smooth(A.runFrom, A.runTo, sp));
-    const live = 1 - ease('dead', dead ? 1 : 0, 1.2);
     const fwdWalk = pistol ? L.pWalk : L.walk, fwdRun = pistol ? L.pRun : L.run;
     for (const a of Object.values(L)) a.setEffectiveWeight(0);
-    L.idle.setEffectiveWeight((1 - move) * live);
-    fwdWalk.setEffectiveWeight(move * f * (1 - run) * live);
-    fwdRun.setEffectiveWeight(move * f * run * live);
-    if (L.back) L.back.setEffectiveWeight(move * b * live);
-    if (L.strafeL) L.strafeL.setEffectiveWeight(move * l * live);
-    if (L.strafeR) L.strafeR.setEffectiveWeight(move * r * live);
+    // standing: the pistol stance always; with a long gun the aim stance while aiming (aim weight from last frame)
+    const stand = (1 - move) * normal;
+    if (pistol) L.pIdle.setEffectiveWeight(stand);
+    else { L.fire.setEffectiveWeight(stand * w.aim); L.idle.setEffectiveWeight(stand * (1 - w.aim)); }
+    fwdWalk.setEffectiveWeight(move * f * (1 - run) * normal);
+    fwdRun.setEffectiveWeight(move * f * run * normal);
+    if (L.back) L.back.setEffectiveWeight(move * b * normal);
+    if (L.strafeL) L.strafeL.setEffectiveWeight(move * l * normal);
+    if (L.strafeR) L.strafeR.setEffectiveWeight(move * r * normal);
     const rate = (id, max) => Math.min(max, Math.max(0.6, sp / (R[id] || 30)));
     fwdWalk.timeScale = rate(pistol ? 'pWalk' : 'walk', A.walkRateMax);
-    fwdRun.timeScale = rate(pistol ? 'pRun' : 'run', 1.6);
+    fwdRun.timeScale = rate(pistol ? 'pRun' : this.pick.run, 1.6);
     if (L.back) L.back.timeScale = rate('back', A.walkRateMax);
     if (L.strafeL) L.strafeL.timeScale = rate('strafeL', A.walkRateMax);
     if (L.strafeR) L.strafeR.timeScale = rate('strafeR', A.walkRateMax);
@@ -381,11 +438,11 @@ export class HumanView {
     const am = ease('aim', !dead && st.aim && !reloading ? 1 : 0) * (1 - rl) * (1 - thr);
     const hit = !dead && st.hitAge < A.hitTime ? Math.sin((st.hitAge / A.hitTime) * Math.PI) : 0;
     const relaxed = Math.max(0, 1 - rl - am - thr);
-    const up = live * (1 - hit * 0.8);
+    const up = normal * (1 - hit * 0.8);
     for (const a of Object.values(U)) a.setEffectiveWeight(0);
     if (pistol) {
       // pistol: Pistol Idle is the ready / aim pose; walking and running swing the arms of their clips; the reload is
-      // Pistol Idle with procedural hand moves (no clip from the user)
+      // Pistol Idle + the left hand moved by IK (D82, _pistolReload — no pistol reload clip from the user)
       const moving = move * f;
       U.pIdle.setEffectiveWeight((am + rl + relaxed * (1 - moving)) * up);
       U.pWalk.setEffectiveWeight(relaxed * moving * (1 - run) * up);
@@ -397,11 +454,11 @@ export class HumanView {
       U.idle.setEffectiveWeight(relaxed * (1 - moving) * up);
       U.run.setEffectiveWeight(relaxed * moving * up);
       U.run.timeScale = fwdRun.timeScale;
-      U.fire.setEffectiveWeight(am * up);
+      U.fire.setEffectiveWeight(am * up);       // held still at FIRE_POSE_T: a steady aim (the kick is procedural)
       U.reload.setEffectiveWeight(rl * up);
-      if (reloading) U.reload.time = Math.min(0.999, st.reload) * tpl.clips.reload.duration;
+      if (reloading) U.reload.time = Math.min(0.999, st.reload) * this.reloadDur;
     }
-    U.hit.setEffectiveWeight(hit * live);
+    U.hit.setEffectiveWeight(hit * normal);
     if (hit > 0) U.hit.time = A.hitFrom + Math.min(1, st.hitAge / A.hitTime) * A.hitSpan;
     // grenade toss: while aiming, the arm winds up and holds; on the throw the clip plays on from the hold
     let tossT = -1;
@@ -411,19 +468,43 @@ export class HumanView {
       U.throw.time = tossT;
       U.throw.setEffectiveWeight(thr * up);
     }
-    // death
+    // full body
     this.die.setEffectiveWeight(1 - live);
     if (dead) this.die.time = Math.min(this.dieDur, st.deadAge);
+    if (this.dodge) {
+      this.dodge.setEffectiveWeight(dg * live);
+      if (rolling) this.dodge.time = Math.min(0.999, st.dodge) * this.dodgeDur;
+    }
+    if (this.crouchIdle) {
+      const cm = this.crouchWalk ? Math.min(1, sp / 10) : 0;
+      this.crouchIdle.setEffectiveWeight(cr * (1 - cm) * live);
+      if (this.crouchWalk) {
+        this.crouchWalk.setEffectiveWeight(cr * cm * live);
+        this.crouchWalk.timeScale = Math.min(A.walkRateMax, Math.max(0.6, sp / (R.crouchWalk || 30)));
+      }
+    }
     this.mixer.update(Math.max(0, dt));
 
     // the gun goes to the left hand while the right arm throws
     const left = thr > 0.5 && tossT >= A.throwHandOff && tossT < A.throwHandBack;
     if (left !== this.inLeft) this._mountGun(left);
 
+    // D82: where the barrel points in THIS pose (relative to the body's facing) — the renderer turns the body by it,
+    // so the gun itself points at the aim whatever the legs do (walking / strafing hips sway the torso)
+    const aimW = Math.max(am, pistol ? rl : 0) * normal;
+    const yawNow = aimW > 0.001 && this.gun && !this.inLeft ? this._barrelYaw() : 0;
+
     // ---- procedural layers (after the clips): recoil, pistol reload
-    if (!dead) this._procedural(st, pistol, rl, am);
-    const m = tpl.mounts[this.set];
-    this.aimYaw = m ? m.yaw * Math.max(am, pistol ? rl : 0) * live : 0;
+    if (!dead && normal > 0.05) this._procedural(st, pistol, rl * normal, am);
+    this.aimYaw = yawNow * aimW;
+  }
+
+  /** The barrel's yaw relative to the body's facing (sim convention: + = to the right). */
+  _barrelYaw() {
+    this.group.updateMatrixWorld(true);
+    const d = _pt.set(1, 0, 0).transformDirection(this.gun.matrixWorld);
+    d.applyQuaternion(this.group.getWorldQuaternion(_q2).invert());
+    return Math.atan2(d.z, d.x);
   }
 
   /** Rotates a bone about a world axis (keeps its parent chain). */
@@ -436,6 +517,85 @@ export class HumanView {
     bone.quaternion.copy(_q2.invert().multiply(_q));
     bone.updateMatrixWorld(true);
   }
+
+  /** Rotates a bone by a world-space rotation q (keeps its parent chain). */
+  _rotateWorldQ(bone, q) {
+    bone.parent.updateMatrixWorld(true);
+    bone.parent.getWorldQuaternion(_q2);
+    bone.getWorldQuaternion(_q);
+    _q.premultiply(q);
+    bone.quaternion.copy(_q2.invert().multiply(_q));
+    bone.updateMatrixWorld(true);
+  }
+
+  /**
+   * D82: two-bone IK of an arm — the wrist goes to world point `target`, the elbow bends towards world point `pole`.
+   * Starts from the animated pose (the bend plane of the clip at weight 0), so blending in / out never jumps.
+   */
+  _armIK(side, target, pole) {
+    const A = this.bones.get(`${side}Arm`), F = this.bones.get(`${side}ForeArm`), H = this.bones.get(`${side}Hand`);
+    if (!A || !F || !H) return;
+    const { a, f, h, t, p, e, q } = _ik;
+    A.getWorldPosition(a); F.getWorldPosition(f); H.getWorldPosition(h);
+    const l1 = a.distanceTo(f), l2 = f.distanceTo(h);
+    t.copy(target).sub(a);
+    const d = Math.min(l1 + l2 - 1e-3, Math.max(Math.abs(l1 - l2) + 1e-3, t.length()));
+    t.normalize();
+    p.copy(pole).sub(a);
+    p.addScaledVector(t, -p.dot(t));
+    if (p.lengthSq() < 1e-8) return;
+    p.normalize();
+    const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d)));
+    e.copy(a).addScaledVector(t, l1 * cosA).addScaledVector(p, l1 * Math.sqrt(1 - cosA * cosA)); // the new elbow
+    q.setFromUnitVectors(f.sub(a).normalize(), _pt.copy(e).sub(a).normalize());
+    this._rotateWorldQ(A, q);
+    F.getWorldPosition(f); H.getWorldPosition(h);
+    const wrist = _pt2.copy(a).addScaledVector(t, d);
+    q.setFromUnitVectors(h.sub(f).normalize(), wrist.sub(f).normalize());
+    this._rotateWorldQ(F, q);
+  }
+
+  /**
+   * D82 pistol reload (the user has no pistol reload clip; the old procedural shake is gone): the gun turns up and in
+   * to the chest, the LEFT hand (IK) goes from the gun to the belt for a magazine, pushes it up into the grip, racks
+   * the slide and takes the gun again. pr — reload progress 0…1, k — layer weight.
+   */
+  _pistolReload(pr, k) {
+    const B = (n) => this.bones.get(n);
+    const gun = this.gun;
+    if (!gun || !gun.visible) return;
+    // the right arm: the gun up and in
+    const tilt = smooth(0, 0.16, pr) * (1 - smooth(0.86, 1, pr)) * k;
+    const seat = (smooth(0.6, 0.66, pr) - smooth(0.66, 0.74, pr)) * k; // the magazine slapped home
+    _up.set(0, 1, 0);
+    this._rotateWorld(B('RightForeArm'), _axis, 0.16 * tilt);
+    this._rotateWorld(B('RightForeArm'), _up, 0.4 * tilt);
+    this._rotateWorld(B('RightHand'), _axis, 0.28 * tilt - 0.08 * seat);
+    // the left hand: keys of the path (character frame: f forward, h up, s right; or a point of the gun)
+    const reach = smooth(0.04, 0.2, pr) * (1 - smooth(0.86, 0.98, pr)) * k; // IK weight: from the grip and back
+    if (reach < 0.002) return;
+    this.group.updateMatrixWorld(true);
+    const P = RELOAD_PTS;
+    B('LeftHand').getWorldPosition(P.cur);
+    this._charPoint(4, 29, -8, P.belt);
+    gun.localToWorld(P.under.set(-1, -9, 0));
+    gun.localToWorld(P.seated.set(-1, -6.5, 0));
+    gun.localToWorld(P.slide.set(1, 3.5, -1));
+    gun.localToWorld(P.racked.set(-3.5, 3.5, -1));
+    const path = RELOAD_PATH;
+    P.tgt.copy(P.cur);
+    for (let i = 0; i < path.length - 1; i++) {
+      const [t0, k0] = path[i], [t1, k1] = path[i + 1];
+      if (pr <= t0) { P.tgt.copy(P[k0]); break; }
+      if (pr <= t1) { P.tgt.copy(P[k0]).lerp(P[k1], smooth(t0, t1, pr)); break; }
+    }
+    P.tgt.lerp(P.cur, 1 - reach);
+    this._charPoint(-6, 18, -22, P.pole); // the elbow down, back and out to the left
+    this._armIK('Left', P.tgt, P.pole);
+  }
+
+  /** A point of the character frame (f forward, h up, s right; game units) → world. */
+  _charPoint(f, h, s, out) { return out.set(f, h, s).applyMatrix4(this.group.matrixWorld); }
 
   _procedural(st, pistol, rl, am) {
     const A = HUMAN_ANIM;
@@ -451,17 +611,7 @@ export class HumanView {
       this._rotateWorld(B('RightHand'), _axis, (pistol ? A.recoilPistol : A.recoilRifle) * kk);
       this._rotateWorld(B('RightForeArm'), _axis, (pistol ? 0.08 : 0.04) * kk);
     }
-    if (pistol && pr >= 0) {
-      // pistol reload: the gun tips up and in, the left hand drops to the belt for a magazine and comes back
-      const tip = Math.sin(Math.PI * clamp01(pr / 0.95)) * rl;
-      const drop = (smooth(0.12, 0.38, pr) - smooth(0.55, 0.82, pr)) * rl;
-      this._rotateWorld(B('RightForeArm'), _axis, 0.35 * tip);
-      this._rotateWorld(B('RightHand'), _axis, 0.45 * tip);
-      this._rotateWorld(B('LeftArm'), _axis, -0.9 * drop);
-      this._rotateWorld(B('LeftForeArm'), _axis, -0.5 * drop);
-      const seat = Math.max(0, Math.sin(Math.PI * clamp01((pr - 0.7) / 0.12))); // the magazine slapped in
-      this._rotateWorld(B('RightHand'), _axis, -0.12 * seat * rl);
-    }
+    if (pistol && pr >= 0 && rl > 0.01) this._pistolReload(pr, rl);
   }
 
   dispose() {

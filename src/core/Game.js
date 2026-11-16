@@ -17,6 +17,7 @@ import { createRunSeed } from './SeededRandom.js';
 import { QUALITY_LEVELS, QUALITY_PRESETS, resolveAutoQuality } from '../config/settings.js';
 import { getLevel, LEVELS } from '../data/levels/index.js';
 import { AUTO_AIM } from '../data/player.js';
+import { AI_TUNING } from '../data/humans.js';
 import { nextLevelId, isLastLevel, defaultLevelSelection } from '../systems/Campaign.js';
 import { CHEATS } from '../config/constants.js';
 
@@ -39,6 +40,14 @@ export class Game {
       this.inView = (x, y) => {
         r3.projectToScreen(x, y, 16, pt);
         return pt.x >= inset && pt.x <= r3.viewW - inset && pt.y >= inset && pt.y <= r3.viewH - inset;
+      };
+      // D82: enemies open fire only from the screen (the whole body inside, a little margin)
+      const aiInset = AI_TUNING.onScreenInset;
+      this.inViewAI = (x, y) => {
+        r3.projectToScreen(x, y, 0, pt);
+        if (pt.x < aiInset || pt.x > r3.viewW - aiInset || pt.y > r3.viewH - aiInset) return false;
+        r3.projectToScreen(x, y, 56, pt);
+        return pt.y >= aiInset;
       };
     } catch (e) {
       console.error('WebGL renderer could not be created', e); // the menus keep working; a level cannot start
@@ -93,6 +102,7 @@ export class Game {
     if (this.run) {
       this.run.autoFire = !!this.touchMode;              // D74: the mobile version shoots by itself
       this.run.autoAim.inView = this.inView || null;      // D75: at enemies on the screen only
+      this.run.ai.inView = this.inViewAI || null;         // D82: enemies fire only from the screen
       this.run.update(this.input, dt, this.clock.time);
       if (this.onSimStep) this.onSimStep(this.run, this.clock.time);
     }

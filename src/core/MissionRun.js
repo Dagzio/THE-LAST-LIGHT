@@ -16,7 +16,7 @@ import { Particles } from '../render/Particles.js';
 import { WEAPONS, HERO_WEAPONS, getWeapon } from '../data/weapons.js';
 import { HUMAN_TYPES } from '../data/humans.js';
 import { CAPS } from '../data/balance.js';
-import { FACING, INTERACT } from '../data/player.js';
+import { FACING, INTERACT, COVER, muzzleOf, barrelOffsetAngle } from '../data/player.js';
 
 const AIM = { x: 0, y: 0 };
 const BODY_FADE = 30; // s a dead body stays (presentation; bodies never block anything)
@@ -60,6 +60,7 @@ export class MissionRun {
     this.controller = new PlayerController(events, { w: level.width, h: level.height });
     this.controller.world = this.world;
     this.weapons = new WeaponSystem(this.projectiles, this.rng, events);
+    this.weapons.world = this.world;
     this.projectileSystem = new ProjectileSystem(this.projectiles, this.rng, events, (id) => this._statsFor(id));
     this.projectileSystem.world = this.world;
     this.projectileSystem.player = this.player;
@@ -189,18 +190,38 @@ export class MissionRun {
 
   cancelGrenadeAim() { this._gFire = false; this._gWaitUp = true; this.holdFire = false; this.grenadePreview.active = false; }
 
-  /** D76 facing (kept): the body faces the movement; while shooting / aiming (and a moment after) it faces the aim. */
+  /** D82: behind low cover he crouches — except while shooting and a moment after (he stands up to fire). */
+  _updateCover(p, shooting, time) {
+    if (shooting && p.cover && p.cover.kind === 'low') p.exposedUntil = time + COVER.popUp;
+    p.crouched = !!p.cover && p.cover.kind === 'low' && p.alive && !p.dodging && time >= p.exposedUntil;
+  }
+
+  /**
+   * D76 facing (kept): the body faces the movement; while shooting / aiming (and a moment after) and standing with a
+   * mouse it faces the aim — then the arms hold the gun up at it (aimPose) and the body turns so that the BARREL line
+   * goes through the aim point (D82: the gun is beside the body's centre). In cover, not shooting: crouched he faces
+   * the low object (looks over it), pressed against high cover he has his back to it.
+   */
   _updateFacing(p, shooting, time) {
-    if (!p.alive) return;
+    if (!p.alive) { p.aimPose = false; return; }
     if (shooting || this.grenadePreview.active) p.faceAimUntil = time + FACING.aimHold;
     const moving = p.dodging || Math.hypot(p.vx, p.vy) > 1;
-    if (time < p.faceAimUntil || (!moving && p.hasAim && !this.autoFire)) p.bodyAngle = p.aimAngle;
-    else if (moving) p.bodyAngle = p.dodging ? Math.atan2(p.dodgeDirY, p.dodgeDirX) : Math.atan2(p.facingY, p.facingX);
+    const mouse = p.hasAim && !this.autoFire;
+    const firing = time < p.faceAimUntil;
+    const cover = p.cover && !firing && !moving ? p.cover : null;
+    p.aimPose = false;
+    if (p.dodging) p.bodyAngle = Math.atan2(p.dodgeDirY, p.dodgeDirX);
+    else if (cover) p.bodyAngle = cover.kind === 'low' ? Math.atan2(-cover.ny, -cover.nx) : Math.atan2(cover.ny, cover.nx);
+    else if (firing || (mouse && (!moving || FACING.alwaysAimMouse))) {
+      const d = Math.hypot(p.aimX - p.x, p.aimY - p.y);
+      p.bodyAngle = p.aimAngle - (p.hasAim ? barrelOffsetAngle(muzzleOf(this.weapon.stats.gun), d) : 0);
+      p.aimPose = true;
+    } else if (moving) p.bodyAngle = Math.atan2(p.facingY, p.facingX);
     if (this.autoFire && !this.autoAim.target && !this.grenadeArmed && time >= p.faceAimUntil) p.aimAngle = p.bodyAngle;
   }
 
-  /** True while the hero holds the gun up (shooting or a moment after) — the renderer's aim pose. */
-  get heroAiming() { return this.player.alive && this.lastTime < this.player.faceAimUntil; }
+  /** True while the hero holds the gun up at the aim — the renderer's aim pose. */
+  get heroAiming() { return this.player.alive && this.player.aimPose; }
 
   // ---------------- pickups, crates, objectives ----------------
   _pickup(pk, time) {
@@ -329,9 +350,10 @@ export class MissionRun {
     let fire = this.autoFire ? false : input.isDown('fire');
     if (this.autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, this.enemies, this.weapon.stats.range);
     else this.autoAim.reset();
-    const shooting = fire && !this.holdFire && !this.grenadeArmed;
+    const shooting = fire && !this.holdFire && !this.grenadeArmed && !p.dodging; // D82: no shots mid-roll
     this.weapons.update(this.weapon, p, shooting, input.consumePressed('reload'), time);
     this._grenadeInput(input, time);
+    this._updateCover(p, shooting, time);
     this._updateFacing(p, shooting, time);
 
     this.levelWorld.updateDoors(this._bodies(), time, dt);

@@ -45,4 +45,5 @@ export const AI_TUNING = {
   burstPause: [0.7, 1.3],    // s between bursts (rifles)
   movingTargetSpread: 1.6,   // × spread when the player runs; × 2.5 while he rolls
   stuckTime: 1.5,            // s without progress → next waypoint / give up
+  onScreenInset: 24,         // CSS px: D82 — an enemy shoots only when his whole body is this far inside the screen
 };

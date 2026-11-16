@@ -25,7 +25,12 @@ export class HumanAISystem {
     this.pool = pool;
     this.level = level;
     this.world = level.world;
+    /** D82: (x, y) → true when that ground point is on the screen (set by Game; null in tests = everywhere) */
+    this.inView = null;
   }
+
+  /** D82 (user request): an enemy opens fire only once he is on the screen. */
+  _onScreen(e) { return !this.inView || this.inView(e.x, e.y); }
 
   _rand(a, b) { return a + (b - a) * this.rng.next(); }
 
@@ -53,7 +58,8 @@ export class HumanAISystem {
     const d = Math.sqrt(d2);
     const tracking = e.ai.mode === 'combat';
     if (!tracking && d > V.near && Math.abs(angDiff(Math.atan2(dy, dx), e.faceAngle)) > (V.fov * Math.PI) / 360) return false;
-    return this.world.clear(e.x, e.y, p.x, p.y);
+    // D82: a hero crouched behind low cover is hidden by the low objects too
+    return this.world.clear(e.x, e.y, p.x, p.y, null, p.crouched ? BLOCK.SIGHT | BLOCK.LOW : BLOCK.SIGHT);
   }
 
   _perceive(e, p, enemies, time) {
@@ -153,7 +159,7 @@ export class HumanAISystem {
           const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
           face = Math.atan2(dy, dx);
           const k = e.type.keepRange;
-          if (d > k + 90) { mx = dx / d; my = dy / d; speed = S.combat; }
+          if (d > k + 90 || !this._onScreen(e)) { mx = dx / d; my = dy / d; speed = S.combat; } // D82: closes in until on the screen
           else if (d < k - 110) { mx = -dx / d; my = -dy / d; speed = S.combat * 0.75; }
           else {
             if (time >= ai.strafeUntil) {
@@ -234,12 +240,14 @@ export class HumanAISystem {
   _shoot(e, p, time) {
     const ai = e.ai, g = e.gun, s = g.stats;
     if (ai.mode !== 'combat' || !ai.sees || !p.alive || time < ai.reactAt || g.reloading) return;
+    if (!this._onScreen(e)) return; // D82: never from off the screen
     const to = Math.atan2(p.y - e.y, p.x - e.x);
     if (Math.abs(angDiff(to, e.faceAngle)) > 0.3 || time < g.nextShotAt) return;
     if (g.ammo <= 0) { this._reload(e, time); return; }
     const mz = muzzleOf(s.gun);
     const c = Math.cos(e.faceAngle), sn = Math.sin(e.faceAngle);
     const mx = e.x + c * mz.f - sn * mz.s, my = e.y + sn * mz.f + c * mz.s;
+    if (this.world.segmentHit(e.x, e.y, mx, my, 0) !== Infinity) { g.nextShotAt = time + 0.3; return; } // D82: barrel past a wall: no shot
     let spread = (s.spreadAngle * Math.PI) / 180;
     if (p.dodging) spread *= 2.5;
     else if (Math.hypot(p.vx, p.vy) > 20) spread *= T.movingTargetSpread;

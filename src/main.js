@@ -1,7 +1,7 @@
 // Game start (imported by boot.js after the preload): wires platform services, the runtime and the UI.
 // No globals are created (except window.__game while the dev asset viewer flag is on).
 import { DEBUG_ENABLED, DEBUG_MODELS } from './config/constants.js';
-import { MUSIC_FILES, MUSIC_BED, SFX_FILES, AUDIO_DIR, ENEMY_HIT_SFX, FOOTSTEPS, PLAYER_HURT_SFX } from './data/sounds.js';
+import { MUSIC_FILES, SFX_FILES, AUDIO_DIR, ENEMY_KILL_SFX, FOOTSTEPS, PLAYER_HURT_SFX } from './data/sounds.js';
 import { PLAYER } from './data/player.js';
 import { STATES } from './core/GameStateMachine.js';
 import { WeaponAudio } from './platform/WeaponAudio.js';
@@ -22,18 +22,17 @@ const ENEMY_SHOT_SFX = { enemy_pistol: 'pistol.shot', enemy_rifle: 'assault_rifl
 /** Gameplay facts → sounds. Repeated sounds get a small cosmetic pitch variation. */
 function wireCombatSounds(events, game) {
   const throttle = (ms) => { let last = 0; return () => { const now = performance.now(); if (now - last < ms) return false; last = now; return true; }; };
-  const hitOk = throttle(70), killOk = throttle(30), ricOk = throttle(60), enemyShotOk = throttle(45);
-  let lastHitIdx = -1;
-  events.on('hit', () => {
-    if (!hitOk()) return;
-    let i = Math.floor(Math.random() * ENEMY_HIT_SFX.length);
-    if (i === lastHitIdx) i = (i + 1) % ENEMY_HIT_SFX.length;
-    lastHitIdx = i;
-    const name = ENEMY_HIT_SFX[i];
-    if (Sfx.duration(name) > 0) Sfx.play(name, 0.95 + Math.random() * 0.1, { voices: 1 });
-    else Sfx.play('hit', 0.9 + Math.random() * 0.2);
+  const killOk = throttle(30), ricOk = throttle(60), enemyShotOk = throttle(45);
+  // D82 (user request): no sound on a hit; a kill plays one of the user's three death sounds (never the same twice)
+  let lastKillIdx = -1;
+  events.on('kill', () => {
+    if (!killOk()) return;
+    let i = Math.floor(Math.random() * ENEMY_KILL_SFX.length);
+    if (i === lastKillIdx) i = (i + 1) % ENEMY_KILL_SFX.length;
+    lastKillIdx = i;
+    const name = ENEMY_KILL_SFX[i];
+    Sfx.play(Sfx.duration(name) > 0 ? name : 'kill', 0.96 + Math.random() * 0.08, { voices: 3 });
   });
-  events.on('kill', () => { if (killOk()) Sfx.play('kill', 0.92 + Math.random() * 0.16, { voices: 3 }); });
   // enemy shots: the gun's recorded shot, quieter with distance from the hero
   events.on('enemyShot', (x, y, a, weaponId) => {
     const p = game.run && game.run.player;
@@ -86,7 +85,7 @@ function wireCameraShake(game) {
 /** @param {{loaded: Promise<void>, shownAt: number}} boot */
 export function startGame(boot) {
   installBrowserHygiene();
-  Music.init(MUSIC_FILES, MUSIC_BED);
+  Music.init(MUSIC_FILES);
 
   const game = new Game(document.getElementById('world'), document.getElementById('world3d'));
   const ui = new UIManager(game);
@@ -118,10 +117,9 @@ export function startGame(boot) {
  * the recorded sounds, the characters / textures, the level preview, the menu scene with one frame-rate window
  * measured on it. Steps that cannot run (no WebGL) are skipped; a stalled step never blocks TAP TO PLAY.
  */
-const WARM = { sounds: 0.25, assets: 0.35, previews: 0.15, menu: 0.25, maxSeconds: 30, tuneSeconds: 4 };
+// D82: the last step is the first music track (the menu is a still picture since D81 — no frame-rate window on it)
+const WARM = { sounds: 0.25, assets: 0.35, previews: 0.15, music: 0.25, maxSeconds: 30 };
 async function warmUp(game, ui, progress) {
-  const t0 = performance.now();
-  const late = () => (performance.now() - t0) / 1000 > WARM.maxSeconds;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   try {
     await Sfx.loadFiles(SFX_FILES, AUDIO_DIR);
@@ -133,14 +131,9 @@ async function warmUp(game, ui, progress) {
       await Promise.race([r3.assetsReady, sleep(WARM.maxSeconds * 1000)]);
       progress(WARM.sounds + WARM.assets);
       await ui._prerenderThumbs((k) => progress(WARM.sounds + WARM.assets + WARM.previews * k));
-      progress(WARM.sounds + WARM.assets + WARM.previews);
-      const w0 = r3.adaptWindows || 0, s0 = performance.now();
-      while (!late() && (performance.now() - s0) / 1000 < WARM.tuneSeconds && !((r3.adaptWindows || 0) > w0)) {
-        const k = Math.min(1, (performance.now() - s0) / 1000 / 2.6);
-        progress(WARM.sounds + WARM.assets + WARM.previews + WARM.menu * 0.95 * k);
-        await sleep(100);
-      }
     }
+    progress(WARM.sounds + WARM.assets + WARM.previews);
+    await Promise.race([Music.preload(), sleep(8000)]);
   } catch (e) {
     console.error('Warm-up step failed (the game still starts)', e);
   }

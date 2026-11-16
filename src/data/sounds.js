@@ -8,14 +8,12 @@
 export const AUDIO_DIR = 'assets/audio/';
 const DIR = AUDIO_DIR;
 
-/** Background music (H5: starts once on entering the main menu; the playlist is shuffled → random every time). */
-export const MUSIC_FILES = [`${DIR}bg1.mp3`, `${DIR}bg2.mp3`];
-
 /**
- * Music bed (2026-11-09): a low bass loop under the music (its level is set in the file itself), all the time the music plays (same Music
- * switch, same pause / mute rules). loopStart / loopEnd skip the encoder silence at the file edges (no gap).
+ * Background music (H5: starts once on entering the main menu and never stops — menus, levels, results; the playlist
+ * is shuffled → a random track first, then the other, never the same twice in a row). D82: only the user's two tracks
+ * (the old bass bed under them is gone); the first track is decoded under the splash, so the menu opens with music.
  */
-export const MUSIC_BED = { file: `${DIR}bg-bass.mp3`, gain: 1, loopStart: 0.058, loopEnd: 13.776 };
+export const MUSIC_FILES = [`${DIR}bg1.mp3`, `${DIR}bg2.mp3`];
 
 /**
  * One-shot SFX files: name → file. The name is the Sfx name — a file named like a synth recipe replaces it
@@ -28,11 +26,10 @@ export const SFX_FILES = {
   defeat: { file: 'game-over.mp3', trim: 0.07, gain: 1 },
   victory: { file: 'game-win.mp3', trim: 0.05, gain: 1 },
   boom: { file: 'grenade.mp3', trim: 0.015, gain: 1 },            // frag grenade blast
-  // D52: the user replaced the hit / kill files — re-measured (punch −23.5 / −22.9 / −25.4 / −33.8 dB)
-  enemyHit1: { file: 'enemies/enemy-hit1.mp3', trim: 0.06, gain: 1 },
-  enemyHit2: { file: 'enemies/enemy-hit2.mp3', trim: 0.08, gain: 1 },
-  enemyHit3: { file: 'enemies/enemy-hit3.mp3', trim: 0.02, gain: 1 },
-  kill: { file: 'enemies/enemy-killed1.mp3', trim: 0.03, gain: 1 },
+  // D82 (user files): three enemy deaths — played on the kill only (a hit on an enemy makes no sound of its own)
+  kill1: { file: 'enemies/enemy-killed1.mp3', trim: 0.05, gain: 1 },  // onsets measured: 0.061 / 0.063 / 0.032 s
+  kill2: { file: 'enemies/enemy-killed2.mp3', trim: 0.05, gain: 1 },
+  kill3: { file: 'enemies/enemy-killed3.mp3', trim: 0.02, gain: 1 },
   // D52 new files
   ricochet: { file: 'bullet.mp3', trim: 0.04, gain: 1 },               // a bullet stopped by a rock / wall / pad
   // keeper (user files, player/): D56 footsteps — one whole walking loop (FOOTSTEPS below); hurt — 2 takes (D53)
@@ -67,8 +64,8 @@ export const FOOTSTEPS = { sfx: 'steps', minSpeed: 8, minRate: 0.6, maxRate: 1.6
 /** The keeper is hurt (D53): one of the user's two takes at random (synth 'playerHurt' while they load). */
 export const PLAYER_HURT_SFX = ['playerHurt1', 'playerHurt2'];
 
-/** Hit on an enemy: one of these at random (never the same twice in a row). */
-export const ENEMY_HIT_SFX = ['enemyHit1', 'enemyHit2', 'enemyHit3'];
+/** D82: an enemy killed — one of these at random (never the same twice in a row). */
+export const ENEMY_KILL_SFX = ['kill1', 'kill2', 'kill3'];
 
 /**
  * Weapon sounds. A weapon without an entry (or without `shot` / `reload`) uses the synthesized fallback below.

@@ -23,7 +23,19 @@ export class Player {
     this.bodyAngle = 0;
     this.faceAimUntil = 0;     // game-clock time until which the body keeps facing the aim after a shot
 
+    this.aimPose = false;      // D82: the arms hold the gun up at the aim (presentation reads it; set by the run)
+
+    // D82 cover (data/player.js COVER): the object he is pressed against, and whether he crouches behind it now
+    this.cover = null;         // { kind: 'low' | 'high', nx, ny } — n points from the object to him
+    this.coverSince = -1;      // game time he started pushing into a cover object (−1: not pushing)
+    this.coverBlockUntil = 0;  // just left a cover: no new one before this time
+    this.exposedUntil = 0;     // stands up from low cover until this time (shooting)
+    this.crouched = false;
+
     this.dodging = false;
+    this.dodgeStartAt = 0;
+    this.dodgeFromX = x;       // D82: the roll follows the clip's path from here
+    this.dodgeFromY = y;
     this.dodgeEndsAt = 0;
     this.dodgeReadyAt = 0;     // game-clock time when dodge is available again
     this.dodgeCooldown = 0;    // length of the current cooldown (s) — the DASH button fills its ring over it

@@ -10,6 +10,7 @@ export const Music = (() => {
   let src = null, cur = null, pend = null, busy = false, retry = false;
   // Only the current track stays decoded (a 3.5-min stereo track is ~77 MB of PCM — two would be too much for phones).
   let cacheUrl = null, cacheBuf = null, last = null;
+  let loadingUrl = null, loading = null; // D82: the first track is decoded under the splash (preload)
   // Music bed (2026-11-09): a quiet bass loop under the tracks — same gain node (Hush / switch / suspend apply to it)
   let bed = null, bedBuf = null, bedSrc = null, bedLoading = false;
   const LIFE = ['hidden', 'blur'];
@@ -46,6 +47,7 @@ export const Music = (() => {
     }
     const url = list[i];
     let buf = cacheUrl === url ? cacheBuf : null;
+    if (!buf && loadingUrl === url && loading) buf = await loading; // the preload is still decoding it
     if (!buf) {
       cacheUrl = null; cacheBuf = null; // release the previous track before decoding the next
       buf = await loadBuf(a, url);
@@ -116,6 +118,18 @@ export const Music = (() => {
     ctx,
     sync,
     init(tracks, bedCfg = null) { list = shuffle(tracks.slice()); i = 0; bed = bedCfg; },
+    /** D82: decodes the first (random) track ahead, so the music is there the moment the main menu opens. */
+    preload() {
+      const a = ctx();
+      if (!a || !list.length || cacheBuf || loading) return loading || Promise.resolve();
+      loadingUrl = list[0];
+      loading = loadBuf(a, loadingUrl).then((b) => {
+        if (b && a === ac && !cacheBuf) { cacheUrl = loadingUrl; cacheBuf = b; }
+        loading = null; loadingUrl = null;
+        return b;
+      });
+      return loading;
+    },
     start() { started = true; sync(); }, // first time — start, then a cheap sync
     pause(r) { (LIFE.includes(r) ? Life : Hush).add(r); sync(); },
     resume(r) { Life.delete(r); Hush.delete(r); sync(); },

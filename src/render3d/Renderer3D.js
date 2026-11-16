@@ -171,7 +171,7 @@ export class Renderer3D {
   _newView(key, tint, gunId, scale = 1, variant = 0) {
     const tpl = this.templates && this.templates[key];
     if (!tpl) return null;
-    const v = tpl.instantiate(this._material(tpl, tint), variant);
+    const v = tpl.instantiate(this._material(tpl, tint), variant, key !== 'hero'); // D82: enemies mix clip variants
     if (scale !== 1) v.wrap.scale.multiplyScalar(scale);
     for (const [id, g] of Object.entries(this.gunGeos || {})) v.addGun(id, g.geometry, g.material);
     const flash = new THREE.Mesh(this.flashGeo, this.flashMat);
@@ -210,10 +210,17 @@ export class Renderer3D {
     this.bullets.frustumCulled = false;
     this.bullets.setColorAt(0, WHITE);
     this.bullets.count = 0;
-    // reticle: ring + four ticks
-    const ring = new THREE.RingGeometry(9, 11, 28);
-    ring.rotateX(-Math.PI / 2);
-    this.reticle = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0xffe9c2, transparent: true, opacity: 0.85, depthWrite: false }));
+    // reticle (D82, user request: a crosshair as in the original game): ring + four ticks + a centre dot, flat on the
+    // floor at the aim point, drawn over everything
+    const parts = [new THREE.RingGeometry(9, 11.5, 32)];
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      parts.push(new THREE.PlaneGeometry(7, 2.2).rotateZ(a).translate(Math.cos(a) * 17, Math.sin(a) * 17, 0));
+    }
+    parts.push(new THREE.CircleGeometry(2.2, 12));
+    const reticleGeo = mergeSimple(parts);
+    reticleGeo.rotateX(-Math.PI / 2);
+    this.reticle = new THREE.Mesh(reticleGeo, new THREE.MeshBasicMaterial({ color: 0xffe9c2, transparent: true, opacity: 0.9, depthWrite: false, depthTest: false }));
     this.reticle.renderOrder = 12;
     this.reticle.visible = false;
     // grenade aim
@@ -257,6 +264,14 @@ export class Renderer3D {
     }));
     this.objMarker.renderOrder = 15;
     this.objMarker.visible = false;
+    // D82: a shield over the hero while he is in cover
+    this.coverIcon = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), iconMat((g) => {
+      g.fillStyle = 'rgba(10,12,16,0.7)'; g.beginPath(); g.arc(32, 32, 28, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#8fd8ff'; g.strokeStyle = '#0d2a3a'; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(32, 10); g.lineTo(50, 17); g.lineTo(48, 34); g.quadraticCurveTo(44, 47, 32, 54); g.quadraticCurveTo(20, 47, 16, 34); g.lineTo(14, 17); g.closePath(); g.fill(); g.stroke();
+    }));
+    this.coverIcon.renderOrder = 14;
+    this.coverIcon.visible = false;
     const objRing = new THREE.RingGeometry(0.82, 1, 40);
     objRing.rotateX(-Math.PI / 2);
     this.objRing = new THREE.Mesh(objRing, new THREE.MeshBasicMaterial({ color: 0xffcf3a, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -288,7 +303,7 @@ export class Renderer3D {
     this.particles = new THREE.Points(this.particleGeo, new THREE.PointsMaterial({ size: 4, vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true }));
     this.particles.frustumCulled = false;
     this.scene.add(this.bullets, this.reticle, this.aimDots, this.aimRing, this.grenadeMesh, ...this.blastRings, this.hpBack, this.hpFill,
-      this.iconAlert, this.iconCombat, this.objMarker, this.objRing, this.reachRing, this.pools, this.blobs, this.particles);
+      this.iconAlert, this.iconCombat, this.objMarker, this.coverIcon, this.objRing, this.reachRing, this.pools, this.blobs, this.particles);
   }
 
   _ensureParticleBuffers(capacity) {
@@ -593,13 +608,14 @@ export class Renderer3D {
       throwAim: gAim,
       throwAimAge: gAim ? time - this.gAimAt : 0,
       throwAge: time - run.grenades.lastThrowAt,
+      dodge: p.dodging ? Math.min(1, Math.max(0, (time - p.dodgeStartAt) / Math.max(0.01, p.dodgeEndsAt - p.dodgeStartAt))) : -1, // D82: the roll clip
+      crouch: p.crouched,                                                                                                         // D82: low cover
     });
     h.group.position.set(hx, 0, hy);
     h.group.rotation.y = -(this.bodyYaw - h.aimYaw);
-    if (p.dodging) { // the roll: a quick lean into the dash
-      const k = Math.sin(Math.min(1, (time - (p.dodgeEndsAt - 0.22)) / 0.22) * Math.PI);
-      h.group.rotation.z = 0; h.wrap.position.y = -6 * k; h.group.rotation.x = 0;
-    } else h.wrap.position.y = 0;
+    // D82: a shield over the hero in cover
+    this.coverIcon.visible = p.alive && !!p.cover;
+    if (this.coverIcon.visible) { this.coverIcon.position.set(hx, (p.crouched ? 46 : 70) + Math.sin(time * 4) * 1.2, hy); this.coverIcon.quaternion.copy(FACE_CAM); }
     h.flash.visible = p.alive && time - w.lastShotAt >= 0 && time - w.lastShotAt < SHOT_FLASH;
     if (h.flash.visible) h.flash.rotation.x = (w.lastShotAt * 97.3) % (Math.PI * 2);
 

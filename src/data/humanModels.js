@@ -11,7 +11,8 @@ export const HUMAN_MODELS = {
 
 /**
  * Animations (assets/anims/human.json, D79: the user's full Mixamo set — rifle idle / run / strafes / back / fire /
- * reload / hit / toss, pistol idle / walk / run, two deaths). srcHipsCm — the Hips rest height of the rig they were
+ * reload / hit / toss, pistol idle / walk / run, two deaths; D82: + the roll, crouch idle / walk and the enemies'
+ * variants — rifle idle 2, rifle run 2 / 3, walking hit, walking reload, walking death). srcHipsCm — the Hips rest height of the rig they were
  * made on (the Hips track is scaled by the model's own Hips height / this). Layers: render3d/humans.js.
  */
 export const HUMAN_ANIM = {

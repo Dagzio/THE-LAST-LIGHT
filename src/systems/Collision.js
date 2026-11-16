@@ -8,7 +8,9 @@ const CELL = 128;
 const OFFSET = 64; // cells may be negative
 const key = (cx, cy) => (cx + OFFSET) * 4096 + (cy + OFFSET);
 
-export const BLOCK = Object.freeze({ MOVE: 1, BULLET: 2, SIGHT: 4, ALL: 7 });
+// LOW (D82): low cover — stops rounds and looks aimed at a hero crouched behind it (ALL does not include it: walls stop
+// those anyway through BULLET / SIGHT)
+export const BLOCK = Object.freeze({ MOVE: 1, BULLET: 2, SIGHT: 4, LOW: 8, ALL: 7 });
 
 export class CollisionWorld {
   constructor() {
@@ -157,11 +159,18 @@ export class CollisionWorld {
     this._query(Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, mask, (s) => {
       if (filter && !filter(s)) return false;
       let t;
-      if (s.box) t = boxRay(x0, y0, dx, dy, s.minX - radius, s.minY - radius, s.maxX + radius, s.maxY + radius);
-      else {
+      if (s.box) {
+        // D82: a start inside the shape itself is ignored (a muzzle inside a desk), but a start within `radius` of its
+        // face is a hit at once — before, a round fired right at a wall flew through it (the hero pressed against it)
+        const cx = x0 < s.minX ? s.minX : x0 > s.maxX ? s.maxX : x0, cy = y0 < s.minY ? s.minY : y0 > s.maxY ? s.maxY : y0;
+        if (radius > 0 && x0 > s.minX - radius && x0 < s.maxX + radius && y0 > s.minY - radius && y0 < s.maxY + radius
+          && !(x0 > s.minX && x0 < s.maxX && y0 > s.minY && y0 < s.maxY) && (cx - x0) * dx + (cy - y0) * dy > 0) t = 0;
+        else t = boxRay(x0, y0, dx, dy, s.minX - radius, s.minY - radius, s.maxX + radius, s.maxY + radius);
+      } else {
         const R = s.r + radius;
         const fx = x0 - s.x, fy = y0 - s.y;
         const cc = fx * fx + fy * fy - R * R;
+        if (cc <= 0 && fx * fx + fy * fy >= s.r * s.r && (fx * dx + fy * dy) < 0) { best = 0; return false; } // D82: same for circles (moving into it)
         if (cc <= 0) return false; // starts inside → ignore
         const b = 2 * (fx * dx + fy * dy);
         const disc = b * b - 4 * a * cc;
@@ -174,8 +183,31 @@ export class CollisionWorld {
     return best;
   }
 
-  /** Line of sight between two points: false if a sight-blocking shape is in between. */
-  clear(x0, y0, x1, y1, filter = null) { return this.segmentHit(x0, y0, x1, y1, 0, filter, BLOCK.SIGHT) === Infinity; }
+  /** Line of sight between two points: false if a shape blocking `mask` (sight by default) is in between. */
+  clear(x0, y0, x1, y1, filter = null, mask = BLOCK.SIGHT) { return this.segmentHit(x0, y0, x1, y1, 0, filter, mask) === Infinity; }
+
+  /**
+   * D82: the nearest cover shape (shape.cover = 'low' / 'high') whose surface is within `reach` of (x, y) → fills
+   * out { shape, nx, ny, gap } (n: from the surface towards the point, gap: distance to the surface); null if none.
+   */
+  coverAt(x, y, reach, out) {
+    let best = null, bestGap = reach;
+    this._query(x - reach, y - reach, x + reach, y + reach, BLOCK.MOVE, (s) => {
+      if (!s.cover) return false;
+      let dx, dy;
+      if (s.box) {
+        dx = x - (x < s.minX ? s.minX : x > s.maxX ? s.maxX : x);
+        dy = y - (y < s.minY ? s.minY : y > s.maxY ? s.maxY : y);
+      } else { dx = x - s.x; dy = y - s.y; }
+      const d = Math.hypot(dx, dy);
+      if (d < 1e-6) return false; // inside: not a contact
+      const gap = s.box ? d : d - s.r;
+      if (gap < bestGap) { bestGap = gap; best = s; out.nx = dx / d; out.ny = dy / d; out.gap = gap; }
+      return false;
+    });
+    out.shape = best;
+    return best ? out : null;
+  }
 }
 
 const CONTACT = { nx: 0, ny: 0, pen: 0 };

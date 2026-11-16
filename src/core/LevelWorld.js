@@ -26,19 +26,19 @@ export class LevelWorld {
     for (const w of level.walls) {
       const blocks = WALL_BLOCKS[w.style] ?? BLOCK.ALL;
       for (const [a, b] of wallPieces(w, h)) {
-        if (w.y0 === w.y1) this.world.addBox(a, w.y0 - h, b, w.y0 + h, 'wall', blocks);
-        else this.world.addBox(w.x0 - h, a, w.x0 + h, b, 'wall', blocks);
+        const s = w.y0 === w.y1 ? this.world.addBox(a, w.y0 - h, b, w.y0 + h, 'wall', blocks) : this.world.addBox(w.x0 - h, a, w.x0 + h, b, 'wall', blocks);
+        if (blocks === BLOCK.ALL) s.cover = 'high'; // D82: solid walls are high cover (glass is not)
       }
     }
-    // furniture
-    // furniture: every standing object collides; bullets / sight by its height (data/props.js propBlocks)
+    // furniture: every standing object collides; bullets / sight by its height (data/props.js propBlocks); D82: cover
     for (const p of level.props) {
       const t = PROP_TYPES[p.type];
       const blocks = propBlocks(t);
       if (!blocks) continue;
-      if (t.shape === 'circle') { this.world.add(p.x, p.y, t.r, 'prop', blocks); continue; }
-      const [x0, y0, x1, y1] = propBox(p);
-      this.world.addBox(x0, y0, x1, y1, 'prop', blocks);
+      let s;
+      if (t.shape === 'circle') s = this.world.add(p.x, p.y, t.r, 'prop', blocks);
+      else { const [x0, y0, x1, y1] = propBox(p); s = this.world.addBox(x0, y0, x1, y1, 'prop', blocks); }
+      if (t.cover) s.cover = t.cover;
     }
     // doors
     this.doors = level.doors.map((d) => {

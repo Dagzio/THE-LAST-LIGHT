@@ -4,7 +4,7 @@
 // One trigger pull = one round from the magazine; pelletsPerShot projectiles per pull (shotgun).
 // All timers are game-clock timestamps: they freeze with the simulation.
 import { PROJECTILES } from '../data/balance.js';
-import { muzzleOf } from '../data/player.js';
+import { muzzleOf, barrelOffsetAngle } from '../data/player.js';
 
 const MIN_CONVERGE = 40; // world units: an aim point closer than this to the muzzle keeps the plain aim direction
 
@@ -41,6 +41,8 @@ export class WeaponSystem {
     this.pool = pool;
     this.rng = rng;
     this.events = events;
+    /** @type {import('./Collision.js').CollisionWorld|null} D82: a wall between the body and the muzzle stops the shot */
+    this.world = null;
   }
 
   /** Starts a reload if allowed. Returns true if a reload actually started (never twice). */
@@ -82,9 +84,10 @@ export class WeaponSystem {
     w.nextShotAt = time + s.fireInterval;
     w.lastShotAt = time;
     // rounds leave the barrel tip of the gun in the hero's hands (data/player.js MUZZLE — the same point the renderer
-    // puts the flash on), and fly to the aim point (they converge on the reticle, not parallel beside it)
-    const aim = player.aimAngle;
+    // puts the flash on), and fly to the aim point. D82: the body is turned so that the barrel line goes through the
+    // aim point (barrelOffsetAngle) — the rounds fly along the barrel, not across it
     const mz = muzzleOf(s.gun);
+    const aim = player.aimAngle - (player.hasAim ? barrelOffsetAngle(mz, Math.hypot(player.aimX - player.x, player.aimY - player.y)) : 0);
     const c = Math.cos(aim), sn = Math.sin(aim);
     const mx = player.x + c * mz.f - sn * mz.s;
     const my = player.y + sn * mz.f + c * mz.s;
@@ -92,6 +95,13 @@ export class WeaponSystem {
     if (player.hasAim) {
       const dx = player.aimX - mx, dy = player.aimY - my;
       if (dx * dx + dy * dy > MIN_CONVERGE * MIN_CONVERGE && dx * c + dy * sn > 0) base = Math.atan2(dy, dx);
+    }
+    // D82: pressed against a wall the barrel tip can be past it — a wall between the body and the muzzle takes the shot
+    const wallT = this.world ? this.world.segmentHit(player.x, player.y, mx, my, 0) : Infinity;
+    if (wallT !== Infinity) {
+      this.events.emit('shot', mx, my, base, w.weaponId);
+      this.events.emit('bulletBlocked', player.x + (mx - player.x) * wallT, player.y + (my - player.y) * wallT, base);
+      return;
     }
     const spread = (s.spreadAngle * Math.PI) / 180;
     const pellets = Math.max(1, s.pelletsPerShot | 0);

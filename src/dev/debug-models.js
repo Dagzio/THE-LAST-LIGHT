@@ -8,7 +8,10 @@ import { officeMaterials } from '../render3d/OfficeScene.js';
 import { PROP_TYPES, propBlocks } from '../data/props.js';
 import { HUMAN_ANIM } from '../data/humanModels.js';
 
-const CLIPS = ['idle', 'walk', 'run', 'back', 'strafeL', 'strafeR', 'fire', 'reload', 'hit', 'throw', 'pIdle', 'pWalk', 'pRun', 'die', 'die2'];
+// D82: + the roll, the crouch, the enemies' variants and the pistol reload as the game draws it (Pistol Idle + IK hand)
+const CLIPS = ['idle', 'walk', 'run', 'back', 'strafeL', 'strafeR', 'fire', 'reload', 'pReload (game)', 'hit', 'throw', 'pIdle', 'pWalk', 'pRun', 'die', 'die2',
+  'dodge', 'crouchIdle', 'crouchWalk', 'idle2', 'run2', 'run3', 'hit2', 'reload2', 'die3'];
+const GAME_RELOAD = 'pReload (game)';
 const CSS = `
 #dbg-models-btn { position: fixed; right: max(30px, env(safe-area-inset-right)); bottom: 30px; z-index: 9000;
   font: 800 13px/1 system-ui, sans-serif; color: #fff; background: rgba(10, 20, 40, .82); border: 1px dashed #ffd166;
@@ -72,7 +75,7 @@ async function open() {
   scene.add(grid);
   const cam = new THREE.PerspectiveCamera(35, 1, 1, 5000);
   const orbit = { yaw: 0.7, pitch: 0.35, dist: 180, target: new THREE.Vector3(0, 25, 0) };
-  let current = null, view = null, clipName = '', last = performance.now(), raf = 0, act = null;
+  let current = null, view = null, clipName = '', last = performance.now(), raf = 0, act = null, gameT = 0;
 
   const entries = [];
   for (const key of ['hero', 'enemy']) for (const c of CLIPS) entries.push({ group: key === 'hero' ? 'Hero (player.glb)' : 'Enemy (enemy.glb)', name: `${key} · ${c}`, kind: 'human', key, clip: c });
@@ -102,13 +105,16 @@ async function open() {
       view = tpl.instantiate(new THREE.MeshLambertMaterial({ map: tpl.texture }));
       for (const [id, g] of Object.entries(r3.gunGeos || {})) view.addGun(id, g.geometry, g.material);
       view.setGun(e.clip.startsWith('p') ? 'pistol' : e.key === 'hero' ? 'smg' : 'rifle');
-      for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die]) a.setEffectiveWeight(0);
-      const C = tpl.clips[e.clip];
-      act = view.mixer.clipAction(C.full);
-      act.reset().play();
-      act.timeScale = 1;
-      act.setEffectiveWeight(1);
+      for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die, view.dodge, view.crouchIdle, view.crouchWalk]) if (a) a.setEffectiveWeight(0);
       clipName = e.clip;
+      gameT = 0;
+      const C = tpl.clips[e.clip === GAME_RELOAD ? 'pIdle' : e.clip];
+      if (e.clip !== GAME_RELOAD) {
+        act = view.mixer.clipAction(C.full);
+        act.reset().play();
+        act.timeScale = 1;
+        act.setEffectiveWeight(1);
+      } else act = null;
       current = view.group;
       scene.add(current);
       orbit.target.set(0, 28, 0); orbit.dist = 150;
@@ -136,7 +142,11 @@ async function open() {
     last = now;
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (canvas.width !== Math.round(w * renderer.getPixelRatio())) { renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
-    if (view) {
+    if (view && clipName === GAME_RELOAD) {
+      // the game's pistol reload: 1.3 s reload + 0.5 s pause, looped, through the same update as in a level
+      gameT = (gameT + dt) % 1.8;
+      view.update(dt, { speed: 0, moveRel: 0, aim: gameT > 1.3, reload: gameT <= 1.3 ? gameT / 1.3 : -1, hitAge: 99, deadAge: -1, shotAge: 99, throwAim: false, throwAge: Infinity, dodge: -1, crouch: false });
+    } else if (view) {
       view.mixer.update(dt);
       // as in the game: the gun sits in the LEFT hand while the right arm tosses the grenade
       if (clipName === 'throw' && act) { const t = act.time; const left = t >= HUMAN_ANIM.throwHandOff && t < HUMAN_ANIM.throwHandBack; if (left !== view.inLeft) view._mountGun(left); }

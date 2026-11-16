@@ -4,6 +4,7 @@
 // and fly through him while he rolls (dodge invulnerability). Walls / closed doors / tall furniture stop every round.
 import { computeDamage, hitDirectionMult, NEUTRAL_MODIFIERS } from './DamageCalculator.js';
 import { PLAYER } from '../data/player.js';
+import { BLOCK } from './Collision.js';
 
 export class ProjectileSystem {
   /**
@@ -40,8 +41,8 @@ export class ProjectileSystem {
     }
   }
 
-  _wall(p) {
-    return this.world ? this.world.segmentHit(p.prevX, p.prevY, p.x, p.y, p.radius) : Infinity;
+  _wall(p, mask = BLOCK.BULLET) {
+    return this.world ? this.world.segmentHit(p.prevX, p.prevY, p.x, p.y, p.radius, null, mask) : Infinity;
   }
 
   _blocked(p, t) {
@@ -50,10 +51,10 @@ export class ProjectileSystem {
     this.pool.release(p);
   }
 
-  /** An enemy round: the hero (unless rolling) or the first wall on this step's segment. */
+  /** An enemy round: the hero (unless rolling) or the first wall on this step's segment (D82: crouched behind low cover, the low objects stop it too). */
   _collideHero(p, time) {
-    const wallT = this._wall(p);
     const h = this.player;
+    const wallT = this._wall(p, h && h.crouched ? BLOCK.BULLET | BLOCK.LOW : BLOCK.BULLET);
     if (h && h.alive && !h.isInvulnerable(time)) {
       const sx = p.prevX, sy = p.prevY, ex = p.x - sx, ey = p.y - sy;
       const l2 = ex * ex + ey * ey;

@@ -4,7 +4,7 @@
 export const GRENADES = {
   frag: {
     id: 'frag', nameKey: 'grenade.frag',
-    radius: 95, damage: 90,
+    radius: 95, damage: 99,     // D82: the hero's damage +10 % (was 90)
     knockback: 40,            // world units outward (small)
     critChance: 0, critMultiplier: 1,
   },

@@ -1,6 +1,6 @@
 // Player movement and dodge (02_SPEC §4). Reads only abstract input (getMove / consumePressed / pointerWorld),
 // never keys or DOM — keyboard and touch drive it the same way.
-import { PLAYER } from '../data/player.js';
+import { PLAYER, COVER, dodgeTravel } from '../data/player.js';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../config/constants.js';
 
 const move = { x: 0, y: 0 }; // reused
@@ -46,15 +46,21 @@ export class PlayerController {
       player.aimY = a.y;
     }
 
-    if (input.consumePressed('dash')) this._tryDodge(player, input, moving, time);
+    if (input.consumePressed('dash')) this._tryDodge(player, moving, time);
     if (player.dodging && time >= player.dodgeEndsAt) player.dodging = false;
 
     if (player.dodging) {
-      player.vx = player.dodgeDirX * PLAYER.dodge.speed;
-      player.vy = player.dodgeDirY * PLAYER.dodge.speed;
+      // D82: along the roll clip's own path (fast in the dive, slow while getting up); untouchable in the dive / roll
+      const D = PLAYER.dodge, k0 = (time - player.dodgeStartAt) / D.duration, k1 = k0 + dt / D.duration;
+      const step = (dodgeTravel(k1) - dodgeTravel(k0)) * D.distance;
+      player.vx = dt > 0 ? (player.dodgeDirX * step) / dt : 0;
+      player.vy = dt > 0 ? (player.dodgeDirY * step) / dt : 0;
+      if (k1 > D.invulnerableFrom && k0 < D.invulnerableTo) {
+        player.invulnerableUntil = Math.max(player.invulnerableUntil, player.dodgeStartAt + D.invulnerableTo * D.duration);
+      }
     } else {
       const aiming = time < player.faceAimUntil; // D79: slower while shooting / aiming
-      const speed = PLAYER.moveSpeed * this.speedMult * (aiming ? PLAYER.aimMoveMult : 1);
+      const speed = PLAYER.moveSpeed * this.speedMult * (aiming ? PLAYER.aimMoveMult : 1) * (player.crouched ? COVER.crouchSpeedMult : 1);
       player.vx = move.x * speed; // |move| ≤ 1 → diagonal is never faster
       player.vy = move.y * speed;
     }
@@ -66,23 +72,53 @@ export class PlayerController {
       player.x = clamp(player.x, r, this.bounds.w - r);
       player.y = clamp(player.y, r, this.bounds.h - r);
     }
+    this._cover(player, moving, time);
   }
 
-  _tryDodge(player, input, moving, time) {
-    if (player.dodging || time < player.dodgeReadyAt) return false; // cooldown / already dashing
-    let dx = player.facingX, dy = player.facingY;
-    // Standing: last movement direction; if the player never moved — where he aims (GDD §8.3: towards the cursor).
-    if (!moving && !player.hasMoved) { dx = Math.cos(player.aimAngle); dy = Math.sin(player.aimAngle); }
+  /**
+   * D82 cover: walking INTO a cover object for a moment takes cover against it; it is kept while he stands or moves
+   * along it, and left when he walks away from it, slides off its end or rolls.
+   */
+  _cover(p, moving, time) {
+    const C = COVER;
+    const c = this.world && !p.dodging ? this.world.coverAt(p.x, p.y, p.radius + C.reach, CONTACT) : null;
+    if (!c) { p.cover = null; p.coverSince = -1; return; }
+    const len = Math.hypot(move.x, move.y) || 1;
+    const into = moving ? -(move.x * c.nx + move.y * c.ny) / len : 0; // > 0: pushing into the object
+    if (p.cover) {
+      if (into < -C.exitDot) { p.cover = null; p.coverSince = -1; p.coverBlockUntil = time + 0.3; return; }
+      p.cover.kind = c.shape.cover; p.cover.nx = c.nx; p.cover.ny = c.ny; // sliding along it (or onto the next one)
+      return;
+    }
+    if (into < C.pushDot || time < p.coverBlockUntil) { p.coverSince = -1; return; }
+    if (p.coverSince < 0) p.coverSince = time;
+    if (time - p.coverSince >= C.enterTime) {
+      p.cover = { kind: c.shape.cover, nx: c.nx, ny: c.ny };
+      this.events.emit('cover', c.shape.cover);
+    }
+  }
+
+  _tryDodge(player, moving, time) {
+    if (player.dodging || time < player.dodgeReadyAt) return false; // cooldown / already rolling
+    // D82 (user request): moving — the roll goes where he moves; standing — where his arms (the body) point
+    let dx = Math.cos(player.bodyAngle), dy = Math.sin(player.bodyAngle);
+    if (moving) { const l = Math.hypot(move.x, move.y) || 1; dx = move.x / l; dy = move.y / l; }
     player.dodging = true;
     player.dodgeDirX = dx;
     player.dodgeDirY = dy;
+    player.dodgeStartAt = time;
+    player.dodgeFromX = player.x;
+    player.dodgeFromY = player.y;
     player.dodgeEndsAt = time + PLAYER.dodge.duration;
     player.dodgeCooldown = PLAYER.dodge.cooldown * this.dodgeCooldownMult; // presentation: DASH button progress ring
     player.dodgeReadyAt = time + player.dodgeCooldown;
-    player.invulnerableUntil = Math.max(player.invulnerableUntil, time + PLAYER.dodge.invulnerability);
+    player.cover = null;
+    player.crouched = false;
     this.events.emit('dash', player.x, player.y);
     return true;
   }
 }
+
+const CONTACT = { shape: null, nx: 0, ny: 0, gap: 0 };
 
 function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }
