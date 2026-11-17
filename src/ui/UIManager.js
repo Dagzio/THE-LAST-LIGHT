@@ -234,8 +234,33 @@ export class UIManager {
     return c;
   }
 
+  /** D90: the card art of a level (loaded once; the card on screen is redrawn when it arrives). */
+  _previewImage(map) {
+    const imgs = this.previewImgs || (this.previewImgs = new Map());
+    let im = imgs.get(map.id);
+    if (!im) {
+      im = new Image();
+      im.decoding = 'async';
+      im.onload = () => { if (MAPS[this.viewIndex] === map && document.getElementById('mapGrid')) this._showMapCard(); };
+      im.src = map.preview;
+      imgs.set(map.id, im);
+    }
+    return im;
+  }
+
   /** Draws the 3D preview into the card canvas once. False when the renderer cannot do it now. */
   _render3dThumb(map, c) {
+    // D90 (user): a level with its own card art shows it (cover-fit), not the 3D render
+    if (map.preview) {
+      const im = this._previewImage(map);
+      if (!im.complete || !im.naturalWidth) return false;
+      const g = c.getContext('2d'), s = Math.max(c.width / im.naturalWidth, c.height / im.naturalHeight);
+      const w = im.naturalWidth * s, h = im.naturalHeight * s;
+      g.clearRect(0, 0, c.width, c.height);
+      g.drawImage(im, (c.width - w) / 2, (c.height - h) / 2, w, h);
+      c.dataset.ready = '1';
+      return true;
+    }
     const r3 = this.game.renderer3d;
     if (!r3 || this.game.sm.inMap) return false;
     const img = r3.renderMapPreview(map, c.width);

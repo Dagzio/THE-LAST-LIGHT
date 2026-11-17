@@ -5,6 +5,7 @@
 import { TUTORIAL } from '../data/tutorial.js';
 import { STEALTH } from '../data/stealth.js';
 import { StealthDirector } from './StealthDirector.js';
+import { PROP_TYPES, propBox } from '../data/props.js';
 
 const NO_TARGETS = [];
 
@@ -51,9 +52,65 @@ export class TutorialDirector {
   objectiveTarget(out) {
     const s = this.step;
     if (!s || !s.target) return null;
-    out.x = s.target[0]; out.y = s.target[1];
+    // D90: the off-screen arrow points at the nearest object lit up (else the lesson's spot)
+    const hl = this.highlights(), p = this.run.player;
+    let best = null, bd = Infinity;
+    for (const h of hl) { const d = Math.hypot(h.x - p.x, h.y - p.y); if (d < bd) { bd = d; best = h; } }
+    out.x = best ? best.x : s.target[0]; out.y = best ? best.y : s.target[1];
     return out;
   }
+
+  /**
+   * D90 (user: light up the objects themselves): what the lesson on is about, as drawn highlights — boxes
+   * { x, y, w, d } (props, rects) and rings { x, y, r } (targets, enemies, bodies). Recomputed per call (cheap: a few).
+   */
+  highlights() {
+    const out = this._hl || (this._hl = []);
+    out.length = 0;
+    const s = this.step, run = this.run, L = run.level;
+    if (!s || !s.hl) return out;
+    for (const h of s.hl) {
+      if (h.pickup) {
+        if (h.unless && run.inventory.includes(h.unless)) continue;
+        const pk = L.pickups.find((x) => x.id === h.pickup);
+        if (pk) out.push(this._propBox(pk.x, pk.y));
+      } else if (h.targets) {
+        for (const t of this.targets) out.push({ x: t.x, y: t.y, r: 13 });
+      } else if (h.prop) {
+        out.push(this._propBox(h.prop[0], h.prop[1]));
+      } else if (h.rect) {
+        const r = typeof h.rect === 'string' ? (h.rect === 'exit' ? L.exit && L.exit.rect : L[h.rect]) : h.rect;
+        if (r) out.push({ x: (r[0] + r[2]) / 2, y: (r[1] + r[3]) / 2, w: r[2] - r[0], d: r[3] - r[1] });
+      } else if (h.tag) {
+        for (const e of run.enemies) if (e.alive && e.tag === h.tag) out.push({ x: e.x, y: e.y, r: 22, e });
+      } else if (h.bodies) {
+        for (const e of run.enemies) if (!e.alive && e.ammoDrop > 0 && h.bodies.includes(e.tag)) out.push({ x: e.x, y: e.y, r: 20, e });
+      }
+    }
+    return out;
+  }
+
+  /** The footprint of the prop standing at (x, y) as a highlight box (a small square when none is there). */
+  _propBox(x, y) {
+    const cache = this._boxes || (this._boxes = new Map()), key = `${x},${y}`;
+    let b = cache.get(key);
+    if (!b) {
+      let best = null, bd = 30;
+      for (const p of this.run.level.props) {
+        const t = PROP_TYPES[p.type];
+        if (!t || t.decor || t.flat || t.wall) continue;
+        const d = Math.hypot(p.x - x, p.y - y);
+        if (d < bd) { bd = d; best = p; }
+      }
+      const r = best ? propBox(best) : [x - 15, y - 15, x + 15, y + 15];
+      b = { x: (r[0] + r[2]) / 2, y: (r[1] + r[3]) / 2, w: r[2] - r[0], d: r[3] - r[1] };
+      cache.set(key, b);
+    }
+    return b;
+  }
+
+  /** D90: the HUD controls this lesson lights up: { control: PC key } (HUD.js), or null. */
+  get uiFocus() { const s = this.step; return s && s.ui ? s.ui : null; }
 
   /** D89: the mobile version's auto aim (it fires at enemies only) takes the range targets during the shooting lessons. */
   get aimTargets() {

@@ -29,6 +29,10 @@ export const HUMAN_ANIM = {
   runRateMax: 1.6,      // run clips
   strideK: 1.12,        // D86: "In Place" clips — ground speed = planted-foot speed × this (calibrated on the clips with travel)
   aimYawRate: 10,       // D86: 1/s — how fast the body's barrel correction follows (eases out the stride's sway)
+  // D90 (user: closer to the wall): in cover the model is drawn this many units nearer the object than his collision
+  // circle allows (the circle is wider than the body's depth); presentation only
+  coverHugHigh: 7,
+  coverHugLow: 6,
   peekFrom: 0.2,        // D87: "Female Peek And Aim" — leaning out plays from here (s)…
   peekHoldAt: 1.2,      // …to the held aim (the clip: lean 0.3–0.9, aim held 0.9–1.6, back 1.7–2.4)
   runFrom: 48,          // units/s: walk legs below, run legs above (mixed in between)

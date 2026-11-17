@@ -69,20 +69,26 @@ export const Sfx = (() => {
       const gain = (f ? f.gain : 1) * (opts && opts.gain != null ? opts.gain : 1);
       const max = opts && opts.voices > 0 ? opts.voices : 0;
       const cut = !!(opts && opts.cut);
+      const dur = opts && opts.dur > 0 ? opts.dur : 0; // D90: only this long a slice (faded out at its end)
       wake();
       try {
         const s = a.createBufferSource(); // a new node per sound
         s.buffer = buf;
         if (rate !== 1) s.playbackRate.value = rate;
         let g = null;
-        if (gain !== 1 || max || cut) {
+        if (gain !== 1 || max || cut || dur) {
           g = a.createGain();
           g.gain.value = gain;
           s.connect(g);
           g.connect(a.destination);
           if (max) limit(a, name, s, g, max);
         } else s.connect(a.destination);
-        s.start(0, offset);
+        if (dur) {
+          const t = a.currentTime, len = dur / (rate || 1), fade = Math.min(0.08, len * 0.4);
+          g.gain.setValueAtTime(gain, t + len - fade);
+          g.gain.linearRampToValueAtTime(0, t + len);
+          s.start(0, offset, dur + 0.01);
+        } else s.start(0, offset);
         // opts.cut: a handle to fade the sound out early (a long reload clip that must not run past the reload)
         if (cut) return { stop(fade = 0.06) { try { g.gain.setTargetAtTime(0, a.currentTime, fade / 3); s.stop(a.currentTime + fade * 2); } catch (e) { /* ended */ } } };
       } catch (e) { /* SFX never throws */ }

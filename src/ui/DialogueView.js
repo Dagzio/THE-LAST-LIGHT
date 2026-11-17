@@ -87,7 +87,25 @@ export class DialogueView {
     this.el.name.textContent = T(sp.nameKey);
     this.full = T(key);
     if (!keepTyped) this.shown = 0;
-    this.el.text.textContent = this.full.slice(0, Math.floor(this.shown));
+    this._paint();
+  }
+
+  /**
+   * D90: the text is centred — the whole line is laid out at once, the letters not typed yet hidden (so the typed ones
+   * never move as the line grows).
+   */
+  _paint() {
+    const n = Math.floor(this.shown);
+    if (!this.lineEl) {
+      this.lineEl = document.createElement('span');
+      this.typedEl = document.createTextNode('');
+      this.restEl = document.createElement('span');
+      this.restEl.className = 'dlg-rest';
+      this.lineEl.append(this.typedEl, this.restEl);
+      this.el.text.replaceChildren(this.lineEl);
+    }
+    this.typedEl.data = this.full.slice(0, n);
+    this.restEl.textContent = this.full.slice(n);
   }
 
   /** Typewriter (real frame time: the game clock stands still meanwhile). */
@@ -96,13 +114,13 @@ export class DialogueView {
     if (!this.game.sm.is('RUNNING')) return; // paused: the typing waits too
     const before = Math.floor(this.shown);
     this.shown = Math.min(this.full.length, this.shown + Math.max(0, dt) * DIALOGUE_CPS);
-    if (Math.floor(this.shown) !== before) this.el.text.textContent = this.full.slice(0, Math.floor(this.shown));
+    if (Math.floor(this.shown) !== before) this._paint();
   }
 
   /** NEXT: the line still typing → shown whole; else the next line, or the end. */
   next() {
     if (!this.lines) return;
-    if (this.shown < this.full.length) { this.shown = this.full.length; this.el.text.textContent = this.full; return; }
+    if (this.shown < this.full.length) { this.shown = this.full.length; this._paint(); return; }
     this.index += 1;
     if (this.index >= this.lines.length) { this.close(); return; }
     this._showLine(false);

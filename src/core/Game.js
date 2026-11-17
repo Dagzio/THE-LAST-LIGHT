@@ -19,7 +19,7 @@ import { getLevel, LEVELS } from '../data/levels/index.js';
 import { levelModes, resolveLevel } from '../data/modes.js';
 import { AUTO_AIM } from '../data/player.js';
 import { AI_TUNING } from '../data/humans.js';
-import { nextLevelId, isLastLevel, defaultLevelSelection } from '../systems/Campaign.js';
+import { nextLevelId, isLastLevel, defaultLevelSelection, isLevelOpen } from '../systems/Campaign.js';
 import { CHEATS } from '../config/constants.js';
 
 export class Game {
@@ -155,7 +155,7 @@ export class Game {
 
   backToMenu() { return this.sm.set(STATES.MAIN_MENU); }
 
-  isMapUnlocked(id) { const l = getLevel(id); return !!l && (!!l.alwaysOpen || this.progress.profile.unlockedLevels.includes(id)); } // D88
+  isMapUnlocked(id) { return isLevelOpen(this.progress.profile, getLevel(id)); } // D88 / D90
 
   isMapCleared(id) { return this.progress.profile.completedLevels.includes(id); }
 

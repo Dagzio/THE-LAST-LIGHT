@@ -14,6 +14,18 @@ const CALL_SECONDS = 7;     // s a phone-call card stays (game clock: a pause fr
 const PT = { x: 0, y: 0 };
 const OBJ = { x: 0, y: 0 };
 
+/** D90: the HUD element of each control lit up by the training ground: [keyboard, touch] selectors. */
+const TUT_UI = {
+  interact: ['#cratePrompt', '#interactBtn'],
+  weapon: ['#hudWeapon', '#hudWeapon'],
+  reload: ['#hudWeapon', '[data-touch-action="reload"]'],
+  cover: ['#coverPrompt', '#coverBtn'],
+  takedown: ['#ctxPrompt', '#interactBtn'],
+  crouch: [null, '#crouchBtn'],
+  grenade: ['#hudGrenade', '#grenadeBtn'],
+  dash: ['.hud-actions .act-dash', '[data-touch-action="dash"]'],
+};
+
 export class HUD {
   /** @param {import('../core/Game.js').Game} game */
   constructor(game) {
@@ -96,6 +108,8 @@ export class HUD {
   }
 
   _resetCache() {
+    for (const el of this._tutEls || []) { el.classList.remove('tut-focus'); const tag = el.querySelector(':scope > .tut-tag'); if (tag) tag.remove(); if (el.dataset.tutPos) { el.style.position = ''; delete el.dataset.tutPos; } } // D90
+    this._tutEls = [];
     this.cache = {
       hp: -1, maxHp: -1, ammo: -1, mag: -1, weaponId: '', reloading: null, reloadPct: -1, hurt: null, lowAmmo: null,
       hitFlash: null, lastHitAt: null, objKey: '', objIdx: -1, levelKey: '', items: '', slots: '', gKey: '', dashPct: -1,
@@ -218,6 +232,31 @@ export class HUD {
   }
 
   /** An arrow at the screen edge pointing at the objective while it is off screen. */
+  /**
+   * D90 (user: every control shown as the lesson needs it): the HUD controls of the lesson glow, with a tag — the PC key
+   * (the keyboard) or "TAP" (touch). The touch / PC element of each control (only the visible one shows).
+   */
+  _tutFocus(ui) {
+    const c = this.cache, touch = !!this.game.touchMode, key = ui ? `${touch}|${Object.entries(ui).join(';')}` : '';
+    if (key === c.tutFocusKey) return;
+    c.tutFocusKey = key;
+    for (const el of this._tutEls || []) { el.classList.remove('tut-focus'); const tag = el.querySelector(':scope > .tut-tag'); if (tag) tag.remove(); if (el.dataset.tutPos) { el.style.position = ''; delete el.dataset.tutPos; } }
+    this._tutEls = [];
+    if (!ui) return;
+    for (const [ctl, k] of Object.entries(ui)) {
+      const sel = TUT_UI[ctl] && TUT_UI[ctl][touch ? 1 : 0];
+      const el = sel && document.querySelector(sel);
+      if (!el) continue;
+      el.classList.add('tut-focus');
+      if (getComputedStyle(el).position === 'static') { el.style.position = 'relative'; el.dataset.tutPos = '1'; } // (the tag's anchor)
+      const tag = document.createElement('span');
+      tag.className = 'tut-tag';
+      tag.textContent = touch ? T('tut.tap') : k.startsWith('key.') ? T(k) : k;
+      el.append(tag);
+      this._tutEls.push(el);
+    }
+  }
+
   _objectiveArrow(run, running) {
     const c = this.cache, el = this.el.arrow, r3 = this.game.renderer3d;
     const t = running && r3 ? run.objectiveTarget(OBJ) : null;
@@ -318,6 +357,7 @@ export class HUD {
         if (o && !this.game.touchMode) for (const k of o.keys) { const b = document.createElement('kbd'); b.className = 'obj-key'; b.textContent = k.startsWith('key.') ? T(k) : k; el.objText.append(' ', b); }
         if (fresh) { el.objective.classList.remove('pop'); void el.objective.offsetWidth; el.objective.classList.add('pop'); invalidateHudBlockers(); }
       }
+      this._tutFocus(m.uiFocus);
     } else if (run.modeId !== 'survival' && (objKey !== c.objKey || run.objectiveIndex !== c.objIdx)) {
       c.objKey = objKey; c.objIdx = run.objectiveIndex;
       el.objKicker.textContent = T('hud.objective', { n: Math.min(run.objectiveIndex + 1, run.level.objectives.length), total: run.level.objectives.length });

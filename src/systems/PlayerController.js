@@ -108,16 +108,28 @@ export class PlayerController {
   coverEdge(p) {
     const c = p.cover;
     if (!c || !this.world) return 0;
-    const tx = -c.ny, ty = c.nx, reach = p.radius + COVER.reach, d = COVER.edgeProbe;
+    const tx = -c.ny, ty = c.nx;
     let side = 0, best = -Infinity;
     for (const s of [1, -1]) {
-      const g = this.world.coverAt(p.x + tx * s * d, p.y + ty * s * d, reach, EDGE);
-      const ends = !g || g.shape.cover !== 'high' || (g.shape.box && Math.abs(g.nx) < 0.97 && Math.abs(g.ny) < 0.97);
-      if (!ends) continue;
+      if (!this._endsAt(p, s, COVER.edgeProbe, 'high')) continue;
       const toAim = p.hasAim ? (p.aimX - p.x) * tx * s + (p.aimY - p.y) * ty * s : 0;
       if (toAim > best) { best = toAim; side = s; }
     }
     return side;
+  }
+
+  /**
+   * D90: does his cover's face end within d along its tangent (side s)? The probe runs just off the face (1 unit), so
+   * the first unit past the end already counts — not his centre's distance, which made the corner fuzzy. kind: the
+   * face must be cover of this kind to go on (null — any cover).
+   */
+  _endsAt(p, s, d, kind = null) {
+    const w = this.world;
+    const g0 = w.coverAt(p.x, p.y, p.radius + COVER.reach, PROBE0);
+    if (!g0) return true;
+    const tx = -g0.ny, ty = g0.nx, off = g0.gap - 1;
+    const g = w.coverAt(p.x + tx * s * d - g0.nx * off, p.y + ty * s * d - g0.ny * off, 3, EDGE);
+    return !g || (!!kind && g.shape.cover !== kind) || (!!g.shape.box && Math.abs(g.nx) < 0.97 && Math.abs(g.ny) < 0.97);
   }
 
   /**
@@ -183,6 +195,11 @@ export class PlayerController {
         c = this.world ? this.world.coverAt(p.x, p.y, reach, CONTACT) : null;
       }
       if (c) { p.cover.kind = c.shape.cover; p.cover.nx = c.nx; p.cover.ny = c.ny; } else this._leaveCover(p);
+      // D90 (user): the corner is his limit — his body's edge stops at the end of the face (any cover), never past it
+      if (p.cover && wasFace && time >= p.coverSnapUntil) {
+        const along = (p.x - x0) * -p.cover.ny + (p.y - y0) * p.cover.nx;
+        if (Math.abs(along) > 1e-6 && this._endsAt(p, Math.sign(along), COVER.edgeStop)) { p.x = x0; p.y = y0; p.vx = 0; p.vy = 0; }
+      }
     }
     const here = !p.cover && !p.dodging && p.alive && this.world ? this.world.coverAt(p.x, p.y, reach, CONTACT) : null;
     p.coverHere = here ? here.shape.cover : null;
@@ -213,5 +230,6 @@ export class PlayerController {
 
 const CONTACT = { shape: null, nx: 0, ny: 0, gap: 0 };
 const EDGE = { shape: null, nx: 0, ny: 0, gap: 0 }; // D87: the edge probes (CONTACT stays the hero's own contact)
+const PROBE0 = { shape: null, nx: 0, ny: 0, gap: 0 }; // D90: his own contact for the probes
 
 function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }

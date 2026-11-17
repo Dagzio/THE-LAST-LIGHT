@@ -34,6 +34,7 @@ const CHAR_LOOK = {
 const MAX_BULLETS = 200;
 const MAX_BARS = 32;
 const MAX_POOLS = 40;
+const MAX_HL = 12; // D90: highlighted objects of a lesson at once
 const TILT = (CAMERA.tilt * Math.PI) / 180;
 const SHOT_FLASH = 0.05;
 const DEATH_SINK = 26;   // s after death the body starts to sink away (BODY_FADE in the run is 30)
@@ -336,6 +337,14 @@ export class Renderer3D {
     this.objRing = new THREE.Mesh(objRing, new THREE.MeshBasicMaterial({ color: 0xffcf3a, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.objRing.renderOrder = 3;
     this.objRing.visible = false;
+    // D90 (user: light up the objects themselves): the training ground's highlights — a glowing frame round a prop
+    // (4 bars), a ring under a target / an enemy, a bobbing chevron over each
+    const flat = new THREE.PlaneGeometry(1, 1); flat.rotateX(-Math.PI / 2);
+    const hlMat = new THREE.MeshBasicMaterial({ color: 0xffcf3a, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending });
+    this.hlBars = new THREE.InstancedMesh(flat, hlMat, MAX_HL * 4);
+    this.hlRings = new THREE.InstancedMesh(new THREE.RingGeometry(0.8, 1, 40).rotateX(-Math.PI / 2), hlMat, MAX_HL);
+    this.hlArrows = new THREE.InstancedMesh(new THREE.PlaneGeometry(13, 13), this.objMarker.material, MAX_HL);
+    for (const im of [this.hlBars, this.hlRings, this.hlArrows]) { im.frustumCulled = false; im.count = 0; im.renderOrder = im === this.hlArrows ? 15 : 3; }
     // crate "in reach" ring
     this.reachRing = new THREE.Mesh(objRing, new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.reachRing.renderOrder = 3;
@@ -369,7 +378,7 @@ export class Renderer3D {
     this.particles = new THREE.Points(this.particleGeo, new THREE.PointsMaterial({ size: 4, vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true }));
     this.particles.frustumCulled = false;
     this.scene.add(this.bullets, this.reticle, this.aimDots, this.aimRing, this.grenadeMesh, ...this.blastRings, this.hpBack, this.hpFill,
-      this.iconAlert, this.iconCombat, this.objMarker, this.objRing, this.reachRing, this.pools, this.blobs, this.particles);
+      this.iconAlert, this.iconCombat, this.objMarker, this.objRing, this.reachRing, this.hlBars, this.hlRings, this.hlArrows, this.pools, this.blobs, this.particles);
   }
 
   _ensureParticleBuffers(capacity) {
@@ -442,14 +451,46 @@ export class Renderer3D {
     const it = run.interactTarget;
     this.reachRing.visible = !!it;
     if (it) { this._flat(this.reachRing, it.def.x, it.def.y, (it.def.hidden ? 44 : 30) + Math.sin(time * 6) * 2, 1.2, 0.85); } // D88: round the chest prop
+    // D90: the lesson's objects lit up (training ground) — instead of the area marker
+    const hl = run.mode && run.mode.highlights && !run.over ? run.mode.highlights() : null;
+    this._syncHighlights(hl, time);
     // objective marker over the current target (yellow chevron + ring)
-    const t = run.objectiveTarget(OBJ_PT);
+    const t = hl && hl.length ? null : run.objectiveTarget(OBJ_PT);
     this.objMarker.visible = this.objRing.visible = !!t && !run.over;
     if (t) {
       this.objMarker.position.set(t.x, 70 + Math.sin(time * 3.2) * 4, t.y);
       this.objMarker.quaternion.copy(FACE_CAM);
       this._flat(this.objRing, t.x, t.y, 26 + (time * 18) % 14, 1.0, 0.65 - ((time * 18) % 14) / 30);
     }
+  }
+
+  /** D90: frames / rings / chevrons over the highlighted objects (pulsing). */
+  _syncHighlights(hl, time) {
+    let bars = 0, rings = 0, arrows = 0;
+    const pulse = 0.55 + 0.45 * Math.sin(time * 5), T = 2.2;
+    if (hl) {
+      for (const h of hl) {
+        if (arrows >= MAX_HL) break;
+        let top = 34;
+        if (h.r) {
+          const ex = h.e ? this._lx(h.e) : h.x, ey = h.e ? this._ly(h.e) : h.y;
+          const r = h.r + pulse * 3;
+          P.set(ex, 1.7, ey); S.set(r, 1, r); M.compose(P, Q.identity(), S); this.hlRings.setMatrixAt(rings++, M);
+          top = h.e && h.e.alive ? 80 : 30;
+          P.set(ex, top + Math.sin(time * 3.2) * 3, ey);
+        } else {
+          const g = 4 + pulse * 2, w = h.w + g * 2, d = h.d + g * 2;
+          for (const [cx, cz, sx, sz] of [[0, -d / 2, w + T, T], [0, d / 2, w + T, T], [-w / 2, 0, T, d], [w / 2, 0, T, d]]) {
+            P.set(h.x + cx, 1.7, h.y + cz); S.set(sx, 1, sz); M.compose(P, Q.identity(), S); this.hlBars.setMatrixAt(bars++, M);
+          }
+          P.set(h.x, top + 20 + Math.sin(time * 3.2) * 3, h.y);
+        }
+        S.set(1, 1, 1); M.compose(P, FACE_CAM, S); this.hlArrows.setMatrixAt(arrows++, M);
+      }
+    }
+    this.hlBars.count = bars; this.hlRings.count = rings; this.hlArrows.count = arrows;
+    for (const im of [this.hlBars, this.hlRings, this.hlArrows]) im.instanceMatrix.needsUpdate = true;
+    this.hlBars.material.opacity = 0.55 + 0.4 * pulse;
   }
 
   // ---------------- level lifecycle ----------------
@@ -507,7 +548,7 @@ export class Renderer3D {
   }
 
   /** D85: a noise of the run (event 'noise') → an expanding ring on the floor (stealth runs only). */
-  noise(x, y, r) { if (this.stealthOverlay) this.stealthOverlay.addNoise(x, y, r, this.lastSyncTime); }
+  noise(x, y, r) { if (this.stealthOverlay && this.map && this.map.modeId === 'stealth') this.stealthOverlay.addNoise(x, y, r, this.lastSyncTime); } // D90: not on the training ground
 
   busy() { return this.guard.busy(); }
 
@@ -698,12 +739,19 @@ export class Renderer3D {
       cover: p.alive && p.cover ? p.cover.kind : null,                                                                            // D83: cover poses
       crouch: p.alive && !p.cover && p.stance === 'crouch',                                                                        // D85: stealth crouch
       peek: p.alive && p.peek ? p.peek.k : 0,                                                                                       // D87: leaning out of the corner
+      peekSide: p.peek ? p.peek.side : 0,                                                                                           // D90: +1 his right, −1 his left
       takedown: p.alive && p.takedown ? Math.min(1, Math.max(0, (time - p.takedown.t0) / STEALTH.takedown.duration)) : -1,         // D85: the takedown clip
       takedownFrom: STEALTH.takedown.clipFrom, takedownTo: STEALTH.takedown.clipTo,
     });
-    h.group.position.set(hx, 0, hy);
+    // D90: in cover the model hugs the object (eased in / out; facing it to fire over low cover — no hug)
+    const hugOn = p.alive && p.cover && !p.dodging && (p.cover.kind === 'high' || !run.heroAiming);
+    const hug = hugOn ? (p.cover.kind === 'low' ? HUMAN_ANIM.coverHugLow : HUMAN_ANIM.coverHugHigh) : 0;
+    const hk = Math.min(1, (this.frameDt || 0) * 12);
+    this.hugX = (this.hugX || 0) + ((hugOn ? -p.cover.nx * hug : 0) - (this.hugX || 0)) * hk;
+    this.hugY = (this.hugY || 0) + ((hugOn ? -p.cover.ny * hug : 0) - (this.hugY || 0)) * hk;
+    h.group.position.set(hx + this.hugX, 0, hy + this.hugY);
     h.group.rotation.y = -(this.bodyYaw - h.aimYaw);
-    if (h.xray) h.xray.visible = p.alive; // D86
+    if (h.xray) h.xray.visible = p.alive && !(this.map && this.map.noXray); // D86; D90: off where the level says so
     h.flash.visible = p.alive && time - w.lastShotAt >= 0 && time - w.lastShotAt < SHOT_FLASH;
     if (h.flash.visible) h.flash.rotation.x = (w.lastShotAt * 97.3) % (Math.PI * 2);
 

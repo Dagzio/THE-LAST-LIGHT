@@ -66,9 +66,23 @@ function wireCombatSounds(events, game) {
     const FS = steps.fs;
     const speed = p ? Math.hypot(p.vx, p.vy) : 0;
     const walking = !!p && game.sm.is(STATES.RUNNING) && p.alive && !p.dodging && speed > FS.minSpeed;
+    const hero = game.renderer3d && game.renderer3d.hero;
+    // D90: one step per foot put down (the recording's uneven steps cut into slices — data/sounds.js LEVEL_FOOTSTEPS)
+    if (FS.slices) {
+      const n = hero ? hero.footfalls : 0;
+      if (walking && n !== steps.feet && steps.feet !== undefined) {
+        let i = Math.floor(Math.random() * FS.slices.length);
+        if (i === steps.slice) i = (i + 1) % FS.slices.length;
+        steps.slice = i;
+        const [at, len] = FS.slices[i];
+        const loud = p.cover || p.stance === 'crouch' || speed < 70 ? FS.quiet : 1;
+        Sfx.play(FS.sfx, 0.96 + Math.random() * 0.08, { offset: at, dur: len, gain: FS.gain * loud, voices: 2 });
+      }
+      steps.feet = n;
+      return;
+    }
     if (!walking) { if (steps.h) { steps.h.stop(); steps.h = null; } return; }
     // D87: the pace of the legs animation (2 steps per gait cycle) against the recording's own pace
-    const hero = game.renderer3d && game.renderer3d.hero;
     const pace = hero && hero.gaitHz > 0 ? (2 * hero.gaitHz) / FS.stepsPerSec : speed / (FS.refSpeed || PLAYER.moveSpeed);
     const rate = Math.min(FS.maxRate, Math.max(FS.minRate, pace));
     if (!steps.h || steps.h.done) steps.h = Sfx.loop(FS.sfx, rate);

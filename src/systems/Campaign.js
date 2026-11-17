@@ -13,8 +13,18 @@ export function nextLevelId(id) {
 
 export const isLastLevel = (id) => !nextLevelId(id);
 
+/**
+ * Is a level open in this profile? D88: an always-open level (the training ground) is; D90 (user): a level that
+ * `requires` another is closed until that one is completed (the office waits for the training ground — old saves too).
+ */
+export function isLevelOpen(profile, level) {
+  if (!level) return false;
+  if (level.alwaysOpen) return true;
+  return profile.unlockedLevels.includes(level.id) && (!level.requires || profile.completedLevels.includes(level.requires));
+}
+
 export function unlockedLevels(profile) {
-  return LEVELS.filter((m) => m.alwaysOpen || profile.unlockedLevels.includes(m.id)); // D88: the training ground
+  return LEVELS.filter((m) => isLevelOpen(profile, m));
 }
 
 /** H5 §11: level select opens on the newest unlocked level that is not cleared yet (else the last unlocked). */

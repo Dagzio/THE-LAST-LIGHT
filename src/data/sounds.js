@@ -75,7 +75,13 @@ export const FOOTSTEPS = { sfx: 'steps', minSpeed: 8, minRate: 0.5, maxRate: 2.0
 /** D89 (user request): a level's own steps recording (level.footsteps) — the training ground (outdoor ground) uses
  * steps1, the office keeps `steps`. stepsPerSec — that recording's own pace. */
 // steps1: 4.15 s, 8 steps (onsets measured in the browser, D89) → 1.93 per second
-export const LEVEL_FOOTSTEPS = { steps1: { sfx: 'steps1', stepsPerSec: 1.93 } };
+// D90 (user: the steps follow his speed): its steps are uneven (0.3–0.8 s apart) — looped, they never matched the
+// legs. So each foot put down by the animation (render3d/humans.js footfalls) plays ONE step cut from the recording:
+// slices [start, length] (s) measured on its loudness (browser decode), one at random, never the same twice.
+export const LEVEL_FOOTSTEPS = {
+  steps1: { sfx: 'steps1', stepsPerSec: 1.93, slices: [[0.09, 0.4], [0.58, 0.4], [1.38, 0.32], [2.02, 0.4], [2.6, 0.42], [3.26, 0.42], [3.78, 0.36]],
+    gain: 0.9, quiet: 0.55 /* × while sneaking / slow */ },
+};
 export const footstepsOf = (level) => ({ ...FOOTSTEPS, ...((level && LEVEL_FOOTSTEPS[level.footsteps]) || {}) });
 /** The keeper is hurt (D53): one of the user's two takes at random (synth 'playerHurt' while they load). */
 export const PLAYER_HURT_SFX = ['playerHurt1', 'playerHurt2'];

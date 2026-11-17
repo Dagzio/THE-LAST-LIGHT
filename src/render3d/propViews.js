@@ -12,6 +12,10 @@ import { TRAINING_VIEW_ATLAS } from '../data/trainingViews.js';
 import { PROP_MODELS } from '../data/propModels.js';
 import { PROP_TYPES } from '../data/props.js';
 import { lightAt } from './officeLights.js';
+import { CAMERA } from '../config/camera.js';
+
+// D90: foliage drawn as one picture turned to the camera (it never turns: no yaw) — leaning back by this angle
+const SPRITE_LEAN = Math.PI / 2 - (CAMERA.tilt * Math.PI) / 180;
 
 const VIEW_AMBIENT = 1.0;  // vertex colour without a light nearby (the scene's own lights do the rest)…
 const VIEW_GAIN = 0.9;     // …plus the baked lights around (lamps, screens)
@@ -82,6 +86,18 @@ function propFaces(p, out) {
     const g = quad(front, W, h, A);
     g.translate(0, m.at || 40, 0.6);
     out.push(g.applyMatrix4(base));
+    return;
+  }
+  if (m.sprite) {
+    // D90 (user: the trees were boxes with flat sides): trees / bushes / grass — the front picture as one quad standing
+    // at the base, turned to the camera (a picture of the tree on screen, from any spot); its size from drawW / the
+    // catalogue width, its height from the picture's proportions
+    const pic = item.front || item.top, w = (m.drawW || t.w) * (m.sprite.scale || 1), h = (w * pic[3]) / pic[2];
+    const g = quad(pic, w, h, A);
+    g.translate(0, h / 2, 0);
+    g.rotateX(-SPRITE_LEAN * (m.sprite.lean ?? 1));
+    g.translate(p.x, p.elev || 0, p.y + (m.sprite.back || 0));
+    out.push(g);
     return;
   }
   if (m.flatTop) { // D88: a mat on the ground — only its top picture, just above the floor

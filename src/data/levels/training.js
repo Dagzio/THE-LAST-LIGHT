@@ -20,11 +20,13 @@ export const TRAINING = {
   nameKey: 'level.training.name',
   descKey: 'level.training.desc',
   location: 'training',
+  preview: 'assets/ui/previews/training.webp', // D90: the user's card art (NEW/previewTutorial.png)
   alwaysOpen: true,          // never locked (the first level; a save made before it existed still sees it)
   fixedMode: 'tutorial',     // data/modes.js: one mode — the lessons
   outdoor: true,             // render: no night windows / wall lamps / baseboards; the ground goes on outside
   outside: 'grass',
   enemyModel: 'enemyTraining', // D89: the user's training enemy model (data/humanModels.js), the office one elsewhere
+  noXray: true,                // D90 (user): no X-ray silhouette of the hero through the walls here
   footsteps: 'steps1',         // D89: the user's second steps recording (data/sounds.js LEVEL_FOOTSTEPS)
   lighting: { hemi: 1.15, key: 1.55, exposure: 1.0, sky: 0xe4eeff, ground: 0x55663a, sun: 0xfff0d6, background: 0x6c8748 },
   width: 2400,
@@ -174,12 +176,12 @@ export const TRAINING = {
   reinforcements: null,
 
   // the open chests / the table / the medical case: taken with E (the label says what); `hidden` — no crate model (the
-  // chest prop is drawn already)
+  // chest prop is drawn already). D90 (user: the rounds can always be taken) `refill` — s until it can be taken again
   pickups: [
-    { id: 'chest_smg', kind: 'crate', item: 'smg', x: 290, y: 1320, hidden: true, label: 'hud.take.smg' },
-    { id: 'chest_rifle', kind: 'crate', item: 'rifle', x: 500, y: 1320, hidden: true, label: 'hud.take.rifle' },
-    { id: 'ammo_table', kind: 'crate', item: 'ammo', count: 1, x: 560, y: 990, hidden: true, label: 'hud.take.ammo' },
-    { id: 'grenade_chest', kind: 'crate', item: 'grenades', count: 2, x: 1800, y: 490, hidden: true, label: 'hud.take.grenades' },
+    { id: 'chest_smg', kind: 'crate', item: 'smg', x: 290, y: 1320, hidden: true, refill: 1.5, label: 'hud.take.smg' },
+    { id: 'chest_rifle', kind: 'crate', item: 'rifle', x: 500, y: 1320, hidden: true, refill: 1.5, label: 'hud.take.rifle' },
+    { id: 'ammo_table', kind: 'crate', item: 'ammo', count: 1, x: 560, y: 990, hidden: true, refill: 1, label: 'hud.take.ammo' },
+    { id: 'grenade_chest', kind: 'crate', item: 'grenades', count: 2, x: 1800, y: 490, hidden: true, refill: 1.5, label: 'hud.take.grenades' },
     { id: 'medkit_case', kind: 'crate', item: 'medkit', x: 1150, y: 1330, hidden: true, label: 'hud.take.medkit' },
   ],
 

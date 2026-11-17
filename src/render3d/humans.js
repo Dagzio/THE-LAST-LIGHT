@@ -31,6 +31,7 @@ const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quater
 const _axis = new THREE.Vector3();
 const _tq = new THREE.Quaternion(), _tp = new THREE.Quaternion();
 const _q3 = new THREE.Quaternion();
+const FOOTFALLS = [0.25, 0.75]; // D90: gait phases where a foot comes down (0 = the left foot's mid-swing)
 
 /** One loaded model (hero / enemy): skeleton, clips for that skeleton, gun mounts. */
 export class HumanTemplate {
@@ -366,7 +367,12 @@ export class HumanView {
       lowL: C.crouchL ? act(C.crouchL.lower) : null, lowR: C.crouchR ? act(C.crouchR.lower) : null,
       walk: C.crouchWalk ? act(C.crouchWalk.lower) : null,
       upRifle: C.crouchIdle2 ? act(C.crouchIdle2.upper) : null,
-      highIdle: held('peek', 0), highL: loop('coverL'), highR: loop('coverR'),
+      // D90 (user): behind LOW cover — back to it in "Male Crouch Pose", moving along it — the whole "Crouched Sneaking
+      // Left / Right" clips (the stealth crouch out of cover keeps the clips above)
+      coverIdle: held('crouchPose', 0),
+      coverSL: C.crouchL ? act(C.crouchL.full) : null, coverSR: C.crouchR ? act(C.crouchR.full) : null,
+      // D90: leaning out of high cover — the user's left / right takes (by the side of the corner)
+      peekL: held('peekL', 0), peekR: held('peekR', 0), highL: loop('coverL'), highR: loop('coverR'),
       toCrouch: held('toCrouch'), toStand: held('toStand'),
     };
     this.takedownAct = C.takedown ? held('takedown') : null; // D85 stealth: the takedown from behind
@@ -399,6 +405,7 @@ export class HumanView {
     this.touched = ['Spine', 'RightHand', 'RightForeArm'].filter((n) => bones.get(n)).map((n) => [bones.get(n), bones.get(n).quaternion.clone()]);
     this.torsoTwist = 0;        // D86: the last torso fix (rad, dev / checks)
     this.gaitHz = 0;            // D87: the legs' cadence (gait cycles/s) this frame — the footsteps follow it
+    this.footfalls = 0;         // D90: feet put down so far (the footstep one-shots follow it)
   }
 
   /**
@@ -420,7 +427,11 @@ export class HumanView {
       wsum += w;
     }
     if (wsum > 0) {
-      this.phase = (this.phase + (dt * fsum) / wsum) % 1;
+      // D90: a foot comes down at a quarter cycle after each foot's mid-swing (phase 0 = the left foot's) — counted
+      // for the footstep sounds that follow the legs (main.js)
+      const p0 = this.phase, p1 = p0 + (dt * fsum) / wsum;
+      for (const at of FOOTFALLS) if ((p0 < at && p1 >= at) || (p0 < at + 1 && p1 >= at + 1)) this.footfalls += 1;
+      this.phase = p1 % 1;
       this.gaitHz = Math.max(this.gaitHz, fsum / wsum); // D87: the cadence (cycles/s) — the footsteps' pace
     }
     for (const a of list) {
@@ -532,7 +543,7 @@ export class HumanView {
     const lowOn = !dead && !rolling && !tdOn && (st.cover === 'low' || !!st.crouch) && !!cv.lowIdle;
     // D87: aiming in high cover = leaning out of its corner ("Female Peek And Aim" by the lean, st.peek 0…1)
     const peekK = st.cover === 'high' ? st.peek || 0 : 0;
-    const highOn = !dead && !rolling && st.cover === 'high' && (!st.aim || peekK > 0) && !!cv.highIdle;
+    const highOn = !dead && !rolling && st.cover === 'high' && (!st.aim || peekK > 0) && !!(cv.peekL || cv.peekR);
     const lowW = ease('low', lowOn ? 1 : 0, 1.3) * (1 - dg);
     const highW = ease('high', highOn ? 1 : 0, 1.3) * (1 - dg) * (1 - lowW);
     const busyW = ease('busy', st.busy && !dead && this.busy ? 1 : 0, 0.8) * (1 - dg) * (1 - lowW) * (1 - highW);
@@ -649,24 +660,31 @@ export class HumanView {
     const fw = (a, v) => { if (a) a.setEffectiveWeight(a.getEffectiveWeight() + v); };
     for (const a of Object.values(cv)) if (a) a.setEffectiveWeight(0);
     const lw = lowW * live * (1 - tr), hw = highW * live * (1 - tr);
-    fw(cv.lowIdle, lw * (1 - cm) * (1 - lowAim));
+    const inLow = st.cover === 'low' && !!cv.coverIdle;
+    fw(inLow ? cv.coverIdle : cv.lowIdle, lw * (1 - cm) * (1 - lowAim)); // D90: back to low cover — Male Crouch Pose
     fw(cv.lowFire, lw * (1 - cm) * lowAim); // D88 (user): the Cover/Crouch clips for both guns (no Pistol Kneeling Idle)
     let crouchBack = null;
-    if (st.cover !== 'low' && cv.walk) {
+    if (inLow) {
+      // D90: along low cover (back to it) — the whole Crouched Sneaking Left / Right clips; firing over it — kneeling fire
+      fw(cv.coverSL, lw * cm * shL * (1 - lowAim)); fw(cv.coverSR, lw * cm * shR * (1 - lowAim));
+      fw(cv.lowFire, lw * cm * lowAim);
+    } else if (cv.walk) {
       // D85 stealth crouch (not in cover): forward / back — the crouch walk (backwards played in reverse), sideways —
       // D86 "Crouched Sneaking Left / Right"
       const fb = f + b, side = l + r, tot = fb + side || 1;
       fw(cv.walk, lw * cm * (fb / tot));
       fw(cv.lowL, lw * cm * (l / tot)); fw(cv.lowR, lw * cm * (r / tot));
       if (b > f) crouchBack = this._backSet || (this._backSet = new Set([cv.walk]));
-    } else { fw(cv.lowL, lw * cm * shL); fw(cv.lowR, lw * cm * shR); } // along low cover: the sneaks only
-    fw(cv.upRifle, lw * cm); // the gun-holding arms over the crouched legs (D88: Crouch Idle's, both guns)
-    fw(cv.highIdle, hw * (1 - cm));
-    if (cv.highIdle) cv.highIdle.time = A.peekFrom + (A.peekHoldAt - A.peekFrom) * smooth(0, 1, peekK); // (0 → back to the wall)
-    if (peekK <= 0 && cv.highIdle) cv.highIdle.time = 0;
+      fw(cv.upRifle, lw * cm); // the gun-holding arms over the crouched legs (D88: Crouch Idle's, both guns)
+    }
+    // D90: high cover — back to it; leaning out of the corner plays the user's take for that side (st.peekSide: +1 his
+    // right, −1 his left)
+    const peekA = (st.peekSide < 0 ? cv.peekL : cv.peekR) || cv.peekL || cv.peekR;
+    fw(peekA, hw * (1 - cm));
+    if (peekA) peekA.time = peekK > 0 ? A.peekFrom + (A.peekHoldAt - A.peekFrom) * smooth(0, 1, peekK) : 0; // (0 → back to the wall)
     fw(cv.highL, hw * cm * shL); fw(cv.highR, hw * cm * shR);
     // the crouch / cover set in step too (its own clips; the stand clips are idle while it plays)
-    if (lw + hw > 1e-3) this._gaitStep(dt, sp, [cv.walk, cv.lowL, cv.lowR, cv.highL, cv.highR], crouchBack);
+    if (lw + hw > 1e-3) this._gaitStep(dt, sp, [cv.walk, cv.lowL, cv.lowR, cv.coverSL, cv.coverSR, cv.highL, cv.highR], crouchBack);
     if (this.trans) this.trans.a.setEffectiveWeight(tr);
     if (this.busy) this.busy.setEffectiveWeight(busyW * live);
     // D86: the mixer writes a bone only when its blended value CHANGED since the last frame — a held pose (the rifle aim

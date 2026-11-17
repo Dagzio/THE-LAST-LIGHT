@@ -60,11 +60,12 @@ export const PROP_MODELS = {
   air_conditioner: { view: 'air_conditioner', wall: true, at: 68 },
   security_camera: { view: 'security_camera', wall: true, at: 70 },
   // D88: the training ground — the user's sheets in their own atlas (data/trainingViews.js)
-  tree: { view: 'deciduous_tree', top: 1, atlas: 'training', drawW: 120, drawD: 120 },
+  // D90: foliage — one picture turned to the camera (render3d/propViews.js `sprite`), not a box of views
+  tree: { view: 'deciduous_tree', top: 1, atlas: 'training', drawW: 120, drawD: 120, sprite: { lean: 1 } },
   boulder: { view: 'boulder', top: 1, atlas: 'training' },
-  bush: { view: 'leafy_bush', top: 0.9, atlas: 'training' },
-  grass_tuft: { view: 'grass_tuft', top: 0.8, atlas: 'training' },
-  flowers: { view: 'wildflower_clump', top: 0.8, atlas: 'training' },
+  bush: { view: 'leafy_bush', top: 0.9, atlas: 'training', sprite: { lean: 1 } },
+  grass_tuft: { view: 'grass_tuft', top: 0.8, atlas: 'training', sprite: { lean: 1 } },
+  flowers: { view: 'wildflower_clump', top: 0.8, atlas: 'training', sprite: { lean: 1 } },
   canopy: { view: 'camouflage_canopy', top: 1, atlas: 'training' },
   tent: { view: 'field_tent', top: 1, atlas: 'training' },
   fabric_screen: { view: 'fabric_screen', top: 1, atlas: 'training' },

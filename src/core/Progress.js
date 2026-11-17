@@ -54,7 +54,12 @@ export class Progress {
   /** Test cheat (CHEATS): every level opens. @returns {number} levels newly unlocked */
   cheatUnlockAll() {
     let n = 0;
-    for (const l of LEVELS) if (!this.profile.unlockedLevels.includes(l.id)) { this.profile.unlockedLevels.push(l.id); n++; }
+    const p = this.profile;
+    for (const l of LEVELS) {
+      if (!p.unlockedLevels.includes(l.id)) { p.unlockedLevels.push(l.id); n++; }
+      // D90: a level waiting for another one — the cheat counts that one as completed
+      if (l.requires && !p.completedLevels.includes(l.requires)) { p.completedLevels.push(l.requires); n++; }
+    }
     if (n) this._commit();
     return n;
   }

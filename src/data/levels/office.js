@@ -19,6 +19,8 @@ export const OFFICE = {
   nameKey: 'level.office.name',
   descKey: 'level.office.desc',
   location: 'office',
+  requires: 'training', // D90 (user): closed until the training ground is completed
+  preview: 'assets/ui/previews/office.webp', // D90: the user's card art (NEW/previewOffice.png)
   width: 2250,
   height: 1800,
   wallHeight: 78,

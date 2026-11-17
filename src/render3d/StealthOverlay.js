@@ -14,6 +14,7 @@ const RAYS = 24;
 const MAX_CONES = 12;
 const MAX_RINGS = 8;
 const RECASTS_PER_FRAME = 4;
+const RING_LIFE = 0.7;     // D90: s a noise wave lives
 const Y = 1.3;
 const MID = 0.55;          // the middle ring at this fraction of each ray
 const EDGE = 0.22;         // the outer fraction of the cone (each side) that fades to 0
@@ -50,10 +51,12 @@ export class StealthOverlay {
     for (const b of [this.barBack, this.barFill]) { b.frustumCulled = false; b.count = 0; }
     this.barFill.setColorAt(0, BAR_AMBER); // per bar: amber suspicion / red radio call (D88); the attribute from the start
     this.barBack.renderOrder = 13; this.barFill.renderOrder = 14;
-    // noise rings
-    const ring = new THREE.RingGeometry(0.965, 1, 48);
+    // noise rings — D90 (user: softer, nicer): a soft wave (a blurred band fading inwards, no hard line) instead of the
+    // thin hard ring; additive (the per-instance tint fades it out), a pale tint
+    const ring = new THREE.PlaneGeometry(2, 2);
     ring.rotateX(-Math.PI / 2);
-    this.rings = new THREE.InstancedMesh(ring, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }), MAX_RINGS);
+    this.ringTex = softRingTexture();
+    this.rings = new THREE.InstancedMesh(ring, new THREE.MeshBasicMaterial({ map: this.ringTex, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending }), MAX_RINGS);
     this.rings.frustumCulled = false;
     this.rings.renderOrder = 3;
     this.rings.setColorAt(0, RING_C.setScalar(1)); // the colour attribute exists from the start (no shader recompile later)
@@ -139,14 +142,14 @@ export class StealthOverlay {
     this.barBack.count = this.barFill.count = bars;
     this.barBack.instanceMatrix.needsUpdate = this.barFill.instanceMatrix.needsUpdate = true;
     if (bars && this.barFill.instanceColor) this.barFill.instanceColor.needsUpdate = true;
-    // the noise rings: grow to r in 0.45 s and fade
+    // the noise rings: grow to r in RING_LIFE s (eased out — fast, then slowing) and fade softly
     let r = 0;
-    this.ringList = this.ringList.filter((q) => time - q.at < 0.6 && time >= q.at);
+    this.ringList = this.ringList.filter((q) => time - q.at < RING_LIFE && time >= q.at);
     for (const q of this.ringList) {
-      const k = (time - q.at) / 0.45;
-      if (k > 1) continue;
-      P.set(q.x, 1.6, q.y); S.set(q.r * k, 1, q.r * k); M.compose(P, Q.identity(), S);
-      this.rings.setColorAt(r, RING_C.setScalar(1 - k * k)); // additive: fades out as it reaches its radius
+      const k = (time - q.at) / RING_LIFE, g = 1 - (1 - k) * (1 - k) * (1 - k);
+      const s = Math.max(1, q.r * (0.15 + 0.85 * g));
+      P.set(q.x, 1.6, q.y); S.set(s, 1, s); M.compose(P, Q.identity(), S);
+      this.rings.setColorAt(r, RING_C.setRGB(0.91, 0.94, 1).multiplyScalar((1 - k) * (1 - k))); // the tint fades out
       this.rings.setMatrixAt(r++, M);
     }
     this.rings.count = r;
@@ -210,6 +213,24 @@ export class StealthOverlay {
 
   dispose() {
     for (const o of [this.cones, this.barBack, this.barFill, this.rings]) { this.scene.remove(o); o.geometry.dispose(); o.material.dispose(); }
+    if (this.ringTex) this.ringTex.dispose();
     this.cache.clear();
   }
+}
+
+/** D90: the noise wave — a soft band near the edge of the disc, blurred both ways and fading towards the centre. */
+function softRingTexture() {
+  const n = 128, c = document.createElement('canvas');
+  c.width = c.height = n;
+  const g = c.getContext('2d'), grad = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.55, 'rgba(255,255,255,0.05)');
+  grad.addColorStop(0.8, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(0.92, 'rgba(255,255,255,0.6)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, n, n);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }

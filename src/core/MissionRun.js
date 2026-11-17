@@ -274,7 +274,7 @@ export class MissionRun {
     const cover = p.cover && !firing ? p.cover : null; // D83: in cover he keeps facing it while moving along it
     p.aimPose = false;
     if (p.dodging) p.bodyAngle = Math.atan2(p.dodgeDirY, p.dodgeDirX);
-    else if (cover) p.bodyAngle = cover.kind === 'low' ? Math.atan2(-cover.ny, -cover.nx) : Math.atan2(cover.ny, cover.nx);
+    else if (cover) p.bodyAngle = Math.atan2(cover.ny, cover.nx); // D90 (user): back to it, low cover too (turns to fire)
     else if (firing || (mouse && (!moving || FACING.alwaysAimMouse))) {
       const d = Math.hypot(p.aimX - p.x, p.aimY - p.y);
       p.bodyAngle = p.aimAngle - (p.hasAim ? barrelOffsetAngle(muzzleOf(this.weapon.stats.gun), d) : 0);
@@ -347,6 +347,8 @@ export class MissionRun {
     let best = null, bestD = Infinity;
     for (const pk of this.pickups) {
       if (pk.taken) continue;
+      // D90: a crate that never runs out (the training ground's table / chests) can be opened again after a moment
+      if (pk.def.refill > 0 && pk.openedAt >= 0 && time - pk.openedAt >= pk.def.refill) pk.openedAt = -1;
       const d = Math.hypot(p.x - pk.def.x, p.y - pk.def.y);
       if (pk.def.kind === 'crate') {
         if (pk.openedAt < 0 && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
