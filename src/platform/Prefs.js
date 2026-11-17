@@ -23,6 +23,13 @@ export const Prefs = {
   setLang(lang) {
     try { localStorage.setItem('kl.lang', lang); } catch (e) { /* storage unavailable */ }
   },
+  // D85: the last chosen game mode on the level select (mission / stealth / survival)
+  getMode() {
+    try { return localStorage.getItem('kl.mode'); } catch (e) { return null; }
+  },
+  setMode(mode) {
+    try { localStorage.setItem('kl.mode', mode); } catch (e) { /* storage unavailable */ }
+  },
   getQuality() {
     try { return localStorage.getItem('kl.quality'); } catch (e) { return null; }
   },

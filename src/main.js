@@ -51,6 +51,13 @@ function wireCombatSounds(events, game) {
   events.on('doorUnlocked', () => Sfx.play('buy', 0.8));
   events.on('reinforcements', () => Sfx.play('waveStart')); // synthesized horn: the alarm of the turn
   events.on('spotted', () => Sfx.play('deny', 1.3, { voices: 1 }));
+  // D85 modes
+  events.on('suspicion', () => Sfx.play('click', 0.7, { gain: 0.6, voices: 1 }));
+  events.on('alarm', () => Sfx.play('waveStart'));
+  events.on('takedown', () => Sfx.play('hit', 0.8, { voices: 1 }));
+  events.on('bodyFound', () => Sfx.play('deny', 1.2, { voices: 1 }));
+  events.on('copyDone', () => Sfx.play('levelUp'));
+  events.on('threatLevel', (n) => { if (n > 1) Sfx.play('waveStart', 1.2); });
   events.on('weaponSwitch', () => Sfx.play('click', 0.8));
   events.on('bulletBlocked', () => {
     if (!ricOk()) return;
@@ -80,6 +87,7 @@ function wireCameraShake(game) {
   const shake = (a, d) => { if (game.renderer3d) game.renderer3d.shake(a, d); };
   ev.on('grenadeBlast', () => shake(7, 0.3));
   ev.on('playerHit', () => shake(2.5, 0.12));
+  ev.on('noise', (x, y, r) => { if (game.renderer3d) game.renderer3d.noise(x, y, r); }); // D85 stealth: noise rings
 }
 
 /** @param {{loaded: Promise<void>, shownAt: number}} boot */

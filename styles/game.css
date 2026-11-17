@@ -1343,6 +1343,30 @@ button.hud-weapon { pointer-events: auto; background: none; border: 0; padding: 
 .interact-neon { visibility: hidden; }
 .interact-neon.on { visibility: visible; animation: interactPulse 1s ease-in-out infinite alternate; }
 @keyframes interactPulse { from { filter: brightness(1); } to { filter: brightness(1.35); } }
+/* D85 stealth HUD: the alert scale under the objective + the visibility eye; the touch crouch button */
+.stealth-hud { display: none; align-items: center; gap: 10px; margin-top: 8px; padding: 5px 12px; background: rgba(8, 11, 16, 0.78);
+  font-family: var(--font-display); font-weight: 800; font-stretch: condensed; letter-spacing: 0.08em; color: #cfd6df; font-size: 15px; }
+body[data-mode="stealth"] #screen-game .stealth-hud { display: inline-flex; }
+.alert-pips { display: inline-flex; gap: 3px; }
+.alert-pips i { width: 14px; height: 6px; background: rgba(255, 255, 255, 0.14); }
+.stealth-hud[data-level="0"] .alert-pips i:nth-child(-n+1) { background: #8fd0ff; }
+.stealth-hud[data-level="1"] .alert-pips i:nth-child(-n+2) { background: #ffd23a; }
+.stealth-hud[data-level="2"] .alert-pips i:nth-child(-n+3) { background: #ff9a2a; }
+.stealth-hud[data-level="3"] .alert-pips i { background: #ff3a2a; }
+.stealth-hud[data-level="1"] .alert-label { color: #ffd23a; }
+.stealth-hud[data-level="2"] .alert-label { color: #ff9a2a; }
+.stealth-hud[data-level="3"] .alert-label { color: #ff3a2a; animation: interactPulse 0.4s ease-in-out infinite alternate; }
+.vis-label { display: inline-flex; align-items: center; gap: 5px; padding-left: 10px; border-left: 1px solid rgba(255, 255, 255, 0.18); }
+.vis-label svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+.vis-label[data-vis="hidden"] { color: #6f8fb0; }
+.vis-label[data-vis="dim"] { color: #c4ccd6; }
+.vis-label[data-vis="lit"] { color: #ffd98a; }
+.crouch-neon { display: none; }
+body[data-mode="stealth"] .crouch-neon { display: inline-flex; }
+.crouch-neon.on { box-shadow: 0 0 0 2px #8fd8ff, 0 0 16px rgba(143, 216, 255, 0.75); }
+.ctx-prompt { pointer-events: none; }
+.ctx-prompt.takedown .kiosk-key { background: #c0261c; color: #fff; }
+body.map-over .ctx-prompt { display: none; }
 /* D83 touch: the cover button — next to an object one can hide behind; lit (tap leaves) while in cover */
 .cover-neon { display: none; }
 .cover-neon.on { display: flex; animation: interactPulse 1s ease-in-out infinite alternate; }

@@ -16,6 +16,7 @@ import { Progress } from './Progress.js';
 import { createRunSeed } from './SeededRandom.js';
 import { QUALITY_LEVELS, QUALITY_PRESETS, resolveAutoQuality } from '../config/settings.js';
 import { getLevel, LEVELS } from '../data/levels/index.js';
+import { levelModes, resolveLevel } from '../data/modes.js';
 import { AUTO_AIM } from '../data/player.js';
 import { AI_TUNING } from '../data/humans.js';
 import { nextLevelId, isLastLevel, defaultLevelSelection } from '../systems/Campaign.js';
@@ -59,6 +60,8 @@ export class Game {
     /** @type {((run: MissionRun, time: number) => void) | null} set by main.js: called after every simulation step */
     this.onSimStep = null;
     this.selectedMapId = LEVELS[0].id;
+    this._modeId = Prefs.getMode() || 'mission'; // D85: the last chosen mode (a UI preference)
+    this.modeId = 'mission';
     this.mapId = null;
     this.events = new GameEvents();  // presentation hooks: sound, particles, HUD
     this.run = null;                 // MissionRun of the current level attempt
@@ -103,6 +106,7 @@ export class Game {
       this.run.autoFire = !!this.touchMode;              // D74: the mobile version shoots by itself
       this.run.autoAim.inView = this.inView || null;      // D75: at enemies on the screen only
       this.run.ai.inView = this.inViewAI || null;         // D82: enemies fire only from the screen
+      if (this.run.mode && 'inView' in this.run.mode) this.run.mode.inView = this.inViewAI || null; // D85: survival spawns off screen
       this.run.update(this.input, dt, this.clock.time);
       if (this.onSimStep) this.onSimStep(this.run, this.clock.time);
     }
@@ -159,11 +163,26 @@ export class Game {
 
   selectMap(id) { if (getLevel(id) && this.isMapUnlocked(id)) this.selectedMapId = id; }
 
-  /** Starts the selected (unlocked) level with a fresh run. Guarded against a double start. */
+  /** D85: the modes the selected level offers, and the chosen one (a UI preference, kept in Prefs). */
+  availableModes(levelId = this.selectedMapId) { return levelModes(getLevel(levelId)); }
+
+  get selectedModeId() {
+    const modes = this.availableModes();
+    return modes.includes(this._modeId) ? this._modeId : modes[0];
+  }
+
+  selectMode(modeId) {
+    if (!this.availableModes().includes(modeId)) return false;
+    this._modeId = modeId;
+    Prefs.setMode(modeId);
+    return true;
+  }
+
+  /** Starts the selected (unlocked) level with a fresh run in the selected mode. Guarded against a double start. */
   beginMap() {
     const level = getLevel(this.selectedMapId);
     if (!this.sm.is(STATES.MAP_SELECT) || !level || !this.renderer3d || !this.isMapUnlocked(level.id)) return false;
-    return this._startRun(level);
+    return this._startRun(level, this.selectedModeId);
   }
 
   /** CONTINUE after a victory (not the last level): back to level select with the next level selected. */
@@ -179,20 +198,26 @@ export class Game {
   resultSummary() {
     const r = this.run;
     if (!r || !r.over) return null;
+    const mb = (this.progress.profile.modeBests[r.mapId] || {})[r.modeId] || null;
     return {
-      won: r.victory, reason: r.defeat, mapId: r.mapId, mapNameKey: r.level.nameKey,
+      won: r.victory, reason: r.defeat, mapId: r.mapId, mapNameKey: r.level.nameKey, modeId: r.modeId,
       time: r.stats.time, kills: r.stats.kills, shots: r.stats.shotsFired, hits: r.stats.hits,
       damageTaken: Math.round(r.stats.damageTaken), ghost: !r.stats.spotted,
-      best: this.progress.profile.bestTimes[r.mapId] || 0,
-      last: r.victory && isLastLevel(r.mapId),
+      best: r.modeId === 'mission' ? this.progress.profile.bestTimes[r.mapId] || 0 : mb ? mb.time : 0,
+      last: r.victory && isLastLevel(r.mapId) && r.modeId !== 'survival',
+      // D85: stealth — medals, intel, takedowns; survival — threat, best kills, a new record
+      medals: r.modeId === 'stealth' && r.mode ? r.mode.medals() : null,
+      intel: r.intel, intelTotal: r.level.pickups.filter((p) => p.kind === 'intel').length,
+      takedowns: r.stats.takedowns || 0, threat: r.stats.threat || 0,
+      bestKills: mb ? mb.kills || 0 : 0, newRecord: !!(this.progress.lastResult && this.progress.lastResult.run === r && this.progress.lastResult.newRecord),
     };
   }
 
-  /** RETRY / PLAY AGAIN after the level is over: a completely fresh run of the same level. */
+  /** RETRY / PLAY AGAIN after the level is over: a completely fresh run of the same level (and mode). */
   retryMap() {
     const level = getLevel(this.mapId);
     if (!this.sm.mapOver || !level) return false;
-    return this._startRun(level);
+    return this._startRun(level, this.modeId || 'mission');
   }
 
   /** Game speed (1 = normal). Presentation-side controller, the simulation stays fixed-step. */
@@ -210,18 +235,21 @@ export class Game {
   /** E / the touch button / the label: open the crate in reach. */
   interact() { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.interact(this.clock.time)); }
 
-  _startRun(level) {
+  _startRun(level, modeId = 'mission') {
     this.mapId = level.id;
+    this.modeId = modeId;
     this.clock.reset();
     this._disposeRun();
-    this.run = new MissionRun(level, createRunSeed(), this.events);
+    const resolved = resolveLevel(level, modeId); // D85: the level as the mode has it (same office, other job)
+    this.run = new MissionRun(resolved, createRunSeed(), this.events);
     this.run.particles.setQualityFactor(QUALITY_PRESETS[this.quality].particles);
-    this.renderer3d.loadMap(level, this.run.player.x, this.run.player.y); // warm-up: no step until shaders are ready
+    this.renderer3d.loadMap(resolved, this.run.player.x, this.run.player.y); // warm-up: no step until shaders are ready
     this.input.pointerMapper = (cx, cy, out) => this.renderer3d.screenToGround(cx, cy, out);
     this.input.releaseAll();
     this.loop.resetTiming();
+    document.body.dataset.mode = modeId;
     const ok = this.sm.set(STATES.RUNNING);
-    if (ok) this.events.emit('mapStarted', level.id);
+    if (ok) this.events.emit('mapStarted', level.id, modeId);
     return ok;
   }
 

@@ -7,7 +7,9 @@
 import { Storage } from '../platform/StorageService.js';
 import { LEVELS } from '../data/levels/index.js';
 
-export const SCHEMA_VERSION = 3;
+// D85 — schema 4: + modeBests (the best stealth / survival results per level); a schema 3 profile is migrated.
+export const SCHEMA_VERSION = 4;
+const MODE_KEYS = ['stealth', 'survival'];
 export const PROFILE_KEY = 'profile';
 export const BACKUP_KEY = 'profile.backup';
 const MAX_N = 1e9;
@@ -17,7 +19,8 @@ export function createDefaultProfile() {
     schemaVersion: SCHEMA_VERSION,
     unlockedLevels: [LEVELS[0].id],
     completedLevels: [],
-    bestTimes: {},            // level id → seconds of the fastest win
+    bestTimes: {},            // level id → seconds of the fastest win (mission)
+    modeBests: {},            // D85: level id → { stealth: { time, medals, intel }, survival: { time, kills } }
     statistics: { totalKills: 0, levelsWon: 0, levelsFailed: 0 },
   };
 }
@@ -25,6 +28,7 @@ export function createDefaultProfile() {
 /** Brings older schemas up to the current one. Unknown versions are rejected (null). */
 export function migrateProfile(data) {
   if (!data || typeof data !== 'object') return null;
+  if (data.schemaVersion === 3) return { ...data, schemaVersion: SCHEMA_VERSION, modeBests: {} }; // D85
   return data.schemaVersion === SCHEMA_VERSION ? data : null;
 }
 
@@ -47,6 +51,20 @@ export function validateProfile(data) {
   for (const id of Object.keys(bt)) {
     const v = Number(bt[id]);
     if (ids.has(id) && Number.isFinite(v) && v > 0) p.bestTimes[id] = Math.round(v * 10) / 10;
+  }
+  // D85: the best results per mode — only known levels / modes, sane numbers; anything else is dropped
+  const mb = data.modeBests && typeof data.modeBests === 'object' ? data.modeBests : {};
+  for (const id of Object.keys(mb)) {
+    if (!ids.has(id) || !mb[id] || typeof mb[id] !== 'object') { repaired = true; continue; }
+    for (const m of Object.keys(mb[id])) {
+      const r = mb[id][m];
+      const time = Number(r && r.time);
+      if (!MODE_KEYS.includes(m) || !(Number.isFinite(time) && time > 0)) { repaired = true; continue; }
+      const out = { time: Math.round(time * 10) / 10 };
+      if (m === 'stealth') { out.medals = int(r.medals, 0, 3) ?? 0; out.intel = int(r.intel, 0, 10) ?? 0; }
+      else out.kills = int(r.kills, 0, MAX_N) ?? 0;
+      (p.modeBests[id] = p.modeBests[id] || {})[m] = out;
+    }
   }
   const st = data.statistics && typeof data.statistics === 'object' ? data.statistics : {};
   for (const k of Object.keys(p.statistics)) {

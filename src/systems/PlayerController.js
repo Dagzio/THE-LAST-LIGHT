@@ -21,6 +21,8 @@ export class PlayerController {
     this.world = null;
     /** @type {{next:()=>number}|null} D83: the run's seeded RNG (which roll clip) */
     this.rng = null;
+    /** D85 stealth: { walk, run, crouch } speeds (player.moveMode picks one); null = the normal speed */
+    this.speedProfile = null;
   }
 
   /**
@@ -48,6 +50,7 @@ export class PlayerController {
       player.aimY = a.y;
     }
 
+    if (player.takedown) { player.vx = 0; player.vy = 0; input.consumePressed('dash'); input.consumePressed('cover'); return; } // D85: locked
     if (input.consumePressed('dash')) this._tryDodge(player, moving, time);
     if (input.consumePressed('cover')) this.toggleCover(player, time);
     if (player.dodging && time >= player.dodgeEndsAt) player.dodging = false;
@@ -66,7 +69,9 @@ export class PlayerController {
       this._coverMove(player, dt, time);
     } else {
       const aiming = time < player.faceAimUntil; // D79: slower while shooting / aiming
-      const speed = PLAYER.moveSpeed * this.speedMult * (aiming ? PLAYER.aimMoveMult : 1);
+      const SP = this.speedProfile; // D85 stealth: walk (silent) / run / crouch
+      const base = SP ? (player.moveMode === 'run' ? SP.run : player.moveMode === 'crouch' ? SP.crouch : SP.walk) : PLAYER.moveSpeed;
+      const speed = base * this.speedMult * (aiming ? PLAYER.aimMoveMult : 1);
       player.vx = move.x * speed; // |move| ≤ 1 → diagonal is never faster
       player.vy = move.y * speed;
     }

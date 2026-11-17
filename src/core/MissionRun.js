@@ -13,7 +13,9 @@ import { AutoAim } from '../systems/AutoAim.js';
 import { SeededRandom } from './SeededRandom.js';
 import { LevelWorld, DOOR } from './LevelWorld.js';
 import { Particles } from '../render/Particles.js';
-import { WEAPONS, HERO_WEAPONS, getWeapon } from '../data/weapons.js';
+import { WEAPONS, getWeapon } from '../data/weapons.js';
+import { StealthDirector } from '../systems/StealthDirector.js';
+import { SurvivalDirector } from '../systems/SurvivalDirector.js';
 import { HUMAN_TYPES } from '../data/humans.js';
 import { CAPS } from '../data/balance.js';
 import { FACING, INTERACT, COVER, muzzleOf, barrelOffsetAngle } from '../data/player.js';
@@ -52,10 +54,15 @@ export class MissionRun {
     this.particles = new Particles(CAPS.particles);
 
     // weapons: the pistol at start (user decision); the SMG from a crate. Each keeps its own magazine.
-    this.inventory = ['pistol'];
-    this.weaponStates = { pistol: new WeaponState(WEAPONS.pistol) };
-    this.weapon = this.weaponStates.pistol;
+    // D85: a mode may start with another loadout (stealth: the silenced pistol)
+    this.modeId = level.modeId || 'mission';
+    const L = level.loadout || { weapons: ['pistol'], grenades: {} };
+    this.inventory = [...L.weapons];
+    this.weaponStates = {};
+    for (const id of L.weapons) this.weaponStates[id] = new WeaponState(WEAPONS[id]);
+    this.weapon = this.weaponStates[this.inventory[0]];
     this.weaponStats = this.weapon.stats;
+    this.bodyFade = level.bodyFade ?? BODY_FADE;
 
     this.controller = new PlayerController(events, { w: level.width, h: level.height });
     this.controller.world = this.world;
@@ -82,11 +89,16 @@ export class MissionRun {
     for (const s of level.enemies) this._spawnEnemy(s);
     this.reinforced = false;
 
-    // pickups / crates / objectives
-    this.pickups = level.pickups.map((def) => ({ def, taken: false, openedAt: -1 }));
-    this.has = { keycard: false, drive: false };
+    // pickups / crates / objectives (D85: dormant pickups wait for the survival director; item / count per crate)
+    this.pickups = level.pickups.map((def) => ({ def, taken: !!def.dormant, openedAt: -1, item: def.item ?? null, count: def.count || 1, until: Infinity }));
+    this.has = { keycard: false, drive: false, copy: false };
+    this.intel = 0;
+    this.copyProgress = 0;
     this.objectiveIndex = 0;
     this.interactTarget = null;  // the crate in reach (E / touch button)
+    for (const [t, n] of Object.entries(L.grenades || {})) this.grenades.add(t, n);
+    // D85: the mode's director (stealth / survival rules); the mission has none
+    this.mode = this.modeId === 'stealth' ? new StealthDirector(this) : this.modeId === 'survival' ? new SurvivalDirector(this) : null;
 
     this._unsub = [
       events.on('shot', (x, y, angle, weaponId) => {
@@ -94,8 +106,9 @@ export class MissionRun {
         this.particles.cone(x, y, angle, 0.6, 4, 240, 0.1, 2, '#ffd27a');
         const p = this.player;
         this.particles.cone(p.x, p.y, angle + Math.PI / 2, 0.5, 1, 110, 0.45, 2, '#c99a3e'); // a brass casing
-        const W = getWeapon(weaponId);
-        this.ai.hear(this.enemies, x, y, (W && W.noise) || 500, this.lastTime);
+        const W = getWeapon(weaponId), noise = (W && W.noise) || 500;
+        if (this.ai.stealth) this.noise(x, y, noise, noise > 300 ? 'loud' : 'quiet'); // D85
+        else this.ai.hear(this.enemies, x, y, noise, this.lastTime);
       }),
       events.on('enemyShot', (x, y, angle) => this.particles.cone(x, y, angle, 0.6, 3, 220, 0.1, 2, '#ffcf70')),
       events.on('hit', (x, y, amount, crit, target) => {
@@ -112,17 +125,25 @@ export class MissionRun {
       events.on('bulletBlocked', (x, y) => this.particles.burst(x, y, 4, 120, 0.16, 1.8, '#d7d2c8')),
       events.on('grenadeBlast', (type, x, y, r) => {
         this.particles.burst(x, y, 26, r * 2.4, 0.5, 3, '#ffb070');
-        this.ai.hear(this.enemies, x, y, 700, this.lastTime);
+        if (this.ai.stealth) this.noise(x, y, 700, 'loud');
+        else this.ai.hear(this.enemies, x, y, 700, this.lastTime);
       }),
       events.on('spotted', () => { this.stats.spotted = true; }),
     ];
   }
 
+  /** D85: a noise of the hero / the fight (stealth): the enemies around hear it; the renderer draws the ring. */
+  noise(x, y, radius, kind = 'quiet') {
+    this.events.emit('noise', x, y, radius, kind);
+    if (this.ai.stealth) this.ai.hearStealth(this.enemies, x, y, radius, kind, this.lastTime);
+  }
+
   // ---------------- spawning ----------------
-  _spawnEnemy(s, hunting = false) {
-    const type = HUMAN_TYPES[s.type];
+  /** @param {object} s spawn data  @param {boolean} hunting  @param {object|null} typeOverride / weaponOverride (survival scaling) */
+  _spawnEnemy(s, hunting = false, typeOverride = null, weaponOverride = null) {
+    const type = typeOverride || HUMAN_TYPES[s.type];
     if (!type) return null;
-    const e = new Human(type, WEAPONS[type.weapon], s);
+    const e = new Human(type, weaponOverride || WEAPONS[type.weapon], s);
     this.world.pushOut(e);
     this.enemies.push(e);
     if (hunting) this.ai.alert(e, this.player.x, this.player.y, this.lastTime);
@@ -205,6 +226,7 @@ export class MissionRun {
    */
   _updateFacing(p, shooting, time) {
     if (!p.alive) { p.aimPose = false; return; }
+    if (p.takedown) { p.bodyAngle = p.takedown.face; p.aimPose = false; return; } // D85: facing the victim's back
     if (shooting || this.grenadePreview.active) p.faceAimUntil = time + FACING.aimHold;
     const moving = p.dodging || Math.hypot(p.vx, p.vy) > 1;
     const mouse = p.hasAim && !this.autoFire;
@@ -232,6 +254,7 @@ export class MissionRun {
       p.hp = Math.min(p.maxHp, p.hp + INTERACT.medkitHeal);
     } else if (d.kind === 'keycard') this.has.keycard = true;
     else if (d.kind === 'drive') this.has.drive = true;
+    else if (d.kind === 'intel') this.intel += 1; // D85 stealth: hidden intel (optional)
     pk.taken = true;
     this.events.emit('pickup', d.kind, d.id);
     if (d.kind === 'drive') this._onDrive(time);
@@ -241,17 +264,17 @@ export class MissionRun {
   /** Opens the crate in reach (E / the touch button): its item goes to the hero once. */
   interact(time = this.lastTime) {
     const pk = this.interactTarget;
-    if (!pk || pk.openedAt >= 0 || this.over || !this.player.alive) return false;
+    if (!pk || pk.openedAt >= 0 || this.over || !this.player.alive || pk.def.kind !== 'crate') return false;
     pk.openedAt = time;
-    const d = pk.def;
-    if (d.item === 'smg' && !this.inventory.includes('smg')) {
+    const d = pk.def, item = pk.item, count = pk.count || 1; // D85: the survival director fills its crates
+    if (item === 'smg' && !this.inventory.includes('smg')) {
       this.inventory.push('smg');
       this.weaponStates.smg = new WeaponState(WEAPONS.smg);
       this.switchWeapon('smg');
-    } else if (d.item === 'grenades') {
-      this.grenades.add('frag', d.count || 1);
+    } else if (item === 'grenades') {
+      this.grenades.add('frag', count);
     }
-    this.events.emit('crateOpened', d.item, d.count || 1, d.id);
+    this.events.emit('crateOpened', item, count, d.id);
     this.interactTarget = null;
     return true;
   }
@@ -280,9 +303,20 @@ export class MissionRun {
       const d = Math.hypot(p.x - pk.def.x, p.y - pk.def.y);
       if (pk.def.kind === 'crate') {
         if (pk.openedAt < 0 && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
+      } else if (pk.def.kind === 'terminal') {
+        // D85 stealth: the copy is held at the terminal (the stealth director advances it) — not a walk-over pickup
+        if (!this.has.copy && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
       } else if (d <= INTERACT.pickupRadius + p.radius) this._pickup(pk, time);
     }
     this.interactTarget = best;
+    // D85: what a dead enemy carried (the supervisor's key card) is taken by walking over his body
+    for (const e of this.enemies) {
+      if (e.alive || !e.carries) continue;
+      if (Math.hypot(p.x - e.x, p.y - e.y) > INTERACT.pickupRadius + p.radius + 6) continue;
+      if (e.carries === 'keycard') this.has.keycard = true;
+      this.events.emit('pickup', e.carries, `loot_${e.id}`);
+      e.carries = null;
+    }
     // the hero with the key card unlocks a key-card door from close by
     if (this.has.keycard) {
       for (const dr of this.doors) {
@@ -299,20 +333,32 @@ export class MissionRun {
   _onDrive() {
     for (const dr of this.doors) if (dr.def.lock === 'drive' && dr.locked) { dr.locked = false; this.events.emit('doorUnlocked', dr.id); }
     const R = this.level.reinforcements;
-    if (R && !this.reinforced) {
-      this.reinforced = true;
-      for (const s of R.enemies) this._spawnEnemy(s, true);
-      this.events.emit('reinforcements', R.enemies.length);
-    }
+    if (R && (R.after || 'drive') === 'drive') this.callReinforcements();
+  }
+
+  /** The reinforcements of the level come in hunting the hero — once (mission: the drive; D85 stealth: the alarm). */
+  callReinforcements() {
+    const R = this.level.reinforcements;
+    if (!R || this.reinforced) return false;
+    this.reinforced = true;
+    for (const s of R.enemies) this._spawnEnemy(s, true);
+    this.events.emit('reinforcements', R.enemies.length);
+    return true;
   }
 
   get objective() { return this.level.objectives[this.objectiveIndex] || null; }
 
   /** World point of the current objective (HUD arrow / marker), or null. */
   objectiveTarget(out = {}) {
+    if (this.mode && this.mode.objectiveTarget) return this.mode.objectiveTarget(out); // D85: survival — supplies
     const o = this.objective;
     if (!o) return null;
     if (o.target === 'exit') { out.x = this.level.exit.x; out.y = this.level.exit.y; return out; }
+    // D85: a key card still carried by a living enemy — the marker follows him
+    if (o.target === 'keycard') {
+      const c = this.enemies.find((e) => e.alive && e.carries === 'keycard');
+      if (c) { out.x = c.x; out.y = c.y; return out; }
+    }
     const pk = this.pickups.find((k) => k.def.id === o.target);
     if (!pk) return null;
     out.x = pk.def.x; out.y = pk.def.y;
@@ -322,12 +368,14 @@ export class MissionRun {
   _updateObjectives() {
     const o = this.objective;
     if (!o) return;
-    const done = o.target === 'keycard' ? this.has.keycard : o.target === 'drive' ? this.has.drive : false;
+    const key = o.done || o.target;
+    const done = key === 'keycard' ? this.has.keycard : key === 'drive' ? this.has.drive : key === 'copy' ? this.has.copy : false;
     if (done) {
       this.objectiveIndex += 1;
       this.events.emit('objective', this.objectiveIndex, this.objective);
     }
-    if (o.target === 'exit' && this.has.drive) {
+    // the exit counts once every objective before it is done (mission: after the drive)
+    if (o.target === 'exit' && this.level.exit) {
       const r = this.level.exit.rect, p = this.player;
       if (p.x >= r[0] && p.x <= r[2] && p.y >= r[1] && p.y <= r[3]) this._setVictory();
     }
@@ -354,17 +402,19 @@ export class MissionRun {
     const p = this.player;
     p.prevX = p.x; p.prevY = p.y;
     for (let i = 0; i < this.enemies.length; i++) { const e = this.enemies[i]; e.prevX = e.x; e.prevY = e.y; }
+    if (this.mode && this.mode.preUpdate) this.mode.preUpdate(input, dt, time); // D85: stance, takedown, copy (stealth)
     this.controller.update(p, input, dt, time);
 
     if (input.consumePressed('switchWeapon')) this.switchWeapon();
-    if (input.consumePressed('weapon1')) this.switchWeapon(HERO_WEAPONS[0]);
-    if (input.consumePressed('weapon2') && this.inventory.includes(HERO_WEAPONS[1])) this.switchWeapon(HERO_WEAPONS[1]);
+    if (input.consumePressed('weapon1')) this.switchWeapon(this.inventory[0]);
+    if (input.consumePressed('weapon2') && this.inventory[1]) this.switchWeapon(this.inventory[1]);
     if (input.consumePressed('interact')) this.interact(time);
 
-    let fire = this.autoFire ? false : input.isDown('fire');
-    if (this.autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, this.enemies, this.weapon.stats.range);
+    const autoFire = this.autoFire && (!this.mode || this.mode.autoFireAllowed !== false); // D85: never breaks stealth
+    let fire = autoFire ? false : (this.autoFire ? false : input.isDown('fire'));
+    if (autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, this.enemies, this.weapon.stats.range);
     else this.autoAim.reset();
-    const shooting = fire && !this.holdFire && !this.grenadeArmed && !p.dodging; // D82: no shots mid-roll
+    const shooting = fire && !this.holdFire && !this.grenadeArmed && !p.dodging && !p.takedown; // D82: no shots mid-roll
     this.weapons.update(this.weapon, p, shooting, input.consumePressed('reload'), time);
     this._grenadeInput(input, time);
     this._updateCover(p, shooting, time);
@@ -372,6 +422,7 @@ export class MissionRun {
 
     this.levelWorld.updateDoors(this._bodies(), time, dt);
     this.ai.update(this.enemies, p, dt, time);
+    if (this.mode) this.mode.update(dt, time); // D85: the mode's rules (detection level / alarm, spawns, supplies)
     this.projectileSystem.update(this.enemies, dt, time);
     this.grenades.update(this.enemies, time);
     this._updatePickups(time);
@@ -380,7 +431,7 @@ export class MissionRun {
 
     for (let i = this.enemies.length - 1; i >= 0; i--) { // bodies vanish after a long while (never during a fight)
       const e = this.enemies[i];
-      if (!e.alive && time - e.deathAt > BODY_FADE) this.enemies.splice(i, 1);
+      if (!e.alive && time - e.deathAt > this.bodyFade) this.enemies.splice(i, 1);
     }
     this.particles.update(dt);
   }

@@ -120,6 +120,9 @@ export const WEAPON_SOUNDS = {
   },
 };
 
+// D85: the silenced pistol — the pistol's own shot, higher and much quieter (a "pfft"), the same reload
+WEAPON_SOUNDS.pistol_sd = { shot: { sfx: 'pistol.shot', pitch: 0.04, vol: 0, voices: 2, rate: 1.55, gain: 0.32 }, reload: WEAPON_SOUNDS.pistol.reload };
+
 /** Fallback for weapons without own files (user decision 2026-11-09: synthesized, as before). */
 export const DEFAULT_WEAPON_SOUNDS = {
   shot: { sfx: 'shot', pitch: 0.08, vol: 0, voices: 3 },

@@ -10,6 +10,7 @@ import { muzzleOf } from '../data/player.js';
 import { BLOCK } from './Collision.js';
 
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const NEXT = { x: 0, y: 0 };
 
 export class HumanAISystem {
@@ -27,7 +28,14 @@ export class HumanAISystem {
     this.world = level.world;
     /** D82: (x, y) → true when that ground point is on the screen (set by Game; null in tests = everywhere) */
     this.inView = null;
+    /** D85 stealth: the STEALTH rules (null = the mission's perception), the light at a point, the global SEARCH */
+    this.stealth = null;
+    this.lightAt = null;
+    this.searchUntil = -Infinity;
   }
+
+  /** D85: the global SEARCH level is on (a body found, a loud shot heard) — the enemies see further, faster. */
+  searching(time) { return time < this.searchUntil; }
 
   /** D82 (user request): an enemy opens fire only once he is on the screen. */
   _onScreen(e) { return !this.inView || this.inView(e.x, e.y); }
@@ -39,10 +47,13 @@ export class HumanAISystem {
       const e = enemies[i];
       if (!e.alive) continue;
       const g = e.gun, ai = e.ai;
+      if (ai.mode === 'grabbed') { e.vx = 0; e.vy = 0; continue; } // D85: held in a takedown
       if (g.reloading && time >= g.reloadEndsAt) { g.reloading = false; g.ammo = g.stats.magazineSize; g.burstLeft = g.stats.burst || 1; }
       if (time >= ai.thinkAt) {
         ai.thinkAt = time + T.thinkInterval * (0.85 + 0.3 * this.rng.next());
-        this._perceive(e, player, enemies, time);
+        if (this.stealth && ai.mode !== 'combat') this._perceiveStealth(e, player, time);
+        else this._perceive(e, player, enemies, time);
+        if (this.stealth && ai.mode !== 'combat') this._lookForBodies(e, enemies, time);
       }
       this._behave(e, player, dt, time);
       this._shoot(e, player, time);
@@ -58,8 +69,107 @@ export class HumanAISystem {
     const d = Math.sqrt(d2);
     const tracking = e.ai.mode === 'combat';
     if (!tracking && d > V.near && Math.abs(angDiff(Math.atan2(dy, dx), e.faceAngle)) > (V.fov * Math.PI) / 360) return false;
-    // D82: a hero crouched behind low cover is hidden by the low objects too
-    return this.world.clear(e.x, e.y, p.x, p.y, null, p.crouched ? BLOCK.SIGHT | BLOCK.LOW : BLOCK.SIGHT);
+    // D82: a hero crouched behind low cover is hidden by the low objects too (D85: or crouching)
+    return this.world.clear(e.x, e.y, p.x, p.y, null, p.lowProfile ? BLOCK.SIGHT | BLOCK.LOW : BLOCK.SIGHT);
+  }
+
+  // ---------------- D85 stealth perception (MODES_DESIGN_D85.md §3.4) ----------------
+  /**
+   * The suspicion meter: fills while the hero is in the view cone and line of sight — faster close, in the light,
+   * upright, moving, in the middle of the cone; falls after a grace when he is out of sight. Stages: notice (stop and
+   * look) → investigate (walk to the spot) → full: spotted (combat).
+   */
+  _perceiveStealth(e, p, time) {
+    const S = this.stealth, ai = e.ai, V = e.type.view;
+    const dt = Number.isFinite(ai.thoughtAt) ? Math.min(0.5, time - ai.thoughtAt) : 0;
+    ai.thoughtAt = time;
+    let seen = false, rate = 0;
+    if (p.alive) {
+      const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy);
+      const busy = e.busy && ai.mode === 'idle';
+      const search = this.searching(time);
+      const lum = this.lightAt ? this.lightAt(p.x, p.y) : 1;
+      const lightK = clamp01((lum - S.light.dark) / (S.light.lit - S.light.dark));
+      const reach = V.range * (0.5 + 0.5 * lightK) * (busy ? S.busy.range : 1) * (search ? S.search.rangeMult : 1);
+      const half = ((V.fov * Math.PI) / 360) * (busy ? S.busy.fov : 1);
+      const a = Math.abs(angDiff(Math.atan2(dy, dx), e.faceAngle));
+      const sp = Math.hypot(p.vx, p.vy);
+      const mask = p.lowProfile ? BLOCK.SIGHT | BLOCK.LOW : BLOCK.SIGHT;
+      if (d <= reach && a <= half && this.world.clear(e.x, e.y, p.x, p.y, null, mask)) {
+        seen = true;
+        const distK = 1 - 0.75 * clamp01((d - V.near) / Math.max(1, reach - V.near));
+        const periph = a > S.peripheral.from * half ? S.peripheral.mult : 1;
+        const stanceK = p.lowProfile ? S.stance.crouch : S.stance.stand;
+        const motionK = sp < S.motion.stillBelow ? S.motion.still : sp > S.motion.runAbove ? S.motion.run : S.motion.walk;
+        rate = S.rate * distK * (0.3 + 0.7 * lightK) * stanceK * motionK * periph * (0.6 / e.type.reaction)
+          * (ai.investigate ? S.investigate.fillMult : 1) * (search ? S.search.fillMult : 1);
+      }
+      // felt at any angle: an upright, moving hero very close
+      if (!p.lowProfile && sp > S.motion.stillBelow && d <= S.feel.dist && this.world.clear(e.x, e.y, p.x, p.y)) { seen = true; rate += S.feel.rate; }
+    }
+    if (seen) {
+      ai.suspicion = Math.min(1, ai.suspicion + rate * dt);
+      ai.seenAt = time;
+      ai.lastSeenX = p.x; ai.lastSeenY = p.y; ai.lastSeenAt = time;
+    } else if (time - ai.seenAt > S.decayAfter) ai.suspicion = Math.max(0, ai.suspicion - S.decay * dt);
+    if (ai.suspicion >= 1) {
+      ai.investigate = false;
+      ai.mode = 'combat';
+      ai.aware = true;
+      ai.strafeUntil = 0;
+      ai.reactAt = time + e.type.reaction * 0.6;
+      ai.sees = seen;
+      this.events.emit('spotted', e);
+      return;
+    }
+    if (seen && ai.suspicion >= S.investigateAt && ai.mode !== 'alert') this.investigate(e, p.x, p.y, time, ai.suspicion);
+    ai.sees = false; // nobody shoots before the meter is full
+  }
+
+  /** D85: walk to a suspicious spot (a glimpse, a noise, a body) and search there; never interrupts a fight. */
+  investigate(e, x, y, time, s = 0) {
+    const ai = e.ai;
+    if (!e.alive || ai.mode === 'combat' || ai.mode === 'grabbed') return;
+    ai.suspicion = Math.max(ai.suspicion, s);
+    ai.seenAt = Math.max(ai.seenAt, time);
+    if (ai.mode !== 'alert') this.events.emit('suspicion', e, 'investigate');
+    ai.mode = 'alert';
+    ai.investigate = true;
+    ai.lastSeenX = x; ai.lastSeenY = y;
+    ai.routeGoalX = NaN;
+  }
+
+  /** D85: a noise in stealth (running steps, a silenced / loud shot, a takedown) — heard within r, half through walls. */
+  hearStealth(enemies, x, y, r, kind, time) {
+    const S = this.stealth;
+    for (const e of enemies) {
+      if (!e.alive || e.ai.mode === 'combat' || e.ai.mode === 'grabbed') continue;
+      const d = Math.hypot(e.x - x, e.y - y);
+      if (d > r || (d > r * 0.5 && !this.world.clear(e.x, e.y, x, y))) continue;
+      this.investigate(e, x, y, time, kind === 'loud' ? S.hearing.loud : S.hearing.quiet);
+    }
+    if (kind === 'loud') this.searchUntil = Math.max(this.searchUntil, time + S.search.duration);
+  }
+
+  /** D85: a dead body in sight raises the search (each body is found once). */
+  _lookForBodies(e, enemies, time) {
+    const S = this.stealth, ai = e.ai, V = e.type.view;
+    if (time < (ai.bodyCheckAt || 0)) return;
+    ai.bodyCheckAt = time + S.bodies.every;
+    const half = (V.fov * Math.PI) / 360;
+    for (const b of enemies) {
+      if (b === e || b.alive || b.found) continue;
+      const dark = this.lightAt && this.lightAt(b.x, b.y) < S.light.dark;
+      const reach = V.range * S.bodies.rangeMult * (dark ? S.bodies.darkMult : 1);
+      const dx = b.x - e.x, dy = b.y - e.y;
+      if (dx * dx + dy * dy > reach * reach) continue;
+      if (Math.abs(angDiff(Math.atan2(dy, dx), e.faceAngle)) > half || !this.world.clear(e.x, e.y, b.x, b.y)) continue;
+      b.found = true;
+      this.searchUntil = Math.max(this.searchUntil, time + S.search.duration);
+      this.investigate(e, b.x, b.y, time, 0.6);
+      this.events.emit('bodyFound', e, b);
+      return;
+    }
   }
 
   _perceive(e, p, enemies, time) {
@@ -116,6 +226,11 @@ export class HumanAISystem {
   /** Shot by the hero: turn to him right away. */
   onHit(e, p, time) {
     if (!e.alive) return;
+    if (this.stealth && e.ai.mode !== 'combat') { // D85: wounded — he looks for the shooter, everyone searches
+      this.investigate(e, p.x, p.y, time, 0.9);
+      this.searchUntil = Math.max(this.searchUntil, time + this.stealth.search.duration);
+      return;
+    }
     if (e.ai.mode !== 'combat') {
       this.alert(e, p.x, p.y, time);
       e.ai.reactAt = time + 0.35;
@@ -126,7 +241,14 @@ export class HumanAISystem {
   _behave(e, p, dt, time) {
     const ai = e.ai, S = e.type.speed;
     let mx = 0, my = 0, speed = 0, face = e.faceAngle, turn = 4;
-    switch (ai.mode) {
+    // D85 stealth: noticing something (the meter rising) — he stops and turns towards it
+    const noticing = this.stealth && (ai.mode === 'idle' || ai.mode === 'patrol' || ai.mode === 'return')
+      && ai.suspicion >= this.stealth.noticeAt && time - ai.seenAt < 1;
+    if (noticing) {
+      face = Math.atan2(ai.lastSeenY - e.y, ai.lastSeenX - e.x);
+      turn = 2;
+      ai.progressAt = time; ai.progressX = e.x; ai.progressY = e.y;
+    } else switch (ai.mode) {
       case 'idle': {
         face = ai.post.angle;
         if (Math.hypot(e.x - ai.post.x, e.y - ai.post.y) > 24) ai.mode = 'return';
@@ -134,11 +256,17 @@ export class HumanAISystem {
       }
       case 'patrol': {
         const pt = ai.patrol[ai.patrolIdx];
-        if (time < ai.waitUntil) { face = Math.atan2(pt.y - e.y, pt.x - e.x); turn = 2; break; }
+        if (time < ai.waitUntil) {
+          // D85: waiting at the point just reached — looking where the data says (or on to the next point)
+          face = Number.isFinite(ai.lookAt) ? ai.lookAt : Math.atan2(pt.y - e.y, pt.x - e.x);
+          turn = 2;
+          break;
+        }
         const dx = pt.x - e.x, dy = pt.y - e.y, d = Math.hypot(dx, dy);
         if (d < T.arriveDist) {
+          ai.lookAt = Number.isFinite(pt.look) ? pt.look : NaN;
           ai.patrolIdx = (ai.patrolIdx + 1) % ai.patrol.length;
-          ai.waitUntil = time + this._rand(1.0, 2.2);
+          ai.waitUntil = time + (Number.isFinite(pt.wait) ? pt.wait : this._rand(1.0, 2.2));
           break;
         }
         mx = dx / d; my = dy / d; speed = S.patrol; face = Math.atan2(dy, dx);
@@ -150,7 +278,8 @@ export class HumanAISystem {
           break;
         }
         const dx = NEXT.x - e.x, dy = NEXT.y - e.y, d = Math.hypot(dx, dy) || 1;
-        mx = dx / d; my = dy / d; speed = S.combat; face = Math.atan2(dy, dx); turn = 7;
+        // D85: investigating (stealth) is a brisk walk, not a charge
+        mx = dx / d; my = dy / d; speed = ai.investigate ? S.patrol * this.stealth.investigate.speedMult : S.combat; face = Math.atan2(dy, dx); turn = 7;
         break;
       }
       case 'combat': {
@@ -181,7 +310,7 @@ export class HumanAISystem {
         const k = time - (ai.searchStart || time);
         face = (ai.lookBase || 0) + Math.sin(k * 1.4) * 1.3;
         turn = 3;
-        if (time >= ai.searchUntil) { ai.mode = 'return'; ai.routeGoalX = NaN; }
+        if (time >= ai.searchUntil) { ai.mode = 'return'; ai.routeGoalX = NaN; ai.investigate = false; }
         break;
       }
       case 'return': {

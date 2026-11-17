@@ -32,6 +32,10 @@ export class Player {
     this.coverAwayFor = 0;     // s he has pushed away from the object
     this.exposedUntil = 0;     // kneeling fire from low cover: exposed until this time
     this.crouched = false;
+    // D85 stealth: stance (C) and how he moves; a takedown in progress locks him
+    this.stance = 'stand';     // 'stand' | 'crouch'
+    this.moveMode = 'walk';    // 'walk' | 'run' | 'crouch' (stealth speeds)
+    this.takedown = null;      // { e, t0, killed } while a takedown plays
 
     this.dodging = false;
     this.dodgeVariant = 0;     // D83: which roll clip (data/player.js PLAYER.dodge.variants)
@@ -54,6 +58,9 @@ export class Player {
   }
 
   isInvulnerable(time) { return time < this.invulnerableUntil; }
+
+  /** D85: low to the ground — kneeling behind cover or crouching (low objects then hide him from the eyes). */
+  get lowProfile() { return this.crouched || this.stance === 'crouch'; }
 
   /**
    * Incoming damage (02_SPEC §6): base → permanent Armor → (temporary armor, Phase 6) → invulnerability → HP.

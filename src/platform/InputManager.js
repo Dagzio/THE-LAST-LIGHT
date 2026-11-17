@@ -135,6 +135,12 @@ export class InputManager {
     return out;
   }
 
+  /** D85: true while an analog stick (touch) moves the hero — a partial tilt is a walk, a full one a run (stealth). */
+  analogActive() {
+    for (const v of this.sourceAxes.values()) if (v.x !== 0 || v.y !== 0) return true;
+    return false;
+  }
+
   /** Pointer position in world units (computed on demand, no per-frame work). */
   pointerWorld() {
     const { clientX, clientY, world } = this.pointer;

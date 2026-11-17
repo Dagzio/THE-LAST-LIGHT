@@ -3,6 +3,7 @@
 import { STATES } from '../core/GameStateMachine.js';
 import { T, applyTranslations, onLanguageChange } from '../i18n/i18n.js';
 import { LEVELS as MAPS } from '../data/levels/index.js';
+import { MODES, resolveLevel } from '../data/modes.js';
 import { Sfx } from '../platform/Sfx.js';
 import { Music } from '../platform/Music.js';
 import { AC } from '../platform/AudioUnlock.js';
@@ -183,6 +184,7 @@ export class UIManager {
       case 'askExit': this._ask('exit'); break;
       case 'fullscreen': toggleFullscreen(); break;
       case 'selectMap': this.game.selectMap(btn.dataset.mapId); this._refreshMapSelect(); break;
+      case 'selectMode': this.game.selectMode(btn.dataset.mode); this._refreshMapSelect(); break;
       case 'mapPrev': this._turnMap(-1); break;
       case 'mapNext': this._turnMap(1); break;
       case 'retryMap': this.game.retryMap(); break;
@@ -348,13 +350,28 @@ export class UIManager {
     state.textContent = locked ? T('map.stateLocked', { map: prev ? T(prev.nameKey) : '' }) : T(cleared ? 'map.stateCleared' : 'map.stateNew');
     state.classList.toggle('cleared', cleared);
     state.classList.toggle('locked', locked);
+    // D85: the mode tabs (only the level's modes; hidden when it has the mission only) + the mode's texts / best
+    const modes = this.game.availableModes(map.id), modeId = modes.includes(this.game.selectedModeId) ? this.game.selectedModeId : modes[0];
+    const tabs = document.getElementById('modeTabs');
+    tabs.hidden = modes.length < 2;
+    for (const b of tabs.querySelectorAll('.mode-tab')) {
+      const on = b.dataset.mode === modeId;
+      b.hidden = !modes.includes(b.dataset.mode);
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+    const clock = (v) => `${Math.floor(v / 60)}:${String(Math.round(v) % 60).padStart(2, '0')}`;
+    const mode = MODES[modeId];
     document.getElementById('mapName').textContent = T(map.nameKey);
-    document.getElementById('mapDesc').textContent = T(map.descKey);
-    document.getElementById('mapWaves').textContent = T('map.objectives', { n: map.objectives.length });
+    document.getElementById('mapDesc').textContent = T(modeId === 'mission' ? map.descKey : mode.descKey);
+    const resolved = resolveLevel(map, modeId);
+    document.getElementById('mapWaves').textContent = modeId === 'survival' ? T(mode.nameKey) : T('map.objectives', { n: resolved.objectives.length });
+    const mb = (this.game.progress.profile.modeBests[map.id] || {})[modeId];
     const best = this.game.progress.profile.bestTimes[map.id];
     const bestFact = document.getElementById('mapBoss');
-    bestFact.textContent = best ? T('map.best', { t: `${Math.floor(best / 60)}:${String(Math.round(best) % 60).padStart(2, '0')}` }) : '';
-    bestFact.hidden = !best;
+    bestFact.textContent = modeId === 'mission' ? (best ? T('map.best', { t: clock(best) }) : '')
+      : !mb ? T('map.noRecord') : modeId === 'stealth' ? T('map.bestStealth', { t: clock(mb.time), m: mb.medals }) : T('map.bestSurvival', { t: clock(mb.time), k: mb.kills });
+    bestFact.hidden = !bestFact.textContent;
     document.querySelector('[data-action="beginMap"]').disabled = locked;
   }
 

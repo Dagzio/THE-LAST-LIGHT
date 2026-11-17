@@ -13,6 +13,8 @@ import { HUMAN_MODELS, HUMAN_ANIM, GUN_MODELS, gunModelOf } from '../data/humanM
 import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { dodgeOf } from '../data/player.js';
+import { STEALTH } from '../data/stealth.js';
+import { StealthOverlay } from './StealthOverlay.js';
 import { CAMERA, CAMERA_TOUCH } from '../config/camera.js';
 import { QUALITY_PRESETS, antialiasFor, TOUCH } from '../config/settings.js';
 
@@ -338,6 +340,12 @@ export class Renderer3D {
         spin.add(new THREE.Mesh(new THREE.BoxGeometry(11, 0.8, 7), card), new THREE.Mesh(new THREE.BoxGeometry(3, 1, 3).translate(-3, 0, -1), dark));
         spin.position.y = 28;
         root.add(spin);
+      } else if (def.kind === 'intel') {
+        // D85 stealth: a confidential folder (amber), spinning like the key card
+        spin = new THREE.Group();
+        spin.add(new THREE.Mesh(new THREE.BoxGeometry(12, 1.2, 9), drive), new THREE.Mesh(new THREE.BoxGeometry(8, 1.4, 1.2).translate(0, 0, -2), white));
+        spin.position.y = 28;
+        root.add(spin);
       } else if (def.kind === 'drive') {
         spin = new THREE.Group();
         spin.add(new THREE.Mesh(new THREE.BoxGeometry(10, 2.4, 3.6), drive), new THREE.Mesh(new THREE.BoxGeometry(3, 1.6, 2.6).translate(6, 0, 0), trim));
@@ -389,6 +397,8 @@ export class Renderer3D {
     this.office = buildOfficeScene(level, { aniso: pr.aniso, shadows: true });
     this.scene.add(this.office.group);
     this._buildPickups(level);
+    // D85: the stealth run's view cones / suspicion bars / noise rings
+    if (level.modeId === 'stealth') this.stealthOverlay = new StealthOverlay(this.scene, FACE_CAM, this.quality === 'low' ? 10 : 16);
     this._resize(true);
     this.rig.snap(spawnX, spawnY, level.width, level.height);
     this._placeCamera();
@@ -409,6 +419,7 @@ export class Renderer3D {
   }
 
   unloadMap() {
+    if (this.stealthOverlay) { this.stealthOverlay.dispose(); this.stealthOverlay = null; }
     if (this.office) { this.scene.remove(this.office.group); this.office.dispose(); this.office = null; }
     if (this.pickupGroup) {
       this.scene.remove(this.pickupGroup);
@@ -420,6 +431,9 @@ export class Renderer3D {
     if (this.hero) { this.hero.dispose(); this.hero = null; }
     this.map = null;
   }
+
+  /** D85: a noise of the run (event 'noise') → an expanding ring on the floor (stealth runs only). */
+  noise(x, y, r) { if (this.stealthOverlay) this.stealthOverlay.addNoise(x, y, r, this.lastSyncTime); }
 
   busy() { return this.guard.busy(); }
 
@@ -607,6 +621,9 @@ export class Renderer3D {
       dodge: p.dodging ? Math.min(1, Math.max(0, (time - p.dodgeStartAt) / Math.max(0.01, p.dodgeEndsAt - p.dodgeStartAt))) : -1, // D82: the roll clip
       dodgeClip: dodgeOf(p).clip,                                                                                                 // D83: which roll
       cover: p.alive && p.cover ? p.cover.kind : null,                                                                            // D83: cover poses
+      crouch: p.alive && !p.cover && p.stance === 'crouch',                                                                        // D85: stealth crouch
+      takedown: p.alive && p.takedown ? Math.min(1, Math.max(0, (time - p.takedown.t0) / STEALTH.takedown.duration)) : -1,         // D85: the takedown clip
+      takedownFrom: STEALTH.takedown.clipFrom, takedownTo: STEALTH.takedown.clipTo,
     });
     h.group.position.set(hx, 0, hy);
     h.group.rotation.y = -(this.bodyYaw - h.aimYaw);
@@ -643,7 +660,9 @@ export class Renderer3D {
         deadAge: e.alive ? -1 : time - e.deathAt,
         busy: !!e.busy && e.alive && ai.mode === 'idle' && sp < 2, // D83: going through the files until alerted
       });
-      const sink = !e.alive ? Math.max(0, time - e.deathAt - DEATH_SINK) * 6 : 0;
+      // D85: bodies sink 4 s before the run removes them (stealth: they stay — the guards can find them)
+      const sinkFrom = Number.isFinite(run.bodyFade) ? Math.max(1, run.bodyFade - 4) : Infinity;
+      const sink = !e.alive && Number.isFinite(sinkFrom) ? Math.max(0, time - e.deathAt - Math.min(DEATH_SINK, sinkFrom)) * 6 : 0;
       v.group.position.set(ex, -sink, ey);
       v.group.rotation.y = -(e.faceAngle - v.aimYaw);
       v.flash.visible = e.alive && time - g.lastShotAt >= 0 && time - g.lastShotAt < SHOT_FLASH;
@@ -675,6 +694,7 @@ export class Renderer3D {
     // ---- level: doors, pickups, objective
     this.office.update(run);
     this._syncPickups(run, time);
+    if (this.stealthOverlay) this.stealthOverlay.sync(run, time, (x, y) => this._onScreen(x, y, 60));
 
     // ---- reticle (live cursor with this frame's camera)
     this.reticle.visible = p.alive && p.hasAim && !run.autoFire;

@@ -46,20 +46,50 @@ export class ResultsView {
     el.journal.classList.toggle('won', s.won);
     el.journal.classList.toggle('congrats', congrats);
     el.kicker.textContent = T('result.kicker', { map: T(s.mapNameKey) });
-    el.title.textContent = s.won ? T('victory.title') : T('defeat.player');
-    el.sub.textContent = s.won ? T(congrats ? 'congrats.text' : 'result.wonText') : T('result.lostText');
-    el.stamp.textContent = T(s.won ? 'result.victory' : 'result.defeat');
-
-    // lines: [labelKey, target, format] — KILL LIST (D78): time, kills, accuracy, damage taken (+ best time on a win)
     const clock = (v) => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
     const acc = s.shots > 0 ? Math.round((Math.min(s.hits, s.shots) / s.shots) * 100) : 0;
-    const rows = [
-      ['result.time', Math.round(s.time), clock],
-      ['result.kills', s.kills, (v) => String(v)],
-      ['result.accuracy', acc, (v) => `${v}%`],
-      ['result.damage', s.damageTaken, (v) => String(v)],
-    ];
-    if (s.won && s.best > 0) rows.push(['result.best', Math.round(s.best), clock]);
+    const num = (v) => String(v);
+    let rows;
+    if (s.modeId === 'survival') {
+      // D85 survival: how long, how many, the threat reached, the records
+      el.title.textContent = T('result.survivalOver');
+      el.sub.textContent = T('result.survivalText');
+      el.stamp.textContent = T(s.newRecord ? 'result.newRecord' : 'result.defeat');
+      rows = [
+        ['result.survived', Math.round(s.time), clock],
+        ['result.kills', s.kills, num],
+        ['result.threat', s.threat, num],
+        ['result.accuracy', acc, (v) => `${v}%`],
+        ['result.best', Math.round(s.best), clock],
+        ['result.bestKills', s.bestKills, num],
+      ];
+    } else if (s.modeId === 'stealth') {
+      // D85 stealth: medals (Ghost / No kills / Fast), intel, takedowns
+      const md = s.medals || {}, n = (md.ghost ? 1 : 0) + (md.noKills ? 1 : 0) + (md.fast ? 1 : 0);
+      el.title.textContent = s.won ? T('victory.title') : T(s.reason === 'detected' ? 'defeat.detected' : 'defeat.player');
+      el.sub.textContent = s.won ? T('result.stealthWon') : T(s.reason === 'detected' ? 'result.detectedText' : 'result.lostText');
+      el.stamp.textContent = T(s.won ? (n === 3 ? 'result.rankGhost' : 'result.victory') : 'result.defeat');
+      rows = [
+        ['result.time', Math.round(s.time), clock],
+        ['result.medals', n, (v) => `${v}/3`],
+        ['result.intel', s.intel, (v) => `${v}/${s.intelTotal}`],
+        ['result.takedowns', s.takedowns, num],
+        ['result.kills', s.kills, num],
+      ];
+      if (s.won && s.best > 0) rows.push(['result.best', Math.round(s.best), clock]);
+    } else {
+      el.title.textContent = s.won ? T('victory.title') : T('defeat.player');
+      el.sub.textContent = s.won ? T(congrats ? 'congrats.text' : 'result.wonText') : T('result.lostText');
+      el.stamp.textContent = T(s.won ? 'result.victory' : 'result.defeat');
+      // lines: [labelKey, target, format] — KILL LIST (D78): time, kills, accuracy, damage taken (+ best time on a win)
+      rows = [
+        ['result.time', Math.round(s.time), clock],
+        ['result.kills', s.kills, num],
+        ['result.accuracy', acc, (v) => `${v}%`],
+        ['result.damage', s.damageTaken, num],
+      ];
+      if (s.won && s.best > 0) rows.push(['result.best', Math.round(s.best), clock]);
+    }
     el.lines.replaceChildren();
     this.items = [];
     for (const row of rows) {

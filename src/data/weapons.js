@@ -18,6 +18,14 @@ export const WEAPONS = {
     projectileSpeed: 1050, spreadAngle: 6, pelletsPerShot: 1, critChance: 0, critMultiplier: 1.5, penetrationCount: 0,
     noise: 560,
   },
+  // D85 stealth only (NEW GAME.docx asset list): quiet (heard at 140 instead of 520); a shot at an unaware enemy
+  // does ×sneakMult — one shot fells a thug / gunman, never the heavy
+  pistol_sd: {
+    id: 'pistol_sd', nameKey: 'weapon.pistol_sd', gun: 'pistol',
+    damage: 22, fireInterval: 0.45, magazineSize: 10, reloadDuration: 1.6, range: 420,
+    projectileSpeed: 950, spreadAngle: 1.5, pelletsPerShot: 1, critChance: 0, critMultiplier: 1.5, penetrationCount: 0,
+    noise: 140, sneakMult: 3,
+  },
   // --- enemies (shoot at the hero; damage per bullet)
   enemy_pistol: {
     id: 'enemy_pistol', gun: 'pistol', hostile: true,

@@ -14,6 +14,10 @@ export const KEY_BINDINGS = {
   throwGrenade: ['KeyG'],
   switchWeapon: [],
   cover: ['KeyQ'],
+  // D85 stealth: Shift — run (walking is silent), C — crouch, F — takedown from behind
+  run: ['ShiftLeft', 'ShiftRight'],
+  crouch: ['KeyC'],
+  takedown: ['KeyF'],
   weapon1: ['Digit1', 'Numpad1'],
   weapon2: ['Digit2', 'Numpad2'],
 };

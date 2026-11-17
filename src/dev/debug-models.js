@@ -12,7 +12,7 @@ import { HUMAN_ANIM } from '../data/humanModels.js';
 const CLIPS = ['idle', 'walk', 'run', 'back', 'strafeL', 'strafeR', 'fire', 'reload', 'pReload (game)', 'hit', 'throw', 'pIdle', 'pWalk', 'pRun', 'die', 'die2',
   'dodge', 'crouchIdle', 'crouchWalk', 'idle2', 'run2', 'run3', 'hit2', 'reload2', 'die3',
   // D83: the enemies' rifle walk, the second roll, the cover set, the busy idle
-  'pReload', 'pReload2', 'rwalk', 'dodge2', 'crouchIdle2', 'pKneel', 'crouchFire', 'crouchL', 'crouchR', 'toCrouch', 'toStand', 'coverL', 'coverR', 'coverTurn', 'peek', 'files'];
+  'pReload', 'pReload2', 'rwalk', 'dodge2', 'crouchIdle2', 'pKneel', 'crouchFire', 'crouchL', 'crouchR', 'toCrouch', 'toStand', 'coverL', 'coverR', 'coverTurn', 'peek', 'files', 'takedown'];
 const GAME_RELOAD = 'pReload (game)';
 const CSS = `
 #dbg-models-btn { position: fixed; right: max(30px, env(safe-area-inset-right)); bottom: 30px; z-index: 9000;
@@ -107,7 +107,7 @@ async function open() {
       view = tpl.instantiate(new THREE.MeshLambertMaterial({ map: tpl.texture }));
       for (const [id, g] of Object.entries(r3.gunGeos || {})) view.addGun(id, g.geometry, g.material);
       view.setGun(e.clip.startsWith('p') ? 'pistol' : e.key === 'hero' ? 'smg' : 'rifle');
-      for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die, view.dodge, view.crouchIdle, view.crouchWalk, ...Object.values(view.cv || {}), view.busy, ...Object.values(view.dodges || {}).map((d) => d.a), ...Object.values(view.pRel || {}).flatMap((r) => [r.u, r.l])]) if (a) a.setEffectiveWeight(0);
+      for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die, view.dodge, view.crouchIdle, view.crouchWalk, ...Object.values(view.cv || {}), view.busy, view.takedownAct, ...Object.values(view.dodges || {}).map((d) => d.a), ...Object.values(view.pRel || {}).flatMap((r) => [r.u, r.l])]) if (a) a.setEffectiveWeight(0);
       clipName = e.clip;
       gameT = 0;
       const C = tpl.clips[e.clip === GAME_RELOAD ? 'pIdle' : e.clip];

@@ -9,6 +9,9 @@
 // D81: the furniture is drawn with the user's sprites (painted from the front) — big pieces face the camera (south),
 // types without art were replaced by ones with art; `drawn: false` — a chair already painted in its table's / desk's
 // sprite (it still collides).
+import { OFFICE_STEALTH } from './office.stealth.js';
+import { OFFICE_SURVIVAL } from './office.survival.js';
+
 const W = (x0, y0, x1, y1, style, gaps = []) => ({ x0, y0, x1, y1, style, gaps });
 
 export const OFFICE = {
@@ -21,6 +24,9 @@ export const OFFICE = {
   wallHeight: 78,
   wallThickness: 20,
   playerSpawn: { x: 1200, y: 1630, angle: -Math.PI / 2 },
+  // D85: the modes of this demo level (data/modes.js resolveLevel): mission = this file as it is
+  modes: { mission: {}, stealth: OFFICE_STEALTH, survival: OFFICE_SURVIVAL },
+  briefing: { start: 'call.office.brief', turn: 'call.office.turn' },
 
   // rooms: floor material + the routing graph of the AI (zone → zone through doors / openings). D83: light — the
   // room's night mood (render3d/officeLights.js: warm / cool / dim ceiling lights, dark = only its own lamps / screens)

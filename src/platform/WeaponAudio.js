@@ -29,7 +29,7 @@ export class WeaponAudio {
   shot(weaponId) {
     const s = this.sounds(weaponId).shot;
     // Only ever quieter than the file level (no clipping on overlaps); pitch both ways.
-    Sfx.play(s.sfx, (s.rate || 1) * (1 + spread(s.pitch)), { gain: 1 - Math.random() * (s.vol || 0), voices: s.voices });
+    Sfx.play(s.sfx, (s.rate || 1) * (1 + spread(s.pitch)), { gain: (s.gain ?? 1) * (1 - Math.random() * (s.vol || 0)), voices: s.voices });
   }
 
   /** Reload plan: where each cue starts on this reload's timeline (s from its start) and from where in its file. */

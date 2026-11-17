@@ -92,6 +92,8 @@ export class ProjectileSystem {
       p.markHit(hit.id);
       const stats = p.stats || this.getWeaponStats(p.weaponId);
       const r = computeDamage(stats.damage, stats, hit, this.modifiers, this.rng, hitDirectionMult(hit, p.vx, p.vy));
+      // D85: the silenced pistol fells an enemy who is not fighting the hero (unaware) — ×sneakMult
+      if (stats.sneakMult && hit.ai && hit.ai.mode !== 'combat') r.amount *= stats.sneakMult;
       const killed = hit.applyDamage(r.amount, time);
       const hx = sx + ex * hitT, hy = sy + ey * hitT;
       this.events.emit('hit', hx, hy, r.amount, r.crit, hit, p.angle);

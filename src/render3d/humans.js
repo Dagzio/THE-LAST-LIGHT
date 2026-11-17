@@ -343,7 +343,10 @@ export class HumanView {
       lowL: loop('crouchL'), lowR: loop('crouchR'),
       highIdle: held('peek', 0), highL: loop('coverL'), highR: loop('coverR'),
       toCrouch: held('toCrouch'), toStand: held('toStand'),
+      walk: loop('crouchWalk'), // D85 stealth: crouch-walking forward / back (sideways: the strafes above)
     };
+    this.takedownAct = C.takedown ? held('takedown') : null; // D85 stealth: the takedown from behind
+    this.takedownDur = C.takedown ? C.takedown.duration : 1;
     this.crouchIdle = this.cv.lowIdle; this.crouchWalk = null; // (dev viewer)
     this.trans = null;       // { a: action, from, to (clip s), dur (s), age (s) } — a stand ↔ kneel transition playing
     this.lowWas = false;
@@ -424,9 +427,12 @@ export class HumanView {
     const rollId = st.dodgeClip && this.dodges[st.dodgeClip] ? st.dodgeClip : 'dodge';
     const rolling = !dead && st.dodge >= 0 && !!this.dodges[rollId];
     if (rolling) { w.dodge = 1; this.dodgeId = rollId; } else ease('dodge', 0, 2.5); // starts at once, blends out as he gets up
-    const dg = this.dodges[this.dodgeId] ? w.dodge : 0;
+    // D85: the takedown — a full-body clip like the roll (its time follows the takedown's progress)
+    const tdOn = !dead && st.takedown >= 0 && !!this.takedownAct;
+    if (tdOn) w.td = 1; else ease('td', 0, 2.5);
+    const dg = 1 - (1 - (this.dodges[this.dodgeId] ? w.dodge : 0)) * (1 - (w.td || 0));
     const cv = this.cv;
-    const lowOn = !dead && !rolling && st.cover === 'low' && !!cv.lowIdle;
+    const lowOn = !dead && !rolling && !tdOn && (st.cover === 'low' || !!st.crouch) && !!cv.lowIdle;
     const highOn = !dead && !rolling && st.cover === 'high' && !st.aim && !!cv.highIdle;
     const lowW = ease('low', lowOn ? 1 : 0, 1.3) * (1 - dg);
     const highW = ease('high', highOn ? 1 : 0, 1.3) * (1 - dg) * (1 - lowW);
@@ -528,8 +534,12 @@ export class HumanView {
     this.die.setEffectiveWeight(1 - live);
     if (dead) this.die.time = Math.min(this.dieDur, st.deadAge);
     for (const [id, d] of Object.entries(this.dodges)) {
-      d.a.setEffectiveWeight(id === this.dodgeId ? dg * live : 0);
+      d.a.setEffectiveWeight(id === this.dodgeId ? (this.dodges[this.dodgeId] ? w.dodge : 0) * (1 - (w.td || 0)) * live : 0);
       if (rolling && id === rollId) d.a.time = Math.min(0.999, st.dodge) * d.dur;
+    }
+    if (this.takedownAct) {
+      this.takedownAct.setEffectiveWeight((w.td || 0) * live);
+      if (tdOn) { const a = st.takedownFrom ?? 0, b = st.takedownTo ?? this.takedownDur; this.takedownAct.time = Math.min(this.takedownDur * 0.999, a + (b - a) * st.takedown); }
     }
     // cover: kneeling / kneeling fire / kneeling strafes; back to it / sneaking sideways (in place clips: own pace)
     const lowAim = ease('lowAim', lowOn && st.aim ? 1 : 0, 1.5);
@@ -539,7 +549,13 @@ export class HumanView {
     const lw = lowW * live * (1 - tr), hw = highW * live * (1 - tr);
     fw(cv.lowIdle, lw * (1 - cm) * (1 - lowAim));
     fw(pistol ? cv.pKneel : cv.lowFire, lw * (1 - cm) * lowAim);
-    fw(cv.lowL, lw * cm * shL); fw(cv.lowR, lw * cm * shR);
+    if (st.cover !== 'low' && cv.walk) {
+      // D85 stealth crouch (not in cover): forward / back — the crouch walk (backwards played in reverse), sideways — the strafes
+      const fb = f + b, side = l + r, tot = fb + side || 1;
+      fw(cv.walk, lw * cm * (fb / tot));
+      fw(cv.lowL, lw * cm * (l / tot)); fw(cv.lowR, lw * cm * (r / tot));
+      cv.walk.timeScale = (b > f ? -1 : 1) * Math.min(1.6, Math.max(0.6, sp / (R.crouchWalk || 30)));
+    } else { fw(cv.lowL, lw * cm * shL); fw(cv.lowR, lw * cm * shR); }
     fw(cv.highIdle, hw * (1 - cm));
     fw(cv.highL, hw * cm * shL); fw(cv.highR, hw * cm * shR);
     const pace = Math.min(1.6, Math.max(0.6, sp / 32));

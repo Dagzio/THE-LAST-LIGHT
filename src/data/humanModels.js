@@ -51,4 +51,4 @@ export const GUN_MODELS = {
 };
 
 /** Weapon id (player / enemy weapon data) → gun model. */
-export const gunModelOf = (weaponId) => (weaponId === 'smg' ? 'smg' : weaponId === 'pistol' || weaponId === 'enemy_pistol' ? 'pistol' : 'rifle');
+export const gunModelOf = (weaponId) => (weaponId === 'smg' ? 'smg' : weaponId === 'pistol' || weaponId === 'pistol_sd' || weaponId === 'enemy_pistol' ? 'pistol' : 'rifle');

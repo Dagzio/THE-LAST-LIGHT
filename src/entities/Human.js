@@ -27,6 +27,10 @@ export class Human {
     this.faceAngle = Number.isFinite(spawn.angle) ? spawn.angle : 0; // where the body / eyes look
     this.illuminated = false; // DamageCalculator contract (no beam in KILL LIST)
     this.busy = !!spawn.busy; // D83 presentation: a posted enemy going through the files until alerted
+    // D85 stealth: an item he carries (loot on his body), his body found by another, how he died
+    this.carries = spawn.carries || null;
+    this.found = false;
+    this.killedBy = null;
     this.gun = {
       stats: weapon,
       ammo: weapon.magazineSize,
@@ -40,7 +44,11 @@ export class Human {
     this.ai = {
       mode: spawn.patrol ? 'patrol' : 'idle',
       post: { x: spawn.x, y: spawn.y, angle: this.faceAngle },
-      patrol: spawn.patrol ? spawn.patrol.map(([x, y]) => ({ x, y })) : null,
+      // D85: a patrol point may hold a wait (s) and a look angle while waiting
+      patrol: spawn.patrol ? spawn.patrol.map(([x, y, wait, look]) => ({ x, y, wait, look })) : null,
+      suspicion: 0,          // D85 stealth: 0…1 detection meter
+      seenAt: -Infinity,     // last time he saw / felt the hero (stealth)
+      investigate: false,    // walking to a suspicious spot (stealth)
       patrolIdx: 1,
       waitUntil: 0,
       sees: false,
