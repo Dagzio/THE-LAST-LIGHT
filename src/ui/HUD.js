@@ -12,7 +12,11 @@ import { coversHud, invalidateHudBlockers } from './hudBlockers.js';
 const BANNER_CLASS = 'show';
 const CALL_SECONDS = 7;     // s a phone-call card stays (game clock: a pause freezes it)
 const PT = { x: 0, y: 0 };
+const HERO_PT = { x: 0, y: 0 };
 const OBJ = { x: 0, y: 0 };
+
+/** D91: the HUD things a control's tag must not cover. */
+const TAG_OBSTACLES = '.ring-btn, .hud-objective, .stealth-hud, .hud-plate, .hud-weapon, .act-btn, .neon-btn, .touch-stick, .kiosk-prompt';
 
 /** D90: the HUD element of each control lit up by the training ground: [keyboard, touch] selectors. */
 const TUT_UI = {
@@ -231,7 +235,6 @@ export class HUD {
     if (x !== c.kx || y !== c.ky) { c.kx = x; c.ky = y; el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`; }
   }
 
-  /** An arrow at the screen edge pointing at the objective while it is off screen. */
   /**
    * D90 (user: every control shown as the lesson needs it): the HUD controls of the lesson glow, with a tag — the PC key
    * (the keyboard) or "TAP" (touch). The touch / PC element of each control (only the visible one shows).
@@ -257,6 +260,51 @@ export class HUD {
     }
   }
 
+  /**
+   * D91 (mobile: readable): the objective never ends in "…" — its font shrinks to fit (down to 12 px), then it may
+   * take a second line.
+   */
+  _fitObjective() {
+    const t = this.el.objText;
+    this.cache.objW = innerWidth;
+    t.style.fontSize = ''; t.classList.remove('wrap');
+    let fs = parseFloat(getComputedStyle(t).fontSize);
+    while (fs > 12 && t.scrollWidth > t.clientWidth + 1) { fs -= 0.5; t.style.fontSize = `${fs}px`; }
+    if (t.scrollWidth > t.clientWidth + 1) t.classList.add('wrap');
+  }
+
+  /**
+   * D91 (mobile: nothing overlaps): each lit control's tag goes above it — or to its left / right / below, the first
+   * side where it stays on the screen and covers no other HUD control (the buttons beside it, the HP plate).
+   */
+  _placeTags() {
+    const W = innerWidth, H = innerHeight, sides = ['', 'at-left', 'at-right', 'at-below'];
+    const obst = [];
+    for (const o of document.querySelectorAll(TAG_OBSTACLES)) {
+      const r = o.getBoundingClientRect();
+      if (r.width > 1 && r.height > 1 && o.offsetParent !== null && getComputedStyle(o).visibility !== 'hidden') obst.push({ o, r });
+    }
+    for (const el of this._tutEls) {
+      const tag = el.querySelector(':scope > .tut-tag');
+      if (!tag) continue;
+      for (const side of sides) {
+        tag.classList.remove('at-left', 'at-right', 'at-below');
+        if (side) tag.classList.add(side);
+        if (el.classList.contains('kiosk-prompt')) break; // over a world prompt: always above it
+        const r = tag.getBoundingClientRect();
+        const inside = r.left >= 2 && r.top >= 2 && r.right <= W - 2 && r.bottom <= H - 2;
+        const hits = obst.some(({ o, r: q }) => o !== el && !o.contains(el) && !el.contains(o)
+          && Math.min(r.right, q.right) - Math.max(r.left, q.left) > 1 && Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top) > 1);
+        if (inside && !hits) break;
+      }
+    }
+  }
+
+  /**
+   * An arrow pointing at the objective while it is off screen. D91 (mobile: nothing overlaps): it circles the hero (an
+   * ellipse round him, clear of the top HUD and the screen edges) instead of sitting on the screen edge — there it went
+   * under the objective plate / the corner buttons, or right over the target at the edge.
+   */
   _objectiveArrow(run, running) {
     const c = this.cache, el = this.el.arrow, r3 = this.game.renderer3d;
     const t = running && r3 ? run.objectiveTarget(OBJ) : null;
@@ -264,12 +312,21 @@ export class HUD {
     if (t) {
       r3.projectToScreen(t.x, t.y, 30, PT);
       const W = r3.viewW, H = r3.viewH, m = 46;
-      const inside = PT.x > m && PT.x < W - m && PT.y > m + 40 && PT.y < H - m;
+      const inside = PT.x > 12 && PT.x < W - 12 && PT.y > 12 && PT.y < H - 12; // D91: on the screen at all → no arrow
       if (!inside) {
-        const cx = W / 2, cy = H / 2, dx = PT.x - cx, dy = PT.y - cy;
-        ang = Math.atan2(dy, dx);
-        const k = Math.min((W / 2 - m) / Math.max(1e-6, Math.abs(dx)), (H / 2 - m) / Math.max(1e-6, Math.abs(dy)));
-        x = cx + dx * k; y = cy + dy * k;
+        const p = run.player, now = performance.now();
+        r3.projectToScreen(p.x, p.y, 30, HERO_PT);
+        if (now >= (this._bandAt || 0)) { // the top HUD band (objective plate, corner buttons), measured now and then
+          this._bandAt = now + 250;
+          let b = 0;
+          for (const q of document.querySelectorAll('#hudObjective, #screen-game .corner .ring-btn, #stealthHud, #waveBanner.show .stamp')) { const r = q.getBoundingClientRect(); if (r.height > 1) b = Math.max(b, r.bottom); }
+          this._band = b;
+        }
+        ang = Math.atan2(PT.y - HERO_PT.y, PT.x - HERO_PT.x);
+        const s = Math.sin(ang), up = s < 0;
+        const rx = Math.min(W * 0.28, 230);
+        const ry = Math.max(40, Math.min(H * 0.3, up ? HERO_PT.y - (this._band || 0) - 28 : H - 28 - HERO_PT.y));
+        x = HERO_PT.x + Math.cos(ang) * rx; y = HERO_PT.y + s * ry;
         on = true;
       }
     }
@@ -312,6 +369,7 @@ export class HUD {
       el.slots.replaceChildren(...slotIds.map((id, i) => {
         const s = document.createElement('i');
         s.textContent = String(i + 1);
+        s.dataset.weapon = id; // D91: a tap on a slot takes that weapon (UIManager)
         s.className = `slot${run.inventory.includes(id) ? '' : ' none'}${id === w.weaponId ? ' on' : ''}`;
         return s;
       }));
@@ -355,16 +413,21 @@ export class HUD {
         el.objKicker.textContent = T('hud.tutorial', { n: Math.min(m.index + 1, m.steps.length), total: m.steps.length });
         el.objText.replaceChildren(document.createTextNode(o ? T(o.textKey, { n: o.n, of: o.of }) : ''));
         if (o && !this.game.touchMode) for (const k of o.keys) { const b = document.createElement('kbd'); b.className = 'obj-key'; b.textContent = k.startsWith('key.') ? T(k) : k; el.objText.append(' ', b); }
+        this._fitObjective();
         if (fresh) { el.objective.classList.remove('pop'); void el.objective.offsetWidth; el.objective.classList.add('pop'); invalidateHudBlockers(); }
       }
       this._tutFocus(m.uiFocus);
+      const now = performance.now();
+      if (this._tutEls.length && now >= (this._tagAt || 0)) { this._tagAt = now + 300; this._placeTags(); } // D91
     } else if (run.modeId !== 'survival' && (objKey !== c.objKey || run.objectiveIndex !== c.objIdx)) {
       c.objKey = objKey; c.objIdx = run.objectiveIndex;
       el.objKicker.textContent = T('hud.objective', { n: Math.min(run.objectiveIndex + 1, run.level.objectives.length), total: run.level.objectives.length });
       el.objText.textContent = o ? T(o.textKey) : '';
+      this._fitObjective();
       el.objective.classList.remove('pop'); void el.objective.offsetWidth; el.objective.classList.add('pop');
       invalidateHudBlockers();
     }
+    if (innerWidth !== c.objW) this._fitObjective(); // D91: a resize / turn refits the objective
     const levelKey = run.level.nameKey;
     if (levelKey !== c.levelKey) { c.levelKey = levelKey; el.levelName.textContent = T(levelKey); }
     const items = `${run.has.keycard ? 'k' : ''}${run.has.drive ? 'd' : ''}`;

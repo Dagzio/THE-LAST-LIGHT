@@ -88,6 +88,16 @@ export class DialogueView {
     this.full = T(key);
     if (!keepTyped) this.shown = 0;
     this._paint();
+    this._fit();
+  }
+
+  /** D91 (small phones): the whole line fits its box — the font shrinks (down to 12 px) when the line is long. */
+  _fit() {
+    const box = this.el.text, line = this.lineEl;
+    if (!line) return;
+    box.style.fontSize = '';
+    let fs = parseFloat(getComputedStyle(box).fontSize);
+    while (fs - 0.5 >= 12 && line.offsetHeight > box.clientHeight - 3) { fs -= 0.5; box.style.fontSize = `${fs}px`; }
   }
 
   /**

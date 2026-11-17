@@ -193,7 +193,12 @@ export class UIManager {
       case 'interact': if (!this.game.interact()) Sfx.play('deny'); break;
       case 'toggleCover': if (!this.game.toggleCover()) Sfx.play('deny'); break;
       case 'armGrenade': Sfx.play(this.game.armGrenade('frag') ? 'click' : 'deny'); break;
-      case 'switchWeapon': if (this.game.switchWeapon()) Sfx.play('click'); break;
+      case 'switchWeapon': { // D91: a tap on a slot chip takes that weapon; elsewhere on the block — the next one
+        const slot = e.target.closest('.slot[data-weapon]');
+        const id = slot && !slot.classList.contains('none') ? slot.dataset.weapon : null;
+        if (this.game.switchWeapon(id)) Sfx.play('click');
+        break;
+      }
       default: break;
     }
   }
@@ -385,7 +390,20 @@ export class UIManager {
       b.classList.toggle('on', on);
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     }
-    const clock = (v) => `${Math.floor(v / 60)}:${String(Math.round(v) % 60).padStart(2, '0')}`;
+    // D91 (mobile): the tab labels stay whole — one font size for all, shrunk until the longest fits (H5: shrink, never cut)
+    if (!tabs.hidden) {
+      const list = [...tabs.querySelectorAll('.mode-tab:not([hidden])')];
+      const over = () => list.some((b) => { const s = b.querySelector('span'); return s && s.scrollWidth > s.clientWidth + 1; });
+      const fit = () => {
+        for (const b of list) b.style.fontSize = '';
+        let fs = list.length ? parseFloat(getComputedStyle(list[0]).fontSize) : 0;
+        while (fs - 0.5 >= 12 && over()) { fs -= 0.5; for (const b of list) b.style.fontSize = `${fs}px`; }
+      };
+      tabs.classList.remove('compact');
+      fit();
+      if (over()) { tabs.classList.add('compact'); fit(); } // still too long at 12 px: the labels without their icons
+    }
+    const clock =(v) => `${Math.floor(v / 60)}:${String(Math.round(v) % 60).padStart(2, '0')}`;
     const mode = MODES[modeId];
     document.getElementById('mapName').textContent = T(map.nameKey);
     document.getElementById('mapDesc').textContent = T(modeId === 'mission' ? map.descKey : mode.descKey);

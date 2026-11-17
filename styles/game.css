@@ -1456,3 +1456,38 @@ body.dlg-open #screen-game .hud-player, body.dlg-open #screen-game .touch-contro
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); animation: tutTag 1s ease-in-out infinite;
 }
 @keyframes tutTag { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+/* ===== D91 (user: the mobile version — nothing overlaps, everything readable and playable). H5 05-MOBILE-POLISH:
+   nothing under 12 px, buttons ≥ 40–44 px tall. ===== */
+.hud-obj-kicker { font-size: max(12px, calc(12px * var(--fs))); }
+body.touch .hud-lv { font-size: 12px; }
+/* the banners (HIT / DOOR OPEN …) stand above the hero, never on him; smaller on phones */
+body.touch .wave-banner { top: 21%; }
+@media (max-height: 500px) { .wave-banner .stamp { font-size: max(22px, calc(34px * var(--fs))); } }
+/* the weapon slots: on touch each one is a button of its own (tap = that weapon), big enough for a thumb */
+body.touch .hud-weapon { grid-template-areas: "gun ammo" "reload reload" "slots slots"; min-height: 44px; }
+body.touch .hud-slots { gap: 8px; margin-top: 4px; }
+body.touch .hud-slots .slot { min-width: 36px; height: 32px; line-height: 30px; padding: 0 6px; font-size: 16px; font-weight: 800; border-radius: 4px; }
+.hud-slots .slot { font-size: max(12px, calc(12px * var(--fs))); }
+/* the dialogue on phones: buttons a thumb can hit (≥ 38 px), labels ≥ 13 px; the text keeps clear of them */
+@media (max-height: 500px) {
+  .dlg-btn { font-size: 13px; min-height: 38px; padding: 0 16px; }
+  .dlg-text { top: 48%; bottom: calc(9% + 42px); }
+}
+/* D91: the tag of a lit control may sit beside it (HUD.js picks the side where it covers nothing) */
+.tut-tag.at-left { left: auto; right: calc(100% + 10px); bottom: auto; top: 50%; translate: 0 -50%; }
+.tut-tag.at-right { left: calc(100% + 10px); bottom: auto; top: 50%; translate: 0 -50%; }
+.tut-tag.at-below { bottom: auto; top: calc(100% + 8px); }
+@media (max-height: 500px) { .mode-tab { letter-spacing: 0.02em; padding: 0.5em 0.25em; gap: 0.3em; } }
+.hud-obj-text.wrap { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.15; text-align: center; } /* D91 */
+.mode-tabs.compact .mode-tab .ico { display: none; } /* D91: narrow phones — the labels whole, the icons go */
+/* D91: never under 12 px — the world prompts, the key caps, the mode tabs */
+.kiosk-prompt { font-size: max(12px, calc(16px * var(--fs))); }
+.act-key-wide { font-size: 12px; }
+.mode-tab { font-size: max(12px, calc(17px * var(--fs))); }
+/* D91: the dialogue covers the scene's arrow (no arrow over it); its buttons stay clear of the portraits; thumb size */
+body.dlg-open .obj-arrow { display: none; }
+.dlg-btns { left: 6%; right: 6%; }
+.dlg-btn { min-height: 40px; }
+@media (max-height: 500px) { .dlg-btn { min-height: 40px; } .dlg-text { bottom: calc(9% + 44px); } }
+@media (max-height: 500px) { .dlg-text { bottom: calc(9% + 42px); line-height: 1.2; } }
