@@ -35,7 +35,7 @@ export const TUTORIAL = {
       hl: [{ tag: 'stealth' }], ui: { takedown: 'F', crouch: 'C' } },
     { id: 'grenades', textKey: 'tut.obj.grenadeTake', keys: ['E'], dialogue: 'tut.grenade', target: [1800, 490], hl: [{ pickup: 'grenade_chest' }], ui: { interact: 'E' } },
     { id: 'kill', tag: 'grenade', textKey: 'tut.obj.grenadeThrow', keys: ['G', 'key.lmb'], target: [2120, 300], opens: 'gE', hl: [{ tag: 'grenade' }], ui: { grenade: 'G' } },
-    { id: 'roll', textKey: 'tut.obj.roll', keys: ['key.space'], dialogue: 'tut.roll', target: [1990, 890], opens: 'gF', hl: [{ rect: [1930, 872, 2050, 908] }], ui: { dash: 'key.space' } },
+    { id: 'roll', textKey: 'tut.obj.roll', keys: ['key.space'], dialogue: 'tut.roll', target: [1990, 890], opens: 'gF', hl: [{ rect: [1930, 872, 2050, 908] }, { arrow: [1990, 815, 1990, 965] }], ui: { dash: 'key.space' } },
     { id: 'kill', tag: 'ambush', textKey: 'tut.obj.ambush', dialogue: 'tut.ambush', target: [1990, 1420], opens: 'gG', ambush: true, hl: [{ tag: 'ambush' }] },
     { id: 'medkit', textKey: 'tut.obj.medkit', keys: ['E'], dialogue: 'tut.medkit', target: [1150, 1330], opens: 'gH', hl: [{ pickup: 'medkit_case' }], ui: { interact: 'E' } },
     { id: 'exit', textKey: 'tut.obj.exit', dialogue: 'tut.end', target: [1200, 1745], hl: [{ rect: 'exit' }] },

@@ -44,7 +44,7 @@ export class AutoAim {
     }
     // keep the current target unless the new one is clearly closer
     const cur = this.target;
-    if (cur && cur !== best && this._valid(cur, o, reach)) {
+    if (cur && cur !== best && enemies.includes(cur) && this._valid(cur, o, reach)) { // D92: only while still a candidate
       const dc = Math.hypot(cur.x - o.x, cur.y - o.y);
       if (!best || bestD > dc * this.cfg.switchRatio) best = cur;
     }

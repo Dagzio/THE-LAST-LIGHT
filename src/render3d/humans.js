@@ -744,6 +744,7 @@ export class HumanView {
   }
 
   dispose() {
+    if (this.fadeMat) { this.fadeMat.dispose(); this.fadeMat = null; } // D92: a fading body's own material
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.mixer.getRoot());
     if (this.group.parent) this.group.parent.remove(this.group);

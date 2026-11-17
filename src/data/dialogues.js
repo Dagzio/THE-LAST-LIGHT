@@ -14,7 +14,7 @@ const H = (key) => ['handler', key], K = (key) => ['hero', key];
 /** id → lines [speaker, locale key]. */
 export const DIALOGUES = {
   // ---- office · mission
-  'office.start': [H('dlg.os.1'), K('dlg.os.2'), H('dlg.os.3'), K('dlg.os.4')],
+  'office.start': [H('dlg.os.1'), K('dlg.os.2'), H('dlg.os.3'), K('dlg.os.4'), H('dlg.os.5'), K('dlg.os.6')], // D92: + the SMG / medkits
   'office.keycard': [K('dlg.ok.1'), H('dlg.ok.2')],
   'office.drive': [H('dlg.od.1'), K('dlg.od.2'), H('dlg.od.3')],
   // ---- office · stealth

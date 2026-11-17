@@ -359,6 +359,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
       pb.place(d.axis === 'x' ? d.x + s * (hw + 1) : d.x, d.axis === 'x' ? d.y : d.y + s * (hw + 1), d.axis === 'x' ? 0 : 1);
       pb.box('metalDark', 3, H - 4, T + 2, 0, 0, 0);
     }
+    if (d.kind === 'gate') continue; // D92 (user): the yard gates have no header beam over the passage (a black plank)
     pb.place(d.x, d.y, d.axis === 'x' ? 0 : 1);
     pb.box('metalDark', d.width + 6, 6, T + 2, 0, H - 8, 0);
   }
@@ -494,9 +495,19 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
 
   const M = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
   const RED = new THREE.Color(1.6, 0.15, 0.1), GREEN = new THREE.Color(0.2, 1.6, 0.4);
+  // D92: the side of a gate's wall where its yard is (its first zone) — the leaf slides there, clear of the path fences
+  const yardSide = (d) => {
+    const z = d.zones && level.zones.find((q) => q.id === d.zones[0]);
+    if (!z) return 1;
+    const c = d.axis === 'x' ? (z.rect[1] + z.rect[3]) / 2 - d.y : (z.rect[0] + z.rect[2]) / 2 - d.x;
+    return c < 0 ? -1 : 1;
+  };
   const placeLeaf = (v, open) => {
     const d = v.def, off = open * d.width * 0.98;
-    if (d.axis === 'x') { P.set(d.x - off, 4, d.y); Q.identity(); } else { P.set(d.x, 4, d.y - off); Q.setFromAxisAngle(UP, Math.PI / 2); }
+    // D92 (user: the open gates flickered in the wall): a yard gate first steps out of the wall line, then slides along
+    // its outer face (not inside the wall — its picture is taller than the fence and fought the wall's faces)
+    const out = d.kind === 'gate' ? Math.min(1, open * 5) * (T / 2 + 2.5) * yardSide(d) : 0;
+    if (d.axis === 'x') { P.set(d.x - off, 4, d.y + out); Q.identity(); } else { P.set(d.x + out, 4, d.y - off); Q.setFromAxisAngle(UP, Math.PI / 2); }
     S.set(d.width, 1, 1);
     M.compose(P, Q, S);
     v.im.setMatrixAt(v.i, M);

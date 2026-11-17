@@ -15,6 +15,9 @@ import { CameraRig, distanceFor } from './CameraRig.js';
 import { dodgeOf } from '../data/player.js';
 import { STEALTH } from '../data/stealth.js';
 import { StealthOverlay } from './StealthOverlay.js';
+import { BLOCK } from '../systems/Collision.js';
+
+const BLOCK_MOVE = BLOCK.MOVE;
 import { CAMERA, CAMERA_TOUCH } from '../config/camera.js';
 import { QUALITY_PRESETS, antialiasFor, TOUCH } from '../config/settings.js';
 
@@ -37,7 +40,15 @@ const MAX_POOLS = 40;
 const MAX_HL = 12; // D90: highlighted objects of a lesson at once
 const TILT = (CAMERA.tilt * Math.PI) / 180;
 const SHOT_FLASH = 0.05;
-const DEATH_SINK = 26;   // s after death the body starts to sink away (BODY_FADE in the run is 30)
+// D92: the fall of the dead — the clips fall forward ~25 units (hips) and lie ~60 long; the turn towards free room
+const DEATH_FALL = 62;     // units of floor the fall needs ahead (a band DEATH_WIDE wide: the arms spread)
+const DEATH_WIDE = 16;
+const DEATH_DRIFT = 0.4;   // rad: the fall drifts to his right (measured: the head ends ~55 ahead, ~24 to the right)
+const DEATH_TURN = 0.35;   // s the turn towards free room eases in
+const DEATH_TURNS = [0, 0.45, -0.45, 0.9, -0.9, 1.35, -1.35, 1.57, -1.57]; // rad, the smallest first
+const DEATH_FADE_AT = 1.1; // s: no room anywhere — he fades out after the fall…
+const DEATH_FADE = 0.5;    // …this fast (and every body this fast before the run removes it)
+const smooth01 = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
 
 const M = new THREE.Matrix4();
 const Q = new THREE.Quaternion();
@@ -345,6 +356,15 @@ export class Renderer3D {
     this.hlRings = new THREE.InstancedMesh(new THREE.RingGeometry(0.8, 1, 40).rotateX(-Math.PI / 2), hlMat, MAX_HL);
     this.hlArrows = new THREE.InstancedMesh(new THREE.PlaneGeometry(13, 13), this.objMarker.material, MAX_HL);
     for (const im of [this.hlBars, this.hlRings, this.hlArrows]) { im.frustumCulled = false; im.count = 0; im.renderOrder = im === this.hlArrows ? 15 : 3; }
+    // D92: a direction arrow painted on the ground (the roll lesson: across the mats); unit length along +x
+    const arrowGeo = new THREE.PlaneGeometry(1, 1); arrowGeo.rotateX(-Math.PI / 2);
+    this.hlGroundArrow = new THREE.Mesh(arrowGeo, new THREE.MeshBasicMaterial({ map: iconTexture((g) => {
+      g.fillStyle = '#ffcf3a'; g.strokeStyle = 'rgba(40, 28, 0, 0.9)'; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(4, 24); g.lineTo(38, 24); g.lineTo(38, 12); g.lineTo(60, 32); g.lineTo(38, 52); g.lineTo(38, 40); g.lineTo(4, 40); g.closePath(); g.fill(); g.stroke();
+    }), transparent: true, depthWrite: false }));
+    this.hlGroundArrow.renderOrder = 6; // (over the mats)
+    this.hlGroundArrow.visible = false;
+    this.scene.add(this.hlGroundArrow);
     // crate "in reach" ring
     this.reachRing = new THREE.Mesh(objRing, new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.reachRing.renderOrder = 3;
@@ -453,7 +473,9 @@ export class Renderer3D {
     if (it) { this._flat(this.reachRing, it.def.x, it.def.y, (it.def.hidden ? 44 : 30) + Math.sin(time * 6) * 2, 1.2, 0.85); } // D88: round the chest prop
     // D90: the lesson's objects lit up (training ground) — instead of the area marker
     const hl = run.mode && run.mode.highlights && !run.over ? run.mode.highlights() : null;
-    this._syncHighlights(hl, time);
+    // D92: the level's pointed supplies (the office's SMG crate) — lit too, the objective marker stays
+    const ptr = !run.over && run.pointers ? run.pointers() : null;
+    this._syncHighlights(hl && hl.length ? (ptr && ptr.length ? hl.concat(ptr) : hl) : ptr, time);
     // objective marker over the current target (yellow chevron + ring)
     const t = hl && hl.length ? null : run.objectiveTarget(OBJ_PT);
     this.objMarker.visible = this.objRing.visible = !!t && !run.over;
@@ -464,13 +486,52 @@ export class Renderer3D {
     }
   }
 
+  /** D92: where a dead enemy falls — the first turn whose floor ahead is free (walls, doors, furniture), else a fade. */
+  _planDeath(v, e, run) {
+    v.deathOff = 0; v.deathFade = false;
+    v.deathFace = e.faceAngle;
+    const w = run.world;
+    if (!w) return;
+    for (const off of DEATH_TURNS) {
+      const a = e.faceAngle + off + DEATH_DRIFT;
+      if (w.segmentHit(e.x, e.y, e.x + Math.cos(a) * DEATH_FALL, e.y + Math.sin(a) * DEATH_FALL, DEATH_WIDE, null, BLOCK_MOVE) === Infinity) { v.deathOff = off; return; }
+    }
+    v.deathFade = run.modeId !== 'stealth'; // (stealth: the body must stay for the guards — no fade)
+  }
+
+  /** D92: a view's opacity (its own copy of the shared material, the same shader program); 0 hides it. */
+  _fadeView(v, k) {
+    if (k >= 0.999 && !v.fadeMat) return;
+    if (!v.fadeMat) {
+      const src = v.mesh.material, m = src.clone();
+      m.onBeforeCompile = src.onBeforeCompile; // (the rim light: the same program as the shared material)
+      m.transparent = true;
+      v.mesh.material = m;
+      v.fadeMat = m;
+    }
+    v.fadeMat.opacity = Math.max(0, Math.min(1, k));
+    for (const g of Object.values(v.guns)) if (k < 0.6) g.visible = false;
+    v.group.visible = v.group.visible && k > 0.01;
+  }
+
   /** D90: frames / rings / chevrons over the highlighted objects (pulsing). */
   _syncHighlights(hl, time) {
-    let bars = 0, rings = 0, arrows = 0;
+    let bars = 0, rings = 0, arrows = 0, groundArrow = false;
     const pulse = 0.55 + 0.45 * Math.sin(time * 5), T = 2.2;
     if (hl) {
       for (const h of hl) {
         if (arrows >= MAX_HL) break;
+        if (h.arrow) { // D92: the ground arrow (no chevron)
+          const [x0, y0, x1, y1] = h.arrow, len = Math.hypot(x1 - x0, y1 - y0), a = Math.atan2(y1 - y0, x1 - x0);
+          const g = this.hlGroundArrow, k = 0.5 + 0.5 * Math.sin(time * 4);
+          g.visible = true;
+          g.position.set((x0 + x1) / 2, 4, (y0 + y1) / 2);
+          g.rotation.set(0, -a, 0);
+          g.scale.set(len, 1, len * 0.42);
+          g.material.opacity = 0.55 + 0.4 * k;
+          groundArrow = true;
+          continue;
+        }
         let top = 34;
         if (h.r) {
           const ex = h.e ? this._lx(h.e) : h.x, ey = h.e ? this._ly(h.e) : h.y;
@@ -489,6 +550,7 @@ export class Renderer3D {
       }
     }
     this.hlBars.count = bars; this.hlRings.count = rings; this.hlArrows.count = arrows;
+    if (!groundArrow) this.hlGroundArrow.visible = false;
     for (const im of [this.hlBars, this.hlRings, this.hlArrows]) im.instanceMatrix.needsUpdate = true;
     this.hlBars.material.opacity = 0.55 + 0.4 * pulse;
   }
@@ -789,11 +851,20 @@ export class Renderer3D {
         deadAge: e.alive ? -1 : time - e.deathAt,
         busy: !!e.busy && e.alive && ai.mode === 'idle' && sp < 2, // D83: going through the files until alerted
       });
-      // D85: bodies sink 4 s before the run removes them (stealth: they stay — the guards can find them)
-      const sinkFrom = Number.isFinite(run.bodyFade) ? Math.max(1, run.bodyFade - 4) : Infinity;
-      const sink = !e.alive && Number.isFinite(sinkFrom) ? Math.max(0, time - e.deathAt - Math.min(DEATH_SINK, sinkFrom)) * 6 : 0;
-      v.group.position.set(ex, -sink, ey);
-      v.group.rotation.y = -(e.faceAngle - v.aimYaw);
+      // D92 (user: the dead must not fall through walls / furniture / the floor): the fall goes where there is room (a
+      // turn of up to 90° eased in while he staggers); with no room he fades out right after the fall. Bodies no
+      // longer sink through the floor before the run removes them — they fade (stealth: they stay, the guards find them)
+      let yaw = e.faceAngle;
+      if (!e.alive) {
+        if (v.deathOff === undefined) this._planDeath(v, e, run);
+        const age = time - e.deathAt;
+        yaw += v.deathOff * smooth01(age / DEATH_TURN);
+        let fade = v.deathFade ? 1 - smooth01((age - DEATH_FADE_AT) / DEATH_FADE) : 1;
+        if (Number.isFinite(run.bodyFade)) fade = Math.min(fade, 1 - smooth01((age - (run.bodyFade - DEATH_FADE - 0.3)) / DEATH_FADE));
+        this._fadeView(v, fade);
+      }
+      v.group.position.set(ex, 0, ey);
+      v.group.rotation.y = -(yaw - v.aimYaw);
       v.flash.visible = e.alive && time - g.lastShotAt >= 0 && time - g.lastShotAt < SHOT_FLASH;
       if (v.flash.visible) v.flash.rotation.x = (g.lastShotAt * 91.7) % (Math.PI * 2);
       if (!e.alive) continue;

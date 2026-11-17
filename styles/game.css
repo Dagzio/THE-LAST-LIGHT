@@ -1491,3 +1491,7 @@ body.dlg-open .obj-arrow { display: none; }
 .dlg-btn { min-height: 40px; }
 @media (max-height: 500px) { .dlg-btn { min-height: 40px; } .dlg-text { bottom: calc(9% + 44px); } }
 @media (max-height: 500px) { .dlg-text { bottom: calc(9% + 42px); line-height: 1.2; } }
+/* D92: the second pointer (a supply the level shows: the office's SMG crate) — smaller, blue */
+.obj-arrow.alt { width: 34px; height: 34px; box-shadow: 0 0 0 2px #7fd6ff, 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 12px rgba(127, 214, 255, 0.5); }
+.obj-arrow.alt svg { stroke: #9fe2ff; }
+body.dlg-open .obj-arrow.alt { display: none; }

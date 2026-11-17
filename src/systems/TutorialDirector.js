@@ -75,7 +75,7 @@ export class TutorialDirector {
         const pk = L.pickups.find((x) => x.id === h.pickup);
         if (pk) out.push(this._propBox(pk.x, pk.y));
       } else if (h.targets) {
-        for (const t of this.targets) out.push({ x: t.x, y: t.y, r: 13 });
+        this.targets.forEach((t, i) => { if (!this.hitTargets.has(i)) out.push({ x: t.x, y: t.y, r: 13 }); }); // D92: not the hit ones
       } else if (h.prop) {
         out.push(this._propBox(h.prop[0], h.prop[1]));
       } else if (h.rect) {
@@ -83,6 +83,9 @@ export class TutorialDirector {
         if (r) out.push({ x: (r[0] + r[2]) / 2, y: (r[1] + r[3]) / 2, w: r[2] - r[0], d: r[3] - r[1] });
       } else if (h.tag) {
         for (const e of run.enemies) if (e.alive && e.tag === h.tag) out.push({ x: e.x, y: e.y, r: 22, e });
+      } else if (h.arrow) { // D92 (user): the way to roll — an arrow drawn on the ground (from the gate across the mats)
+        const [x0, y0, x1, y1] = h.arrow;
+        out.push({ arrow: h.arrow, x: (x0 + x1) / 2, y: (y0 + y1) / 2 });
       } else if (h.bodies) {
         for (const e of run.enemies) if (!e.alive && e.ammoDrop > 0 && h.bodies.includes(e.tag)) out.push({ x: e.x, y: e.y, r: 20, e });
       }
@@ -117,7 +120,8 @@ export class TutorialDirector {
     const s = this.step;
     if (!s || s.id !== 'hits') return null;
     if (this.run.weapon.weaponId !== s.weapon) return NO_TARGETS; // the wrong gun: no rounds wasted (switch first)
-    return this._aim || (this._aim = this.targets.map((t) => ({ x: t.x, y: t.y + 4, radius: 6, alive: true })));
+    // D92: only the targets not hit yet in this lesson
+    return this._aim || (this._aim = this.targets.filter((t, i) => !this.hitTargets.has(i)).map((t) => ({ x: t.x, y: t.y + 4, radius: 6, alive: true })));
   }
 
   // the stealth director's flags the HUD reads
@@ -127,6 +131,8 @@ export class TutorialDirector {
   _next(i) {
     this.index = i;
     this.count = 0;
+    this.hitTargets = new Set(); // D92: the targets hit in this lesson
+    this._aim = null;
     const s = this.step;
     if (!s) return;
     // progress already made counts (both guns taken before, a target already down)
@@ -180,7 +186,11 @@ export class TutorialDirector {
     const s = this.step;
     if (!s || s.id !== 'hits' || this.run.weapon.weaponId !== s.weapon) return;
     const r = TUTORIAL.hitsNear;
-    if (!this.targets.some((t) => Math.abs(t.x - x) <= r && Math.abs(t.y - y) <= r)) return;
+    const i = this.targets.findIndex((t) => Math.abs(t.x - x) <= r && Math.abs(t.y - y) <= r);
+    // D92 (user): each gun hits different targets — a target already hit in this lesson no longer counts (nor glows)
+    if (i < 0 || this.hitTargets.has(i)) return;
+    this.hitTargets.add(i);
+    this._aim = null;
     this.count += 1;
     this.run.events.emit('targetHit', x, y);
     if (this.count >= s.need) this._done();

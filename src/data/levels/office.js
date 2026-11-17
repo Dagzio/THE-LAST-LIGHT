@@ -233,8 +233,8 @@ export const OFFICE = {
 
   // enemies: type (data/humans.js), post, facing (rad: 0 east, π/2 south, π west, −π/2 north), optional patrol loop
   enemies: [
-    { type: 'thug', x: 980, y: 1250, angle: 0, patrol: [[980, 1250], [1420, 1250]] },
-    { type: 'thug', x: 1560, y: 1390, angle: Math.PI },
+    // D92 (user): the two nearest the start are gone; a guard (pistol, idle) stands right of the turnstiles
+    { type: 'thug', x: 1395, y: 1172, angle: Math.PI },
     { type: 'gunman', x: 400, y: 1040, angle: 0, patrol: [[400, 1040], [1750, 1040]] },
     { type: 'thug', x: 560, y: 1230, angle: Math.PI / 2 },
     { type: 'thug', x: 330, y: 1580, angle: 0, patrol: [[330, 1580], [690, 1580]] },
@@ -261,6 +261,8 @@ export const OFFICE = {
     ],
   },
 
+  // D92 (user): the SMG crate is lit up and pointed at (a second arrow) until it is opened — mission mode
+  pointers: [{ pickup: 'crate_smg' }],
   pickups: [
     { id: 'crate_smg', kind: 'crate', item: 'smg', x: 690, y: 1585 },
     { id: 'crate_grenades', kind: 'crate', item: 'grenades', count: 2, x: 1700, y: 1662 },

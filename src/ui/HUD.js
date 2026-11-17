@@ -14,6 +14,7 @@ const CALL_SECONDS = 7;     // s a phone-call card stays (game clock: a pause fr
 const PT = { x: 0, y: 0 };
 const HERO_PT = { x: 0, y: 0 };
 const OBJ = { x: 0, y: 0 };
+const OBJ2 = { x: 0, y: 0 };
 
 /** D91: the HUD things a control's tag must not cover. */
 const TAG_OBSTACLES = '.ring-btn, .hud-objective, .stealth-hud, .hud-plate, .hud-weapon, .act-btn, .neon-btn, .touch-stick, .kiosk-prompt';
@@ -42,7 +43,7 @@ export class HUD {
       items: $('hudItems'),
       banner: $('waveBanner'), bannerText: $('waveBannerText'), screen: $('screen-game'),
       call: $('introCard'), callKicker: $('introKicker'), callTitle: $('introTitle'), callText: $('introText'),
-      crate: $('cratePrompt'), crateText: $('cratePromptText'), arrow: $('objArrow'), interactBtn: $('interactBtn'),
+      crate: $('cratePrompt'), crateText: $('cratePromptText'), arrow: $('objArrow'), arrow2: $('objArrow2'), interactBtn: $('interactBtn'),
       coverPrompt: $('coverPrompt'), coverBtn: $('coverBtn'),
       // D85 stealth
       stealth: $('stealthHud'), alertLabel: $('alertLabel'), vis: $('visLabel'), visText: $('visText'),
@@ -306,12 +307,29 @@ export class HUD {
    * under the objective plate / the corner buttons, or right over the target at the edge.
    */
   _objectiveArrow(run, running) {
-    const c = this.cache, el = this.el.arrow, r3 = this.game.renderer3d;
+    const r3 = this.game.renderer3d;
     const t = running && r3 ? run.objectiveTarget(OBJ) : null;
+    const a = this._arrow(run, this.el.arrow, t, 'main', 1);
+    // D92 (user): a second, smaller pointer at a supply the level shows (the office's SMG crate) — inside the main one
+    const t2 = running && r3 && run.pointerTarget ? run.pointerTarget(OBJ2) : null;
+    this._arrow(run, this.el.arrow2, t2, 'alt', a !== null && t2 && Math.abs(Math.atan2(Math.sin(a - this._angOf(run, t2)), Math.cos(a - this._angOf(run, t2)))) < 0.6 ? 0.62 : 1);
+  }
+
+  _angOf(run, t) {
+    const r3 = this.game.renderer3d, p = run.player;
+    r3.projectToScreen(t.x, t.y, 30, PT); r3.projectToScreen(p.x, p.y, 30, HERO_PT);
+    return Math.atan2(PT.y - HERO_PT.y, PT.x - HERO_PT.x);
+  }
+
+  /** One off-screen arrow round the hero towards t (null hides it); k scales its ellipse. → its angle, or null. */
+  _arrow(run, el, t, key, k) {
+    if (!el) return null;
+    const c = this.cache.arrows || (this.cache.arrows = {}), st = c[key] || (c[key] = { on: null, x: -1, y: -1, a: -1 });
+    const r3 = this.game.renderer3d;
     let on = false, x = 0, y = 0, ang = 0;
     if (t) {
       r3.projectToScreen(t.x, t.y, 30, PT);
-      const W = r3.viewW, H = r3.viewH, m = 46;
+      const W = r3.viewW, H = r3.viewH;
       const inside = PT.x > 12 && PT.x < W - 12 && PT.y > 12 && PT.y < H - 12; // D91: on the screen at all → no arrow
       if (!inside) {
         const p = run.player, now = performance.now();
@@ -324,19 +342,20 @@ export class HUD {
         }
         ang = Math.atan2(PT.y - HERO_PT.y, PT.x - HERO_PT.x);
         const s = Math.sin(ang), up = s < 0;
-        const rx = Math.min(W * 0.28, 230);
-        const ry = Math.max(40, Math.min(H * 0.3, up ? HERO_PT.y - (this._band || 0) - 28 : H - 28 - HERO_PT.y));
+        const rx = Math.min(W * 0.28, 230) * k;
+        const ry = Math.max(40, Math.min(H * 0.3, up ? HERO_PT.y - (this._band || 0) - 28 : H - 28 - HERO_PT.y)) * k;
         x = HERO_PT.x + Math.cos(ang) * rx; y = HERO_PT.y + s * ry;
         on = true;
       }
     }
-    if (on !== c.arrowOn) { c.arrowOn = on; el.classList.toggle('on', on); }
-    if (!on) return;
+    if (on !== st.on) { st.on = on; el.classList.toggle('on', on); }
+    if (!on) return null;
     const rx = Math.round(x), ry = Math.round(y), ra = Math.round(ang * 100) / 100;
-    if (rx !== c.ax || ry !== c.ay || ra !== c.aa) {
-      c.ax = rx; c.ay = ry; c.aa = ra;
+    if (rx !== st.x || ry !== st.y || ra !== st.a) {
+      st.x = rx; st.y = ry; st.a = ra;
       el.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -50%) rotate(${ra}rad)`;
     }
+    return ang;
   }
 
   update() {

@@ -403,6 +403,31 @@ export class MissionRun {
   }
 
   /** World point of the current objective (HUD arrow / marker), or null. */
+  /**
+   * D92 (user: the office's SMG crate easy to find): the level's `pointers` — supplies lit up (a frame + a chevron) and
+   * pointed at by a second arrow until they are opened. Mission mode only. → boxes { x, y, w, d }.
+   */
+  pointers() {
+    const out = this._ptrs || (this._ptrs = []);
+    out.length = 0;
+    if (this.modeId !== 'mission' || !this.level.pointers) return out;
+    for (const ptr of this.level.pointers) {
+      const pk = this.pickups.find((x) => x.def.id === ptr.pickup);
+      if (pk && !pk.taken && pk.openedAt < 0) out.push({ x: pk.def.x, y: pk.def.y, w: ptr.w || 46, d: ptr.d || 26 });
+    }
+    return out;
+  }
+
+  /** D92: the nearest pointed supply (the second HUD arrow), or null. */
+  pointerTarget(out = {}) {
+    const list = this.pointers(), p = this.player;
+    let best = null, bd = Infinity;
+    for (const b of list) { const d = Math.hypot(b.x - p.x, b.y - p.y); if (d < bd) { bd = d; best = b; } }
+    if (!best) return null;
+    out.x = best.x; out.y = best.y;
+    return out;
+  }
+
   objectiveTarget(out = {}) {
     if (this.mode && this.mode.objectiveTarget) return this.mode.objectiveTarget(out); // D85: survival — supplies
     const o = this.objective;
