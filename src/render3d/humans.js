@@ -10,7 +10,10 @@
 //  - upper body, two weapon sets — rifle (rifle, SMG) and pistol: relaxed (idle / run), aim (Firing Rifle held still /
 //    Pistol Idle), reload (Reloading; D84 the pistol: "Pistol Reload" / "Pistol Reloading Idle"), hit, grenade toss
 //    (the gun goes to the left hand while the right arm throws — works with both sets);
-//  - full body: death, the roll (Dodge, D82), crouching behind low cover (Idle Crouching / Crouch Walking, D82).
+//  - full body: death, the rolls (D82 / D83), cover (Crouch Idle, kneeling fire, wall sneaks), busy, the takedown (D85);
+//    moving crouched (D86): the legs of Crouched Sneaking / Crouch Walking, the arms of the crouch idle with the gun.
+// D86: the locomotion clips play in step (one gait phase, offset by each clip's left-foot swing); the torso keeps the
+// orientation the upper-body clips give it over whatever hips the legs' clip has (strafes turn them up to ±95°).
 // D82: standing, the legs + hips come from the aim clip itself, and the body is turned by the barrel's measured yaw —
 // the gun points exactly at the aim; the enemies pick random variants of idle / run / hit / reload / death.
 // The node tree is cloned per character; geometry, texture, material and clips are shared.
@@ -26,6 +29,7 @@ const smooth = (a, b, v) => { const k = clamp01((v - a) / (b - a)); return k * k
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
 const _axis = new THREE.Vector3();
+const _tq = new THREE.Quaternion(), _tp = new THREE.Quaternion();
 const _q3 = new THREE.Quaternion();
 
 /** One loaded model (hero / enemy): skeleton, clips for that skeleton, gun mounts. */
@@ -51,9 +55,16 @@ export class HumanTemplate {
     this.height = height;
     this.anims = anims;
     this.clips = this._buildClips(anims, ref);
+    // ground speed of each clip (units/s): its travel, or (D86, "In Place" clips) the speed its planted foot implies;
+    // gait — the phase of the left foot's swing (looping clips are played in step by it)
     this.rootSpeed = {};
+    this.gait = {};
     const unitsPerCm = this.hipsK * this.scale;
-    for (const id in anims.clips) this.rootSpeed[id] = anims.clips[id].rootSpeed * unitsPerCm;
+    for (const id in anims.clips) {
+      const c = anims.clips[id];
+      this.rootSpeed[id] = (c.rootSpeed > 1 ? c.rootSpeed : (c.stride || 0) * HUMAN_ANIM.strideK) * unitsPerCm;
+      if (Number.isFinite(c.off)) this.gait[id] = c.off;
+    }
     this.mounts = { rifle: this._mount('rifle'), pistol: this._mount('pistol') };
     this.mount = this.mounts.rifle; // (dev viewer info)
   }
@@ -110,6 +121,7 @@ export class HumanTemplate {
     parent.updateMatrixWorld(true);
     const pInv = parent.matrixWorld.clone().invert();
     const pqInv = parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+    this.hipsUp = new THREE.Vector3(0, 1, 0).applyQuaternion(pqInv).normalize(); // D86: the vertical in the Hips' parent frame
     this.hipsK = hips.getWorldPosition(_v).y / HUMAN_ANIM.srcHipsCm;
     const corr = this._corrections(ref);
     this.retargeted = !!corr;
@@ -277,7 +289,7 @@ function pickClips(C, variant, mixed) {
 }
 
 // leg / upper-body layers by ROLE (the clip of a role comes from pickClips); the rest are fixed clips
-const LEGS = ['back', 'strafeL', 'strafeR', 'pWalk', 'pRun'];
+const LEGS = ['back', 'backRun', 'strafeL', 'strafeR', 'pWalk', 'pRun', 'pStrafeL', 'pStrafeR'];
 const UPPER = ['fire', 'throw', 'pIdle', 'pWalk', 'pRun'];
 const FIRE_POSE_T = 0.33;   // the aim pose = "Firing Rifle" held at this time (the gun mount is measured on it)
 const _pt = new THREE.Vector3();
@@ -304,7 +316,15 @@ export class HumanView {
     this.mixer = new THREE.AnimationMixer(root);
     const C = tpl.clips;
     this.pick = pick;
-    const act = (clip) => { const a = this.mixer.clipAction(clip); a.play(); a.setEffectiveWeight(0); return a; };
+    // every action + its clip id (D86: the torso fix reads the hips of the clips driving the upper body)
+    this.acts = [];
+    this.idOf = new Map();
+    const act = (clip) => {
+      const a = this.mixer.clipAction(clip); a.play(); a.setEffectiveWeight(0);
+      const m = /^(.*?)(\.(upper|lower))?$/.exec(clip.name);
+      this.acts.push(a); this.idOf.set(a, m[1]); a.upperDriver = m[3] !== 'lower';
+      return a;
+    };
     this.L = {};
     for (const k of LEGS) if (C[k]) this.L[k] = act(C[k].lower);
     this.L.walk = act(C[pick.walk].lower);
@@ -339,11 +359,14 @@ export class HumanView {
     // its start), sneaking sideways (Left / Right Cover Sneak); Stand To Crouch / Crouch To Standing between them
     this.cv = {
       // D85 (user): crouched in cover — "Crouch Idle" (both guns), moving along — the "Crouch Walk Strafe" clips
-      lowIdle: loop('crouchIdle2') || loop('crouchIdle'), lowFire: held('crouchFire', 0.3), pKneel: loop('pKneel'),
-      lowL: loop('crouchL'), lowR: loop('crouchR'),
+      lowIdle: loop('crouchIdle2'), lowFire: held('crouchFire', 0.3), pKneel: loop('pKneel'),
+      // D86: moving crouched — the LEGS of "Crouched Sneaking Left / Right" (sideways) and "Crouch Walking" (forward /
+      // back); the arms keep the gun as in the crouch idle (rifle) / Pistol Kneeling Idle (the sneaks are unarmed clips)
+      lowL: C.crouchL ? act(C.crouchL.lower) : null, lowR: C.crouchR ? act(C.crouchR.lower) : null,
+      walk: C.crouchWalk ? act(C.crouchWalk.lower) : null,
+      upRifle: C.crouchIdle2 ? act(C.crouchIdle2.upper) : null, upPistol: C.pKneel ? act(C.pKneel.upper) : null,
       highIdle: held('peek', 0), highL: loop('coverL'), highR: loop('coverR'),
       toCrouch: held('toCrouch'), toStand: held('toStand'),
-      walk: loop('crouchWalk'), // D85 stealth: crouch-walking forward / back (sideways: the strafes above)
     };
     this.takedownAct = C.takedown ? held('takedown') : null; // D85 stealth: the takedown from behind
     this.takedownDur = C.takedown ? C.takedown.duration : 1;
@@ -370,6 +393,75 @@ export class HumanView {
     this.inLeft = false;
     this.muzzle = null;
     this.aimYaw = 0;
+    this.phase = Math.random(); // D86: the shared gait phase (cycles) of the locomotion clips (presentation only)
+    // D86: the bones turned after the mixer (torso fix, recoil) and their last mixer-given rotation
+    this.touched = ['Spine', 'RightHand', 'RightForeArm'].filter((n) => bones.get(n)).map((n) => [bones.get(n), bones.get(n).quaternion.clone()]);
+    this.torsoTwist = 0;        // D86: the last torso fix (rad, dev / checks)
+  }
+
+  /**
+   * D86: every looping locomotion clip in `list` is played IN STEP — one shared phase (advanced by the weighted cadence
+   * of the clips at this ground speed), each clip offset by its own left-foot swing — so forward + strafe (diagonals),
+   * walk ↔ run and the crouch set blend without the feet crossing. `back` plays the given clips in reverse.
+   */
+  _gaitStep(dt, sp, list, back) {
+    const R = this.tpl.rootSpeed, G = this.tpl.gait, A = HUMAN_ANIM;
+    let wsum = 0, fsum = 0;
+    for (const a of list) {
+      if (!a) continue;
+      const w = a.getEffectiveWeight();
+      if (w < 1e-3) continue;
+      const id = this.idOf.get(a), dur = a.getClip().duration;
+      const max = /run|Run/.test(id) ? A.runRateMax : A.walkRateMax;
+      const rate = Math.min(max, Math.max(0.6, sp / (R[id] || 30)));
+      fsum += (w * rate) / dur;
+      wsum += w;
+    }
+    if (wsum > 0) this.phase = (this.phase + (dt * fsum) / wsum) % 1;
+    for (const a of list) {
+      if (!a) continue;
+      a.timeScale = 0;
+      const id = this.idOf.get(a), dur = a.getClip().duration;
+      const ph = (back && back.has(a) ? 1 - this.phase : this.phase) + (G[id] || 0);
+      a.time = (ph - Math.floor(ph)) * dur * 0.999;
+    }
+  }
+
+  /**
+   * D86: the torso keeps the pose of the clips that drive the upper body, whatever the legs' hips do — the strafe /
+   * back / crouch-sneak clips turn the hips up to ±55°, and the aim pose rides on them (the gun swung off the aim, then
+   * the whole body was turned back by it and the legs walked crooked). The hips' yaw against the weighted hips of the
+   * upper-body clips (at their current times) is taken off the Spine.
+   */
+  _torsoFix() {
+    const tpl = this.tpl, fps = tpl.anims.fps, up = tpl.hipsUp;
+    let sx = 0, sy = 0, sz = 0, sw = 0, tw = 0;
+    for (const a of this.acts) {
+      if (!a.upperDriver) continue;
+      const w = a.getEffectiveWeight();
+      if (w < 1e-3) continue;
+      const id = this.idOf.get(a), arr = tpl.hipsLocal[id];
+      if (!arr) continue;
+      const n = arr.length / 4, f = Math.max(0, Math.min(n - 1, Math.round(a.time * fps))) * 4;
+      let x = arr[f], y = arr[f + 1], z = arr[f + 2], qw = arr[f + 3];
+      if (tw > 0 && x * sx + y * sy + z * sz + qw * sw < 0) { x = -x; y = -y; z = -z; qw = -qw; }
+      sx += x * w; sy += y * w; sz += z * w; sw += qw * w; tw += w;
+    }
+    const hips = this.bones.get('Hips'), spine = this.bones.get('Spine');
+    if (tw < 1e-3 || !hips || !spine) { this.torsoTwist = 0; return; }
+    _q.set(sx, sy, sz, sw).normalize();                        // the reference hips (parent frame)
+    _q2.copy(_q).multiply(_tq.copy(hips.quaternion).invert()); // C = ref · now⁻¹ (parent frame)
+    let ang = 2 * Math.atan2(_q2.x * up.x + _q2.y * up.y + _q2.z * up.z, _q2.w); // (its turn about the vertical, checks)
+    this.torsoTwist = -Math.atan2(Math.sin(ang), Math.cos(ang));
+    if (1 - Math.abs(_q2.w) < 1e-6) return;
+    // the whole correction (turn + lean), not only the yaw: the spine's world rotation gets C (taken to the world)
+    hips.parent.updateMatrixWorld(true);
+    hips.parent.getWorldQuaternion(_tp);
+    _q2.premultiply(_tp).multiply(_tq.copy(_tp).invert());     // Cw = P · C · P⁻¹
+    hips.updateMatrixWorld(true);
+    spine.getWorldQuaternion(_q).premultiply(_q2);             // the spine's corrected world rotation
+    hips.getWorldQuaternion(_tq);
+    spine.quaternion.copy(_tq.invert().multiply(_q));
   }
 
   /** Adds a gun model (shared geometry, baked: grip at 0, barrel +X, game units) for weapon key `id`. */
@@ -466,6 +558,9 @@ export class HumanView {
     f = ease('f', f / sum); b = ease('b', b / sum); r = ease('r', r / sum); l = ease('l', l / sum);
     const run = ease('run', smooth(A.runFrom, A.runTo, sp));
     const fwdWalk = pistol ? L.pWalk : L.walk, fwdRun = pistol ? L.pRun : L.run;
+    // D86: the user's strafes per gun (Pistol Strafe / Rifle Strafe), running backwards — Rifle Run Backwards
+    const sideL = (pistol && L.pStrafeL) || L.strafeL, sideR = (pistol && L.pStrafeR) || L.strafeR;
+    const backRun = L.backRun || null;
     for (const a of Object.values(L)) a.setEffectiveWeight(0);
     // standing: the pistol stance always; with a long gun the aim stance while aiming (aim weight from last frame)
     const stand = (1 - move) * normal;
@@ -478,15 +573,12 @@ export class HumanView {
     else { L.fire.setEffectiveWeight(stand * w.aim); L.idle.setEffectiveWeight(stand * (1 - w.aim)); }
     fwdWalk.setEffectiveWeight(move * f * (1 - run) * normal);
     fwdRun.setEffectiveWeight(move * f * run * normal);
-    if (L.back) L.back.setEffectiveWeight(move * b * normal);
-    if (L.strafeL) L.strafeL.setEffectiveWeight(move * l * normal);
-    if (L.strafeR) L.strafeR.setEffectiveWeight(move * r * normal);
-    const rate = (id, max) => Math.min(max, Math.max(0.6, sp / (R[id] || 30)));
-    fwdWalk.timeScale = rate(pistol ? 'pWalk' : this.pick.walk, A.walkRateMax);
-    fwdRun.timeScale = rate(pistol ? 'pRun' : this.pick.run, 1.6);
-    if (L.back) L.back.timeScale = rate('back', A.walkRateMax);
-    if (L.strafeL) L.strafeL.timeScale = rate('strafeL', A.walkRateMax);
-    if (L.strafeR) L.strafeR.timeScale = rate('strafeR', A.walkRateMax);
+    if (L.back) L.back.setEffectiveWeight(move * b * (backRun ? 1 - run : 1) * normal);
+    if (backRun) backRun.setEffectiveWeight(move * b * run * normal);
+    if (sideL) sideL.setEffectiveWeight(move * l * normal);
+    if (sideR) sideR.setEffectiveWeight(move * r * normal);
+    // D86: all the leg clips in step (one gait phase, offset per clip by its left-foot swing)
+    this._gaitStep(dead ? 0 : dt, sp, [fwdWalk, fwdRun, L.back, backRun, sideL, sideR]);
 
     // ---- upper body
     const reloading = !dead && st.reload >= 0;
@@ -509,13 +601,15 @@ export class HumanView {
       }
       U.pWalk.setEffectiveWeight(relaxed * moving * (1 - run) * up);
       U.pRun.setEffectiveWeight(relaxed * moving * run * up);
-      U.pWalk.timeScale = fwdWalk.timeScale;
-      U.pRun.timeScale = fwdRun.timeScale;
+      U.pWalk.timeScale = U.pRun.timeScale = 0; // the arms swing in step with the legs (D86)
+      U.pWalk.time = fwdWalk.time;
+      U.pRun.time = fwdRun.time;
     } else {
       const moving = move * f * run;
       U.idle.setEffectiveWeight(relaxed * (1 - moving) * up);
       U.run.setEffectiveWeight(relaxed * moving * up);
-      U.run.timeScale = fwdRun.timeScale;
+      U.run.timeScale = 0;
+      U.run.time = fwdRun.time;
       U.fire.setEffectiveWeight(am * up);       // held still at FIRE_POSE_T: a steady aim (the kick is procedural)
       U.reload.setEffectiveWeight(rl * up);
       if (reloading) U.reload.time = Math.min(0.999, st.reload) * this.reloadDur;
@@ -549,20 +643,29 @@ export class HumanView {
     const lw = lowW * live * (1 - tr), hw = highW * live * (1 - tr);
     fw(cv.lowIdle, lw * (1 - cm) * (1 - lowAim));
     fw(pistol ? cv.pKneel : cv.lowFire, lw * (1 - cm) * lowAim);
+    let crouchBack = null;
     if (st.cover !== 'low' && cv.walk) {
-      // D85 stealth crouch (not in cover): forward / back — the crouch walk (backwards played in reverse), sideways — the strafes
+      // D85 stealth crouch (not in cover): forward / back — the crouch walk (backwards played in reverse), sideways —
+      // D86 "Crouched Sneaking Left / Right"
       const fb = f + b, side = l + r, tot = fb + side || 1;
       fw(cv.walk, lw * cm * (fb / tot));
       fw(cv.lowL, lw * cm * (l / tot)); fw(cv.lowR, lw * cm * (r / tot));
-      cv.walk.timeScale = (b > f ? -1 : 1) * Math.min(1.6, Math.max(0.6, sp / (R.crouchWalk || 30)));
-    } else { fw(cv.lowL, lw * cm * shL); fw(cv.lowR, lw * cm * shR); }
+      if (b > f) crouchBack = this._backSet || (this._backSet = new Set([cv.walk]));
+    } else { fw(cv.lowL, lw * cm * shL); fw(cv.lowR, lw * cm * shR); } // along low cover: the sneaks only
+    fw(pistol ? cv.upPistol : cv.upRifle, lw * cm); // the gun-holding arms over the crouched legs
     fw(cv.highIdle, hw * (1 - cm));
     fw(cv.highL, hw * cm * shL); fw(cv.highR, hw * cm * shR);
-    const pace = Math.min(1.6, Math.max(0.6, sp / 32));
-    for (const a of [cv.lowL, cv.lowR, cv.highL, cv.highR]) if (a) a.timeScale = pace;
+    // the crouch / cover set in step too (its own clips; the stand clips are idle while it plays)
+    if (lw + hw > 1e-3) this._gaitStep(dt, sp, [cv.walk, cv.lowL, cv.lowR, cv.highL, cv.highR], crouchBack);
     if (this.trans) this.trans.a.setEffectiveWeight(tr);
     if (this.busy) this.busy.setEffectiveWeight(busyW * live);
+    // D86: the mixer writes a bone only when its blended value CHANGED since the last frame — a held pose (the rifle aim
+    // is one still frame) would keep (and pile up) last frame's procedural turns. So the bones touched after the mixer
+    // get the mixer's own values back first.
+    for (const [b, q] of this.touched) b.quaternion.copy(q);
     this.mixer.update(Math.max(0, dt));
+    for (const [b, q] of this.touched) q.copy(b.quaternion);
+    if (!dead) this._torsoFix(); // D86: the torso keeps the upper-body clips' pose over the legs' hips
 
     // the gun goes to the left hand while the right arm throws
     const left = thr > 0.5 && tossT >= A.throwHandOff && tossT < A.throwHandBack;
@@ -570,12 +673,13 @@ export class HumanView {
 
     // D82: where the barrel points in THIS pose (relative to the body's facing) — the renderer turns the body by it,
     // so the gun itself points at the aim whatever the legs do (walking / strafing hips sway the torso)
-    const aimW = Math.max(am * normal, lowAim * lowW * live);
+    const aimW = Math.max(am * normal, lowAim * lowW * live * (1 - Math.min(1, sp / 10))); // D86: kneeling aim only (the sneaks are no aim pose)
     const yawNow = aimW > 0.001 && this.gun && !this.inLeft ? this._barrelYaw() : 0;
 
     // ---- procedural layer (after the clips): recoil
     if (!dead && normal > 0.05) this._procedural(st, pistol);
-    this.aimYaw = yawNow * aimW;
+    // D86: eased — the leftover sway of the stride no longer rocks the whole body from side to side
+    this.aimYaw += (yawNow * aimW - this.aimYaw) * Math.min(1, Math.max(0, dt) * A.aimYawRate);
   }
 
   /** The barrel's yaw relative to the body's facing (sim convention: + = to the right). */

@@ -10,9 +10,9 @@ import { HUMAN_ANIM } from '../data/humanModels.js';
 
 // D82: + the roll, the crouch, the enemies' variants and the pistol reload as the game draws it (D84: the user's clips)
 const CLIPS = ['idle', 'walk', 'run', 'back', 'strafeL', 'strafeR', 'fire', 'reload', 'pReload (game)', 'hit', 'throw', 'pIdle', 'pWalk', 'pRun', 'die', 'die2',
-  'dodge', 'crouchIdle', 'crouchWalk', 'idle2', 'run2', 'run3', 'hit2', 'reload2', 'die3',
+  'dodge', 'crouchWalk', 'idle2', 'run2', 'run3', 'hit2', 'reload2', 'die3', 'backRun', 'pStrafeL', 'pStrafeR',
   // D83: the enemies' rifle walk, the second roll, the cover set, the busy idle
-  'pReload', 'pReload2', 'rwalk', 'dodge2', 'crouchIdle2', 'pKneel', 'crouchFire', 'crouchL', 'crouchR', 'toCrouch', 'toStand', 'coverL', 'coverR', 'coverTurn', 'peek', 'files', 'takedown'];
+  'pReload', 'pReload2', 'rwalk', 'dodge2', 'crouchIdle2', 'pKneel', 'crouchFire', 'crouchL', 'crouchR', 'toCrouch', 'toStand', 'coverL', 'coverR', 'peek', 'files', 'takedown'];
 const GAME_RELOAD = 'pReload (game)';
 const CSS = `
 #dbg-models-btn { position: fixed; right: max(30px, env(safe-area-inset-right)); bottom: 30px; z-index: 9000;

@@ -23,7 +23,14 @@ const SUN_DIR = new THREE.Vector3(-260, 820, 300);
 const SUN_Z = SUN_DIR.clone().normalize();
 const SUN_X = new THREE.Vector3(0, 1, 0).cross(SUN_Z).normalize();
 const SUN_Y = SUN_Z.clone().cross(SUN_X);
-const LIGHTING = { hemi: 0.5, key: 1.12 }; // D83: the night mood (was 0.9 / 1.6) — the rooms' own lights bring them up
+// D83: the night mood (was 0.9 / 1.6) — the rooms' own lights bring them up. D86 (user: "too dark, the hero is often
+// hard to see"): exposure 1.0 → 1.3 (ACES keeps the lamps from blowing out), a brighter fill; the characters get a
+// little self-light of their own texture and a rim along the silhouette (hero cool, enemies warm) — readable in any room
+const LIGHTING = { hemi: 0.68, key: 1.2, exposure: 1.3 };
+const CHAR_LOOK = {
+  hero: { selfLight: 0.2, rim: 0xcfe6ff, rimStrength: 0.75, rimPower: 2.2 },
+  enemy: { selfLight: 0.14, rim: 0xffb48a, rimStrength: 0.5, rimPower: 2.4 },
+};
 const MAX_BULLETS = 200;
 const MAX_BARS = 32;
 const MAX_POOLS = 40;
@@ -62,10 +69,10 @@ export class Renderer3D {
   constructor(canvas, quality) {
     this.canvas = canvas;
     this.quality = quality;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: antialiasFor(quality), powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: antialiasFor(quality), powerPreference: 'high-performance', stencil: true }); // D86: stencil — the hero's X-ray
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = LIGHTING.exposure;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
@@ -164,10 +171,18 @@ export class Renderer3D {
   }
 
   /** Shared skinned material per template + tint. */
-  _material(tpl, tint = 0xffffff) {
+  _material(tpl, tint = 0xffffff, look = CHAR_LOOK.enemy) {
     let m = tpl.materials.get(tint);
     if (!m) {
-      m = new THREE.MeshLambertMaterial({ map: tpl.texture, color: tint });
+      // D86: self-light (the texture as emissive, a fraction) + a rim light on the silhouette (fresnel to the camera)
+      m = new THREE.MeshLambertMaterial({ map: tpl.texture, color: tint, emissive: 0xffffff, emissiveMap: tpl.texture, emissiveIntensity: look.selfLight });
+      const rim = { rimColor: { value: new THREE.Color(look.rim).multiplyScalar(look.rimStrength) }, rimPower: { value: look.rimPower } };
+      m.onBeforeCompile = (sh) => {
+        if (!sh.fragmentShader.includes('vViewPosition')) return;
+        Object.assign(sh.uniforms, rim);
+        sh.fragmentShader = 'uniform vec3 rimColor;\nuniform float rimPower;\n' + sh.fragmentShader.replace('#include <opaque_fragment>',
+          'outgoingLight += rimColor * pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), rimPower);\n#include <opaque_fragment>');
+      };
       tpl.materials.set(tint, m);
     }
     return m;
@@ -176,9 +191,11 @@ export class Renderer3D {
   _newView(key, tint, gunId, scale = 1, variant = 0) {
     const tpl = this.templates && this.templates[key];
     if (!tpl) return null;
-    const v = tpl.instantiate(this._material(tpl, tint), variant, key !== 'hero'); // D82: enemies mix clip variants
+    const hero = key === 'hero';
+    const v = tpl.instantiate(this._material(tpl, tint, hero ? CHAR_LOOK.hero : CHAR_LOOK.enemy), variant, !hero); // D82: enemies mix clip variants
     if (scale !== 1) v.wrap.scale.multiplyScalar(scale);
-    for (const [id, g] of Object.entries(this.gunGeos || {})) v.addGun(id, g.geometry, g.material);
+    for (const [id, g] of Object.entries(this.gunGeos || {})) v.addGun(id, g.geometry, hero ? this._stenciled(g.material) : g.material);
+    if (hero) this._xray(v);
     const flash = new THREE.Mesh(this.flashGeo, this.flashMat);
     flash.visible = false;
     flash.renderOrder = 7;
@@ -189,6 +206,48 @@ export class Renderer3D {
     this._castShadow(v);
     this.scene.add(v.group);
     return v;
+  }
+
+  /** D86: the hero's pixels mark the stencil (his X-ray silhouette is never drawn over himself). */
+  _stenciled(mat) {
+    if (mat.userData.stencilOf) return mat;
+    this._stencilMats = this._stencilMats || new Map();
+    let m = this._stencilMats.get(mat);
+    if (!m) {
+      m = mat.clone();
+      Object.assign(m, { stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
+      m.userData.stencilOf = mat;
+      this._stencilMats.set(mat, m);
+    }
+    return m;
+  }
+
+  /**
+   * D86 (user: "the hero is often hard to see"): his X-ray silhouette — the same skinned mesh in one flat colour, drawn
+   * only where something stands in front of him (depth GREATER: a wall, a tall cabinet) and not over his own pixels
+   * (stencil) — the hero stays readable behind the walls the tilted camera puts in front of him.
+   */
+  _xray(v) {
+    const mesh = v.mesh;
+    Object.assign(mesh.material, { stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
+    // drawn after the level's opaque meshes (they sort by material before depth): a wall in front is already there, so
+    // the hero's stencil marks only his really visible pixels
+    mesh.renderOrder = 5;
+    for (const g of Object.values(v.guns)) g.renderOrder = 5;
+    if (!this.xrayMat) {
+      this.xrayMat = new THREE.MeshBasicMaterial({
+        color: 0x8fd0ff, transparent: true, opacity: 0.42, depthWrite: false, depthFunc: THREE.GreaterDepth,
+        stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc, toneMapped: false,
+      });
+    }
+    const x = new THREE.SkinnedMesh(mesh.geometry, this.xrayMat);
+    x.bind(mesh.skeleton, mesh.bindMatrix);
+    x.position.copy(mesh.position); x.quaternion.copy(mesh.quaternion); x.scale.copy(mesh.scale);
+    x.frustumCulled = false;
+    x.castShadow = false;
+    x.renderOrder = 20;
+    mesh.parent.add(x);
+    v.xray = x;
   }
 
   /** The hero casts a real shadow whenever shadows are on; the enemies only on presets with crowdShadows (High). */
@@ -627,6 +686,7 @@ export class Renderer3D {
     });
     h.group.position.set(hx, 0, hy);
     h.group.rotation.y = -(this.bodyYaw - h.aimYaw);
+    if (h.xray) h.xray.visible = p.alive; // D86
     h.flash.visible = p.alive && time - w.lastShotAt >= 0 && time - w.lastShotAt < SHOT_FLASH;
     if (h.flash.visible) h.flash.rotation.x = (w.lastShotAt * 97.3) % (Math.PI * 2);
 

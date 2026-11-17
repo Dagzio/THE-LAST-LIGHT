@@ -21,6 +21,9 @@ export const HUMAN_ANIM = {
   // presentation tuning (D79)
   blendRate: 10,        // 1/s — how fast the layer weights follow the state
   walkRateMax: 2.3,     // walk / strafe / back clips are played up to this fast (beyond, the feet would slide)
+  runRateMax: 1.6,      // run clips
+  strideK: 1.12,        // D86: "In Place" clips — ground speed = planted-foot speed × this (calibrated on the clips with travel)
+  aimYawRate: 10,       // D86: 1/s — how fast the body's barrel correction follows (eases out the stride's sway)
   runFrom: 48,          // units/s: walk legs below, run legs above (mixed in between)
   runTo: 78,
   hitTime: 0.45,        // s the hit flinch shows on the upper body…
