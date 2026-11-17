@@ -25,6 +25,15 @@ export const OFFICE_STEALTH = {
     { type: 'gunman', x: 1840, y: 420, angle: Math.PI / 2, patrol: [[1840, 420, 2, -Math.PI / 2], [1840, 820, 2, 0]] },      // E11 server, the west aisle
     { type: 'gunman', x: 2085, y: 610, angle: Math.PI },                                                                    // E12 server, watching the middle aisle
     { type: 'thug', x: 600, y: 1250, angle: Math.PI },                                                                      // E13 break room
+    // D87 (user: more guards, harder): crossing sightlines — every room watched from two sides, the routes overlap
+    { type: 'gunman', x: 950, y: 300, angle: Math.PI / 2, patrol: [[950, 300, 2, 0], [950, 890, 2, Math.PI]] },             // E14 open space, the N–S lane
+    { type: 'gunman', x: 2100, y: 1040, angle: Math.PI },                                                                   // E15 corridor east end, the server door
+    { type: 'gunman', x: 800, y: 1410, angle: 0, patrol: [[800, 1410, 2, -Math.PI / 2], [1600, 1410, 2, -Math.PI / 2]] },    // E16 lobby, the back lane
+    { type: 'thug', x: 300, y: 1580, angle: 0, patrol: [[300, 1580, 2.5, -Math.PI / 2], [700, 1580, 2.5, -Math.PI / 2]] },   // E17 archive
+    { type: 'gunman', x: 1350, y: 800, angle: 0, patrol: [[1350, 800, 2, -Math.PI / 2], [1750, 800, 2, Math.PI / 2]] },      // E18 print room
+    { type: 'gunman', x: 1870, y: 300, angle: 0, patrol: [[1870, 300, 2, Math.PI / 2], [2100, 300, 2, Math.PI / 2]] },       // E19 server, the north lane
+    { type: 'thug', x: 1720, y: 1200, angle: 0, busy: true },                                                               // E20 security, at the monitors
+    { type: 'thug', x: 400, y: 300, angle: 0, patrol: [[400, 300, 2, Math.PI / 2], [1200, 300, 2, Math.PI / 2]] },           // E21 open space, the north aisle
   ],
   reinforcements: { after: 'alarm', enemies: [
     { type: 'gunman', x: 165, y: 345, angle: 0 }, { type: 'gunman', x: 165, y: 455, angle: 0 }, { type: 'heavy', x: 1200, y: 1640, angle: -Math.PI / 2 },

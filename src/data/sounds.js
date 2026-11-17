@@ -9,6 +9,13 @@ export const AUDIO_DIR = 'assets/audio/';
 const DIR = AUDIO_DIR;
 
 /**
+ * D87 (user request): no synthesized sounds in the game any more — only recorded files play, except these recipes:
+ * the grenade toss and the evidence pickup (key card, drive, intel, the copy — and the medkit since D87). A sound
+ * without a loaded file and not listed here stays silent (victory and the crates are files).
+ */
+export const SYNTH_KEEP = ['throw', 'levelUp'];
+
+/**
  * Background music (H5: starts once on entering the main menu and never stops — menus, levels, results; the playlist
  * is shuffled → a random track first, then the other, never the same twice in a row). D82: only the user's two tracks
  * (the old bass bed under them is gone); the first track is decoded under the splash, so the menu opens with music.
@@ -60,7 +67,9 @@ export const SFX_FILES = {
  * perks, salt pools), clamped to minRate…maxRate. D59: rate = speed / refSpeed — the recording's tempo fits a walk at
  * 112 (the D56 speed), so the slower keeper (95) steps slower too.
  */
-export const FOOTSTEPS = { sfx: 'steps', minSpeed: 8, minRate: 0.6, maxRate: 1.6, refSpeed: 112 };
+// D87 (user request: the steps follow the animation): rate = steps per second of the hero's legs clips (2 per gait
+// cycle, renderer) / the recording's own pace (stepsPerSec: onsets measured every 0.505 s); refSpeed — the fallback
+export const FOOTSTEPS = { sfx: 'steps', minSpeed: 8, minRate: 0.5, maxRate: 2.0, refSpeed: 112, stepsPerSec: 1.98 };
 /** The keeper is hurt (D53): one of the user's two takes at random (synth 'playerHurt' while they load). */
 export const PLAYER_HURT_SFX = ['playerHurt1', 'playerHurt2'];
 

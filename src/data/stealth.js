@@ -8,12 +8,14 @@ export const STEALTH = {
   runNoise: { radius: 150, every: 0.35 },           // a running hero is heard this far, a ring every 0.35 s
   noise: { roll: 180, takedown: 60, silenced: 140 }, // units
   // detection (per enemy suspicion 0…1; the per-tick rate, §3.4)
-  rate: 1.6,                 // /s at full strength (thug: × 0.6 / reaction)
+  rate: 2.0,                 // /s at full strength (thug: × 0.6 / reaction). D87: 1.6 → 2.0 (harder, user)
   noticeAt: 0.2,             // stops and turns towards the hero
   investigateAt: 0.35,       // walks to the spot (suspicion ≥ this)
   decayAfter: 1.5,           // s without seeing before suspicion falls…
   decay: 0.25,               // …per second
-  feel: { dist: 46, rate: 0.5 }, // an upright moving hero this close is felt at any angle (crouched: never)
+  // an upright moving hero this close is felt at any angle (crouched: never). D87: 46 / 0.5 → 72 / 1.1 — walking up
+  // behind a guard turns him round; a takedown needs a crouched approach
+  feel: { dist: 72, rate: 1.1 },
   light: { dark: 0.05, lit: 0.25 }, // luminance: below dark — the shadows (range ×0.5), above lit — full range
   stance: { crouch: 0.55, stand: 1 },
   motion: { still: 0.6, walk: 1, run: 1.35, stillBelow: 8, runAbove: 70 },
@@ -23,9 +25,19 @@ export const STEALTH = {
   search: { duration: 60, rangeMult: 1.15, fillMult: 1.25 }, // the global SEARCH level (a body found, a loud shot)
   hearing: { quiet: 0.5, loud: 0.8 },               // suspicion set by a noise heard
   bodies: { every: 0.3, rangeMult: 0.8, darkMult: 0.5 },
+  // D87 (user: "I can just kill everyone"): killing has a price —
+  //  - a guard who SEES a takedown / a kill (the victim in his cone, in his light-adjusted range) raises the alarm;
+  //  - a body found while the search is already on (a second body) raises the alarm;
+  //  - a wounded guard (a silenced round that did not kill) raises the alarm;
+  //  - radio check-ins: every `every` s the guards miss one of the dead (dead for ≥ `after` s, not found yet) and the
+  //    nearest living guard is sent to his post — the body will be found.
+  witness: { every: 0.2, rangeMult: 0.9 },
+  secondBodyAlarm: true,
+  radio: { every: 35, after: 25 },
   // takedown (from the rear arc, silent)
-  // (the clip "Stealth Assassination" 0.5…3.6 s of the trimmed take is played over `duration`; the strike at killAt)
-  takedown: { reach: 44, rearArcDeg: 140, duration: 2.0, killAt: 0.9, snap: 0.15, behind: 24, clipFrom: 0.5, clipTo: 3.6 },
+  // (the clip "Stealth Assassination" — D87 the user's new take, 0…3.0 s — is played over `duration`; the strike at
+  // killAt: the clip's 1.9 s → 1.9 / 3.0 × 2.4 ≈ 1.52 s. A guard who sees the struggle raises the alarm (witness))
+  takedown: { reach: 44, rearArcDeg: 140, duration: 2.4, killAt: 1.52, snap: 0.15, behind: 24, clipFrom: 0, clipTo: 3.0 },
   // the copy at the server terminal
   copy: { hold: 6, reach: 46 },
   // D85 (user: "complete it unseen"): the alarm fails the job (one flag: 'combat' — it goes on as a firefight)

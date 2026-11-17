@@ -99,11 +99,62 @@ export class PlayerController {
     return true;
   }
 
-  _leaveCover(p) { p.cover = null; p.crouched = false; p.coverAwayFor = 0; }
+  _leaveCover(p) { p.cover = null; p.crouched = false; p.coverAwayFor = 0; p.peek = null; }
+
+  /**
+   * D87: is he at an edge of his HIGH cover? → +1 / −1 (the side along the cover's tangent where it ends), or 0.
+   * When both sides end (a short object) the one towards the aim wins.
+   */
+  coverEdge(p) {
+    const c = p.cover;
+    if (!c || !this.world) return 0;
+    const tx = -c.ny, ty = c.nx, reach = p.radius + COVER.reach, d = COVER.edgeProbe;
+    let side = 0, best = -Infinity;
+    for (const s of [1, -1]) {
+      const g = this.world.coverAt(p.x + tx * s * d, p.y + ty * s * d, reach, EDGE);
+      const ends = !g || g.shape.cover !== 'high' || (g.shape.box && Math.abs(g.nx) < 0.97 && Math.abs(g.ny) < 0.97);
+      if (!ends) continue;
+      const toAim = p.hasAim ? (p.aimX - p.x) * tx * s + (p.aimY - p.y) * ty * s : 0;
+      if (toAim > best) { best = toAim; side = s; }
+    }
+    return side;
+  }
+
+  /**
+   * D87: the trigger in HIGH cover — at an edge he leans out past it (really moves there: exposed, his rounds clear the
+   * corner) and may fire once mostly out; away from an edge he cannot (a hint, `manual` fire only). Not in high cover:
+   * the trigger as is. Called every step after the move. → may he fire now.
+   */
+  peekGate(p, wantFire, manual, dt, time) {
+    const C = COVER;
+    if (!p.cover || p.cover.kind !== 'high' || p.dodging || !p.alive) { p.peek = null; return wantFire; }
+    if (wantFire) {
+      if (!p.peek) {
+        const side = this.coverEdge(p);
+        if (!side) {
+          if (manual && time >= (p.edgeHintAt || 0)) { p.edgeHintAt = time + C.edgeHintEvery; this.events.emit('coverEdge'); }
+          return false;
+        }
+        p.peek = { side, k: 0, baseX: p.x, baseY: p.y, until: 0 };
+      }
+      p.peek.until = time + C.peekHold;
+    }
+    const pk = p.peek;
+    if (!pk) return false;
+    const out = time < pk.until;
+    pk.k = Math.min(1, Math.max(0, pk.k + (out ? 1 : -1) * (dt / C.peekIn)));
+    const tx = -p.cover.ny, ty = p.cover.nx, off = pk.side * C.peekOut * pk.k;
+    p.x = pk.baseX + tx * off; p.y = pk.baseY + ty * off;
+    p.vx = 0; p.vy = 0;
+    if (this.world) this.world.pushOut(p);
+    if (!out && pk.k <= 0) { p.x = pk.baseX; p.y = pk.baseY; p.peek = null; return false; }
+    return wantFire && pk.k >= 0.7;
+  }
 
   /** In cover: steps up to the object first, then moves only along it (kneeling / sneaking sideways). */
   _coverMove(p, dt, time) {
     const c = p.cover, C = COVER;
+    if (p.peek) { p.vx = 0; p.vy = 0; p.coverAwayFor = 0; return; } // D87: leaning out of the corner — no walking
     const tx = -c.ny, ty = c.nx;                          // along the object
     const along = move.x * tx + move.y * ty, away = move.x * c.nx + move.y * c.ny;
     const speed = PLAYER.moveSpeed * this.speedMult * (c.kind === 'low' ? C.crouchSpeedMult : C.sneakSpeedMult);
@@ -123,7 +174,7 @@ export class PlayerController {
   /** After the move: keep the cover's normal / kind up to date, stop at the object's end; the button / Q offer. */
   _coverAfterMove(p, x0, y0, dt, time) {
     const reach = p.radius + COVER.reach;
-    if (p.cover && !p.dodging) {
+    if (p.cover && !p.dodging && !p.peek) { // (D87: leaning out past the edge keeps the cover)
       const wasFace = Math.abs(p.cover.nx) >= 0.97 || Math.abs(p.cover.ny) >= 0.97;
       let c = this.world ? this.world.coverAt(p.x, p.y, reach, CONTACT) : null;
       // past the object's end (the nearest point is its corner): back to where he was — he stops at the edge
@@ -161,5 +212,6 @@ export class PlayerController {
 }
 
 const CONTACT = { shape: null, nx: 0, ny: 0, gap: 0 };
+const EDGE = { shape: null, nx: 0, ny: 0, gap: 0 }; // D87: the edge probes (CONTACT stays the hero's own contact)
 
 function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }

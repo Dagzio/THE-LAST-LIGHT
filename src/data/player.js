@@ -62,6 +62,13 @@ export const COVER = {
   exitDot: 0.6,             // pushing away from the object this directly…
   exitHold: 0.3,            // …for this long leaves the cover
   popUp: 0.5,               // s he stays exposed after a shot from low cover
+  // D87 (user request): behind HIGH cover he can shoot only from its corner — he leans out past the edge ("Female Peek
+  // And Aim"), really exposed there; away from an edge the trigger does nothing (a hint says so). Low cover: over it.
+  edgeProbe: 18,            // units along the cover: no cover there (or only its corner) → he stands at an edge
+  peekOut: 24,              // units he leans out past the edge (his body clears the corner — and can be hit)
+  peekIn: 0.16,             // s to lean out / back
+  peekHold: 0.45,           // s he stays out after the last shot
+  edgeHintEvery: 1.5,       // s between the "move to the edge" hints
 };
 
 /**

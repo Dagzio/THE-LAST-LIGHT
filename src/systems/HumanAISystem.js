@@ -126,6 +126,24 @@ export class HumanAISystem {
     ai.sees = false; // nobody shoots before the meter is full
   }
 
+  /**
+   * D87 stealth: does this guard see the point (x, y) now — in his cone, within his range at the light there (× mult),
+   * in line of sight? (A witness of a takedown / a kill.)
+   */
+  seesPoint(e, x, y, time, mult = 1) {
+    if (!e.alive || e.ai.mode === 'grabbed') return false;
+    const S = this.stealth, V = e.type.view, ai = e.ai;
+    const busy = e.busy && ai.mode === 'idle';
+    const lum = this.lightAt ? this.lightAt(x, y) : 1;
+    const lightK = S ? clamp01((lum - S.light.dark) / (S.light.lit - S.light.dark)) : 1;
+    const reach = V.range * (0.5 + 0.5 * lightK) * mult * (busy && S ? S.busy.range : 1) * (S && this.searching(time) ? S.search.rangeMult : 1);
+    const dx = x - e.x, dy = y - e.y;
+    if (dx * dx + dy * dy > reach * reach) return false;
+    const half = ((V.fov * Math.PI) / 360) * (busy && S ? S.busy.fov : 1);
+    if (ai.mode !== 'combat' && Math.abs(angDiff(Math.atan2(dy, dx), e.faceAngle)) > half) return false;
+    return this.world.clear(e.x, e.y, x, y, null, BLOCK.SIGHT);
+  }
+
   /** D85: walk to a suspicious spot (a glimpse, a noise, a body) and search there; never interrupts a fight. */
   investigate(e, x, y, time, s = 0) {
     const ai = e.ai;
@@ -165,9 +183,10 @@ export class HumanAISystem {
       if (dx * dx + dy * dy > reach * reach) continue;
       if (Math.abs(angDiff(Math.atan2(dy, dx), e.faceAngle)) > half || !this.world.clear(e.x, e.y, b.x, b.y)) continue;
       b.found = true;
+      const second = this.searching(time); // D87: found while the search is on — the director raises the alarm
       this.searchUntil = Math.max(this.searchUntil, time + S.search.duration);
       this.investigate(e, b.x, b.y, time, 0.6);
-      this.events.emit('bodyFound', e, b);
+      this.events.emit('bodyFound', e, b, second);
       return;
     }
   }
@@ -226,9 +245,14 @@ export class HumanAISystem {
   /** Shot by the hero: turn to him right away. */
   onHit(e, p, time) {
     if (!e.alive) return;
-    if (this.stealth && e.ai.mode !== 'combat') { // D85: wounded — he looks for the shooter, everyone searches
-      this.investigate(e, p.x, p.y, time, 0.9);
+    if (this.stealth && e.ai.mode !== 'combat') {
+      // D87: wounded and alive — he knows he is under attack: straight to combat (the director raises the alarm)
+      const ai = e.ai;
+      ai.mode = 'combat'; ai.aware = true; ai.suspicion = 1; ai.investigate = false; ai.strafeUntil = 0;
+      ai.lastSeenX = p.x; ai.lastSeenY = p.y; ai.lastSeenAt = time;
+      ai.reactAt = time + 0.35;
       this.searchUntil = Math.max(this.searchUntil, time + this.stealth.search.duration);
+      this.events.emit('spotted', e);
       return;
     }
     if (e.ai.mode !== 'combat') {

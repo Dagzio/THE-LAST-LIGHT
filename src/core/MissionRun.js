@@ -414,11 +414,13 @@ export class MissionRun {
     let fire = autoFire ? false : (this.autoFire ? false : input.isDown('fire'));
     if (autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, this.enemies, this.weapon.stats.range);
     else this.autoAim.reset();
-    const shooting = fire && !this.holdFire && !this.grenadeArmed && !p.dodging && !p.takedown; // D82: no shots mid-roll
+    const trigger = fire && !this.holdFire && !this.grenadeArmed && !p.dodging && !p.takedown; // D82: no shots mid-roll
+    // D87: behind high cover — only leaning out of its corner (else the trigger does nothing; a hint for manual fire)
+    const shooting = this.controller.peekGate(p, trigger, !autoFire, dt, time);
     this.weapons.update(this.weapon, p, shooting, input.consumePressed('reload'), time);
     this._grenadeInput(input, time);
     this._updateCover(p, shooting, time);
-    this._updateFacing(p, shooting, time);
+    this._updateFacing(p, shooting || !!p.peek, time); // leaning out he already faces the aim
 
     this.levelWorld.updateDoors(this._bodies(), time, dt);
     this.ai.update(this.enemies, p, dt, time);
@@ -459,6 +461,7 @@ export class MissionRun {
   dispose() {
     for (const u of this._unsub) u();
     this._unsub = [];
+    if (this.mode && this.mode.dispose) this.mode.dispose(); // D87: the director's own event subscriptions
     this.projectiles.clear();
     this.particles.clear();
     this.grenades.clear();

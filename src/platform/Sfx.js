@@ -5,6 +5,9 @@
 import { newCtx, closeCtx } from './audioCommon.js';
 import { buildSfxBuffer, SFX_NAMES } from './SfxLibrary.js';
 import { Prefs } from './Prefs.js';
+import { SYNTH_KEEP } from '../data/sounds.js';
+
+const SYNTH_OK = new Set(SYNTH_KEEP); // D87: the only synthesized sounds still played
 
 const decode = (c, data) => new Promise((resolve, reject) => {
   const p = c.decodeAudioData(data, resolve, reject); // callback form for old Safari, promise form elsewhere
@@ -48,7 +51,7 @@ export const Sfx = (() => {
     wake,
     alive: () => ac,
     /** True if `name` can sound (a loaded file or a synth recipe). */
-    has: (name) => !!files[name] || SFX_NAMES.includes(name),
+    has: (name) => !!files[name] || (SYNTH_OK.has(name) && SFX_NAMES.includes(name)),
     /**
      * @param {number} [rate] playbackRate (pitch variation for repeated sounds, GDD §18)
      * @param {{gain?:number, offset?:number, voices?:number}} [opts] gain × the file's own gain; offset — seconds
@@ -57,6 +60,7 @@ export const Sfx = (() => {
     play(name, rate = 1, opts = null) {
       const a = ctx();
       if (!on || muted.size > 0 || !a) return;
+      if (!files[name] && !SYNTH_OK.has(name)) return; // D87: no synthesized fallback (user request)
       const buf = bufs[name] ?? (bufs[name] = buildSfxBuffer(name, a));
       if (!buf) return;
       const f = files[name];
@@ -153,7 +157,7 @@ export const Sfx = (() => {
      * (first hit, first kill, a boss slam…) was synthesized in the middle of the fight — a visible hitch.
      */
     prewarm(onProgress) {
-      const todo = SFX_NAMES.filter((n) => !bufs[n]);
+      const todo = SFX_NAMES.filter((n) => !bufs[n] && SYNTH_OK.has(n)); // D87: only the kept recipes
       const total = todo.length || 1;
       // D77: runs under the splash (after the recorded files), so it may take whole idle slices; resolves when done
       const idle = window.requestIdleCallback ? (fn) => window.requestIdleCallback(fn, { timeout: 50 }) : (fn) => setTimeout(fn, 4);

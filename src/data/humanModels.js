@@ -24,6 +24,8 @@ export const HUMAN_ANIM = {
   runRateMax: 1.6,      // run clips
   strideK: 1.12,        // D86: "In Place" clips — ground speed = planted-foot speed × this (calibrated on the clips with travel)
   aimYawRate: 10,       // D86: 1/s — how fast the body's barrel correction follows (eases out the stride's sway)
+  peekFrom: 0.2,        // D87: "Female Peek And Aim" — leaning out plays from here (s)…
+  peekHoldAt: 1.2,      // …to the held aim (the clip: lean 0.3–0.9, aim held 0.9–1.6, back 1.7–2.4)
   runFrom: 48,          // units/s: walk legs below, run legs above (mixed in between)
   runTo: 78,
   hitTime: 0.45,        // s the hit flinch shows on the upper body…

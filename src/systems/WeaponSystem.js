@@ -16,6 +16,8 @@ export class WeaponState {
     this.stats = stats;
     this.weaponId = stats.id;
     this.ammo = stats.magazineSize;     // a new map / equip starts with a full magazine
+    // D87: rounds left beyond the magazine — only a gun with `reserve` counts them (the stealth pistol); else unlimited
+    this.reserve = Number.isFinite(stats.reserve) ? stats.reserve : Infinity;
     this.reloading = false;
     this.reloadStartedAt = 0;
     this.reloadEndsAt = 0;
@@ -47,7 +49,7 @@ export class WeaponSystem {
 
   /** Starts a reload if allowed. Returns true if a reload actually started (never twice). */
   startReload(w, time) {
-    if (w.reloading || w.ammo >= w.stats.magazineSize) return false;
+    if (w.reloading || w.ammo >= w.stats.magazineSize || !(w.reserve > 0)) return false;
     w.reloading = true;
     w.reloadStartedAt = time;
     w.reloadEndsAt = time + w.stats.reloadDuration;
@@ -66,7 +68,9 @@ export class WeaponSystem {
   update(w, player, fireHeld, manualReload, time) {
     if (w.reloading && time >= w.reloadEndsAt) {
       w.reloading = false;
-      w.ammo = w.stats.magazineSize;
+      const take = Math.min(w.stats.magazineSize - w.ammo, w.reserve); // D87: from the counted rounds (∞ = as before)
+      w.ammo += take;
+      w.reserve -= take;
       this.events.emit('reloadEnd', w.weaponId);
     }
     if (manualReload) this.startReload(w, time);

@@ -425,6 +425,10 @@ const ROWS = [
   ['banner.intel', 'INTEL {n}/{total}', 'ДОКАЗ {n}/{total}', 'УЛИКА {n}/{total}', 'INFO {n}/{total}', 'INDIZIO {n}/{total}', 'INDICE {n}/{total}', 'PISTA {n}/{total}', 'PISTA {n}/{total}', 'دليل {n}/{total}', '情報 {n}/{total}'],
   ['banner.threat', 'THREAT LEVEL {n}', 'РІВЕНЬ ЗАГРОЗИ {n}', 'УРОВЕНЬ УГРОЗЫ {n}', 'BEDROHUNGSSTUFE {n}', 'LIVELLO DI MINACCIA {n}', 'NIVEAU DE MENACE {n}', 'NIVEL DE AMENAZA {n}', 'NÍVEL DE AMEAÇA {n}', 'مستوى التهديد {n}', '脅威レベル {n}'],
   ['banner.contact', 'CONTACT', 'КОНТАКТ', 'КОНТАКТ', 'FEINDKONTAKT', 'CONTATTO', 'CONTACT', 'CONTACTO', 'CONTATO', 'اشتباك', '接敵'],
+  // D87 stealth / cover
+  ['banner.radioCheck', 'A GUARD MISSED HIS CHECK-IN', 'ОХОРОНЕЦЬ НЕ ВИЙШОВ НА ЗВ’ЯЗОК', 'ОХРАННИК НЕ ВЫШЕЛ НА СВЯЗЬ', 'EINE WACHE MELDET SICH NICHT', 'UNA GUARDIA NON RISPONDE', 'UN GARDE NE RÉPOND PLUS', 'UN GUARDIA NO RESPONDE', 'UM GUARDA NÃO RESPONDE', 'حارس لا يرد على الاتصال', '警備員の応答なし'],
+  ['banner.witness', 'THE KILL WAS SEEN', 'УБИВСТВО ПОМІТИЛИ', 'УБИЙСТВО ЗАМЕТИЛИ', 'DER ANGRIFF WURDE GESEHEN', 'L’UCCISIONE È STATA VISTA', 'LE MEURTRE A ÉTÉ VU', 'HAN VISTO EL ATAQUE', 'VIRAM O ATAQUE', 'شوهدت عملية القتل', '殺害を目撃された'],
+  ['banner.coverEdge', 'MOVE TO THE EDGE TO SHOOT', 'ПІДІЙДІТЬ ДО КРАЮ, ЩОБ СТРІЛЯТИ', 'ПОДОЙДИТЕ К КРАЮ, ЧТОБЫ СТРЕЛЯТЬ', 'ZUM SCHIESSEN AN DIE KANTE', 'VAI AL BORDO PER SPARARE', 'ALLEZ AU BORD POUR TIRER', 'VE AL BORDE PARA DISPARAR', 'VÁ ATÉ A BORDA PARA ATIRAR', 'تحرّك إلى الحافة لتطلق النار', '撃つには端へ移動'],
   ['banner.supplies', 'SUPPLIES DROPPED', 'З’ЯВИЛИСЯ ПРИПАСИ', 'ПОЯВИЛИСЬ ПРИПАСЫ', 'VORRÄTE AUFGETAUCHT', 'NUOVE SCORTE', 'PROVISIONS DISPONIBLES', 'NUEVOS SUMINISTROS', 'NOVOS SUPRIMENTOS', 'وصلت إمدادات', '物資出現'],
   ['weapon.pistol_sd', 'SILENCED PISTOL', 'ПІСТОЛЕТ З ГЛУШНИКОМ', 'ПИСТОЛЕТ С ГЛУШИТЕЛЕМ', 'SCHALLGEDÄMPFTE PISTOLE', 'PISTOLA SILENZIATA', 'PISTOLET SILENCIEUX', 'PISTOLA CON SILENCIADOR', 'PISTOLA COM SILENCIADOR', 'مسدس كاتم', 'サプレッサー付き拳銃'],
   ['defeat.detected', 'DETECTED', 'ВИЯВЛЕНО', 'ОБНАРУЖЕН', 'ENTDECKT', 'SCOPERTO', 'REPÉRÉ', 'DESCUBIERTO', 'DESCOBERTO', 'تم كشفك', '発見された'],

@@ -397,6 +397,7 @@ export class HumanView {
     // D86: the bones turned after the mixer (torso fix, recoil) and their last mixer-given rotation
     this.touched = ['Spine', 'RightHand', 'RightForeArm'].filter((n) => bones.get(n)).map((n) => [bones.get(n), bones.get(n).quaternion.clone()]);
     this.torsoTwist = 0;        // D86: the last torso fix (rad, dev / checks)
+    this.gaitHz = 0;            // D87: the legs' cadence (gait cycles/s) this frame — the footsteps follow it
   }
 
   /**
@@ -417,7 +418,10 @@ export class HumanView {
       fsum += (w * rate) / dur;
       wsum += w;
     }
-    if (wsum > 0) this.phase = (this.phase + (dt * fsum) / wsum) % 1;
+    if (wsum > 0) {
+      this.phase = (this.phase + (dt * fsum) / wsum) % 1;
+      this.gaitHz = Math.max(this.gaitHz, fsum / wsum); // D87: the cadence (cycles/s) — the footsteps' pace
+    }
     for (const a of list) {
       if (!a) continue;
       a.timeScale = 0;
@@ -525,7 +529,9 @@ export class HumanView {
     const dg = 1 - (1 - (this.dodges[this.dodgeId] ? w.dodge : 0)) * (1 - (w.td || 0));
     const cv = this.cv;
     const lowOn = !dead && !rolling && !tdOn && (st.cover === 'low' || !!st.crouch) && !!cv.lowIdle;
-    const highOn = !dead && !rolling && st.cover === 'high' && !st.aim && !!cv.highIdle;
+    // D87: aiming in high cover = leaning out of its corner ("Female Peek And Aim" by the lean, st.peek 0…1)
+    const peekK = st.cover === 'high' ? st.peek || 0 : 0;
+    const highOn = !dead && !rolling && st.cover === 'high' && (!st.aim || peekK > 0) && !!cv.highIdle;
     const lowW = ease('low', lowOn ? 1 : 0, 1.3) * (1 - dg);
     const highW = ease('high', highOn ? 1 : 0, 1.3) * (1 - dg) * (1 - lowW);
     const busyW = ease('busy', st.busy && !dead && this.busy ? 1 : 0, 0.8) * (1 - dg) * (1 - lowW) * (1 - highW);
@@ -550,6 +556,7 @@ export class HumanView {
 
     // ---- legs: direction weights (forward / back / left / right) and walk → run by speed
     const sp = dead ? 0 : st.speed;
+    this.gaitHz = 0; // (set by the gait steps below)
     const move = ease('move', Math.min(1, sp / 12));
     const rel = Number.isFinite(st.moveRel) ? st.moveRel : 0;
     const cf = Math.cos(rel), sr = Math.sin(rel);
@@ -654,6 +661,8 @@ export class HumanView {
     } else { fw(cv.lowL, lw * cm * shL); fw(cv.lowR, lw * cm * shR); } // along low cover: the sneaks only
     fw(pistol ? cv.upPistol : cv.upRifle, lw * cm); // the gun-holding arms over the crouched legs
     fw(cv.highIdle, hw * (1 - cm));
+    if (cv.highIdle) cv.highIdle.time = A.peekFrom + (A.peekHoldAt - A.peekFrom) * smooth(0, 1, peekK); // (0 → back to the wall)
+    if (peekK <= 0 && cv.highIdle) cv.highIdle.time = 0;
     fw(cv.highL, hw * cm * shL); fw(cv.highR, hw * cm * shR);
     // the crouch / cover set in step too (its own clips; the stand clips are idle while it plays)
     if (lw + hw > 1e-3) this._gaitStep(dt, sp, [cv.walk, cv.lowL, cv.lowR, cv.highL, cv.highR], crouchBack);
@@ -673,7 +682,7 @@ export class HumanView {
 
     // D82: where the barrel points in THIS pose (relative to the body's facing) — the renderer turns the body by it,
     // so the gun itself points at the aim whatever the legs do (walking / strafing hips sway the torso)
-    const aimW = Math.max(am * normal, lowAim * lowW * live * (1 - Math.min(1, sp / 10))); // D86: kneeling aim only (the sneaks are no aim pose)
+    const aimW = Math.max(am * normal, lowAim * lowW * live * (1 - Math.min(1, sp / 10)), highW * live * smooth(0.3, 1, peekK)); // D86: kneeling aim only (the sneaks are no aim pose); D87: the peek
     const yawNow = aimW > 0.001 && this.gun && !this.inLeft ? this._barrelYaw() : 0;
 
     // ---- procedural layer (after the clips): recoil

@@ -30,8 +30,7 @@ function wireCombatSounds(events, game) {
     let i = Math.floor(Math.random() * ENEMY_KILL_SFX.length);
     if (i === lastKillIdx) i = (i + 1) % ENEMY_KILL_SFX.length;
     lastKillIdx = i;
-    const name = ENEMY_KILL_SFX[i];
-    Sfx.play(Sfx.duration(name) > 0 ? name : 'kill', 0.96 + Math.random() * 0.08, { voices: 3 });
+    Sfx.play(ENEMY_KILL_SFX[i], 0.96 + Math.random() * 0.08, { voices: 3 });
   });
   // enemy shots: the gun's recorded shot, quieter with distance from the hero
   events.on('enemyShot', (x, y, a, weaponId) => {
@@ -41,32 +40,18 @@ function wireCombatSounds(events, game) {
     const gain = Math.max(0.12, Math.min(0.75, 1 - d / 900));
     Sfx.play(ENEMY_SHOT_SFX[weaponId] || 'pistol.shot', 0.9 + Math.random() * 0.12, { gain, voices: 3 });
   });
-  events.on('dash', () => Sfx.play('dash'));
+  // D87 (user request): no synthesized sounds (Sfx plays only files + data/sounds.js SYNTH_KEEP); the roll, the alarm
+  // horn, the takedown thud and the re-pitched UI cues (spotted, suspicion, body found, weapon switch, door) are gone
   events.on('mapDefeat', () => Sfx.play('defeat'));
   events.on('mapVictory', () => Sfx.play('victory'));
   events.on('grenadeThrow', () => Sfx.play('throw'));
   events.on('grenadeBlast', () => Sfx.play('boom'));
   events.on('crateOpened', () => Sfx.play('crateOpen'));
-  events.on('pickup', (kind) => Sfx.play(kind === 'medkit' ? 'buy' : 'levelUp'));
-  events.on('doorUnlocked', () => Sfx.play('buy', 0.8));
-  events.on('reinforcements', () => Sfx.play('waveStart')); // synthesized horn: the alarm of the turn
-  events.on('spotted', () => Sfx.play('deny', 1.3, { voices: 1 }));
-  // D85 modes
-  events.on('suspicion', () => Sfx.play('click', 0.7, { gain: 0.6, voices: 1 }));
-  events.on('alarm', () => Sfx.play('waveStart'));
-  events.on('takedown', () => Sfx.play('hit', 0.8, { voices: 1 }));
-  events.on('bodyFound', () => Sfx.play('deny', 1.2, { voices: 1 }));
+  events.on('pickup', () => Sfx.play('levelUp')); // D87: the medkit too — the evidence pickup sound
   events.on('copyDone', () => Sfx.play('levelUp'));
-  events.on('threatLevel', (n) => { if (n > 1) Sfx.play('waveStart', 1.2); });
-  events.on('weaponSwitch', () => Sfx.play('click', 0.8));
-  events.on('bulletBlocked', () => {
-    if (!ricOk()) return;
-    if (Sfx.duration('ricochet') > 0) Sfx.play('ricochet', 0.92 + Math.random() * 0.16, { voices: 2, gain: 0.6 });
-    else Sfx.play('hit', 1.6 + Math.random() * 0.3);
-  });
+  events.on('bulletBlocked', () => { if (ricOk()) Sfx.play('ricochet', 0.92 + Math.random() * 0.16, { voices: 2, gain: 0.6 }); });
   events.on('playerHit', () => {
-    const name = PLAYER_HURT_SFX[Math.floor(Math.random() * PLAYER_HURT_SFX.length)];
-    Sfx.play(Sfx.duration(name) > 0 ? name : 'playerHurt', 0.96 + Math.random() * 0.08, { voices: 1 });
+    Sfx.play(PLAYER_HURT_SFX[Math.floor(Math.random() * PLAYER_HURT_SFX.length)], 0.96 + Math.random() * 0.08, { voices: 1 });
   });
   // footsteps: the recorded loop while the hero walks, at his speed; off when he stops, rolls, dies or the game is not running
   const steps = { h: null };
@@ -75,7 +60,10 @@ function wireCombatSounds(events, game) {
     const speed = p ? Math.hypot(p.vx, p.vy) : 0;
     const walking = !!p && game.sm.is(STATES.RUNNING) && p.alive && !p.dodging && speed > FOOTSTEPS.minSpeed;
     if (!walking) { if (steps.h) { steps.h.stop(); steps.h = null; } return; }
-    const rate = Math.min(FOOTSTEPS.maxRate, Math.max(FOOTSTEPS.minRate, speed / (FOOTSTEPS.refSpeed || PLAYER.moveSpeed)));
+    // D87: the pace of the legs animation (2 steps per gait cycle) against the recording's own pace
+    const hero = game.renderer3d && game.renderer3d.hero;
+    const pace = hero && hero.gaitHz > 0 ? (2 * hero.gaitHz) / FOOTSTEPS.stepsPerSec : speed / (FOOTSTEPS.refSpeed || PLAYER.moveSpeed);
+    const rate = Math.min(FOOTSTEPS.maxRate, Math.max(FOOTSTEPS.minRate, pace));
     if (!steps.h || steps.h.done) steps.h = Sfx.loop(FOOTSTEPS.sfx, rate);
     else steps.h.rate(rate);
   });

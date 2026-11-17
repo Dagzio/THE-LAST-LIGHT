@@ -457,7 +457,7 @@ export class Renderer3D {
     this.scene.add(this.office.group);
     this._buildPickups(level);
     // D85: the stealth run's view cones / suspicion bars / noise rings
-    if (level.modeId === 'stealth') this.stealthOverlay = new StealthOverlay(this.scene, FACE_CAM, this.quality === 'low' ? 10 : 16);
+    if (level.modeId === 'stealth') this.stealthOverlay = new StealthOverlay(this.scene, FACE_CAM, this.quality === 'low' ? 12 : 24);
     this._resize(true);
     this.rig.snap(spawnX, spawnY, level.width, level.height);
     this._placeCamera();
@@ -681,6 +681,7 @@ export class Renderer3D {
       dodgeClip: dodgeOf(p).clip,                                                                                                 // D83: which roll
       cover: p.alive && p.cover ? p.cover.kind : null,                                                                            // D83: cover poses
       crouch: p.alive && !p.cover && p.stance === 'crouch',                                                                        // D85: stealth crouch
+      peek: p.alive && p.peek ? p.peek.k : 0,                                                                                       // D87: leaning out of the corner
       takedown: p.alive && p.takedown ? Math.min(1, Math.max(0, (time - p.takedown.t0) / STEALTH.takedown.duration)) : -1,         // D85: the takedown clip
       takedownFrom: STEALTH.takedown.clipFrom, takedownTo: STEALTH.takedown.clipTo,
     });
@@ -754,7 +755,11 @@ export class Renderer3D {
     // ---- level: doors, pickups, objective
     this.office.update(run);
     this._syncPickups(run, time);
-    if (this.stealthOverlay) this.stealthOverlay.sync(run, time, (x, y) => this._onScreen(x, y, 60));
+    if (this.stealthOverlay) {
+      // D87: the cones follow the drawn (interpolated) enemy, not the last simulation step
+      const at = this._coneAt || (this._coneAt = { x: 0, y: 0 });
+      this.stealthOverlay.sync(run, time, (x, y) => this._onScreen(x, y, 60), (e) => { at.x = this._lx(e); at.y = this._ly(e); return at; });
+    }
 
     // ---- reticle (live cursor with this frame's camera)
     this.reticle.visible = p.alive && p.hasAim && !run.autoFire;

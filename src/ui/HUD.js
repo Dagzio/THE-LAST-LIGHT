@@ -54,6 +54,9 @@ export class HUD {
     // D85: the modes' events
     ev.on('alarm', () => this._showBanner('banner.alarm'));
     ev.on('bodyFound', () => this._showBanner('banner.bodyFound'));
+    ev.on('radioCheck', () => this._showBanner('banner.radioCheck'));     // D87
+    ev.on('witness', () => this._showBanner('banner.witness'));
+    ev.on('coverEdge', () => this._showBanner('banner.coverEdge'));
     ev.on('copyDone', () => { this._showBanner('banner.copyDone'); const k = brief('turn'); if (k) this._showCall(call(k)); });
     ev.on('threatLevel', (n) => { if (n > 1) this._showBanner('banner.threat', { n }); });
     ev.on('survivalSpawn', () => { if (game.run && game.run.mode && game.run.mode.spawnLog.length === 1) this._showBanner('banner.contact'); });
@@ -248,7 +251,9 @@ export class HUD {
       el.gun.src = gunIcon(w.weaponId);
     }
     if (w.ammo !== c.ammo) { c.ammo = w.ammo; el.ammo.textContent = String(w.ammo); }
-    if (w.stats.magazineSize !== c.mag) { c.mag = w.stats.magazineSize; el.mag.textContent = String(c.mag); }
+    // D87: a gun with counted rounds shows the reserve after the slash (else the magazine size, as before)
+    const mag = Number.isFinite(w.reserve) ? w.reserve : w.stats.magazineSize;
+    if (mag !== c.mag) { c.mag = mag; el.mag.textContent = String(mag); }
     const slotIds = [run.inventory[0] || HERO_WEAPONS[0], HERO_WEAPONS[1]]; // D85: the first slot is the mode's start gun
     const slots = slotIds.map((id, i) => (run.inventory.includes(id) ? (id === w.weaponId ? `[${i + 1}]` : String(i + 1)) : '')).join(' ');
     if (slots !== c.slots) {

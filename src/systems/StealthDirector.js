@@ -26,6 +26,54 @@ export class StealthDirector {
     this.runNoiseAt = 0;
     this.takedownTarget = null;
     this.copying = false;
+    this.witnessAt = 0;
+    this.nextRadioAt = STEALTH.radio.every;
+    // D87: killing has a price — a body found during the search, a kill seen by another guard
+    this._unsub = [
+      run.events.on('bodyFound', (e, b, second) => { if (second && STEALTH.secondBodyAlarm) this.raiseAlarm(run.lastTime); }),
+      run.events.on('kill', (e) => { if (e && e.x !== undefined) this._witness(e, run.lastTime); }),
+    ];
+  }
+
+  dispose() { for (const u of this._unsub) u(); this._unsub = []; }
+
+  /**
+   * D87: does another guard see the victim `e` now (a takedown in progress, a kill)? The first who does goes to combat
+   * (he saw the attacker) and the alarm is raised. → true if seen.
+   */
+  _witness(e, time) {
+    if (this.alarmRaised) return false;
+    const run = this.run, p = run.player;
+    for (const o of run.enemies) {
+      if (o === e || !o.alive || o.ai.mode === 'combat' || o.ai.mode === 'grabbed') continue;
+      if (!run.ai.seesPoint(o, e.x, e.y, time, STEALTH.witness.rangeMult)) continue;
+      const ai = o.ai;
+      ai.mode = 'combat'; ai.aware = true; ai.suspicion = 1; ai.investigate = false;
+      ai.lastSeenX = p.x; ai.lastSeenY = p.y; ai.lastSeenAt = time; ai.reactAt = time + 0.4;
+      this.raiseAlarm(time);
+      run.events.emit('witness', o, e);
+      return true;
+    }
+    return false;
+  }
+
+  /** D87: radio check-ins — one of the dead (unfound, dead long enough) is missed; the nearest guard goes to his spot. */
+  _radio(time) {
+    if (time < this.nextRadioAt) return;
+    this.nextRadioAt = time + STEALTH.radio.every;
+    const run = this.run, R = STEALTH.radio;
+    const body = run.enemies.find((b) => !b.alive && !b.found && !b.radioed && time - b.deathAt >= R.after);
+    if (!body) return;
+    let best = null, bestD = Infinity;
+    for (const g of run.enemies) {
+      if (!g.alive || g.ai.mode === 'combat' || g.ai.mode === 'grabbed' || g.ai.investigate) continue;
+      const d = Math.hypot(g.x - body.x, g.y - body.y);
+      if (d < bestD) { bestD = d; best = g; }
+    }
+    if (!best) return;
+    body.radioed = true;
+    run.ai.investigate(best, body.x, body.y, time, 0.4);
+    run.events.emit('radioCheck', best, body);
   }
 
   /** On touch the gun never fires by itself in stealth (it would give the hero away); after the alarm it may. */
@@ -43,6 +91,8 @@ export class StealthDirector {
     const run = this.run, p = run.player;
     if (!p.alive) return;
     if (p.takedown) {
+      // D87: the struggle can be seen by another guard (checked a few times a second)
+      if (!p.takedown.killed && time >= this.witnessAt) { this.witnessAt = time + STEALTH.witness.every; this._witness(p.takedown.e, time); }
       this._takedownStep(time);
       input.consumePressed('crouch'); input.consumePressed('takedown'); input.consumePressed('interact');
       return;
@@ -90,6 +140,7 @@ export class StealthDirector {
       else if (e.ai.suspicion > 0.05 || e.ai.investigate || e.ai.mode === 'search') wary = true;
     }
     if (combat) this.raiseAlarm(time);
+    if (!this.alarmRaised) this._radio(time); // D87
     const lvl = this.alarmRaised ? ALERT.ALARM : ai.searching(time) ? ALERT.SEARCH : wary ? ALERT.SUSPICION : ALERT.CALM;
     if (lvl !== this.level) { this.level = lvl; run.events.emit('alertLevel', lvl); }
     this.maxLevel = Math.max(this.maxLevel, lvl);
