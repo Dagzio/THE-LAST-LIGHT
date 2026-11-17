@@ -58,6 +58,7 @@ export class HUD {
     ev.on('copyDone', () => this._showBanner('banner.copyDone'));
     ev.on('targetHit', () => this._showBanner('banner.hit')); // D88 the training ground
     ev.on('ambush', () => this._showBanner('banner.contact'));
+    ev.on('tutorialHint', (key) => this._showBanner(key)); // D89: "rounds won't do — sneak up" / "use a grenade"
     ev.on('threatLevel', (n) => { if (n > 1) this._showBanner('banner.threat', { n }); });
     ev.on('survivalSpawn', () => { if (game.run && game.run.mode && game.run.mode.spawnLog.length === 1) this._showBanner('banner.contact'); });
     ev.on('pickupSpawned', (pk) => { if (pk.def.kind === 'crate') this._showBanner('banner.supplies'); });

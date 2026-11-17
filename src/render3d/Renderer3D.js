@@ -9,7 +9,7 @@ import { createMaterials } from './materials.js';
 import { buildOfficeScene, officeMaterials, preloadOfficeTextures, setOfficeAnisotropy } from './OfficeScene.js';
 import { HumanTemplate, bakeGunGeometry } from './humans.js';
 import { parseSkinnedGLB, loadGLB, blobTexture } from './glb.js';
-import { HUMAN_MODELS, HUMAN_ANIM, GUN_MODELS, gunModelOf } from '../data/humanModels.js';
+import { HUMAN_MODELS, HUMAN_ANIM, GUN_MODELS, gunModelOf, enemyModelOf } from '../data/humanModels.js';
 import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { dodgeOf } from '../data/player.js';
@@ -127,10 +127,11 @@ export class Renderer3D {
   // ---------------- assets (loaded once at start, before TAP TO PLAY) ----------------
   async _loadAssets() {
     const fetchBuf = (url) => fetch(url).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null);
-    const [animRes, heroBuf, enemyBuf, guns, grenade] = await Promise.all([
+    const [animRes, heroBuf, enemyBuf, trainingBuf, guns, grenade] = await Promise.all([
       fetch(HUMAN_ANIM.file).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetchBuf(HUMAN_MODELS.hero.file),
       fetchBuf(HUMAN_MODELS.enemy.file),
+      fetchBuf(HUMAN_MODELS.enemyTraining.file),
       Promise.all(Object.entries(GUN_MODELS).map(([id, e]) => loadGLB(e.file).then((m) => [id, m]))),
       loadGLB('assets/models/grenade.min.glb'),
       preloadOfficeTextures(),
@@ -151,8 +152,10 @@ export class Renderer3D {
     };
     // D81: the clips fit the hero's rig; the enemy's bones are retargeted against the hero's rest pose
     const heroTex = make('hero', heroBuf, null);
-    const enemyTex = make('enemy', enemyBuf, this.templates.hero ? this.templates.hero.rest : null);
-    await Promise.all([heroTex, enemyTex]);
+    const heroRest = this.templates.hero ? this.templates.hero.rest : null;
+    const enemyTex = make('enemy', enemyBuf, heroRest);
+    const trainingTex = make('enemyTraining', trainingBuf, heroRest);
+    await Promise.all([heroTex, enemyTex, trainingTex]);
     this.gunGeos = {};
     for (const [id, m] of guns) {
       if (!m) continue;
@@ -650,7 +653,8 @@ export class Renderer3D {
     let v = this.views.get(e.id);
     if (!v) {
       const L = e.type;
-      v = this._newView('enemy', L.tint ?? 0xffffff, gunModelOf(e.gun ? e.gun.stats.id : 'enemy_rifle'), L.scale || 1, Math.abs(e.id));
+      const key = enemyModelOf(this.map);
+      v = this._newView(this.templates && this.templates[key] ? key : 'enemy', L.tint ?? 0xffffff, gunModelOf(e.gun ? e.gun.stats.id : 'enemy_rifle'), L.scale || 1, Math.abs(e.id));
       if (!v) return null;
       if (e.id >= 0) this.views.set(e.id, v);
     }

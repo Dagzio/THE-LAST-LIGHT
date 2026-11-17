@@ -7,7 +7,12 @@ const DIR = 'assets/models/';
 export const HUMAN_MODELS = {
   hero: { file: `${DIR}hero.glb`, height: 56 },
   enemy: { file: `${DIR}enemy.glb`, height: 56 },
+  // D89: the training ground's instructors / dummies (NEW/tutorial/models — the same Mixamo rig, the enemies' clips)
+  enemyTraining: { file: `${DIR}enemy_training.glb`, height: 56 },
 };
+
+/** Enemy model of a level (level.enemyModel) — the key of HUMAN_MODELS; the office keeps the default enemy. */
+export const enemyModelOf = (level) => (level && HUMAN_MODELS[level.enemyModel] ? level.enemyModel : 'enemy');
 
 /**
  * Animations (assets/anims/human.json, D79: the user's full Mixamo set — rifle idle / run / strafes / back / fire /

@@ -42,6 +42,7 @@ export const SFX_FILES = {
   radio: { file: 'radio.mp3', gain: 1 },                               // D88 (user file): a dialogue opens
   // keeper (user files, player/): D56 footsteps — one whole walking loop (FOOTSTEPS below); hurt — 2 takes (D53)
   steps: { file: 'player/steps.mp3', gain: 1 },
+  steps1: { file: 'player/steps1.mp3', gain: 1 },                     // D89 (user file): the training ground's steps
   playerHurt1: { file: 'player/player-hitted1.mp3', gain: 1 },
   playerHurt2: { file: 'player/player-hitted2.mp3', trim: 0.025, gain: 1 },
   // D53 replacements of synthesized sounds: CC0 packs (sfx/CREDITS.txt), mixed / levelled into the file (gain 1)
@@ -71,6 +72,11 @@ export const SFX_FILES = {
 // D87 (user request: the steps follow the animation): rate = steps per second of the hero's legs clips (2 per gait
 // cycle, renderer) / the recording's own pace (stepsPerSec: onsets measured every 0.505 s); refSpeed — the fallback
 export const FOOTSTEPS = { sfx: 'steps', minSpeed: 8, minRate: 0.5, maxRate: 2.0, refSpeed: 112, stepsPerSec: 1.98 };
+/** D89 (user request): a level's own steps recording (level.footsteps) — the training ground (outdoor ground) uses
+ * steps1, the office keeps `steps`. stepsPerSec — that recording's own pace. */
+// steps1: 4.15 s, 8 steps (onsets measured in the browser, D89) → 1.93 per second
+export const LEVEL_FOOTSTEPS = { steps1: { sfx: 'steps1', stepsPerSec: 1.93 } };
+export const footstepsOf = (level) => ({ ...FOOTSTEPS, ...((level && LEVEL_FOOTSTEPS[level.footsteps]) || {}) });
 /** The keeper is hurt (D53): one of the user's two takes at random (synth 'playerHurt' while they load). */
 export const PLAYER_HURT_SFX = ['playerHurt1', 'playerHurt2'];
 

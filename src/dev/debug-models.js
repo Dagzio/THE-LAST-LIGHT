@@ -80,7 +80,8 @@ async function open() {
   let current = null, view = null, clipName = '', last = performance.now(), raf = 0, act = null, gameT = 0, gameRel = 'pReload2';
 
   const entries = [];
-  for (const key of ['hero', 'enemy']) for (const c of CLIPS) entries.push({ group: key === 'hero' ? 'Hero (player.glb)' : 'Enemy (enemy.glb)', name: `${key} · ${c}`, kind: 'human', key, clip: c });
+  const GROUPS = { hero: 'Hero (player.glb)', enemy: 'Enemy (enemy.glb)', enemyTraining: 'Training enemy (enemy_training.glb)' };
+  for (const key of Object.keys(GROUPS)) for (const c of CLIPS) entries.push({ group: GROUPS[key], name: `${key} · ${c}`, kind: 'human', key, clip: c });
   for (const type of Object.keys(PROP_BUILDERS)) entries.push({ group: 'Office props', name: type, kind: 'prop', type });
   const list = el.querySelector('.list');
   let lastGroup = '';

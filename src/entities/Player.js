@@ -70,7 +70,8 @@ export class Player {
     if (!this.alive || !(amount > 0) || !Number.isFinite(amount)) return 0;
     if (!ignoreInvulnerability && this.isInvulnerable(time)) return 0; // D62: poison ticks go through it
     const reduced = amount * (this.damageTakenMult > 0 ? this.damageTakenMult : 1);
-    const applied = Math.min(this.hp, reduced);
+    // D89: the training ground never kills him (minHp — the ambush only hurts; the medkit lesson follows)
+    const applied = Math.max(0, Math.min(this.hp - (this.minHp > 0 ? this.minHp : 0), reduced));
     this.hp -= applied;
     this.lastHitAt = time;
     this.invulnerableUntil = Math.max(this.invulnerableUntil, time + hitInvulnerability);

@@ -1,7 +1,7 @@
 // Game start (imported by boot.js after the preload): wires platform services, the runtime and the UI.
 // No globals are created (except window.__game while the dev asset viewer flag is on).
 import { DEBUG_ENABLED, DEBUG_MODELS } from './config/constants.js';
-import { MUSIC_FILES, SFX_FILES, AUDIO_DIR, ENEMY_KILL_SFX, FOOTSTEPS, PLAYER_HURT_SFX } from './data/sounds.js';
+import { MUSIC_FILES, SFX_FILES, AUDIO_DIR, ENEMY_KILL_SFX, FOOTSTEPS, footstepsOf, PLAYER_HURT_SFX } from './data/sounds.js';
 import { PLAYER } from './data/player.js';
 import { STATES } from './core/GameStateMachine.js';
 import { WeaponAudio } from './platform/WeaponAudio.js';
@@ -58,17 +58,20 @@ function wireCombatSounds(events, game) {
     Sfx.play(PLAYER_HURT_SFX[Math.floor(Math.random() * PLAYER_HURT_SFX.length)], 0.96 + Math.random() * 0.08, { voices: 1 });
   });
   // footsteps: the recorded loop while the hero walks, at his speed; off when he stops, rolls, dies or the game is not running
-  const steps = { h: null };
+  // D89: the level picks its recording (data/sounds.js footstepsOf)
+  const steps = { h: null, level: null, fs: FOOTSTEPS };
   game.onFrame(() => {
     const run = game.run, p = run && run.player;
+    if (run && run.level !== steps.level) { steps.level = run.level; steps.fs = footstepsOf(run.level); if (steps.h) { steps.h.stop(); steps.h = null; } }
+    const FS = steps.fs;
     const speed = p ? Math.hypot(p.vx, p.vy) : 0;
-    const walking = !!p && game.sm.is(STATES.RUNNING) && p.alive && !p.dodging && speed > FOOTSTEPS.minSpeed;
+    const walking = !!p && game.sm.is(STATES.RUNNING) && p.alive && !p.dodging && speed > FS.minSpeed;
     if (!walking) { if (steps.h) { steps.h.stop(); steps.h = null; } return; }
     // D87: the pace of the legs animation (2 steps per gait cycle) against the recording's own pace
     const hero = game.renderer3d && game.renderer3d.hero;
-    const pace = hero && hero.gaitHz > 0 ? (2 * hero.gaitHz) / FOOTSTEPS.stepsPerSec : speed / (FOOTSTEPS.refSpeed || PLAYER.moveSpeed);
-    const rate = Math.min(FOOTSTEPS.maxRate, Math.max(FOOTSTEPS.minRate, pace));
-    if (!steps.h || steps.h.done) steps.h = Sfx.loop(FOOTSTEPS.sfx, rate);
+    const pace = hero && hero.gaitHz > 0 ? (2 * hero.gaitHz) / FS.stepsPerSec : speed / (FS.refSpeed || PLAYER.moveSpeed);
+    const rate = Math.min(FS.maxRate, Math.max(FS.minRate, pace));
+    if (!steps.h || steps.h.done) steps.h = Sfx.loop(FS.sfx, rate);
     else steps.h.rate(rate);
   });
 }

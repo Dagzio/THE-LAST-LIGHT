@@ -37,6 +37,8 @@ export class Human {
     this.harmless = !!spawn.harmless || this.dummy;
     this.noCone = !!spawn.noCone || this.dummy;
     this.tag = spawn.tag || null;
+    // D89 training ground: rounds do not fell him (the lesson wants a takedown / a grenade) — ProjectileSystem
+    this.bulletProof = !!spawn.bulletProof;
     this.gun = {
       stats: weapon,
       ammo: weapon.magazineSize,

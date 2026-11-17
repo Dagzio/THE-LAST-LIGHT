@@ -90,6 +90,13 @@ export class ProjectileSystem {
       }
       if (!hit) break;
       p.markHit(hit.id);
+      // D89 training ground: a lesson's target that rounds cannot fell (the takedown guards, the grenade dummies) —
+      // the round stops on it like on a wall (a spark, no damage) and the lesson says how to do it
+      if (hit.bulletProof) {
+        this.events.emit('bulletProofHit', hit, time);
+        this._blocked(p, hitT);
+        return;
+      }
       const stats = p.stats || this.getWeaponStats(p.weaponId);
       const r = computeDamage(stats.damage, stats, hit, this.modifiers, this.rng, hitDirectionMult(hit, p.vx, p.vy));
       // D85: the silenced pistol fells an enemy who is not fighting the hero (unaware) — ×sneakMult

@@ -449,6 +449,11 @@ const ROWS = [
   ['banner.rifle', 'M4A1 TAKEN', 'M4A1 ВЗЯТО', 'M4A1 ВЗЯТ', 'M4A1 GENOMMEN', 'M4A1 PRESO', 'M4A1 PRIS', 'M4A1 OBTENIDO', 'M4A1 OBTIDO', 'تم أخذ M4A1', 'M4A1 入手'],
   ['banner.ammo', '+{n} ROUNDS', '+{n} НАБОЇВ', '+{n} ПАТРОНОВ', '+{n} SCHUSS', '+{n} COLPI', '+{n} BALLES', '+{n} BALAS', '+{n} BALAS', '+{n} طلقة', '弾薬 +{n}'],
   ['banner.noAmmo', 'NO AMMO', 'НЕМАЄ НАБОЇВ', 'НЕТ ПАТРОНОВ', 'KEINE MUNITION', 'MUNIZIONI FINITE', 'PLUS DE MUNITIONS', 'SIN MUNICIÓN', 'SEM MUNIÇÃO', 'لا ذخيرة', '弾切れ'],
+  // D89 training ground: a round stopped on a lesson's target
+  ['banner.useTakedown', 'ROUNDS WON\'T DO — SNEAK UP', 'КУЛІ НЕ ДІЮТЬ — ПІДКРАДИСЯ', 'ПУЛИ НЕ БЕРУТ — ПОДКРАДИСЬ', 'KUGELN NUTZLOS — ANSCHLEICHEN', 'I PROIETTILI NON BASTANO — AVVICINATI', 'BALLES INUTILES — APPROCHE-TOI', 'LAS BALAS NO SIRVEN — ACÉRCATE', 'BALAS NÃO ADIANTAM — APROXIME-SE', 'الرصاص لا ينفع — تسلّل', '弾は効かない — 忍び寄れ'],
+  ['banner.useGrenade', 'ROUNDS WON\'T DO — GRENADE', 'КУЛІ НЕ ДІЮТЬ — ГРАНАТА', 'ПУЛИ НЕ БЕРУТ — ГРАНАТА', 'KUGELN NUTZLOS — GRANATE', 'I PROIETTILI NON BASTANO — GRANATA', 'BALLES INUTILES — GRENADE', 'LAS BALAS NO SIRVEN — GRANADA', 'BALAS NÃO ADIANTAM — GRANADA', 'الرصاص لا ينفع — قنبلة', '弾は効かない — 手榴弾'],
+  ['banner.notYet', 'NOT YET — FOLLOW THE TASK', 'ЩЕ НЕ ЧАС — ВИКОНУЙ ЗАВДАННЯ', 'ЕЩЁ РАНО — ВЫПОЛНЯЙ ЗАДАНИЕ', 'NOCH NICHT — FOLGE DER AUFGABE', 'NON ANCORA — SEGUI IL COMPITO', 'PAS ENCORE — SUIS LA CONSIGNE', 'AÚN NO — SIGUE LA TAREA', 'AINDA NÃO — SIGA A TAREFA', 'ليس بعد — اتبع المهمة', 'まだだ — 課題に従え'],
+  ['banner.grenadeRefill', '+1 GRENADE', '+1 ГРАНАТА', '+1 ГРАНАТА', '+1 GRANATE', '+1 GRANATA', '+1 GRENADE', '+1 GRANADA', '+1 GRANADA', '+1 قنبلة', '手榴弾 +1'],
   ['banner.hit', 'HIT', 'ВЛУЧАННЯ', 'ПОПАДАНИЕ', 'TREFFER', 'COLPITO', 'TOUCHÉ', 'IMPACTO', 'ACERTO', 'إصابة', '命中'],
   ['hud.take.smg', 'TAKE SMG', 'ВЗЯТИ SMG', 'ВЗЯТЬ SMG', 'SMG NEHMEN', 'PRENDI SMG', 'PRENDRE LE SMG', 'COGER SMG', 'PEGAR SMG', 'خذ SMG', 'SMGを取る'],
   ['hud.take.rifle', 'TAKE M4A1', 'ВЗЯТИ M4A1', 'ВЗЯТЬ M4A1', 'M4A1 NEHMEN', 'PRENDI M4A1', 'PRENDRE LE M4A1', 'COGER M4A1', 'PEGAR M4A1', 'خذ M4A1', 'M4A1を取る'],

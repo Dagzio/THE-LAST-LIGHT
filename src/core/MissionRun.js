@@ -473,7 +473,9 @@ export class MissionRun {
 
     const autoFire = this.autoFire && (!this.mode || this.mode.autoFireAllowed !== false); // D85: never breaks stealth
     let fire = autoFire ? false : (this.autoFire ? false : input.isDown('fire'));
-    if (autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, this.enemies, this.weapon.stats.range);
+    // D89: a mode may give other things to aim at (the training ground's range: the targets)
+    const aimAt = (this.mode && this.mode.aimTargets) || this.enemies;
+    if (autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, aimAt, this.weapon.stats.range, this._peekFrom(p));
     else this.autoAim.reset();
     const trigger = fire && !this.holdFire && !this.grenadeArmed && !p.dodging && !p.takedown; // D82: no shots mid-roll
     // D87: behind high cover — only leaning out of its corner (else the trigger does nothing; a hint for manual fire)
@@ -498,6 +500,20 @@ export class MissionRun {
       if (!e.alive && time - e.deathAt > this.bodyFade) this.enemies.splice(i, 1);
     }
     this.particles.update(dt);
+  }
+
+  /**
+   * D89: the mobile auto fire behind HIGH cover at its corner looks from the leaned-out spot (else the wall hides every
+   * enemy, nothing is fired and he never leans out); null when not there (or already leaning out).
+   */
+  _peekFrom(p) {
+    if (!p.cover || p.cover.kind !== 'high' || p.peek) return null;
+    const side = this.controller.coverEdge(p);
+    if (!side) return null;
+    const o = this._peekSpot || (this._peekSpot = { x: 0, y: 0 });
+    o.x = p.x - p.cover.ny * side * COVER.peekOut;
+    o.y = p.y + p.cover.nx * side * COVER.peekOut;
+    return o;
   }
 
   /**

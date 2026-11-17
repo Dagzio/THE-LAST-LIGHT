@@ -24,6 +24,8 @@ export const TRAINING = {
   fixedMode: 'tutorial',     // data/modes.js: one mode — the lessons
   outdoor: true,             // render: no night windows / wall lamps / baseboards; the ground goes on outside
   outside: 'grass',
+  enemyModel: 'enemyTraining', // D89: the user's training enemy model (data/humanModels.js), the office one elsewhere
+  footsteps: 'steps1',         // D89: the user's second steps recording (data/sounds.js LEVEL_FOOTSTEPS)
   lighting: { hemi: 1.15, key: 1.55, exposure: 1.0, sky: 0xe4eeff, ground: 0x55663a, sun: 0xfff0d6, background: 0x6c8748 },
   width: 2400,
   height: 1800,
@@ -104,27 +106,30 @@ export const TRAINING = {
   props: [
     // --- A armory: two open weapon chests (SMG, M4A1), a workbench, cases, a canopy
     { type: 'weapon_chest_open', x: 290, y: 1320, rot: 0 }, { type: 'weapon_chest_open', x: 500, y: 1320, rot: 0 },
-    { type: 'canopy', x: 250, y: 1300 },
+    { type: 'canopy', x: 250, y: 1555 }, // D89: over the cases, not over the SMG chest (it hid the chest)
     { type: 'workbench', x: 600, y: 1480, rot: 1 }, { type: 'ammo_box', x: 600, y: 1460, rot: 1, elev: 24 }, { type: 'ammo_box', x: 600, y: 1500, rot: 1, elev: 24 },
     { type: 'equipment_case', x: 200, y: 1600 }, { type: 'crate_wood', x: 600, y: 1610 }, { type: 'barrel', x: 190, y: 1450 }, { type: 'barrel', x: 190, y: 1480 },
     { type: 'signal_green', x: 460, y: 1215 },
     // --- B range: targets along the north line, a sandbag backstop, the ammo table
     { type: 'sandbags', x: 270, y: 712 }, { type: 'sandbags', x: 530, y: 712 },
-    { type: 'round_target', x: 230, y: 760, target: true }, { type: 'torso_target', x: 330, y: 770, target: true },
-    { type: 'round_target', x: 400, y: 760, target: true }, { type: 'torso_target', x: 470, y: 770, target: true },
-    { type: 'round_target', x: 570, y: 760, target: true },
+    // D89: the lane to gate B (x 355…445) is kept free — no target stands in the way out
+    { type: 'round_target', x: 205, y: 760, target: true }, { type: 'torso_target', x: 265, y: 770, target: true },
+    { type: 'round_target', x: 325, y: 760, target: true }, { type: 'torso_target', x: 475, y: 770, target: true },
+    { type: 'round_target', x: 535, y: 760, target: true }, { type: 'torso_target', x: 595, y: 770, target: true },
     { type: 'workbench', x: 560, y: 990, rot: 0 }, { type: 'ammo_box', x: 545, y: 990, elev: 24 }, { type: 'ammo_box', x: 575, y: 992, elev: 24 },
     { type: 'barrel', x: 190, y: 1040 }, { type: 'signal_amber', x: 460, y: 695 },
     // --- C cover yard: low covers near the gate, sandbags before the two dummies, the free-standing wall (high cover)
-    { type: 'concrete_cover', x: 280, y: 440 }, { type: 'steel_cover', x: 400, y: 330 },
-    { type: 'sandbags', x: 290, y: 200 }, { type: 'sandbags', x: 640, y: 200 },
+    // D89: sandbags / dummies ~150 from the covers (were ~300: off the top of the screen from the lesson's spot)
+    { type: 'concrete_cover', x: 280, y: 440 }, { type: 'steel_cover', x: 460, y: 200 },
+    // the second dummy: hidden from the back of the free-standing wall, in sight once leaned out of its east corner
+    { type: 'sandbags', x: 290, y: 360 }, { type: 'sandbags', x: 690, y: 362 },
     { type: 'barrel', x: 720, y: 520 }, { type: 'crate_wood', x: 190, y: 160 }, { type: 'signal_amber', x: 745, y: 405 },
     // --- D stealth yard: crates, screens, a tent — places to sneak between
     { type: 'crate_wood', x: 1090, y: 410 }, { type: 'crate_wood', x: 1122, y: 440 }, { type: 'crate_wood_tall', x: 1180, y: 320 },
     { type: 'fabric_screen', x: 1010, y: 500, rot: 1 }, { type: 'fabric_screen', x: 1320, y: 300 }, { type: 'tent', x: 1440, y: 480 },
     { type: 'crate_wood', x: 1400, y: 300 }, { type: 'barrel', x: 960, y: 160 }, { type: 'signal_amber', x: 1505, y: 405 },
     // --- E grenade yard: three dummies behind sandbags, the open grenade chest
-    { type: 'sandbags', x: 2110, y: 280 }, { type: 'sandbags', x: 2020, y: 280 },
+    { type: 'sandbags', x: 2110, y: 340 }, { type: 'sandbags', x: 2020, y: 340 },
     { type: 'supply_chest_open', x: 1800, y: 490, rot: 0 }, { type: 'barrel', x: 1730, y: 160 }, { type: 'crate_wood', x: 2200, y: 520 },
     { type: 'signal_amber', x: 2050, y: 545 },
     // --- F roll yard: jersey barriers, hurdles, the blue mats (roll across them)
@@ -134,7 +139,7 @@ export const TRAINING = {
     { type: 'blue_hurdle', x: 1800, y: 1040 }, { type: 'blue_hurdle', x: 2180, y: 740 },
     { type: 'barrel', x: 2210, y: 1040 }, { type: 'barrel', x: 1770, y: 730 }, { type: 'signal_amber', x: 2050, y: 1065 },
     // --- G ambush: crates and barriers to fight from
-    { type: 'jersey_barrier', x: 1990, y: 1320 }, { type: 'crate_wood', x: 1880, y: 1450 }, { type: 'crate_wood', x: 2110, y: 1440 },
+    { type: 'jersey_barrier', x: 1990, y: 1320 }, { type: 'crate_wood', x: 1880, y: 1395 }, { type: 'crate_wood', x: 2110, y: 1390 },
     { type: 'crate_wood_tall', x: 1820, y: 1580 }, { type: 'supply_chest', x: 2170, y: 1600 }, { type: 'equipment_case', x: 1780, y: 1260 },
     { type: 'signal_amber', x: 1755, y: 1485 },
     // --- H medic: the medical table, a tent, a canopy
@@ -151,17 +156,20 @@ export const TRAINING = {
       .map(([x, y], i) => ({ type: i % 2 ? 'flowers' : 'grass_tuft', x, y })),
   ],
 
-  // dummies: stand still, never shoot; the stealth guards walk, see (stealth rules) but never shoot; the ambush shoots
+  // dummies: stand still, never shoot; the stealth guards walk, see (stealth rules) but never shoot; the ambush shoots.
+  // D89 bulletProof: the takedown guards and the grenade dummies are felled only the way their lesson teaches; the cover
+  // dummies take rounds only in their own lesson (TutorialDirector); the ambush is dormant (a dummy) until the hero walks in
   enemies: [
-    { type: 'thug', x: 290, y: 160, angle: Math.PI / 2, dummy: true, tag: 'cover1' },
-    { type: 'gunman', x: 640, y: 160, angle: Math.PI / 2, dummy: true, tag: 'cover2' },
-    { type: 'thug', x: 1000, y: 200, angle: 0, harmless: true, tag: 'stealth', patrol: [[1000, 200, 1.6, 0], [1440, 200, 1.6, Math.PI / 2]] },
-    { type: 'thug', x: 1250, y: 530, angle: 0, harmless: true, tag: 'stealth' },
-    { type: 'thug', x: 2080, y: 200, angle: Math.PI / 2, dummy: true, tag: 'grenade' },
-    { type: 'thug', x: 2120, y: 225, angle: Math.PI / 2, dummy: true, tag: 'grenade' },
-    { type: 'thug', x: 2160, y: 195, angle: Math.PI / 2, dummy: true, tag: 'grenade' },
-    { type: 'thug', x: 1880, y: 1560, angle: -Math.PI / 2, noCone: true, tag: 'ambush' },
-    { type: 'thug', x: 2150, y: 1540, angle: -Math.PI / 2, noCone: true, tag: 'ambush' },
+    { type: 'thug', x: 290, y: 325, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'cover1' },
+    { type: 'gunman', x: 705, y: 325, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'cover2' },
+    { type: 'thug', x: 1000, y: 200, angle: 0, harmless: true, bulletProof: true, tag: 'stealth', patrol: [[1000, 200, 1.6, 0], [1440, 200, 1.6, Math.PI / 2]] },
+    { type: 'thug', x: 1250, y: 530, angle: 0, harmless: true, bulletProof: true, tag: 'stealth' },
+    { type: 'thug', x: 2080, y: 290, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'grenade' },
+    { type: 'thug', x: 2120, y: 310, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'grenade' },
+    { type: 'thug', x: 2160, y: 285, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'grenade' },
+    // D89: behind the two crates, on the screen as the hero walks in (were by the south wall, off the screen)
+    { type: 'thug', x: 1880, y: 1435, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush' },
+    { type: 'thug', x: 2110, y: 1430, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush' },
   ],
   reinforcements: null,
 

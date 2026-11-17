@@ -6,6 +6,8 @@ import { TUTORIAL } from '../data/tutorial.js';
 import { STEALTH } from '../data/stealth.js';
 import { StealthDirector } from './StealthDirector.js';
 
+const NO_TARGETS = [];
+
 export class TutorialDirector {
   /** @param {import('../core/MissionRun.js').MissionRun} run */
   constructor(run) {
@@ -15,7 +17,9 @@ export class TutorialDirector {
     run.controller.speedProfile = null;        // …elsewhere the normal speeds
     run.player.sneak = false;
     run.player.stance = 'stand';
+    run.player.minHp = TUTORIAL.minHp;          // D89: the lessons never end in a defeat
     this.steps = TUTORIAL.steps;
+    this.hintAt = -Infinity;
     this.index = -1;
     this.count = 0;               // progress of the lesson (hits, ...)
     this.inStealth = false;
@@ -29,6 +33,7 @@ export class TutorialDirector {
       run.events.on('reloadEnd', () => { if (this.step && this.step.id === 'reload') this._done(); }),
       run.events.on('ammoPickup', () => { if (this.step && this.step.id === 'loot') this._done(); }),
       run.events.on('crateOpened', (item) => this._onCrate(item)),
+      run.events.on('bulletProofHit', (e, time) => this._onBulletProof(e, time)),
     ];
     this._next(0);
   }
@@ -50,6 +55,14 @@ export class TutorialDirector {
     return out;
   }
 
+  /** D89: the mobile version's auto aim (it fires at enemies only) takes the range targets during the shooting lessons. */
+  get aimTargets() {
+    const s = this.step;
+    if (!s || s.id !== 'hits') return null;
+    if (this.run.weapon.weaponId !== s.weapon) return NO_TARGETS; // the wrong gun: no rounds wasted (switch first)
+    return this._aim || (this._aim = this.targets.map((t) => ({ x: t.x, y: t.y + 4, radius: 6, alive: true })));
+  }
+
   // the stealth director's flags the HUD reads
   get autoFireAllowed() { return !this.inStealth; }
   get heroVisibility() { return this.stealth.heroVisibility; }
@@ -61,6 +74,13 @@ export class TutorialDirector {
     if (!s) return;
     // progress already made counts (both guns taken before, a target already down)
     this._check();
+    // D89: the cover yard's dummies take rounds only during their own lesson (not felled early from another yard)
+    for (const e of this.run.enemies) if (e.tag === 'cover1' || e.tag === 'cover2') e.bulletProof = !(s.id === 'kill' && s.tag === e.tag);
+    // D89: the reload lesson needs a magazine that is not full (rounds go back to the reserve — nothing is lost)
+    if (s.id === 'reload') {
+      const w = this.run.weapon;
+      if (w && !w.reloading && w.ammo >= w.stats.magazineSize) { const k = Math.ceil(w.stats.magazineSize / 3); w.ammo -= k; w.reserve += k; }
+    }
     this.run.events.emit('tutorialStep', i, s);
     // asked for on the next step (the first one: once the level is on screen, after the run has started)
     if (s.dialogue) this.pendingDialogue = s.dialogue;
@@ -115,6 +135,13 @@ export class TutorialDirector {
     if ((s.id === 'ammo' && item === 'ammo') || (s.id === 'medkit' && item === 'medkit')) this._done();
   }
 
+  /** D89: a round stopped on a lesson's bullet-proof target — the hint says what this lesson wants (throttled). */
+  _onBulletProof(e, time) {
+    if (time - this.hintAt < TUTORIAL.hintEvery) return;
+    this.hintAt = time;
+    this.run.events.emit('tutorialHint', e.tag === 'grenade' ? 'banner.useGrenade' : e.tag === 'stealth' ? 'banner.useTakedown' : 'banner.notYet');
+  }
+
   _onMat(p) {
     const m = this.run.level.rollMat;
     return !!m && p.x >= m[0] && p.x <= m[2] && p.y >= m[1] && p.y <= m[3];
@@ -146,11 +173,19 @@ export class TutorialDirector {
     if (this.pendingDialogue) { const id = this.pendingDialogue; this.pendingDialogue = null; run.events.emit('dialogue', id); }
     // the roll lesson: a roll that started or is passing over the mats
     if (s && s.id === 'roll' && p.dodging && this._onMat(p)) this._done();
+    // D89: the grenade lesson never runs dry — out of grenades with dummies standing, the instructor hands one more
+    const gr = run.grenades;
+    if (s && s.id === 'kill' && s.tag === 'grenade' && gr && !(gr.stock.frag > 0) && !gr.flying.length
+      && run.enemies.some((e) => e.tag === 'grenade' && e.alive)) {
+      gr.stock.frag = 1;
+      run.events.emit('tutorialHint', 'banner.grenadeRefill');
+    }
     // the ambush yard: they open fire once the hero walks in
     if (s && s.ambush && !this.ambushOn && run.levelWorld.zoneAt(p.x, p.y) === 'ambush') {
       this.ambushOn = true;
       for (const e of run.enemies) {
         if (e.tag !== 'ambush' || !e.alive) continue;
+        e.dummy = false; e.harmless = false; e.bulletProof = false; // D89: dormant until the hero walks in
         const ai = e.ai;
         ai.mode = 'combat'; ai.aware = true; ai.suspicion = 1; ai.lastSeenX = p.x; ai.lastSeenY = p.y; ai.lastSeenAt = time; ai.reactAt = time + 0.8;
       }

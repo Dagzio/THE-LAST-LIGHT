@@ -7,7 +7,8 @@
 // KILL LIST (D78): the user's character models (≈ 5 MB each, unchanged) and the animations are fetched here too, with
 // byte progress; the renderer then reads them from the HTTP cache.
 const CODE = [
-  ['lib/three.module.js', 26], ['assets/models/hero.glb', 14], ['assets/models/enemy.glb', 14], ['assets/anims/human.json', 3],
+  ['lib/three.module.js', 26], ['assets/models/hero.glb', 14], ['assets/models/enemy.glb', 14],
+  ['assets/models/enemy_training.glb', 11], ['assets/anims/human.json', 3],
 ]; // [url, share of the bar]
 const W_GAME = 10;                            // game modules evaluated (½) + renderer created / UI built (1)
 const W_WARM = 40;                            // warm-up (main.js warmUp → warmProgress)

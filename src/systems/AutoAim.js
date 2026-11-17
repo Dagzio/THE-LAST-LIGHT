@@ -16,34 +16,36 @@ export class AutoAim {
 
   reset() { this.target = null; }
 
-  _valid(e, p, reach) {
-    if (!e || !e.alive) return false;
-    const d = Math.hypot(e.x - p.x, e.y - p.y) - (e.radius || 0);
+  _valid(e, o, reach) {
+    if (!e || !e.alive || e.bulletProof) return false; // D89: never at a target rounds cannot fell (training ground)
+    const d = Math.hypot(e.x - o.x, e.y - o.y) - (e.radius || 0);
     if (!(d <= reach)) return false;
     if (this.inView && !this.inView(e.x, e.y)) return false; // D75: never at an enemy still off the screen
-    return !this.cfg.lineOfSight || !this.world || this.world.clear(p.x, p.y, e.x, e.y);
+    return !this.cfg.lineOfSight || !this.world || this.world.clear(o.x, o.y, e.x, e.y);
   }
 
   /**
    * @param {import('../entities/Player.js').Player} p
    * @param {Array} enemies
    * @param {number} range the equipped weapon's range
+   * @param {{x:number,y:number}|null} from D89: where he would shoot from (behind high cover at its corner: the leaned-out
+   *   spot — the auto fire then leans him out), default his own position
    * @returns {object|null} the enemy aimed at (the keeper's aimAngle / aimX / aimY are set), or null
    */
-  update(p, enemies, range) {
+  update(p, enemies, range, from = null) {
     if (!p.alive || !(range > 0)) { this.target = null; return null; }
-    const reach = range * this.cfg.rangeFactor;
+    const reach = range * this.cfg.rangeFactor, o = from || p;
     let best = null, bestD = Infinity;
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
-      const d = Math.hypot(e.x - p.x, e.y - p.y);
-      if (d >= bestD || !this._valid(e, p, reach)) continue;
+      const d = Math.hypot(e.x - o.x, e.y - o.y);
+      if (d >= bestD || !this._valid(e, o, reach)) continue;
       best = e; bestD = d;
     }
     // keep the current target unless the new one is clearly closer
     const cur = this.target;
-    if (cur && cur !== best && this._valid(cur, p, reach)) {
-      const dc = Math.hypot(cur.x - p.x, cur.y - p.y);
+    if (cur && cur !== best && this._valid(cur, o, reach)) {
+      const dc = Math.hypot(cur.x - o.x, cur.y - o.y);
       if (!best || bestD > dc * this.cfg.switchRatio) best = cur;
     }
     this.target = best;
