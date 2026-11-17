@@ -85,7 +85,7 @@ export const OFFICE = {
   props: [
     // --- lobby
     { type: 'reception', x: 1200, y: 1360, rot: 0 },
-    { type: 'chair', x: 1200, y: 1322, rot: 0, drawn: false },
+    { type: 'exec_chair', x: 1200, y: 1322, rot: 0 },
     { type: 'armchair', x: 800, y: 1474, rot: 3 }, { type: 'armchair', x: 800, y: 1526, rot: 3 }, { type: 'coffee_table', x: 862, y: 1500 },
     { type: 'armchair', x: 925, y: 1458, rot: 1 }, { type: 'armchair', x: 925, y: 1542, rot: 1 },
     { type: 'armchair', x: 1600, y: 1474, rot: 1 }, { type: 'armchair', x: 1600, y: 1526, rot: 1 }, { type: 'coffee_table', x: 1538, y: 1500 },
@@ -102,11 +102,17 @@ export const OFFICE = {
     { type: 'floor_lamp', x: 780, y: 1600 }, { type: 'floor_lamp', x: 1620, y: 1600 },
     { type: 'desk_lamp', x: 1255, y: 1352, elev: 34 },
     { type: 'papers', x: 1330, y: 1415, rot: 2 }, { type: 'papers', x: 1010, y: 1610, rot: 3 },
+    // D85: more of the user's catalogue (water cooler, bins, a coat stand, a camera)
+    { type: 'water_cooler', x: 775, y: 1250 }, { type: 'coat_stand', x: 1625, y: 1228 },
+    { type: 'steel_bin', x: 960, y: 1590 }, { type: 'steel_bin', x: 1440, y: 1590 },
+    { type: 'security_camera', x: 900, y: 1141.5, rot: 0 }, { type: 'security_camera', x: 1500, y: 1141.5, rot: 0 },
     // --- corridor
     { type: 'elevator', x: 1500, y: 1118.5, rot: 2 }, { type: 'extinguisher', x: 700, y: 1121, rot: 2 },
     { type: 'plant', x: 272, y: 972 }, { type: 'plant', x: 2128, y: 972 }, { type: 'plant', x: 2128, y: 1108 },
     { type: 'plant', x: 900, y: 1108 },
     { type: 'wall_clock', x: 1590, y: 1121, rot: 2 }, { type: 'notice_board', x: 820, y: 1121, rot: 2 },
+    { type: 'water_cooler', x: 1400, y: 1112 }, { type: 'fire_hose', x: 700, y: 961.5, rot: 0 }, { type: 'electrical', x: 1750, y: 961.5, rot: 0 },
+    { type: 'recycling_bin', x: 2128, y: 1040 },
     // --- break room
     { type: 'vending', x: 300, y: 1158, rot: 0 }, { type: 'boxes', x: 352, y: 1155 },
     { type: 'coffee_counter', x: 650, y: 1152, rot: 0 }, { type: 'vending', x: 712, y: 1160, rot: 0 },
@@ -118,6 +124,7 @@ export const OFFICE = {
     { type: 'plant', x: 722, y: 1422 },
     { type: 'wall_clock', x: 400, y: 1141.5, rot: 0 },
     { type: 'papers', x: 560, y: 1400, rot: 1 },
+    { type: 'coffee_vending', x: 590, y: 1158, rot: 0 }, { type: 'first_aid', x: 520, y: 1141.5, rot: 0 }, { type: 'recycling_bin', x: 700, y: 1230 },
     // --- archive
     { type: 'archive_shelf', x: 420, y: 1540, rot: 0 }, { type: 'archive_shelf', x: 420, y: 1620, rot: 0 },
     { type: 'archive_shelf', x: 590, y: 1540, rot: 0 }, { type: 'archive_shelf', x: 590, y: 1620, rot: 0 },
@@ -125,15 +132,16 @@ export const OFFICE = {
     { type: 'boxes', x: 290, y: 1670 }, { type: 'boxes_tall', x: 722, y: 1478 }, { type: 'trolley', x: 700, y: 1672 },
     { type: 'papers', x: 500, y: 1580 },
     // --- security
-    { type: 'console', x: 2050, y: 1158, rot: 0 }, { type: 'chair', x: 2050, y: 1198, rot: 2, drawn: false },
+    { type: 'console', x: 2050, y: 1158, rot: 0 }, { type: 'exec_chair', x: 2050, y: 1198, rot: 2 },
     { type: 'filing_cabinet', x: 1672, y: 1380, rot: 3 }, { type: 'filing_cabinet', x: 1672, y: 1404, rot: 3 },
     { type: 'server_rack', x: 1675, y: 1170, rot: 3 }, { type: 'tv_wall', x: 1760, y: 1141.5, rot: 0 },
     { type: 'boxes', x: 2110, y: 1420 }, { type: 'broken_monitor', x: 1840, y: 1250, rot: 2 },
     { type: 'filing_cabinet', x: 1758, y: 1428, rot: 2 }, { type: 'filing_cabinet', x: 1780, y: 1428, rot: 2 },
     { type: 'filing_cabinet', x: 1802, y: 1428, rot: 2 },
     { type: 'alarm_light', x: 1960, y: 1141.5, rot: 0 }, { type: 'papers', x: 1900, y: 1330, rot: 2 },
+    { type: 'security_camera', x: 1690, y: 1141.5, rot: 0 },
     // --- manager
-    { type: 'exec_desk', x: 1950, y: 1600, rot: 0 }, { type: 'chair', x: 1950, y: 1566, rot: 0 },
+    { type: 'exec_desk', x: 1950, y: 1600, rot: 0 }, { type: 'exec_chair', x: 1950, y: 1566, rot: 0 },
     { type: 'armchair', x: 1912, y: 1652, rot: 2 }, { type: 'armchair', x: 1988, y: 1652, rot: 2 },
     { type: 'bookcase', x: 1735, y: 1467, rot: 0 }, { type: 'bookcase', x: 1790, y: 1467, rot: 0 },
     { type: 'armchair', x: 1674, y: 1555, rot: 3 }, { type: 'armchair', x: 1674, y: 1607, rot: 3 },
@@ -141,7 +149,7 @@ export const OFFICE = {
     { type: 'rug_small', x: 1950, y: 1570 }, { type: 'wall_clock', x: 2000, y: 1461.5, rot: 0 },
     { type: 'floor_lamp', x: 2122, y: 1560 }, { type: 'floor_lamp', x: 1700, y: 1500 },
     { type: 'desk_lamp', x: 1982, y: 1594, elev: 24 }, { type: 'papers', x: 1870, y: 1640, rot: 1 },
-    // --- open space: six blocks of four workstations in two rows facing the camera (D81: the art shows their fronts)
+    // --- open space: six blocks of four workstations — D85: two rows back to back, each chair at its desk's front
     ...cluster(450, 400), ...cluster(750, 400), ...cluster(1050, 400),
     ...cluster(450, 680), ...cluster(750, 680), ...cluster(1050, 680),
     { type: 'whiteboard', x: 880, y: 268, rot: 0 }, { type: 'notice_board', x: 600, y: 261.5, rot: 0 },
@@ -157,12 +165,14 @@ export const OFFICE = {
     { type: 'papers', x: 1000, y: 770, rot: 2 }, { type: 'papers', x: 560, y: 790, rot: 1 }, { type: 'papers', x: 1180, y: 470 },
     { type: 'papers', x: 380, y: 520, rot: 3 }, { type: 'overturned_chair', x: 1150, y: 560, rot: 0 },
     { type: 'printer', x: 1272, y: 330, rot: 1 },
+    { type: 'water_cooler', x: 1280, y: 620 }, { type: 'air_conditioner', x: 450, y: 261.5, rot: 0 },
+    { type: 'steel_bin', x: 527, y: 455 }, { type: 'steel_bin', x: 827, y: 455 }, { type: 'steel_bin', x: 1127, y: 735 },
     // --- conference
     { type: 'conf_table', x: 1550, y: 435, rot: 0 },
-    { type: 'chair_meeting', x: 1480, y: 385, rot: 0, drawn: false }, { type: 'chair_meeting', x: 1550, y: 385, rot: 0, drawn: false },
-    { type: 'chair_meeting', x: 1620, y: 385, rot: 0, drawn: false }, { type: 'chair_meeting', x: 1480, y: 485, rot: 2, drawn: false },
-    { type: 'chair_meeting', x: 1550, y: 485, rot: 2, drawn: false }, { type: 'chair_meeting', x: 1620, y: 485, rot: 2, drawn: false },
-    { type: 'chair_meeting', x: 1432, y: 435, rot: 3, drawn: false }, { type: 'chair_meeting', x: 1668, y: 435, rot: 1, drawn: false },
+    { type: 'chair_meeting', x: 1480, y: 385, rot: 0 }, { type: 'chair_meeting', x: 1550, y: 385, rot: 0 },
+    { type: 'chair_meeting', x: 1620, y: 385, rot: 0 }, { type: 'chair_meeting', x: 1480, y: 485, rot: 2 },
+    { type: 'chair_meeting', x: 1550, y: 485, rot: 2 }, { type: 'chair_meeting', x: 1620, y: 485, rot: 2 },
+    { type: 'chair_meeting', x: 1432, y: 435, rot: 3 }, { type: 'chair_meeting', x: 1668, y: 435, rot: 1 },
     { type: 'tv_wall', x: 1550, y: 261.5, rot: 0 }, { type: 'plant', x: 1322, y: 272 }, { type: 'plant', x: 1778, y: 272 },
     { type: 'wall_clock', x: 1700, y: 261.5, rot: 0 },
     { type: 'floor_lamp', x: 1330, y: 590 }, { type: 'floor_lamp', x: 1770, y: 590 }, { type: 'papers', x: 1440, y: 545, rot: 1 },
@@ -171,13 +181,15 @@ export const OFFICE = {
     { type: 'archive_shelf', x: 1660, y: 639, rot: 0 }, { type: 'archive_shelf', x: 1740, y: 639, rot: 0 },
     { type: 'boxes', x: 1650, y: 700 }, { type: 'trolley', x: 1440, y: 900 }, { type: 'boxes_tall', x: 1322, y: 920 },
     { type: 'papers', x: 1460, y: 740, rot: 2 }, { type: 'papers', x: 1600, y: 860 }, { type: 'boxes', x: 1760, y: 920 },
+    { type: 'shredder', x: 1380, y: 642, rot: 0 }, { type: 'recycling_bin', x: 1430, y: 642 },
     // --- server room
     ...rackRow(1890, 2112, 360), ...rackRow(1890, 2112, 520), ...rackRow(1890, 1994, 680),
-    { type: 'terminal', x: 2097, y: 828, rot: 0 }, { type: 'chair', x: 2097, y: 800, rot: 0 },
+    { type: 'terminal', x: 2097, y: 828, rot: 2 }, { type: 'chair', x: 2097, y: 800, rot: 0 },
     { type: 'boxes', x: 1830, y: 920 },
     // D83 (the reference): cable trays over the rack rows, red alarm lights
     { type: 'cable_tray', x: 2001, y: 360, len: 240 }, { type: 'cable_tray', x: 2001, y: 520, len: 240 }, { type: 'cable_tray', x: 1942, y: 680, len: 130 },
     { type: 'alarm_light', x: 1850, y: 261.5, rot: 0 }, { type: 'alarm_light', x: 2110, y: 261.5, rot: 0 },
+    { type: 'electrical', x: 1980, y: 261.5, rot: 0 },
     // --- stairwell
     { type: 'stairs', x: 175, y: 400, rot: 1 },
   ],
@@ -259,22 +271,19 @@ export const OFFICE = {
   exit: { rect: [110, 310, 240, 490], x: 175, y: 400 },
 };
 
-/** Four workstations in two rows around (cx, cy), all facing the camera (south), each chair behind its desk. */
+/** D85: four workstations in two rows back to back around (cx, cy); every chair at its desk's front (the screen side). */
 function cluster(cx, cy) {
   const out = [];
-  for (const dy of [-36, 36]) for (const dx of [-31, 31]) {
-    out.push({ type: 'workstation', x: cx + dx, y: cy + dy, rot: 0 }, { type: 'chair', x: cx + dx, y: cy + dy - 28, rot: 0 });
+  for (const dx of [-31, 31]) {
+    out.push({ type: 'workstation', x: cx + dx, y: cy - 16, rot: 2 }, { type: 'chair', x: cx + dx, y: cy - 44, rot: 0 });
+    out.push({ type: 'workstation', x: cx + dx, y: cy + 16, rot: 0 }, { type: 'chair', x: cx + dx, y: cy + 44, rot: 2 });
   }
   return out;
 }
 
-/** D83: a planter (north–south, low cover) with two plants standing on it (drawn only: the planter collides). */
+/** D83: a planter (north–south, low cover). */
 function planter(x, y) {
-  return [
-    { type: 'planter', x, y, rot: 1 },
-    { type: 'plant', x, y: y - 16, elev: 20, solid: false },
-    { type: 'plant', x, y: y + 16, elev: 20, solid: false },
-  ];
+  return [{ type: 'planter', x, y, rot: 1 }]; // D85: the plants are part of the planter's own art
 }
 
 /** A row of server racks facing south from x0 to x1 at y. */

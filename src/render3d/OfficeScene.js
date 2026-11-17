@@ -11,6 +11,7 @@ import { PROP_TYPES, propBox } from '../data/props.js';
 import { TILE, tileUV } from './officeAtlas.js';
 import { buildPropCards, hasSprite, propAtlasTexture, preloadPropAtlas } from './propSprites.js';
 import { levelLights, LIGHT_KINDS } from './officeLights.js';
+import { buildPropViews, hasView, propViewTexture, preloadPropViews } from './propViews.js';
 
 const POOL_GAIN = 0.9;    // D83: floor pool brightness per unit of light power
 // D83: floor decal kinds → atlas tiles (render3d/officeAtlas.js)
@@ -53,7 +54,7 @@ function officeTexture(name, aniso) {
 /** Resolves when every office texture has loaded (or failed — a missing file must not block the game). */
 export function preloadOfficeTextures() {
   const names = new Set([...Object.values(FLOORS), ...Object.values(WALLS)].map((e) => e[0]));
-  return Promise.all([preloadPropAtlas(), ...[...names].map((n) => new Promise((res) => {
+  return Promise.all([preloadPropAtlas(), preloadPropViews(), ...[...names].map((n) => new Promise((res) => {
     const t = new THREE.TextureLoader().load(`${TEX_DIR}${n}.png`, () => res(), undefined, () => res());
     t.colorSpace = THREE.SRGBColorSpace;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -121,6 +122,8 @@ export function officeMaterials(aniso = 4) {
   // D83: lit by the baked lights near them (vertex colours: the night ambient + the lamps / screens around)
   m.propCards = new THREE.MeshBasicMaterial({ map: propAtlasTexture(aniso), vertexColors: true, transparent: true, alphaTest: 0.04, depthWrite: true, side: THREE.DoubleSide });
   m.shadowOnly = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+  // D85: the furniture view boxes (the user's 5-view sheets): lit, cut out by alpha, both sides in the shadow map
+  m.propViews = new THREE.MeshLambertMaterial({ map: propViewTexture(aniso), vertexColors: true, alphaTest: 0.5, shadowSide: THREE.DoubleSide });
   sharedMats = m;
   return m;
 }
@@ -129,6 +132,7 @@ export function officeMaterials(aniso = 4) {
 export function setOfficeAnisotropy(aniso) {
   for (const t of texCache.values()) if (t.anisotropy !== aniso) { t.anisotropy = aniso; if (t.image) t.needsUpdate = true; }
   propAtlasTexture(aniso);
+  propViewTexture(aniso);
 }
 
 function roundRect(g, x, y, w, h, r) {
@@ -310,8 +314,9 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   // D83: render-only decor of the lighting (wall lights over each room's north wall) + the level's props
   const extras = wallLights(level);
   const allProps = [...level.props, ...extras];
-  for (const p of extras) buildProp(pb, p);
+  for (const p of extras) if (!hasView(p)) buildProp(pb, p);
   for (const p of level.props) {
+    if (hasView(p) || p.drawn === false) continue; // D85: drawn as a view box (it casts its own silhouette shadow)
     if (!hasSprite(p)) { buildProp(pb, p); continue; }
     const t = PROP_TYPES[p.type];
     if (shadows && t && !t.flat && !t.wall) buildProp(shadowOnly, p);
@@ -400,7 +405,18 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   }
 
   // D81: the sprite cards (one mesh) + the invisible shadow casters of those props
-  const cardGeo = buildPropCards(level, lights);
+  // D85: the view boxes (one mesh) — every prop with the user's 5-view art
+  const viewGeo = buildPropViews(allProps, lights);
+  if (viewGeo) {
+    const vm = new THREE.Mesh(viewGeo, mats.propViews);
+    vm.castShadow = shadows;
+    vm.receiveShadow = shadows;
+    vm.matrixAutoUpdate = false;
+    group.add(vm);
+    meshes.push(vm);
+  }
+  // the old sprite cards: only the props without views (overturned chair, broken monitor, papers, trolley)
+  const cardGeo = buildPropCards({ ...level, props: level.props.filter((p) => !hasView(p)) }, lights);
   if (cardGeo) {
     const cards = new THREE.Mesh(cardGeo, mats.propCards);
     cards.renderOrder = 3; // after the floor decals (pools, contact shadows), before glass

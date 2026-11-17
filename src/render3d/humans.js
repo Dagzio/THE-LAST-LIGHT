@@ -338,7 +338,8 @@ export class HumanView {
     // Fire held / Pistol Kneeling Idle), kneeling strafes along it; high — back to it, the gun up (Peek And Aim held at
     // its start), sneaking sideways (Left / Right Cover Sneak); Stand To Crouch / Crouch To Standing between them
     this.cv = {
-      lowIdle: loop('crouchIdle'), lowFire: held('crouchFire', 0.3), pKneel: loop('pKneel'),
+      // D85 (user): crouched in cover — "Crouch Idle" (both guns), moving along — the "Crouch Walk Strafe" clips
+      lowIdle: loop('crouchIdle2') || loop('crouchIdle'), lowFire: held('crouchFire', 0.3), pKneel: loop('pKneel'),
       lowL: loop('crouchL'), lowR: loop('crouchR'),
       highIdle: held('peek', 0), highL: loop('coverL'), highR: loop('coverR'),
       toCrouch: held('toCrouch'), toStand: held('toStand'),
@@ -536,7 +537,7 @@ export class HumanView {
     const fw = (a, v) => { if (a) a.setEffectiveWeight(a.getEffectiveWeight() + v); };
     for (const a of Object.values(cv)) if (a) a.setEffectiveWeight(0);
     const lw = lowW * live * (1 - tr), hw = highW * live * (1 - tr);
-    fw(pistol ? cv.pKneel : cv.lowIdle, lw * (1 - cm) * (1 - lowAim));
+    fw(cv.lowIdle, lw * (1 - cm) * (1 - lowAim));
     fw(pistol ? cv.pKneel : cv.lowFire, lw * (1 - cm) * lowAim);
     fw(cv.lowL, lw * cm * shL); fw(cv.lowR, lw * cm * shR);
     fw(cv.highIdle, hw * (1 - cm));

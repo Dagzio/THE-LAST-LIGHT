@@ -93,7 +93,7 @@ export function barrelOffsetAngle(mz, d) {
  */
 export const FACING = {
   aimHold: 0.6,             // s the body keeps facing the aim after the trigger is let go
-  alwaysAimMouse: false,
+  alwaysAimMouse: true,     // D85 (user request): with a mouse the hero faces the cursor while moving too (strafe / back legs)
 };
 
 /** D74 / D75 (kept): the mobile version aims and shoots by itself at the nearest visible enemy on the screen. */
