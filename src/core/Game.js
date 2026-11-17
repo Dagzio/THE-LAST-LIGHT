@@ -65,6 +65,7 @@ export class Game {
     this.mapId = null;
     this.events = new GameEvents();  // presentation hooks: sound, particles, HUD
     this.run = null;                 // MissionRun of the current level attempt
+    this.dialogueOpen = false;       // D88: set by ui/DialogueView while a dialogue is on screen (no simulation step)
     this.frameListeners = new Set();
     this.progress = new Progress();  // the only owner of the profile
     this.economy = this.progress;    // (legacy name read by a few UI parts: loadStatus)
@@ -99,7 +100,7 @@ export class Game {
 
   // ---------------- simulation ----------------
   update(dt) {
-    if (!this.sm.simulating) return;
+    if (!this.sm.simulating || this.dialogueOpen) return; // D88: a dialogue on screen — the game waits
     if (this.renderer3d && this.renderer3d.busy()) return; // shaders compiling / context lost: the game waits
     this.clock.advance(dt);
     if (this.run) {
@@ -116,7 +117,7 @@ export class Game {
   render(alpha, frameDt) {
     this.presentationTime += frameDt;
     if (this.sm.inMap && this.run && this.renderer3d) {
-      this.renderer3d.render(this.run, frameDt, this.clock.time, !this.sm.is(STATES.RUNNING), alpha);
+      this.renderer3d.render(this.run, frameDt, this.clock.time, !this.sm.is(STATES.RUNNING) || !!this.dialogueOpen, alpha);
     } else {
       this.viewport.ensure(); // menus: the still picture is CSS (#menuBg); only the input surface follows the size
     }
@@ -154,7 +155,7 @@ export class Game {
 
   backToMenu() { return this.sm.set(STATES.MAIN_MENU); }
 
-  isMapUnlocked(id) { return this.progress.profile.unlockedLevels.includes(id); }
+  isMapUnlocked(id) { const l = getLevel(id); return !!l && (!!l.alwaysOpen || this.progress.profile.unlockedLevels.includes(id)); } // D88
 
   isMapCleared(id) { return this.progress.profile.completedLevels.includes(id); }
 
@@ -247,7 +248,7 @@ export class Game {
     this.input.pointerMapper = (cx, cy, out) => this.renderer3d.screenToGround(cx, cy, out);
     this.input.releaseAll();
     this.loop.resetTiming();
-    document.body.dataset.mode = modeId;
+    document.body.dataset.mode = resolved.modeId; // D88: the training ground → 'tutorial'
     const ok = this.sm.set(STATES.RUNNING);
     if (ok) this.events.emit('mapStarted', level.id, modeId);
     return ok;

@@ -43,6 +43,14 @@ export class InputManager {
       canvas.addEventListener('pointerdown', (e) => {
         if (e.pointerType === 'mouse' && e.button === 0) this.setSourceAction('mouse', 'fire', true);
       });
+      // D88: the mouse wheel changes the weapon (down — next, up — previous; one step per notch burst)
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const now = performance.now();
+        if (now - (this._wheelAt || 0) < 160 || !e.deltaY) return;
+        this._wheelAt = now;
+        this.pressedQueue.add(e.deltaY > 0 ? 'switchWeapon' : 'switchWeaponPrev');
+      }, { passive: false });
     }
     window.addEventListener('pointerup', (e) => {
       if (e.pointerType === 'mouse' && e.button === 0) this.setSourceAction('mouse', 'fire', false);

@@ -13,6 +13,7 @@ import { Sfx } from './platform/Sfx.js';
 import { Game } from './core/Game.js';
 import { UIManager } from './ui/UIManager.js';
 import { HUD } from './ui/HUD.js';
+import { DialogueView } from './ui/DialogueView.js';
 import { TouchControls } from './ui/TouchControls.js';
 import { preloadIcons } from './data/icons.js';
 import { initDebugOverlay } from './ui/DebugOverlay.js';
@@ -49,6 +50,9 @@ function wireCombatSounds(events, game) {
   events.on('crateOpened', () => Sfx.play('crateOpen'));
   events.on('pickup', () => Sfx.play('levelUp')); // D87: the medkit too — the evidence pickup sound
   events.on('copyDone', () => Sfx.play('levelUp'));
+  // D88: rounds taken — the magazine-seated click of the pistol reload (a recorded file); an empty gun — the deny file
+  events.on('ammoPickup', () => Sfx.play('pistol.reload2', 1.05, { voices: 1 }));
+  events.on('noAmmo', () => Sfx.play('deny', 1, { voices: 1 }));
   events.on('bulletBlocked', () => { if (ricOk()) Sfx.play('ricochet', 0.92 + Math.random() * 0.16, { voices: 2, gain: 0.6 }); });
   events.on('playerHit', () => {
     Sfx.play(PLAYER_HURT_SFX[Math.floor(Math.random() * PLAYER_HURT_SFX.length)], 0.96 + Math.random() * 0.08, { voices: 1 });
@@ -86,6 +90,7 @@ export function startGame(boot) {
   const game = new Game(document.getElementById('world'), document.getElementById('world3d'));
   const ui = new UIManager(game);
   new HUD(game);
+  new DialogueView(game); // D88 (before game.start: its keys come before the game's input)
   new TouchControls(game);
   preloadIcons();
   wireCombatSounds(game.events, game);

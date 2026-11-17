@@ -136,12 +136,14 @@ export class SurvivalDirector {
     if (t >= this.crateAt) {
       this.crateAt = t + S.crate.every;
       const max = t >= S.crate.lateAt ? S.crate.maxLate : S.crate.max;
-      const item = !run.inventory.includes('smg') ? 'smg' : (run.grenades.stock.frag | 0) < 3 ? 'grenades' : null;
+      // D88: the rounds are limited — a box of rounds when a carried gun has less than a magazine in reserve
+      const low = run.inventory.some((id) => { const w = run.weaponStates[id]; return w.reserve < w.stats.magazineSize; });
+      const item = !run.inventory.includes('smg') ? 'smg' : low ? 'ammo' : (run.grenades.stock.frag | 0) < 3 ? 'grenades' : null;
       if (item && active('crate') < max) {
         const pk = this._spot('crate', this.firstCrate ? S.crate.firstNear : Infinity);
         if (pk) {
           this.firstCrate = false;
-          pk.taken = false; pk.openedAt = -1; pk.item = item; pk.count = item === 'grenades' ? S.crate.grenades : 1;
+          pk.taken = false; pk.openedAt = -1; pk.item = item; pk.count = item === 'grenades' ? S.crate.grenades : item === 'ammo' ? S.crate.ammoMags : 1;
           run.events.emit('pickupSpawned', pk);
         }
       }

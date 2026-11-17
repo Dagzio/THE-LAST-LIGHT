@@ -20,6 +20,7 @@ export const KEY_BINDINGS = {
   takedown: ['KeyF'],
   weapon1: ['Digit1', 'Numpad1'],
   weapon2: ['Digit2', 'Numpad2'],
+  weapon3: ['Digit3', 'Numpad3'], // D88: the M4A1
 };
 
 export const ACTIONS = Object.keys(KEY_BINDINGS);

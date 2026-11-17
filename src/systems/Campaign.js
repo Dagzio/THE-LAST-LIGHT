@@ -14,7 +14,7 @@ export function nextLevelId(id) {
 export const isLastLevel = (id) => !nextLevelId(id);
 
 export function unlockedLevels(profile) {
-  return LEVELS.filter((m) => profile.unlockedLevels.includes(m.id));
+  return LEVELS.filter((m) => m.alwaysOpen || profile.unlockedLevels.includes(m.id)); // D88: the training ground
 }
 
 /** H5 §11: level select opens on the newest unlocked level that is not cleared yet (else the last unlocked). */

@@ -25,6 +25,7 @@ const MOODS = {
   cool: { kind: 'cool', step: 260 },
   dim: { kind: 'dim', step: 300 },
   dark: { kind: 'dim', step: 0 },     // no ceiling lights: lit by its own lamps / screens only
+  day: { kind: 'dim', step: 0 },      // D88: outdoors in daylight (the training ground): no pools, lit everywhere
 };
 
 /** Lights that come with a prop: [kind, forward offset (towards its front), sideways, stretch x, stretch z]. */

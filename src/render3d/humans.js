@@ -359,12 +359,13 @@ export class HumanView {
     // its start), sneaking sideways (Left / Right Cover Sneak); Stand To Crouch / Crouch To Standing between them
     this.cv = {
       // D85 (user): crouched in cover — "Crouch Idle" (both guns), moving along — the "Crouch Walk Strafe" clips
-      lowIdle: loop('crouchIdle2'), lowFire: held('crouchFire', 0.3), pKneel: loop('pKneel'),
+      // D88 (user): only the Cover/Crouch clips, for both guns (Pistol Kneeling Idle is gone)
+      lowIdle: loop('crouchIdle2'), lowFire: held('crouchFire', 0.3),
       // D86: moving crouched — the LEGS of "Crouched Sneaking Left / Right" (sideways) and "Crouch Walking" (forward /
-      // back); the arms keep the gun as in the crouch idle (rifle) / Pistol Kneeling Idle (the sneaks are unarmed clips)
+      // back); the arms keep the gun as in the crouch idle (the sneaks are unarmed clips)
       lowL: C.crouchL ? act(C.crouchL.lower) : null, lowR: C.crouchR ? act(C.crouchR.lower) : null,
       walk: C.crouchWalk ? act(C.crouchWalk.lower) : null,
-      upRifle: C.crouchIdle2 ? act(C.crouchIdle2.upper) : null, upPistol: C.pKneel ? act(C.pKneel.upper) : null,
+      upRifle: C.crouchIdle2 ? act(C.crouchIdle2.upper) : null,
       highIdle: held('peek', 0), highL: loop('coverL'), highR: loop('coverR'),
       toCrouch: held('toCrouch'), toStand: held('toStand'),
     };
@@ -649,7 +650,7 @@ export class HumanView {
     for (const a of Object.values(cv)) if (a) a.setEffectiveWeight(0);
     const lw = lowW * live * (1 - tr), hw = highW * live * (1 - tr);
     fw(cv.lowIdle, lw * (1 - cm) * (1 - lowAim));
-    fw(pistol ? cv.pKneel : cv.lowFire, lw * (1 - cm) * lowAim);
+    fw(cv.lowFire, lw * (1 - cm) * lowAim); // D88 (user): the Cover/Crouch clips for both guns (no Pistol Kneeling Idle)
     let crouchBack = null;
     if (st.cover !== 'low' && cv.walk) {
       // D85 stealth crouch (not in cover): forward / back — the crouch walk (backwards played in reverse), sideways —
@@ -659,7 +660,7 @@ export class HumanView {
       fw(cv.lowL, lw * cm * (l / tot)); fw(cv.lowR, lw * cm * (r / tot));
       if (b > f) crouchBack = this._backSet || (this._backSet = new Set([cv.walk]));
     } else { fw(cv.lowL, lw * cm * shL); fw(cv.lowR, lw * cm * shR); } // along low cover: the sneaks only
-    fw(pistol ? cv.upPistol : cv.upRifle, lw * cm); // the gun-holding arms over the crouched legs
+    fw(cv.upRifle, lw * cm); // the gun-holding arms over the crouched legs (D88: Crouch Idle's, both guns)
     fw(cv.highIdle, hw * (1 - cm));
     if (cv.highIdle) cv.highIdle.time = A.peekFrom + (A.peekHoldAt - A.peekFrom) * smooth(0, 1, peekK); // (0 → back to the wall)
     if (peekK <= 0 && cv.highIdle) cv.highIdle.time = 0;

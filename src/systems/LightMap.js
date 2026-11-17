@@ -6,7 +6,7 @@ import { levelLights, lightAt } from '../data/lighting.js';
 const CELL = 30;
 const RGB = [0, 0, 0];
 // the rooms' own light between the pools (the moods of data/lighting.js) and how strongly the pools count
-const MOOD_AMBIENT = { warm: 0.16, cool: 0.14, dim: 0.06, dark: 0 };
+const MOOD_AMBIENT = { warm: 0.16, cool: 0.14, dim: 0.06, dark: 0, day: 0.3 }; // D88: day — the training ground
 const POOL_K = 1.5;
 
 export class LightMap {

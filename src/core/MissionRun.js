@@ -13,15 +13,18 @@ import { AutoAim } from '../systems/AutoAim.js';
 import { SeededRandom } from './SeededRandom.js';
 import { LevelWorld, DOOR } from './LevelWorld.js';
 import { Particles } from '../render/Particles.js';
-import { WEAPONS, getWeapon } from '../data/weapons.js';
+import { WEAPONS, getWeapon, HERO_WEAPONS, AMMO_DROPS } from '../data/weapons.js';
 import { StealthDirector } from '../systems/StealthDirector.js';
 import { SurvivalDirector } from '../systems/SurvivalDirector.js';
+import { TutorialDirector } from '../systems/TutorialDirector.js';
 import { HUMAN_TYPES } from '../data/humans.js';
 import { CAPS } from '../data/balance.js';
 import { FACING, INTERACT, COVER, muzzleOf, barrelOffsetAngle } from '../data/player.js';
 
 const AIM = { x: 0, y: 0 };
 const BODY_FADE = 30; // s a dead body stays (presentation; bodies never block anything)
+/** D88: slot of a hero gun (0 pistols, 1 SMG, 2 M4A1). */
+const slotOf = (id) => (WEAPONS[id] && WEAPONS[id].gun === 'pistol' ? 0 : Math.max(0, HERO_WEAPONS.indexOf(id)));
 
 export class MissionRun {
   /**
@@ -98,7 +101,8 @@ export class MissionRun {
     this.interactTarget = null;  // the crate in reach (E / touch button)
     for (const [t, n] of Object.entries(L.grenades || {})) this.grenades.add(t, n);
     // D85: the mode's director (stealth / survival rules); the mission has none
-    this.mode = this.modeId === 'stealth' ? new StealthDirector(this) : this.modeId === 'survival' ? new SurvivalDirector(this) : null;
+    this.mode = this.modeId === 'stealth' ? new StealthDirector(this) : this.modeId === 'survival' ? new SurvivalDirector(this)
+      : this.modeId === 'tutorial' ? new TutorialDirector(this) : null; // D88: the training ground's lessons
 
     this._unsub = [
       events.on('shot', (x, y, angle, weaponId) => {
@@ -155,10 +159,10 @@ export class MissionRun {
 
   // ---------------- weapons ----------------
   /** Equip a carried weapon (1 / 2 / Q / the HUD weapon block). Each weapon keeps its magazine; a reload is dropped. */
-  switchWeapon(id = null) {
-    if (this.over || !this.player.alive) return false;
+  switchWeapon(id = null, dir = 1) {
+    if (this.over || !this.player.alive || this.player.takedown) return false;
     const inv = this.inventory;
-    const next = id || inv[(inv.indexOf(this.weapon.weaponId) + 1) % inv.length];
+    const next = id || inv[(inv.indexOf(this.weapon.weaponId) + (dir < 0 ? inv.length - 1 : 1)) % inv.length];
     const w = this.weaponStates[next];
     if (!w || w === this.weapon) return false;
     if (this.weapon.reloading) this.weapon.reloading = false; // the next reload starts over
@@ -167,6 +171,42 @@ export class MissionRun {
     w.nextShotAt = Math.max(w.nextShotAt, this.lastTime + 0.25); // a moment to bring it up
     this.events.emit('weaponSwitch', next);
     return true;
+  }
+
+  /** D88: the weapon of slot n (0: the pistol the mode gives, 1: SMG, 2: M4A1) if carried — keys 1 / 2 / 3. */
+  slotWeapon(n) {
+    const id = n === 0 ? this.inventory.find((w) => WEAPONS[w] && WEAPONS[w].gun === 'pistol') : HERO_WEAPONS[n];
+    return id && this.inventory.includes(id) ? id : null;
+  }
+
+  /** D88: a gun is added (a crate, the training ground's chests); carried already — its reserve is topped up instead. */
+  giveWeapon(id, equip = true) {
+    const W = WEAPONS[id];
+    if (!W) return false;
+    if (this.inventory.includes(id)) {
+      const w = this.weaponStates[id];
+      w.reserve = Math.min(W.reserveMax ?? Infinity, w.reserve + (W.reserve || W.magazineSize));
+      this.events.emit('ammoPickup', W.ammo, W.reserve || W.magazineSize, id);
+      return true;
+    }
+    this.inventory.push(id);
+    this.inventory.sort((a, b) => slotOf(a) - slotOf(b)); // slot order: pistol, SMG, M4A1
+    this.weaponStates[id] = new WeaponState(W);
+    if (equip) this.switchWeapon(id);
+    return true;
+  }
+
+  /**
+   * D88: rounds of a class (from a body / a box) into the carried gun that takes them — the one in the hands first —
+   * up to its reserveMax. → how many were taken (0: no such gun, or full).
+   */
+  giveAmmo(type, n) {
+    const fits = (w) => w && w.stats.ammo === type;
+    const w = fits(this.weapon) ? this.weapon : this.inventory.map((id) => this.weaponStates[id]).find(fits);
+    if (!w || !(n > 0)) return 0;
+    const take = Math.max(0, Math.min(n, (w.stats.reserveMax ?? Infinity) - w.reserve));
+    if (take > 0) { w.reserve += take; this.events.emit('ammoPickup', type, take, w.weaponId); }
+    return take;
   }
 
   get equippedWeaponId() { return this.weapon.weaponId; }
@@ -266,13 +306,20 @@ export class MissionRun {
     const pk = this.interactTarget;
     if (!pk || pk.openedAt >= 0 || this.over || !this.player.alive || pk.def.kind !== 'crate') return false;
     pk.openedAt = time;
-    const d = pk.def, item = pk.item, count = pk.count || 1; // D85: the survival director fills its crates
-    if (item === 'smg' && !this.inventory.includes('smg')) {
-      this.inventory.push('smg');
-      this.weaponStates.smg = new WeaponState(WEAPONS.smg);
-      this.switchWeapon('smg');
+    const d = pk.def, count = pk.count || 1; // D85: the survival director fills its crates
+    let item = pk.item;
+    if (item === 'smg' || item === 'rifle') {
+      if (this.inventory.includes(item)) item = 'ammo-' + item; // D88: carried already → its reserve is topped up
+      this.giveWeapon(pk.item);
     } else if (item === 'grenades') {
       this.grenades.add('frag', count);
+    } else if (item === 'ammo') {
+      // D88: a box of rounds — a magazine's worth for every carried gun (count = magazines)
+      for (const id of this.inventory) { const w = this.weaponStates[id]; this.giveAmmo(w.stats.ammo, w.stats.magazineSize * count); }
+    } else if (item === 'medkit') {
+      // D88 training ground: a medkit kept in a case (taken with E like a crate) heals even at full health
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + INTERACT.medkitHeal);
+      this.events.emit('pickup', 'medkit', d.id);
     }
     this.events.emit('crateOpened', item, count, d.id);
     this.interactTarget = null;
@@ -309,10 +356,12 @@ export class MissionRun {
       } else if (d <= INTERACT.pickupRadius + p.radius) this._pickup(pk, time);
     }
     this.interactTarget = best;
-    // D85: what a dead enemy carried (the supervisor's key card) is taken by walking over his body
+    // D85: what a dead enemy carried (the supervisor's key card) is taken by walking over his body; D88: his rounds too
     for (const e of this.enemies) {
-      if (e.alive || !e.carries) continue;
+      if (e.alive || (!e.carries && !(e.ammoDrop > 0))) continue;
       if (Math.hypot(p.x - e.x, p.y - e.y) > INTERACT.pickupRadius + p.radius + 6) continue;
+      if (e.ammoDrop > 0) e.ammoDrop -= this.giveAmmo(e.ammoType, e.ammoDrop); // what does not fit stays on him
+      if (!e.carries) continue;
       if (e.carries === 'keycard') this.has.keycard = true;
       this.events.emit('pickup', e.carries, `loot_${e.id}`);
       e.carries = null;
@@ -346,7 +395,10 @@ export class MissionRun {
     return true;
   }
 
-  get objective() { return this.level.objectives[this.objectiveIndex] || null; }
+  get objective() {
+    if (this.mode && 'objective' in this.mode) return this.mode.objective; // D88: the tutorial's lesson
+    return this.level.objectives[this.objectiveIndex] || null;
+  }
 
   /** World point of the current objective (HUD arrow / marker), or null. */
   objectiveTarget(out = {}) {
@@ -368,6 +420,11 @@ export class MissionRun {
   _updateObjectives() {
     const o = this.objective;
     if (!o) return;
+    if (this.modeId === 'tutorial') { // D88: the lessons complete themselves; the last one is the way out
+      const r = this.level.exit && this.level.exit.rect, p = this.player;
+      if (o.id === 'exit' && r && p.x >= r[0] && p.x <= r[2] && p.y >= r[1] && p.y <= r[3]) this._setVictory();
+      return;
+    }
     const key = o.done || o.target;
     const done = key === 'keycard' ? this.has.keycard : key === 'drive' ? this.has.drive : key === 'copy' ? this.has.copy : false;
     if (done) {
@@ -385,6 +442,9 @@ export class MissionRun {
     if (!e || e.reported) return;
     e.reported = true;
     this.stats.kills += 1;
+    // D88: the rounds he leaves (by the class of his gun), rolled once with the run's seeded RNG
+    const type = e.gun && e.gun.stats.drops, R = type && AMMO_DROPS[type];
+    if (R && !e.noDrop) { e.ammoType = type; e.ammoDrop = R[0] + Math.floor(this.rng.next() * (R[1] - R[0] + 1)); }
     this.particles.burst(e.x, e.y, 10, 120, 0.4, 2.6, '#7a1414');
   }
 
@@ -406,8 +466,9 @@ export class MissionRun {
     this.controller.update(p, input, dt, time);
 
     if (input.consumePressed('switchWeapon')) this.switchWeapon();
-    if (input.consumePressed('weapon1')) this.switchWeapon(this.inventory[0]);
-    if (input.consumePressed('weapon2') && this.inventory[1]) this.switchWeapon(this.inventory[1]);
+    if (input.consumePressed('switchWeaponPrev')) this.switchWeapon(null, -1);
+    // D88: 1 / 2 / 3 — the pistol / SMG / M4A1 slots (a slot not carried does nothing)
+    for (let n = 0; n < 3; n++) if (input.consumePressed(`weapon${n + 1}`)) { const id = this.slotWeapon(n); if (id) this.switchWeapon(id); }
     if (input.consumePressed('interact')) this.interact(time);
 
     const autoFire = this.autoFire && (!this.mode || this.mode.autoFireAllowed !== false); // D85: never breaks stealth
@@ -417,6 +478,7 @@ export class MissionRun {
     const trigger = fire && !this.holdFire && !this.grenadeArmed && !p.dodging && !p.takedown; // D82: no shots mid-roll
     // D87: behind high cover — only leaning out of its corner (else the trigger does nothing; a hint for manual fire)
     const shooting = this.controller.peekGate(p, trigger, !autoFire, dt, time);
+    this._outOfAmmo(trigger, time);
     this.weapons.update(this.weapon, p, shooting, input.consumePressed('reload'), time);
     this._grenadeInput(input, time);
     this._updateCover(p, shooting, time);
@@ -436,6 +498,21 @@ export class MissionRun {
       if (!e.alive && time - e.deathAt > this.bodyFade) this.enemies.splice(i, 1);
     }
     this.particles.update(dt);
+  }
+
+  /**
+   * D88: the gun in the hands is empty (no rounds in it, none in reserve) and the trigger is pulled — the next carried
+   * gun with rounds is taken; with none left, "no ammo" (an event, not more often than once a second).
+   */
+  _outOfAmmo(trigger, time) {
+    const w = this.weapon;
+    if (!trigger || w.reloading || w.ammo > 0 || w.reserve > 0) return;
+    const inv = this.inventory, i = inv.indexOf(w.weaponId);
+    for (let k = 1; k < inv.length; k++) {
+      const o = this.weaponStates[inv[(i + k) % inv.length]];
+      if (o.ammo > 0 || o.reserve > 0) { this.switchWeapon(o.weaponId); return; }
+    }
+    if (time >= (this._dryAt || 0)) { this._dryAt = time + 1; this.events.emit('noAmmo'); }
   }
 
   _bodies() {

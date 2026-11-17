@@ -1,6 +1,6 @@
 // UI icons from the user's art (D52, assets/ui/guns — 128 px WebP made from the 512 px PNG sources).
 const DIR = 'assets/ui/guns/';
-const GUN_FILES = { pistol: 'pistol', smg: 'smg' };
+const GUN_FILES = { pistol: 'pistol', pistol_sd: 'pistol', smg: 'smg', rifle: 'rifle' }; // D88: rifle — the M4A1
 const GRENADE_FILES = { frag: 'frag_grenade' };
 
 /** Weapon icon (HUD weapon block, shop weapon cards). */

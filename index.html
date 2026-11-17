@@ -139,6 +139,21 @@
       </span>
     </div>
 
+    <!-- D88: dialogue (the handler / the hero): portrait + the user's frame, the text typed letter by letter; the game
+         waits meanwhile. NEXT finishes the line / goes on, SKIP closes the whole dialogue. -->
+    <div class="dlg" id="dialogue" hidden>
+      <img class="dlg-portrait" id="dlgPortrait" alt="" draggable="false">
+      <div class="dlg-box">
+        <i class="dlg-frame"></i>
+        <b class="dlg-name" id="dlgName"></b>
+        <p class="dlg-text" id="dlgText"></p>
+        <span class="dlg-btns">
+          <button class="dlg-btn dlg-skip" id="dlgSkip" data-nosfx data-i18n="dlg.skip"></button>
+          <button class="dlg-btn dlg-next" id="dlgNext" data-nosfx data-i18n="dlg.next"></button>
+        </span>
+      </div>
+    </div>
+
     <!-- Level result: the case file page — lines count up one by one, then the stamp. Tap the page to skip. -->
     <div class="result-panel" id="resultPanel">
       <article class="journal" id="journal">
@@ -159,7 +174,7 @@
     <div class="offscreen" id="offscreen"><span class="obj-arrow" id="objArrow"><svg viewBox="0 0 24 24"><path d="M4 12h13M12 5l7 7-7 7"/></svg></span></div>
 
     <!-- Above the crate in reach: E / tap opens it -->
-    <button class="kiosk-prompt crate-prompt" id="cratePrompt" data-action="interact" data-nosfx><span class="kiosk-key">E</span><span data-i18n="hud.open"></span></button>
+    <button class="kiosk-prompt crate-prompt" id="cratePrompt" data-action="interact" data-nosfx><span class="kiosk-key">E</span><span id="cratePromptText" data-i18n="hud.open"></span></button>
     <!-- D85 stealth: over the enemy one can take down (F) / over the server terminal (hold E) -->
     <div class="kiosk-prompt crate-prompt ctx-prompt" id="ctxPrompt"><span class="kiosk-key" id="ctxKey">F</span><span id="ctxText"></span></div>
     <!-- D83: next to an object one can hide behind (PC): Q / click takes cover -->

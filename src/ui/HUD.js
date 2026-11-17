@@ -26,7 +26,7 @@ export class HUD {
       items: $('hudItems'),
       banner: $('waveBanner'), bannerText: $('waveBannerText'), screen: $('screen-game'),
       call: $('introCard'), callKicker: $('introKicker'), callTitle: $('introTitle'), callText: $('introText'),
-      crate: $('cratePrompt'), arrow: $('objArrow'), interactBtn: $('interactBtn'),
+      crate: $('cratePrompt'), crateText: $('cratePromptText'), arrow: $('objArrow'), interactBtn: $('interactBtn'),
       coverPrompt: $('coverPrompt'), coverBtn: $('coverBtn'),
       // D85 stealth
       stealth: $('stealthHud'), alertLabel: $('alertLabel'), vis: $('visLabel'), visText: $('visText'),
@@ -48,16 +48,16 @@ export class HUD {
       if (this.call) this._fillCall(this.call);
     });
     const ev = game.events;
-    const call = (text) => ({ kicker: 'call.incoming', title: 'call.handler', text });
-    const brief = (k) => { const b = game.run && game.run.level.briefing; return b && b[k]; };
-    ev.on('mapStarted', () => { const k = brief('start'); if (k) this._showCall(call(k)); });
+    // D88: the handler's calls are dialogues now (ui/DialogueView.js); the call card stays unused
     // D85: the modes' events
     ev.on('alarm', () => this._showBanner('banner.alarm'));
     ev.on('bodyFound', () => this._showBanner('banner.bodyFound'));
     ev.on('radioCheck', () => this._showBanner('banner.radioCheck'));     // D87
     ev.on('witness', () => this._showBanner('banner.witness'));
     ev.on('coverEdge', () => this._showBanner('banner.coverEdge'));
-    ev.on('copyDone', () => { this._showBanner('banner.copyDone'); const k = brief('turn'); if (k) this._showCall(call(k)); });
+    ev.on('copyDone', () => this._showBanner('banner.copyDone'));
+    ev.on('targetHit', () => this._showBanner('banner.hit')); // D88 the training ground
+    ev.on('ambush', () => this._showBanner('banner.contact'));
     ev.on('threatLevel', (n) => { if (n > 1) this._showBanner('banner.threat', { n }); });
     ev.on('survivalSpawn', () => { if (game.run && game.run.mode && game.run.mode.spawnLog.length === 1) this._showBanner('banner.contact'); });
     ev.on('pickupSpawned', (pk) => { if (pk.def.kind === 'crate') this._showBanner('banner.supplies'); });
@@ -67,9 +67,14 @@ export class HUD {
       else if (kind === 'medkit') this._showBanner('banner.medkit');
       else if (kind === 'intel' && game.run) this._showBanner('banner.intel', { n: game.run.intel, total: game.run.level.pickups.filter((p) => p.kind === 'intel').length });
     });
-    ev.on('crateOpened', (item, count) => this._showBanner(item === 'smg' ? 'banner.smg' : 'banner.grenades', { n: count }));
+    ev.on('crateOpened', (item, count) => {
+      const key = { smg: 'banner.smg', rifle: 'banner.rifle', grenades: 'banner.grenades' }[item];
+      if (key) this._showBanner(key, { n: count });
+    });
+    // D88: rounds taken (a body, a box), the gun empty with nothing to switch to
+    ev.on('ammoPickup', (type, n) => this._showBanner('banner.ammo', { n }));
+    ev.on('noAmmo', () => this._showBanner('banner.noAmmo'));
     ev.on('doorUnlocked', (id) => { if (id !== 'exit') this._showBanner('banner.doorOpen'); });
-    ev.on('reinforcements', () => { if (game.run && game.run.modeId === 'mission') { const k = brief('turn'); if (k) this._showCall(call(k)); } });
     game.sm.onChange(() => { if (!game.sm.inMap) { this._hideBanner(); this._hideCall(); } });
     this.el.banner.addEventListener('animationend', () => this._hideBanner());
     game.onFrame(() => this.update());
@@ -94,7 +99,7 @@ export class HUD {
       hp: -1, maxHp: -1, ammo: -1, mag: -1, weaponId: '', reloading: null, reloadPct: -1, hurt: null, lowAmmo: null,
       hitFlash: null, lastHitAt: null, objKey: '', objIdx: -1, levelKey: '', items: '', slots: '', gKey: '', dashPct: -1,
       dashCooling: false, crateOn: null, cx: -1, cy: -1, arrowOn: null, ax: -1, ay: -1, aa: -1, interact: null,
-      coverOn: null, kx: -1, ky: -1, coverBtn: '',
+      coverOn: null, kx: -1, ky: -1, coverBtn: '', crateLabel: '', tutKey: '',
       alert: -1, vis: '', ctxKey: '', cxx: -1, cxy: -1, crouch: null, survKey: '',
     };
   }
@@ -155,6 +160,9 @@ export class HUD {
     }
     if (on !== c.crateOn) { c.crateOn = on; el.classList.toggle('on', on); el.classList.toggle('near', on); }
     if (!on) return;
+    // D88: what the crate holds ("TAKE SMG", "TAKE M4A1", the medkit…) — else OPEN
+    const label = it.def.label || 'hud.open';
+    if (label !== c.crateLabel) { c.crateLabel = label; if (this.el.crateText) this.el.crateText.textContent = T(label); this.labelSize.delete(el); }
     const x = Math.round(PT.x), y = Math.round(PT.y);
     if (x !== c.cx || y !== c.cy) { c.cx = x; c.cy = y; el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`; }
   }
@@ -162,13 +170,15 @@ export class HUD {
   /** D85 stealth: the alert scale, the visibility eye, "F · TAKEDOWN" / "E · COPY" over the target, the crouch toggle. */
   _stealthHud(run, running) {
     const c = this.cache, el = this.el, m = run.mode, p = run.player, r3 = this.game.renderer3d;
-    if (m.level !== c.alert) {
-      c.alert = m.level;
-      el.stealth.dataset.level = String(m.level);
-      el.alertLabel.textContent = T(['alert.calm', 'alert.suspicious', 'alert.search', 'alert.alarm'][m.level]);
+    if (run.modeId === 'stealth') { // (D88: the tutorial uses only the context label and the crouch button)
+      if (m.level !== c.alert) {
+        c.alert = m.level;
+        el.stealth.dataset.level = String(m.level);
+        el.alertLabel.textContent = T(['alert.calm', 'alert.suspicious', 'alert.search', 'alert.alarm'][m.level]);
+      }
+      const v = m.heroVisibility, vis = v < 0.38 ? 'hidden' : v < 0.7 ? 'dim' : 'lit';
+      if (vis !== c.vis) { c.vis = vis; el.vis.dataset.vis = vis; el.visText.textContent = T(`vis.${vis}`); }
     }
-    const v = m.heroVisibility, vis = v < 0.38 ? 'hidden' : v < 0.7 ? 'dim' : 'lit';
-    if (vis !== c.vis) { c.vis = vis; el.vis.dataset.vis = vis; el.visText.textContent = T(`vis.${vis}`); }
     const crouch = p.stance === 'crouch';
     if (crouch !== c.crouch && el.crouchBtn) { c.crouch = crouch; el.crouchBtn.classList.toggle('on', crouch); }
     // the context label over the target
@@ -254,7 +264,8 @@ export class HUD {
     // D87: a gun with counted rounds shows the reserve after the slash (else the magazine size, as before)
     const mag = Number.isFinite(w.reserve) ? w.reserve : w.stats.magazineSize;
     if (mag !== c.mag) { c.mag = mag; el.mag.textContent = String(mag); }
-    const slotIds = [run.inventory[0] || HERO_WEAPONS[0], HERO_WEAPONS[1]]; // D85: the first slot is the mode's start gun
+    // D85: the first slot is the mode's pistol; D88: three slots (pistol, SMG, M4A1) — the M4A1 slot only once seen
+    const slotIds = [run.slotWeapon(0) || HERO_WEAPONS[0], HERO_WEAPONS[1], HERO_WEAPONS[2]].filter((id, i) => i < 2 || run.inventory.includes(id));
     const slots = slotIds.map((id, i) => (run.inventory.includes(id) ? (id === w.weaponId ? `[${i + 1}]` : String(i + 1)) : '')).join(' ');
     if (slots !== c.slots) {
       c.slots = slots;
@@ -291,11 +302,22 @@ export class HUD {
       }
     }
     // D85 stealth: the alert scale, the visibility eye, the context label (takedown / copy), the crouch button
-    if (run.modeId === 'stealth' && run.mode) this._stealthHud(run, running);
+    if ((run.modeId === 'stealth' || run.modeId === 'tutorial') && run.mode) this._stealthHud(run, running);
     // objective + level name
     const o = run.objective;
     const objKey = o ? o.textKey : '';
-    if (run.modeId !== 'survival' && (objKey !== c.objKey || run.objectiveIndex !== c.objIdx)) {
+    if (run.modeId === 'tutorial') {
+      // D88: the lesson — "TRAINING 3/17", its text with the progress, the PC keys as chips
+      const m = run.mode, key = `${m.index}|${o ? o.n : ''}`;
+      if (key !== c.tutKey) {
+        const fresh = !c.tutKey.startsWith(`${m.index}|`);
+        c.tutKey = key;
+        el.objKicker.textContent = T('hud.tutorial', { n: Math.min(m.index + 1, m.steps.length), total: m.steps.length });
+        el.objText.replaceChildren(document.createTextNode(o ? T(o.textKey, { n: o.n, of: o.of }) : ''));
+        if (o && !this.game.touchMode) for (const k of o.keys) { const b = document.createElement('kbd'); b.className = 'obj-key'; b.textContent = k.startsWith('key.') ? T(k) : k; el.objText.append(' ', b); }
+        if (fresh) { el.objective.classList.remove('pop'); void el.objective.offsetWidth; el.objective.classList.add('pop'); invalidateHudBlockers(); }
+      }
+    } else if (run.modeId !== 'survival' && (objKey !== c.objKey || run.objectiveIndex !== c.objIdx)) {
       c.objKey = objKey; c.objIdx = run.objectiveIndex;
       el.objKicker.textContent = T('hud.objective', { n: Math.min(run.objectiveIndex + 1, run.level.objectives.length), total: run.level.objectives.length });
       el.objText.textContent = o ? T(o.textKey) : '';

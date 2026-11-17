@@ -47,7 +47,7 @@ export class HumanAISystem {
       const e = enemies[i];
       if (!e.alive) continue;
       const g = e.gun, ai = e.ai;
-      if (ai.mode === 'grabbed') { e.vx = 0; e.vy = 0; continue; } // D85: held in a takedown
+      if (ai.mode === 'grabbed' || e.dummy) { e.vx = 0; e.vy = 0; continue; } // D85: held in a takedown; D88: a dummy
       if (g.reloading && time >= g.reloadEndsAt) { g.reloading = false; g.ammo = g.stats.magazineSize; g.burstLeft = g.stats.burst || 1; }
       if (time >= ai.thinkAt) {
         ai.thinkAt = time + T.thinkInterval * (0.85 + 0.3 * this.rng.next());
@@ -392,7 +392,7 @@ export class HumanAISystem {
   // ---------------- shooting ----------------
   _shoot(e, p, time) {
     const ai = e.ai, g = e.gun, s = g.stats;
-    if (ai.mode !== 'combat' || !ai.sees || !p.alive || time < ai.reactAt || g.reloading) return;
+    if (e.harmless || ai.mode !== 'combat' || !ai.sees || !p.alive || time < ai.reactAt || g.reloading) return; // D88
     if (!this._onScreen(e)) return; // D82: never from off the screen
     const to = Math.atan2(p.y - e.y, p.x - e.x);
     if (Math.abs(angDiff(to, e.faceAngle)) > 0.3 || time < g.nextShotAt) return;
@@ -438,12 +438,14 @@ export class HumanAISystem {
 
   /** Bodies are solid: enemies push each other apart and step out of the hero (he is never moved by them). */
   _separate(enemies, p) {
+    // D88: a victim held in a takedown is never pushed (the hero stands closer than the bodies' radii — the push made
+    // both slide away across the map)
     for (let i = 0; i < enemies.length; i++) {
       const a = enemies[i];
-      if (!a.alive) continue;
+      if (!a.alive || a.ai.mode === 'grabbed') continue;
       for (let j = i + 1; j < enemies.length; j++) {
         const b = enemies[j];
-        if (!b.alive) continue;
+        if (!b.alive || b.ai.mode === 'grabbed') continue;
         const dx = b.x - a.x, dy = b.y - a.y, R = a.radius + b.radius, d2 = dx * dx + dy * dy;
         if (d2 >= R * R || d2 < 1e-9) continue;
         const d = Math.sqrt(d2), k = (R - d) / d * 0.5;

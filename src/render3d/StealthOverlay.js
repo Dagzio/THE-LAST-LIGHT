@@ -22,6 +22,7 @@ const COLORS = {
 };
 const M = new THREE.Matrix4(), P = new THREE.Vector3(), S = new THREE.Vector3(), Q = new THREE.Quaternion();
 const RING_C = new THREE.Color();
+const BAR_AMBER = new THREE.Color(0xffb02e), BAR_RED = new THREE.Color(0xff3b2a);
 const smoothstep = (v) => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
 
 export class StealthOverlay {
@@ -45,8 +46,9 @@ export class StealthOverlay {
     // suspicion bars (back + fill), amber
     const plane = new THREE.PlaneGeometry(1, 1);
     this.barBack = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ color: 0x0b0d10, transparent: true, opacity: 0.75, depthTest: false, depthWrite: false }), MAX_CONES);
-    this.barFill = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ color: 0xffb02e, depthTest: false, depthWrite: false }), MAX_CONES);
+    this.barFill = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, depthWrite: false }), MAX_CONES);
     for (const b of [this.barBack, this.barFill]) { b.frustumCulled = false; b.count = 0; }
+    this.barFill.setColorAt(0, BAR_AMBER); // per bar: amber suspicion / red radio call (D88); the attribute from the start
     this.barBack.renderOrder = 13; this.barFill.renderOrder = 14;
     // noise rings
     const ring = new THREE.RingGeometry(0.965, 1, 48);
@@ -84,7 +86,7 @@ export class StealthOverlay {
     const list = this._list || (this._list = []);
     list.length = 0;
     for (const e of run.enemies) {
-      if (!e.alive || e.ai.mode === 'grabbed' || !onScreen(e.x, e.y)) continue;
+      if (!e.alive || e.ai.mode === 'grabbed' || e.noCone || !onScreen(e.x, e.y)) continue;
       list.push(e);
     }
     list.sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
@@ -118,11 +120,14 @@ export class StealthOverlay {
       const baseA = 0.34 + 0.08 * c.bright;
       v = this._fan(v, c, at.x, at.y, e.faceAngle, half, 1, c.col, baseA);
       if (c.s > 0.02) v = this._fan(v, c, at.x, at.y, e.faceAngle, half, Math.min(1, c.s), c.col, 0.6);
-      // the suspicion bar over his head
-      if (s > 0.02 && s < 1 && bars < MAX_CONES) {
-        const top = 62 * (e.type.scale || 1) + 10, w = 26;
+      // the suspicion bar over his head; D88: a guard who spotted the hero — his radio call (red, fills to the alarm)
+      const radio = ai.mode === 'combat' && Number.isFinite(ai.radioAt) && ai.radioFor > 0 ? 1 - Math.max(0, ai.radioAt - time) / ai.radioFor : -1;
+      const fill = radio >= 0 ? radio : s;
+      if ((radio >= 0 || (s > 0.02 && s < 1)) && bars < MAX_CONES) {
+        const top = 62 * (e.type.scale || 1) + 10, w = radio >= 0 ? 32 : 26;
         P.set(at.x, top, at.y - 4); S.set(w + 2, 4, 1); M.compose(P, this.faceCam, S); this.barBack.setMatrixAt(bars, M);
-        P.set(at.x - (w * (1 - s)) / 2, top + 0.2, at.y - 3.8); S.set(Math.max(0.01, w * s), 2.6, 1); M.compose(P, this.faceCam, S); this.barFill.setMatrixAt(bars, M);
+        P.set(at.x - (w * (1 - fill)) / 2, top + 0.2, at.y - 3.8); S.set(Math.max(0.01, w * fill), 2.6, 1); M.compose(P, this.faceCam, S); this.barFill.setMatrixAt(bars, M);
+        this.barFill.setColorAt(bars, radio >= 0 ? BAR_RED : BAR_AMBER);
         bars++;
       }
     }
@@ -133,6 +138,7 @@ export class StealthOverlay {
     this.geo.setDrawRange(0, v);
     this.barBack.count = this.barFill.count = bars;
     this.barBack.instanceMatrix.needsUpdate = this.barFill.instanceMatrix.needsUpdate = true;
+    if (bars && this.barFill.instanceColor) this.barFill.instanceColor.needsUpdate = true;
     // the noise rings: grow to r in 0.45 s and fade
     let r = 0;
     this.ringList = this.ringList.filter((q) => time - q.at < 0.6 && time >= q.at);

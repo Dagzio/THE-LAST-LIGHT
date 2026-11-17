@@ -39,6 +39,7 @@ export const SFX_FILES = {
   kill3: { file: 'enemies/enemy-killed3.mp3', trim: 0.02, gain: 1 },
   // D52 new files
   ricochet: { file: 'bullet.mp3', trim: 0.04, gain: 1 },               // a bullet stopped by a rock / wall / pad
+  radio: { file: 'radio.mp3', gain: 1 },                               // D88 (user file): a dialogue opens
   // keeper (user files, player/): D56 footsteps — one whole walking loop (FOOTSTEPS below); hurt — 2 takes (D53)
   steps: { file: 'player/steps.mp3', gain: 1 },
   playerHurt1: { file: 'player/player-hitted1.mp3', gain: 1 },
@@ -128,6 +129,9 @@ export const WEAPON_SOUNDS = {
     },
   },
 };
+
+// D88: the hero's M4A1 — the assault rifle files
+WEAPON_SOUNDS.rifle = WEAPON_SOUNDS.assault_rifle;
 
 // D85: the silenced pistol — the pistol's own shot, higher and much quieter (a "pfft"), the same reload
 WEAPON_SOUNDS.pistol_sd = { shot: { sfx: 'pistol.shot', pitch: 0.04, vol: 0, voices: 2, rate: 1.55, gain: 0.32 }, reload: WEAPON_SOUNDS.pistol.reload };

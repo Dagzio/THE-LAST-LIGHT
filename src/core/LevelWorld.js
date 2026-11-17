@@ -13,8 +13,9 @@ export const DOOR = {
   unlockDist: 70,     // units: the hero with the key card unlocks the secure door from this close
 };
 
-const WALL_BLOCKS = { glass: BLOCK.MOVE };
-const DOOR_BLOCKS = { glass: BLOCK.MOVE };
+// D88: the training ground's mesh fences / gates stop walkers only (seen and shot through)
+const WALL_BLOCKS = { glass: BLOCK.MOVE, fence: BLOCK.MOVE };
+const DOOR_BLOCKS = { glass: BLOCK.MOVE, gate: BLOCK.MOVE };
 
 export class LevelWorld {
   /** @param {object} level data/levels/*.js */

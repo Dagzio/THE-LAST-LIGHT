@@ -31,6 +31,12 @@ export class Human {
     this.carries = spawn.carries || null;
     this.found = false;
     this.killedBy = null;
+    // D88 training ground: a dummy stands still (no eyes, no moves), a harmless one never shoots; `tag` groups them for
+    // the lessons; noCone — no view cone drawn for him
+    this.dummy = !!spawn.dummy;
+    this.harmless = !!spawn.harmless || this.dummy;
+    this.noCone = !!spawn.noCone || this.dummy;
+    this.tag = spawn.tag || null;
     this.gun = {
       stats: weapon,
       ammo: weapon.magazineSize,

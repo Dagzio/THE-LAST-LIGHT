@@ -28,10 +28,14 @@ export class StealthDirector {
     this.copying = false;
     this.witnessAt = 0;
     this.nextRadioAt = STEALTH.radio.every;
+    // D88: the hero sneaks by default (C — an upright walk, Shift — run)
+    run.player.sneak = true;
+    run.player.stance = 'crouch';
     // D87: killing has a price — a body found during the search, a kill seen by another guard
     this._unsub = [
       run.events.on('bodyFound', (e, b, second) => { if (second && STEALTH.secondBodyAlarm) this.raiseAlarm(run.lastTime); }),
       run.events.on('kill', (e) => { if (e && e.x !== undefined) this._witness(e, run.lastTime); }),
+      run.events.on('spotted', (e) => { if (e && e.ai) this._startRadio(e, run.lastTime); }), // D88
     ];
   }
 
@@ -39,7 +43,7 @@ export class StealthDirector {
 
   /**
    * D87: does another guard see the victim `e` now (a takedown in progress, a kill)? The first who does goes to combat
-   * (he saw the attacker) and the alarm is raised. → true if seen.
+   * (he saw the attacker) — D88: and calls it in (the radio delay: downed in time, no alarm). → true if seen.
    */
   _witness(e, time) {
     if (this.alarmRaised) return false;
@@ -50,11 +54,19 @@ export class StealthDirector {
       const ai = o.ai;
       ai.mode = 'combat'; ai.aware = true; ai.suspicion = 1; ai.investigate = false;
       ai.lastSeenX = p.x; ai.lastSeenY = p.y; ai.lastSeenAt = time; ai.reactAt = time + 0.4;
-      this.raiseAlarm(time);
+      this._startRadio(o, time);
       run.events.emit('witness', o, e);
       return true;
     }
     return false;
+  }
+
+  /** D88: a guard who knows about the hero starts his radio call (once); the alarm when it ends and he still stands. */
+  _startRadio(e, time) {
+    if (Number.isFinite(e.ai.radioAt) || this.alarmRaised) return;
+    e.ai.radioFor = STEALTH.spotted.radio;
+    e.ai.radioAt = time + e.ai.radioFor;
+    this.run.events.emit('radioCall', e);
   }
 
   /** D87: radio check-ins — one of the dead (unfound, dead long enough) is missed; the nearest guard goes to his spot. */
@@ -97,13 +109,14 @@ export class StealthDirector {
       input.consumePressed('crouch'); input.consumePressed('takedown'); input.consumePressed('interact');
       return;
     }
-    if (input.consumePressed('crouch')) p.stance = p.stance === 'crouch' ? 'stand' : 'crouch';
-    if (p.dodging) p.stance = 'stand';
+    // D88: sneaking is the default stance (C toggles an upright walk); running (Shift / the stick pushed all the way)
+    // stands him up while it lasts
+    if (input.consumePressed('crouch')) p.sneak = !p.sneak;
     input.getMove(M);
     const tilt = Math.hypot(M.x, M.y);
-    const running = input.isDown('run') || (input.analogActive() && tilt >= 0.95);
-    if (running && p.stance === 'crouch' && input.isDown('run')) p.stance = 'stand'; // Shift stands him up
-    p.moveMode = p.stance === 'crouch' || p.crouched ? 'crouch' : running && tilt > 0.1 ? 'run' : 'walk';
+    const running = (input.isDown('run') || (input.analogActive() && tilt >= 0.95)) && tilt > 0.1;
+    p.stance = p.dodging || running ? 'stand' : p.sneak ? 'crouch' : 'stand';
+    p.moveMode = p.stance === 'crouch' || p.crouched ? 'crouch' : running ? 'run' : 'walk';
     // running is heard (walking and crouching are silent — NEW GAME.docx)
     if (p.moveMode === 'run' && Math.hypot(p.vx, p.vy) > STEALTH.motion.runAbove && time >= this.runNoiseAt) {
       this.runNoiseAt = time + STEALTH.runNoise.every;
@@ -136,12 +149,13 @@ export class StealthDirector {
     let combat = false, wary = false;
     for (const e of run.enemies) {
       if (!e.alive) continue;
-      if (e.ai.mode === 'combat') combat = true;
+      if (e.ai.mode === 'combat') { combat = true; this._startRadio(e, time); }
       else if (e.ai.suspicion > 0.05 || e.ai.investigate || e.ai.mode === 'search') wary = true;
+      // D88: his radio call is through — the alarm (a guard downed before that never makes it)
+      if (Number.isFinite(e.ai.radioAt) && time >= e.ai.radioAt) this.raiseAlarm(time);
     }
-    if (combat) this.raiseAlarm(time);
     if (!this.alarmRaised) this._radio(time); // D87
-    const lvl = this.alarmRaised ? ALERT.ALARM : ai.searching(time) ? ALERT.SEARCH : wary ? ALERT.SUSPICION : ALERT.CALM;
+    const lvl = this.alarmRaised ? ALERT.ALARM : combat || ai.searching(time) ? ALERT.SEARCH : wary ? ALERT.SUSPICION : ALERT.CALM;
     if (lvl !== this.level) { this.level = lvl; run.events.emit('alertLevel', lvl); }
     this.maxLevel = Math.max(this.maxLevel, lvl);
     if (time >= this.failAt) run._setDefeat('detected');
@@ -180,7 +194,8 @@ export class StealthDirector {
 
   _startTakedown(e, time) {
     const p = this.run.player;
-    p.takedown = { e, t0: time, killed: false, fromX: p.x, fromY: p.y, face: e.faceAngle };
+    // D88: the victim is held where he stood (ex, ey) — before, the body push moved him on and the hero followed
+    p.takedown = { e, t0: time, killed: false, fromX: p.x, fromY: p.y, face: e.faceAngle, ex: e.x, ey: e.y };
     p.stance = 'stand';
     p.cover = null;
     e.ai.mode = 'grabbed';
@@ -201,7 +216,8 @@ export class StealthDirector {
       return;
     }
     const s = Math.min(1, k / T.snap);
-    const bx = e.x - Math.cos(td.face) * T.behind, by = e.y - Math.sin(td.face) * T.behind;
+    e.x = td.ex; e.y = td.ey; e.vx = 0; e.vy = 0; e.faceAngle = td.face;
+    const bx = td.ex - Math.cos(td.face) * T.behind, by = td.ey - Math.sin(td.face) * T.behind;
     p.x = td.fromX + (bx - td.fromX) * s;
     p.y = td.fromY + (by - td.fromY) * s;
     p.vx = 0; p.vy = 0;

@@ -11,7 +11,7 @@ import { PROP_TYPES, propBox } from '../data/props.js';
 import { TILE, tileUV } from './officeAtlas.js';
 import { buildPropCards, hasSprite, propAtlasTexture, preloadPropAtlas } from './propSprites.js';
 import { levelLights, LIGHT_KINDS } from './officeLights.js';
-import { buildPropViews, hasView, propViewTexture, preloadPropViews } from './propViews.js';
+import { buildPropViews, hasView, propViewTexture, preloadPropViews, VIEW_ATLASES } from './propViews.js';
 
 const POOL_GAIN = 0.9;    // D83: floor pool brightness per unit of light power
 // D83: floor decal kinds → atlas tiles (render3d/officeAtlas.js)
@@ -23,11 +23,20 @@ const TEX_DIR = 'assets/textures/office/';
 const FLOORS = {
   marble: ['marble', 115], carpet: ['carpet', 110], tile_light: ['tile_light', 90], tile_dark: ['tile_dark', 90],
   oak: ['oak', 110], walnut: ['walnut', 110], concrete: ['concrete', 160], epoxy: ['epoxy', 160], access: ['access', 80],
+  // D88: the training ground (the user's ground atlas, one texture per material, mirrored repeat)
+  grass: ['training/summer_grass.webp', 150], grass_worn: ['training/trampled_grass.webp', 150],
+  grass_soil: ['training/grass_soil.webp', 150], dirt: ['training/packed_dirt.webp', 150], sand: ['training/dry_sand.webp', 150],
+  gravel: ['training/fine_gravel.webp', 120], yard_concrete: ['training/worn_concrete.webp', 160],
+  pavers: ['training/concrete_pavers.webp', 130], rubber: ['training/rubber_tiles.webp', 110],
+  asphalt: ['training/dark_asphalt.webp', 160], stony: ['training/stony_ground.webp', 150],
 };
 const WALLS = {
   ext: ['concrete_blue', 130], int: ['plaster_cool', 110], warm: ['plaster_warm', 110], acoustic: ['acoustic', 80],
   steel: ['steel_panels', 90], walnut: ['walnut_panels', 100],
+  yard: ['training/smooth_concrete.webp', 110], // D88: the training yards' low concrete walls
 };
+/** D88: wall styles drawn as a row of the user's sprites instead of a box (collision: data in core/LevelWorld.js). */
+const SPRITE_WALLS = { fence: 'mesh_fence' };
 // plain colours with a sheen (merged into the vcShiny mesh); the rest of COLORS are dull (vc mesh)
 const SHINY = { leather: 0x34373d, cushion: 0x41444a, chrome: 0xbfc5cc, black: 0x17191d, metal: 0x7f858d, metalDark: 0x2c3037, stone: 0x36373c };
 const COLORS = {
@@ -39,12 +48,16 @@ const COLORS = {
 
 const texCache = new Map();
 /** Loads (once) a repeating sRGB texture of the office set. */
+// D88: 'training/x.webp' — a training-ground texture (assets/textures/training), repeated mirrored (atlas README)
+const texUrl = (name) => (name.includes('/') ? `assets/textures/${name}` : `${TEX_DIR}${name}.png`);
+const texWrap = (name) => (name.includes('/') ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping);
+
 function officeTexture(name, aniso) {
   let t = texCache.get(name);
   if (!t) {
-    t = new THREE.TextureLoader().load(`${TEX_DIR}${name}.png`);
+    t = new THREE.TextureLoader().load(texUrl(name));
     t.colorSpace = THREE.SRGBColorSpace;
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.wrapS = t.wrapT = texWrap(name);
     texCache.set(name, t);
   }
   if (aniso && t.anisotropy !== aniso) { t.anisotropy = aniso; if (t.image) t.needsUpdate = true; }
@@ -55,9 +68,9 @@ function officeTexture(name, aniso) {
 export function preloadOfficeTextures() {
   const names = new Set([...Object.values(FLOORS), ...Object.values(WALLS)].map((e) => e[0]));
   return Promise.all([preloadPropAtlas(), preloadPropViews(), ...[...names].map((n) => new Promise((res) => {
-    const t = new THREE.TextureLoader().load(`${TEX_DIR}${n}.png`, () => res(), undefined, () => res());
+    const t = new THREE.TextureLoader().load(texUrl(n), () => res(), undefined, () => res());
     t.colorSpace = THREE.SRGBColorSpace;
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.wrapS = t.wrapT = texWrap(n);
     texCache.set(n, t);
   }))]);
 }
@@ -91,6 +104,7 @@ export function officeMaterials(aniso = 4) {
   m.screen = new THREE.MeshBasicMaterial({ map: atlas });
   m.decal = new THREE.MeshLambertMaterial({ map: atlas, alphaTest: 0.4 });
   m.wallTop = new THREE.MeshLambertMaterial({ color: 0x1b1e23 });
+  m.wallTopLight = new THREE.MeshLambertMaterial({ color: 0x9a978f }); // D88: the training yards' concrete caps
   // D79: rugs (atlas), soft contact shadows under furniture and along the walls
   m.rug = new THREE.MeshLambertMaterial({ map: atlas, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   const soft = (paint) => { const c = cpuCanvas(128, 128); paint(c.g); const t = new THREE.CanvasTexture(c.canvas); return t; };
@@ -116,6 +130,8 @@ export function officeMaterials(aniso = 4) {
   m.stain = new THREE.MeshLambertMaterial({ map: atlas, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   // door leaves
   m.door_wood = m.walnut; m.door_metal = m.metal; m.door_secure = new THREE.MeshLambertMaterial({ color: 0x3b4048 }); m.door_glass = m.glass;
+  // D88: the training ground's mesh gates — the user's gate picture on a thin leaf (alpha cut)
+  m.door_gate = new THREE.MeshLambertMaterial({ color: 0x5d6168 });
   m.lockLight = new THREE.MeshBasicMaterial({ color: 0xffffff });
   // D81: the user's furniture sprites (pre-lit art: unlit, a touch darker to sit in the night office) and the
   // invisible material of their shadow casters
@@ -124,6 +140,7 @@ export function officeMaterials(aniso = 4) {
   m.shadowOnly = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
   // D85: the furniture view boxes (the user's 5-view sheets): lit, cut out by alpha, both sides in the shadow map
   m.propViews = new THREE.MeshLambertMaterial({ map: propViewTexture(aniso), vertexColors: true, alphaTest: 0.5, shadowSide: THREE.DoubleSide });
+  m.propViewsTraining = new THREE.MeshLambertMaterial({ map: propViewTexture(aniso, 'training'), vertexColors: true, alphaTest: 0.5, shadowSide: THREE.DoubleSide, side: THREE.DoubleSide });
   sharedMats = m;
   return m;
 }
@@ -133,6 +150,7 @@ export function setOfficeAnisotropy(aniso) {
   for (const t of texCache.values()) if (t.anisotropy !== aniso) { t.anisotropy = aniso; if (t.image) t.needsUpdate = true; }
   propAtlasTexture(aniso);
   propViewTexture(aniso);
+  propViewTexture(aniso, 'training');
 }
 
 function roundRect(g, x, y, w, h, r) {
@@ -230,11 +248,25 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     put(`floor_${FLOORS[z.floor] ? z.floor : 'concrete'}`, floorRect(x0, y0, x1, y1, tile));
   }
   const pad = 1600;
-  put('outside', floorRect(-pad, -pad, level.width + pad, level.height + pad, 100, -2));
+  // D88: outdoors (the training ground) the ground goes on as the level's own floor
+  const outKey = level.outside && FLOORS[level.outside] ? level.outside : null;
+  put(outKey ? `floor_${outKey}` : 'outside', floorRect(-pad, -pad, level.width + pad, level.height + pad, outKey ? FLOORS[outKey][1] : 100, outKey ? -0.6 : -2));
 
   // walls
+  const spriteWalls = []; // D88: render-only sprites along the fence lines
   for (const w of level.walls) {
     const horiz = w.y0 === w.y1;
+    if (SPRITE_WALLS[w.style]) {
+      const type = SPRITE_WALLS[w.style], step = PROP_TYPES[type].w;
+      for (const [a, b] of drawPieces(level, w, 0)) {
+        const n = Math.max(1, Math.round((b - a) / step)), len = (b - a) / n;
+        for (let i = 0; i < n; i++) {
+          const c = a + len * (i + 0.5);
+          spriteWalls.push({ type, x: horiz ? c : w.x0, y: horiz ? w.y0 : c, rot: horiz ? 0 : 1, w: len });
+        }
+      }
+      continue;
+    }
     for (const [a, b] of drawPieces(level, w, h)) {
       const len = b - a;
       if (w.style === 'glass') {
@@ -263,21 +295,21 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
       for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * dims[f][0] / tile, uv.getY(i) * dims[f][1] / tile); }
       g.translate(horiz ? (a + b) / 2 : w.x0, H / 2, horiz ? w.y0 : (a + b) / 2);
       put(`wall_${WALLS[w.style] ? w.style : 'int'}`, g.toNonIndexed());
-      put('wallTop', floorRect(horiz ? a : w.x0 - h, horiz ? w.y0 - h : a, horiz ? b : w.x0 + h, horiz ? w.y0 + h : b, 100, H + 0.2));
+      put(w.style === 'yard' ? 'wallTopLight' : 'wallTop', floorRect(horiz ? a : w.x0 - h, horiz ? w.y0 - h : a, horiz ? b : w.x0 + h, horiz ? w.y0 + h : b, 100, H + 0.2));
     }
   }
 
   // D79: baseboards, soft shadow strips along the walls, night windows on the outer walls
   const [bx0, by0, bx1, by1] = buildingRect(level);
   for (const w of level.walls) {
-    if (w.style === 'glass') continue;
+    if (w.style === 'glass' || SPRITE_WALLS[w.style]) continue;
     const horiz = w.y0 === w.y1;
-    const outer = horiz ? (w.y0 === by0 || w.y0 === by1) : (w.x0 === bx0 || w.x0 === bx1);
+    const outer = !level.outdoor && (horiz ? (w.y0 === by0 || w.y0 === by1) : (w.x0 === bx0 || w.x0 === bx1)); // D88: no night windows outdoors
     for (const [a, b] of drawPieces(level, w, h)) {
       const len = b - a, mid = (a + b) / 2;
       const bb = new THREE.BoxGeometry(horiz ? len : T + 2.4, 4, horiz ? T + 2.4 : len);
       bb.translate(horiz ? mid : w.x0, 2, horiz ? w.y0 : mid);
-      put('baseboard', bb.toNonIndexed());
+      if (!level.outdoor) put('baseboard', bb.toNonIndexed());
       for (const side of [-1, 1]) {
         const g = new THREE.PlaneGeometry(len, 30);
         g.rotateX(-Math.PI / 2);                    // v = 1 (the dark edge) on −z
@@ -312,7 +344,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   // build only casts the shadow (an invisible mesh)
   const pb = new PropBuilder(), shadowOnly = new PropBuilder();
   // D83: render-only decor of the lighting (wall lights over each room's north wall) + the level's props
-  const extras = wallLights(level);
+  const extras = level.outdoor ? spriteWalls : [...wallLights(level), ...spriteWalls]; // D88: no wall lamps outdoors
   const allProps = [...level.props, ...extras];
   for (const p of extras) if (!hasView(p)) buildProp(pb, p);
   for (const p of level.props) {
@@ -406,9 +438,10 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
 
   // D81: the sprite cards (one mesh) + the invisible shadow casters of those props
   // D85: the view boxes (one mesh) — every prop with the user's 5-view art
-  const viewGeo = buildPropViews(allProps, lights);
-  if (viewGeo) {
-    const vm = new THREE.Mesh(viewGeo, mats.propViews);
+  for (const [atlas, mat] of [['office', mats.propViews], ['training', mats.propViewsTraining]]) { // D88: one mesh per atlas
+    const viewGeo = buildPropViews(allProps, lights, atlas);
+    if (!viewGeo) continue;
+    const vm = new THREE.Mesh(viewGeo, mat);
     vm.castShadow = shadows;
     vm.receiveShadow = shadows;
     vm.matrixAutoUpdate = false;
@@ -441,8 +474,11 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   const kinds = {};
   for (const d of level.doors) (kinds[d.kind] = kinds[d.kind] || []).push(d);
   const doorViews = [];
+  // D88: the training ground's gates — the user's mesh gate picture (both sides, alpha cut) as the sliding leaf
+  const gateGeo = kinds.gate ? gateLeafGeometry(H) : null;
   for (const [kind, list] of Object.entries(kinds)) {
-    const im = new THREE.InstancedMesh(leafGeo, mats[`door_${kind}`] || mats.door_wood, list.length);
+    const gate = kind === 'gate' && gateGeo;
+    const im = new THREE.InstancedMesh(gate ? gateGeo : leafGeo, gate ? mats.propViewsTraining : mats[`door_${kind}`] || mats.door_wood, list.length);
     im.castShadow = shadows && kind !== 'glass';
     im.frustumCulled = false;
     if (kind === 'glass') im.renderOrder = 5;
@@ -510,10 +546,28 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     dispose() {
       for (const m of meshes) m.geometry.dispose();
       leafGeo.dispose();
+      if (gateGeo) gateGeo.dispose();
       lockMesh.geometry.dispose();
       for (const c of [...group.children]) group.remove(c);
     },
   };
+}
+
+/** D88: a gate leaf 1 unit wide (scaled to the door's width like the box leaves), the mesh gate's front picture. */
+function gateLeafGeometry(wallH) {
+  const A = VIEW_ATLASES.training, item = A.items.mesh_gate_closed;
+  const rect = item && (item.front || item.back);
+  const g = new THREE.PlaneGeometry(1, 1).toNonIndexed();
+  const h = rect ? Math.max(wallH, (PROP_TYPES.mesh_gate_closed.w * rect[3]) / rect[2]) : wallH;
+  g.scale(1, h, 1);
+  g.translate(0, h / 2 - 4, 0); // (the leaves are placed 4 above the floor)
+  if (rect) {
+    const [rx, ry, rw, rh] = rect, uv = g.attributes.uv;
+    const u0 = (rx + 0.5) / A.width, u1 = (rx + rw - 0.5) / A.width, v0 = 1 - (ry + rh - 0.5) / A.height, v1 = 1 - (ry + 0.5) / A.height;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) > 0.5 ? u1 : u0, uv.getY(i) > 0.5 ? v1 : v0);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 3).fill(1), 3));
+  return g;
 }
 
 /**

@@ -22,6 +22,7 @@ export function levelModes(level) {
  * Doors are overridden by id (partial fields); survival builds its pickups from its spots (dormant until spawned).
  */
 export function resolveLevel(level, modeId) {
+  if (level && level.fixedMode) return { ...level, modeId: level.fixedMode }; // D88: the training ground — its lessons only
   const ov = level && level.modes && level.modes[modeId];
   if (!ov || modeId === 'mission') return { ...level, modeId: 'mission' };
   const doors = level.doors.map((d) => (ov.doors && ov.doors[d.id] ? { ...d, ...ov.doors[d.id] } : d));

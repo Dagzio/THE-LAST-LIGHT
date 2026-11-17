@@ -14,10 +14,13 @@ export const PROFILE_KEY = 'profile';
 export const BACKUP_KEY = 'profile.backup';
 const MAX_N = 1e9;
 
+/** D88: the first campaign level (the always-open training ground is not one) — open from the start. */
+const FIRST_LEVEL = (LEVELS.find((l) => !l.alwaysOpen) || LEVELS[0]).id;
+
 export function createDefaultProfile() {
   return {
     schemaVersion: SCHEMA_VERSION,
-    unlockedLevels: [LEVELS[0].id],
+    unlockedLevels: [FIRST_LEVEL],
     completedLevels: [],
     bestTimes: {},            // level id → seconds of the fastest win (mission)
     modeBests: {},            // D85: level id → { stealth: { time, medals, intel }, survival: { time, kills } }
@@ -44,7 +47,7 @@ export function validateProfile(data) {
   let repaired = false;
   const ids = new Set(LEVELS.map((m) => m.id));
   const unlocked = Array.isArray(data.unlockedLevels) ? data.unlockedLevels.filter((id) => ids.has(id)) : [];
-  if (!unlocked.includes(LEVELS[0].id)) { unlocked.unshift(LEVELS[0].id); repaired = true; }
+  if (!unlocked.includes(FIRST_LEVEL)) { unlocked.unshift(FIRST_LEVEL); repaired = true; }
   p.unlockedLevels = [...new Set(unlocked)];
   p.completedLevels = Array.isArray(data.completedLevels) ? [...new Set(data.completedLevels.filter((id) => ids.has(id)))] : [];
   const bt = data.bestTimes && typeof data.bestTimes === 'object' ? data.bestTimes : {};

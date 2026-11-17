@@ -352,6 +352,13 @@ export class Renderer3D {
     this.blobs.frustumCulled = false;
     this.blobs.renderOrder = 1;
     this.blobs.count = 0;
+    // D88: rounds on a body (taken by walking over it) — a small glowing magazine bobbing over him
+    const magGeo = new THREE.BoxGeometry(4, 9, 2.4);
+    magGeo.translate(0, 0, 0);
+    this.ammoMarks = new THREE.InstancedMesh(magGeo, new THREE.MeshBasicMaterial({ color: 0xffc04a }), MAX_POOLS);
+    this.ammoMarks.frustumCulled = false;
+    this.ammoMarks.count = 0;
+    this.scene.add(this.ammoMarks);
     // particles (normal blending: dark blood / dust must show on light floors)
     this.particleGeo = new THREE.BufferGeometry();
     this.particlePos = null;
@@ -380,7 +387,7 @@ export class Renderer3D {
       const root = new THREE.Group();
       root.position.set(def.x, 0, def.y);
       let lid = null, spin = null;
-      if (def.kind === 'crate') {
+      if (def.hidden) { /* D88: the training ground's chests — the prop is drawn already */ } else if (def.kind === 'crate') {
         const body = new THREE.Mesh(new THREE.BoxGeometry(40, 12, 20).translate(0, 6, 0), olive);
         const band = new THREE.Mesh(new THREE.BoxGeometry(41, 2, 21).translate(0, 8, 0), stripe);
         lid = new THREE.Group();
@@ -431,7 +438,7 @@ export class Renderer3D {
     }
     const it = run.interactTarget;
     this.reachRing.visible = !!it;
-    if (it) { this._flat(this.reachRing, it.def.x, it.def.y, 30 + Math.sin(time * 6) * 2, 1.2, 0.7); }
+    if (it) { this._flat(this.reachRing, it.def.x, it.def.y, (it.def.hidden ? 44 : 30) + Math.sin(time * 6) * 2, 1.2, 0.85); } // D88: round the chest prop
     // objective marker over the current target (yellow chevron + ring)
     const t = run.objectiveTarget(OBJ_PT);
     this.objMarker.visible = this.objRing.visible = !!t && !run.over;
@@ -453,11 +460,16 @@ export class Renderer3D {
     this.lastSyncTime = 0;
     this.heroDeadAge = 0;
     const pr = QUALITY_PRESETS[this.quality];
+    // D88: a level may bring its own light (the training ground is outdoors by day); else the night office
+    const Lt = { ...LIGHTING, ...(level.lighting || {}) };
+    this.hemi.intensity = Lt.hemi; this.sun.intensity = Lt.key; this.renderer.toneMappingExposure = Lt.exposure;
+    this.hemi.color.set(Lt.sky ?? 0xc9d6ec); this.hemi.groundColor.set(Lt.ground ?? 0x2b2722); this.sun.color.set(Lt.sun ?? 0xffe6c8);
+    this.scene.background.set(Lt.background ?? 0x07090d);
     this.office = buildOfficeScene(level, { aniso: pr.aniso, shadows: true });
     this.scene.add(this.office.group);
     this._buildPickups(level);
     // D85: the stealth run's view cones / suspicion bars / noise rings
-    if (level.modeId === 'stealth') this.stealthOverlay = new StealthOverlay(this.scene, FACE_CAM, this.quality === 'low' ? 12 : 24);
+    if (level.modeId === 'stealth' || level.modeId === 'tutorial') this.stealthOverlay = new StealthOverlay(this.scene, FACE_CAM, this.quality === 'low' ? 12 : 24); // D88: the tutorial's stealth yard
     this._resize(true);
     this.rig.snap(spawnX, spawnY, level.width, level.height);
     this._placeCamera();
@@ -692,7 +704,7 @@ export class Renderer3D {
     if (h.flash.visible) h.flash.rotation.x = (w.lastShotAt * 97.3) % (Math.PI * 2);
 
     // ---- enemies
-    let bars = 0, alerts = 0, combats = 0, pools = 0, blobs = 0;
+    let bars = 0, alerts = 0, combats = 0, pools = 0, blobs = 0, mags = 0;
     const seen = this._seen || (this._seen = new Set());
     seen.clear();
     for (const e of run.enemies) {
@@ -705,6 +717,10 @@ export class Renderer3D {
       if (!e.alive && pools < MAX_POOLS && vis) {
         const age = time - e.deathAt, s = Math.min(1, Math.max(0, (age - 0.8) / 2.5)) * 34;
         if (s > 0.5) { P.set(ex + Math.cos(e.faceAngle) * 16, 0.5, ey + Math.sin(e.faceAngle) * 16); S.set(s, s, 1); M.compose(P, FLAT_X, S); this.pools.setMatrixAt(pools++, M); }
+      }
+      if (!e.alive && e.ammoDrop > 0 && mags < MAX_POOLS && vis && time - e.deathAt > 0.8) { // D88
+        P.set(ex, 22 + Math.sin(time * 3 + e.id) * 2.5, ey); Q.setFromAxisAngle(UP, time * 2 + e.id); S.set(1, 1, 1);
+        M.compose(P, Q, S); this.ammoMarks.setMatrixAt(mags++, M);
       }
       if (!vis) continue;
       const g = e.gun, ai = e.ai;
@@ -750,6 +766,8 @@ export class Renderer3D {
     this.iconCombat.count = Math.min(MAX_BARS, combats);
     this.pools.count = pools;
     this.blobs.count = blobs;
+    this.ammoMarks.count = mags;
+    this.ammoMarks.instanceMatrix.needsUpdate = true;
     for (const im of [this.hpBack, this.hpFill, this.iconAlert, this.iconCombat, this.pools, this.blobs]) im.instanceMatrix.needsUpdate = true;
 
     // ---- level: doors, pickups, objective
