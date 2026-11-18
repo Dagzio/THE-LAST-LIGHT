@@ -6,57 +6,63 @@
 // the front view's proportions; the top view lies on top, the front / back / left / right views stand on its sides
 // (cut out by their transparency), so the prop can face any way and casts its real silhouette as a shadow.
 //   view  — catalogue object id (or a list: one picked per prop, stable by position);
-//   top   — the top picture's height as a part of the box height (the top view shows everything from above: drawn a
-//           little lower it sits on the main surface rather than on the highest point);
-//   wall  — hangs on a wall: only the front picture, centred at height `at` (units).
+//   wall  — hangs on a wall (D111: a shallow box — its depth from data/props.js), centred at height `at` (units);
+//   surf  — D111: the main surface height (a part of the height), overriding the one the atlas builder measured (the
+//           side walls rise to it, the top picture lies on it, what stands above it is drawn in the middle).
+// D111 (user): the office objects from the new atlases (NEW/Office/office new sprites, every view fits its face) —
+// render3d/propViews.js lowPolyFaces; the training ground keeps its own atlas and the older `top` factor.
 // D93: the side walls follow the top picture's outline (data/viewOutlines.js) — `box: true` keeps the plain box;
 //   sprite — thin / leafy things: the front picture as one quad turned to the camera.
 export const PROP_MODELS = {
-  workstation: { view: 'workstation', top: 0.9 },
-  terminal: { view: 'workstation', top: 0.9 },
-  exec_desk: { view: 'executive_desk', top: 0.9 },
+  workstation: { view: 'workstation' },
+  terminal: { view: 'workstation' },
+  exec_desk: { view: 'executive_desk' },
   // D99 (user models): the desk chairs — the wheeled office chair (as the executive one)
-  chair: { view: 'mesh_chair', top: 0.8, model: { file: 'exec_chair.glb', height: 32, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
+  chair: { view: 'mesh_chair', model: { file: 'exec_chair.glb', height: 32, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
   // D96 (user models, assets/models/props): `model` — drawn from the 3D model (render3d/propModels3d.js); the view is the
   // fallback while it loads. height — units; impostor — a camera-facing picture rendered from the model; fill — extra
   // copies [turn rad, scale] rendered into it (a denser crown)
   // D99: a 4-turn impostor (50 chairs × 2–7.5 k triangles would break the budget); brighter (user: too dark)
-  exec_chair: { view: 'executive_chair', top: 0.8, model: { file: 'exec_chair.glb', height: 34, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
-  chair_meeting: { view: 'cantilever_chair', top: 0.8, model: { file: 'meeting_chair.glb', height: 29, impostor: true, turns: true, bakeH: 256, vary: false, look: { gain: 1.1 } } },
-  conf_table: { view: 'conference_table', top: 1 },
-  armchair: { view: 'lounge_armchair', top: 0.85, model: { file: 'armchair.glb', height: 26, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.6, gain: 1.4 } } },
-  sofa: { view: 'sofa', top: 0.85 },
-  coffee_table: { view: 'marble_coffee_table', top: 1 },
-  round_table: { view: 'round_meeting_table', top: 1 },
-  reception: { view: 'reception', top: 0.95 },
-  filing_cabinet: { view: 'filing_cabinet', top: 1 },
-  archive_shelf: { view: 'archive_shelf', top: 1 },
-  bookcase: { view: 'bookcase', top: 1 },
-  glass_cabinet: { view: 'glass_cabinet', top: 1 },
-  low_cabinet: { view: 'low_cabinet', top: 1 },
-  locker: { view: 'locker', top: 1 },
-  printer: { view: 'copier', top: 1 },
-  shredder: { view: 'shredder', top: 1 },
-  server_rack: { view: 'server_rack', top: 1 },
-  server_rack_open: { view: 'network_rack', top: 1 },
-  console: { view: 'security_console', top: 0.85 },
-  turnstile: { view: 'turnstile', top: 1 },
-  coffee_counter: { view: 'coffee_station', top: 0.9 },
-  coffee_vending: { view: 'coffee_vending', top: 1 },
-  vending: { view: 'snack_vending', top: 1 },
-  water_cooler: { view: 'water_cooler', top: 1 },
-  boxes: { view: 'closed_boxes', top: 1 },
-  boxes_tall: { view: 'flight_cases', top: 1 },
-  open_box: { view: 'open_box', top: 1 },
+  exec_chair: { view: 'executive_chair', model: { file: 'exec_chair.glb', height: 34, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
+  chair_meeting: { view: 'cantilever_chair', model: { file: 'meeting_chair.glb', height: 29, impostor: true, turns: true, bakeH: 256, vary: false, look: { gain: 1.1 } } },
+  conf_table: { view: 'conference_table' },
+  armchair: { view: 'lounge_armchair', model: { file: 'armchair.glb', height: 26, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.6, gain: 1.4 } } },
+  sofa: { view: 'sofa', surf: 1 }, // (its back rest is not something standing on a surface)
+  coffee_table: { view: 'marble_coffee_table' },
+  round_table: { view: 'round_meeting_table', drawH: 23 }, // D111: the table height of the other desks (cover)
+  reception: { view: 'reception' },
+  filing_cabinet: { view: 'filing_cabinet' },
+  archive_shelf: { view: 'archive_shelf' },
+  bookcase: { view: 'bookcase' },
+  glass_cabinet: { view: 'glass_cabinet' },
+  low_cabinet: { view: 'low_cabinet' },
+  locker: { view: 'locker' },
+  printer: { view: 'copier' },
+  shredder: { view: 'shredder' },
+  server_rack: { view: 'server_rack' },
+  server_rack_open: { view: 'network_rack' },
+  console: { view: 'security_console' },
+  turnstile: { view: 'turnstile' },
+  coffee_counter: { view: 'coffee_station', drawH: 46 }, // D111: wider than the catalogue station — its own height
+  coffee_vending: { view: 'coffee_vending' },
+  vending: { view: 'snack_vending' },
+  water_cooler: { view: 'water_cooler', surf: 1 }, // D111: the bottle on the walls (as a cross it read as an X)
+  // D111: the new catalogue has one box / one case — stacked to fill the footprint (nx, nz, layers)
+  boxes: { view: 'closed_boxes', pack: [2, 2, 2] },
+  boxes_tall: { view: 'flight_cases', pack: [1, 2, 5] },
+  open_box: { view: 'open_box' },
   // D93: thin / leafy things — one picture turned to the camera (the outline walls suit solid furniture)
-  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], top: 0.75, sprite: { lean: 1 },
+  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], sprite: { lean: 1 },
     model: { file: ['plant_broadleaf.glb', 'plant_palm.glb', 'plant_snake.glb', 'plant_dracaena.glb'], height: 42, impostor: true } },
-  planter: { view: 'long_planter', top: 0.8 },
-  whiteboard: { view: 'mobile_whiteboard', top: 1 },
-  coat_stand: { view: 'coat_stand', top: 0.9, sprite: { lean: 1 } },
-  steel_bin: { view: 'steel_bin', top: 1 },
-  recycling_bin: { view: 'recycling_bin', top: 1 },
-  desk_lamp: { view: 'desk_lamp', top: 0.8 },
+  planter: { view: 'long_planter', box: true }, // D111: its top view is the leaves — the box keeps the planter's own shape
+  whiteboard: { view: 'mobile_whiteboard' },
+  coat_stand: { view: 'coat_stand', sprite: { lean: 1 } },
+  steel_bin: { view: 'steel_bin' },
+  recycling_bin: { view: 'recycling_bin' },
+  desk_lamp: { view: 'desk_lamp' },
+  // D111: the rugs — the user's new rug (lies on the floor)
+  rug_large: { view: 'rug', flatTop: true },
+  rug_small: { view: 'rug', flatTop: true },
   // on the walls
   wall_light: { view: 'wall_light', wall: true, at: 66 },
   notice_board: { view: 'cork_board', wall: true, at: 40 },

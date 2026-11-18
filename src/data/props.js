@@ -21,9 +21,10 @@ export const PROP_TYPES = {
   round_table: { w: 36, d: 36, h: 23, shape: 'circle', r: 18, cover: 'low' },
   // D97 (user: the curved desk collided as a box): parts — collision boxes [x0, z0, x1, z1] in parts of w × d (z front-
   // ward), the desk's U-shape traced from its top picture's outline (data/viewOutlines.js), 10 strips
-  reception: { w: 150, d: 40, h: 34, cover: 'low', parts: [[-0.5, -0.475, -0.4, 0.0], [-0.4, -0.225, -0.3, 0.275], [-0.3, 0.0, -0.2, 0.375],
-    [-0.2, 0.125, -0.1, 0.475], [-0.1, 0.15, 0.0, 0.5], [0.0, 0.15, 0.1, 0.5], [0.1, 0.125, 0.2, 0.475], [0.2, 0.025, 0.3, 0.4],
-    [0.3, -0.225, 0.4, 0.275], [0.4, -0.475, 0.5, 0.0]] },
+  // D111: re-traced from the new top picture (NEW/Office/office new sprites — a deeper curve)
+  reception: { w: 150, d: 40, h: 34, cover: 'low', parts: [[-0.5, -0.49, -0.4, 0.155], [-0.4, -0.49, -0.3, 0.33], [-0.3, -0.12, -0.2, 0.43],
+    [-0.2, 0.04, -0.1, 0.49], [-0.1, 0.105, 0.0, 0.49], [0.0, 0.105, 0.1, 0.49], [0.1, 0.04, 0.2, 0.49], [0.2, -0.12, 0.3, 0.43],
+    [0.3, -0.49, 0.4, 0.315], [0.4, -0.49, 0.5, 0.155]] },
   filing_cabinet: { w: 20, d: 24, h: 42, cover: 'high' },
   archive_shelf: { w: 70, d: 18, h: 62, cover: 'high' },
   bookcase: { w: 50, d: 14, h: 56, cover: 'high' },

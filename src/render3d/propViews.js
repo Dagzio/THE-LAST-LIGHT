@@ -74,13 +74,41 @@ function quad(rect, w, h, A) {
 }
 
 /**
+ * D111: a quad showing only a horizontal band of a picture — from f0 to f1 of its height (parts from the bottom).
+ */
+function quadBand(rect, w, h, A, f0, f1) {
+  const g = new THREE.PlaneGeometry(w, h).toNonIndexed();
+  const [rx, ry, rw, rh] = rect;
+  const u0 = (rx + 0.5) / A.width, u1 = (rx + rw - 0.5) / A.width;
+  const vAt = (f) => 1 - (ry + rh - 0.5 - (rh - 1) * f) / A.height;
+  const v0 = vAt(f0), v1 = vAt(f1);
+  const uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) > 0.5 ? u1 : u0, uv.getY(i) > 0.5 ? v1 : v0);
+  return g;
+}
+
+/**
  * D93: the walls along one outline loop ([x, z] parts of the footprint) — each wall shows the side picture it faces
  * (front / back / left / right by its outward normal), projected straight onto it (the picture's x / the depth → u).
+ * D111: Hw — the walls' own height (up to the main surface); the pictures keep their mapping over the whole height H.
  */
-function outlineWalls(loop, W, D, H, item, A) {
+function outlineWalls(loop, W, D, H, item, A, Hw = H, inset = 0) {
   let area = 0;
   for (let i = 0; i < loop.length; i++) { const [x0, z0] = loop[i], [x1, z1] = loop[(i + 1) % loop.length]; area += x0 * z1 - x1 * z0; }
   const sgn = area >= 0 ? 1 : -1; // (x, z) loop turning: the outward normal side
+  if (inset > 0) {
+    // D111: the walls a little inside the outline (the simplified loop strayed past the top picture's edge at sharp
+    // ends — a wall top showed beside the desk top); the top picture now always overhangs them a bit, like a desk's lip
+    const P = loop.map(([x, z]) => [x * W, z * D]), n = P.length;
+    const out = (i) => { const [x0, z0] = P[i], [x1, z1] = P[(i + 1) % n], L = Math.hypot(x1 - x0, z1 - z0) || 1; return [((z1 - z0) / L) * sgn, (-(x1 - x0) / L) * sgn]; };
+    loop = P.map(([x, z], i) => {
+      const a = out((i - 1 + n) % n), b = out(i);
+      let mx = a[0] + b[0], mz = a[1] + b[1];
+      const L = Math.hypot(mx, mz) || 1;
+      mx /= L; mz /= L;
+      return [(x - mx * inset) / W, (z - mz * inset) / D];
+    });
+  }
   const pos = [], nor = [], uv = [];
   const uvOf = (view, x, z, y) => {
     const r = item[view] || item.front || item.back;
@@ -94,7 +122,7 @@ function outlineWalls(loop, W, D, H, item, A) {
     if (L < 0.3) continue;
     const nx = (ez / L) * sgn, nz = (-ex / L) * sgn; // outward (the loop's area > 0: counter-clockwise in x / z)
     const view = Math.abs(nz) >= Math.abs(nx) ? (nz > 0 ? 'front' : 'back') : nx > 0 ? 'right' : 'left';
-    const a = [x0, 0, z0], b = [x1, 0, z1], c = [x1, H, z1], d = [x0, H, z0];
+    const a = [x0, 0, z0], b = [x1, 0, z1], c = [x1, Hw, z1], d = [x0, Hw, z0];
     // outward-facing winding (seen from the normal's side: a → b → c counter-clockwise)
     const tri = sgn > 0 ? [a, c, b, a, d, c] : [a, b, c, a, c, d]; // ((b - a) × (c - a) ∝ (-ez, 0, ex): inward for sgn > 0)
     for (const p of tri) { pos.push(p[0], p[1], p[2]); nor.push(nx, 0, nz); uv.push(...uvOf(view, p[0], p[2], p[1])); }
@@ -115,6 +143,9 @@ function propFaces(p, out) {
   const base = _m.compose(_p.set(p.x, p.elev || 0, p.y), _q.setFromAxisAngle(UP, -(rot * Math.PI) / 2), _s);
   const W = p.w || m.drawW || t.w, D = m.drawD || Math.max(1, t.d); // (p.w: a fence piece cut to its wall)
   const front = item.front || item.back;
+  // D111: the user's new office atlases (every view fits its bounding face; `surf` — the main surface height)
+  const surf = m.surf ?? item.surf;
+  if (surf !== undefined && !m.sprite && !m.flatTop) { lowPolyFaces(p, m, item, A, t, base, W, D, surf, v.outline, out); return; }
   if (m.wall) {
     // on the wall: the front picture, its own proportions, standing just off the wall face
     const h = (W * front[3]) / front[2];
@@ -155,6 +186,86 @@ function propFaces(p, out) {
   if (item.left) { const g = quad(item.left, D, Hv, A); g.rotateY(-Math.PI / 2); g.translate(-W / 2, Hv / 2, 0); faces.push(g); }
   if (item.right) { const g = quad(item.right, D, Hv, A); g.rotateY(Math.PI / 2); g.translate(W / 2, Hv / 2, 0); faces.push(g); }
   for (const g of faces) out.push(g.applyMatrix4(base));
+}
+
+/**
+ * D111 (user: the office objects redone as low-poly models with these pictures on their faces; no see-through gaps in
+ * the objects): every view of the new atlases fits its bounding face, so
+ *  - on a wall: a shallow box (its depth from data/props.js) — the front picture, the top / side pictures on its edges;
+ *  - standing: the side walls (along the top picture's outline, or the box sides) rise only to the main surface `surf`
+ *    with the lower part of the side pictures, the top picture lies ON that surface (a desk's top, not over the
+ *    monitor), and what rises above it (monitors, a coffee machine, the plant in a planter) stands in the middle as a
+ *    cross of the front and side pictures' upper parts.
+ */
+function lowPolyFaces(p, m, item, A, t, base, W, D, surf, outline, out) {
+  const front = item.front || item.back;
+  const faces = [];
+  if (m.pack && !m.wall) {
+    // D111: the new catalogue has ONE box / case — a stack of them fills the prop's footprint (nx × nz, ny layers),
+    // each a little off (seeded by the position: a natural pile)
+    const [nx, nz, ny] = m.pack, cw = W / nx, cd = D / nz;
+    const cellH = heightOf(m, item, t, cw, cd);
+    let seed = Math.abs(Math.round(p.x * 13 + p.y * 7)) || 1;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 - 0.5; };
+    for (let k = 0; k < ny; k++) for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+      const cell = [];
+      cellFaces(m, item, A, cw * 0.97, cd * 0.97, cellH, surf, outline, cell);
+      const jx = k ? rnd() * cw * 0.08 : 0, jz = k ? rnd() * cd * 0.08 : 0, yaw = k ? rnd() * 0.12 : 0;
+      for (const g of cell) {
+        g.rotateY(yaw);
+        g.translate((i + 0.5) * cw - W / 2 + jx, k * cellH, (j + 0.5) * cd - D / 2 + jz);
+        faces.push(g);
+      }
+    }
+    for (const g of faces) out.push(g.applyMatrix4(base));
+    return;
+  }
+  if (m.wall) {
+    const h = (W * front[3]) / front[2], dep = Math.max(1, t.d || 2), y = m.at || 40;
+    const g = quad(front, W, h, A); g.translate(0, y, dep + 0.3); faces.push(g);
+    if (item.top) { const q = quad(item.top, W, dep, A); q.rotateX(-Math.PI / 2); q.translate(0, y + h / 2, dep / 2 + 0.3); faces.push(q); }
+    if (item.left) { const q = quad(item.left, dep, h, A); q.rotateY(-Math.PI / 2); q.translate(-W / 2, y, dep / 2 + 0.3); faces.push(q); }
+    if (item.right) { const q = quad(item.right, dep, h, A); q.rotateY(Math.PI / 2); q.translate(W / 2, y, dep / 2 + 0.3); faces.push(q); }
+    for (const q of faces) out.push(q.applyMatrix4(base));
+    return;
+  }
+  cellFaces(m, item, A, W, D, heightOf(m, item, t, W, D), surf, outline, faces);
+  for (const g of faces) out.push(g.applyMatrix4(base));
+}
+
+/**
+ * D111: the drawn height (units) — `drawH`, else the catalogue height scaled as the footprint is (the mean of its width
+ * and depth scales: a turnstile or a whiteboard laid out narrower / deeper than the catalogue keeps a sane height).
+ */
+function heightOf(m, item, t, W, D) {
+  if (m.drawH) return m.drawH;
+  const [w, d, h] = item.size || [];
+  if (!(w > 0 && d > 0 && h > 0)) return t.h;
+  return h * 30 * Math.sqrt((W / (w * 30)) * (D / (d * 30)));
+}
+
+/** D111: the faces of one standing object W × D × H in its own frame (no placement). */
+function cellFaces(m, item, A, W, D, H, surf, outline, faces) {
+  const front = item.front || item.back;
+  const s = Math.min(1, Math.max(0.03, surf)), Hs = H * s;
+  if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, Hs, 0); faces.push(g); }
+  if (outline && !m.box) {
+    const inset = Math.min(1, 0.02 * Math.min(W, D)); // units (≤ 1)
+    for (const loop of outline) faces.push(outlineWalls(loop, W, D, H, item, A, Hs, inset));
+  } else {
+    const side = (rect, w, ry, x, z) => { if (!rect) return; const g = quadBand(rect, w, Hs, A, 0, s); g.rotateY(ry); g.translate(x, Hs / 2, z); faces.push(g); };
+    side(item.front, W, 0, 0, D / 2);
+    side(item.back, W, Math.PI, 0, -D / 2);
+    side(item.left, D, -Math.PI / 2, -W / 2, 0);
+    side(item.right, D, Math.PI / 2, W / 2, 0);
+  }
+  if (s < 0.97) {
+    // above the surface: the front picture's upper part across the middle, the side picture's along it
+    const hu = H - Hs;
+    if (front) { const g = quadBand(front, W, hu, A, s, 1); g.translate(0, Hs + hu / 2, 0); faces.push(g); }
+    const sideP = item.left || item.right;
+    if (sideP) { const g = quadBand(sideP, D, hu, A, s, 1); g.rotateY(-Math.PI / 2); g.translate(0, Hs + hu / 2, 0); faces.push(g); }
+  }
 }
 
 /**
