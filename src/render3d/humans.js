@@ -362,6 +362,7 @@ export class HumanView {
       // D85 (user): crouched in cover — "Crouch Idle" (both guns), moving along — the "Crouch Walk Strafe" clips
       // D88 (user): only the Cover/Crouch clips, for both guns (Pistol Kneeling Idle is gone)
       lowIdle: loop('crouchIdle2'), lowFire: held('crouchFire', 0.3),
+      pKneel: loop('pKneel'), // D102 (user): firing over low cover with the pistol — Pistol Kneeling Idle
       // D86: moving crouched — the LEGS of "Crouched Sneaking Left / Right" (sideways) and "Crouch Walking" (forward /
       // back); the arms keep the gun as in the crouch idle (the sneaks are unarmed clips)
       lowL: C.crouchL ? act(C.crouchL.lower) : null, lowR: C.crouchR ? act(C.crouchR.lower) : null,
@@ -671,12 +672,14 @@ export class HumanView {
     const lw = lowW * live * (1 - tr), hw = highW * live * (1 - tr);
     const inLow = st.cover === 'low' && !!cv.coverIdle;
     fw(inLow ? cv.coverIdle : cv.lowIdle, lw * (1 - cm) * (1 - lowAim)); // D90: back to low cover — Male Crouch Pose
-    fw(cv.lowFire, lw * (1 - cm) * lowAim); // D88 (user): the Cover/Crouch clips for both guns (no Pistol Kneeling Idle)
+    // D88: the Cover/Crouch firing clip for the long guns; D102 (user): the pistol fires kneeling (Pistol Kneeling Idle)
+    const lowFireA = pistol && cv.pKneel ? cv.pKneel : cv.lowFire;
+    fw(lowFireA, lw * (1 - cm) * lowAim);
     let crouchBack = null;
     if (inLow) {
       // D90: along low cover (back to it) — the whole Crouched Sneaking Left / Right clips; firing over it — kneeling fire
       fw(cv.coverSL, lw * cm * shL * (1 - lowAim)); fw(cv.coverSR, lw * cm * shR * (1 - lowAim));
-      fw(cv.lowFire, lw * cm * lowAim);
+      fw(lowFireA, lw * cm * lowAim);
     } else if (cv.walk) {
       // D85 stealth crouch (not in cover): forward / back — the crouch walk (backwards played in reverse), sideways —
       // D86 "Crouched Sneaking Left / Right"

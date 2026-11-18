@@ -163,9 +163,12 @@ export class PlayerController {
     const out = time < pk.until;
     pk.k = Math.min(1, Math.max(0, pk.k + (out ? 1 : -1) * (dt / C.peekIn)));
     const tx = -p.cover.ny, ty = p.cover.nx, off = pk.side * C.peekOut * pk.k;
+    const ox = p.x, oy = p.y;
     p.x = pk.baseX + tx * off; p.y = pk.baseY + ty * off;
-    p.vx = 0; p.vy = 0;
     if (this.world) this.world.pushOut(p);
+    // D102 (user: he slid out of the corner standing still): his real speed of the step out / back — the renderer's
+    // legs walk it (≈ 2 steps each way)
+    p.vx = dt > 0 ? (p.x - ox) / dt : 0; p.vy = dt > 0 ? (p.y - oy) / dt : 0;
     if (!out && pk.k <= 0) { p.x = pk.baseX; p.y = pk.baseY; p.peek = null; return false; }
     // D97 (user: the first shot after leaning out made a sound and took a round but no bullet flew — half out, the
     // barrel was still behind the corner and the wall took the shot): it fires only once he is fully out
