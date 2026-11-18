@@ -72,7 +72,6 @@ export class HUD {
     ev.on('bodyFound', () => this._showBanner('banner.bodyFound'));
     ev.on('radioCheck', () => this._showBanner('banner.radioCheck'));     // D87
     ev.on('witness', () => this._showBanner('banner.witness'));
-    ev.on('coverEdge', () => this._showBanner('banner.coverEdge'));
     ev.on('copyDone', () => this._showBanner('banner.copyDone'));
     ev.on('targetHit', () => this._showBanner('banner.hit')); // D88 the training ground
     ev.on('ambush', () => this._showBanner('banner.contact'));

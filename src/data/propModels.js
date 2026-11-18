@@ -15,14 +15,16 @@ export const PROP_MODELS = {
   workstation: { view: 'workstation', top: 0.9 },
   terminal: { view: 'workstation', top: 0.9 },
   exec_desk: { view: 'executive_desk', top: 0.9 },
-  chair: { view: 'mesh_chair', top: 0.8 },
+  // D99 (user models): the desk chairs — the wheeled office chair (as the executive one)
+  chair: { view: 'mesh_chair', top: 0.8, model: { file: 'exec_chair.glb', height: 32, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
   // D96 (user models, assets/models/props): `model` — drawn from the 3D model (render3d/propModels3d.js); the view is the
   // fallback while it loads. height — units; impostor — a camera-facing picture rendered from the model; fill — extra
   // copies [turn rad, scale] rendered into it (a denser crown)
-  exec_chair: { view: 'executive_chair', top: 0.8, model: { file: 'exec_chair.glb', height: 34 } },
-  chair_meeting: { view: 'cantilever_chair', top: 0.8 },
+  // D99: a 4-turn impostor (50 chairs × 2–7.5 k triangles would break the budget); brighter (user: too dark)
+  exec_chair: { view: 'executive_chair', top: 0.8, model: { file: 'exec_chair.glb', height: 34, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
+  chair_meeting: { view: 'cantilever_chair', top: 0.8, model: { file: 'meeting_chair.glb', height: 29, impostor: true, turns: true, bakeH: 256, vary: false, look: { gain: 1.1 } } },
   conf_table: { view: 'conference_table', top: 1 },
-  armchair: { view: 'lounge_armchair', top: 0.85 },
+  armchair: { view: 'lounge_armchair', top: 0.85, model: { file: 'armchair.glb', height: 26, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.6, gain: 1.4 } } },
   sofa: { view: 'sofa', top: 0.85 },
   coffee_table: { view: 'marble_coffee_table', top: 1 },
   round_table: { view: 'round_meeting_table', top: 1 },
@@ -68,12 +70,10 @@ export const PROP_MODELS = {
   security_camera: { view: 'security_camera', wall: true, at: 70 },
   // D88: the training ground — the user's sheets in their own atlas (data/trainingViews.js)
   // D90: foliage — one picture turned to the camera (render3d/propViews.js `sprite`), not a box of views
-  // D96: the user's tree model; the crown made denser (two more copies turned / shrunk fill the holes in the leaves)
+  // D99 (user): the user's second, detailed tree (60 MB, 2 M triangles) — its picture baked OFFLINE from the model
+  // (tools/bake-impostor.html: 785 × 768 webp, 79 KB) — the game never loads the model
   tree: { view: 'deciduous_tree', top: 1, atlas: 'training', drawW: 120, drawD: 120, sprite: { lean: 1 },
-    // D98 (user: flat, too green): a stronger key light + less fill, the crown's bottom shaded, a lit sun-side edge, the
-    // colour pulled to the yard's olive grass
-    model: { file: 'tree.glb', height: 150, impostor: true, fill: [[1.1, 0.93], [2.3, 0.86], [3.6, 0.95]], fillAt: 0.62,
-      look: { hemi: 1.1, sun: 2.4, tint: [1.55, 1.6, 0.62], mix: 0.55, shade: 0.3, rim: 0.22, sphere: 0.55 } } },
+    model: { file: 'tree_big', height: 150, baked: { file: 'tree_big.webp', frame: [-0.4816, 0.4816, -0.2466, 0.6959] } } },
   boulder: { view: 'boulder', top: 1, atlas: 'training' },
   bush: { view: 'leafy_bush', top: 0.9, atlas: 'training', sprite: { lean: 1 } },
   grass_tuft: { view: 'grass_tuft', top: 0.8, atlas: 'training', sprite: { lean: 1 } },

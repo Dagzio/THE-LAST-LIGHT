@@ -142,13 +142,16 @@ export class PlayerController {
   peekGate(p, wantFire, manual, dt, time) {
     const C = COVER;
     if (!p.cover || p.cover.kind !== 'high' || p.dodging || !p.alive) { p.peek = null; return wantFire; }
+    // D99 (user): aimed away from the wall (in front of him) he simply fires from where he stands — leaning out of the
+    // corner is only for an aim behind the wall; aimed into the wall away from a corner the trigger does nothing (no hint)
+    if (wantFire && !p.peek && p.hasAim) {
+      const dx = p.aimX - p.x, dy = p.aimY - p.y, L = Math.hypot(dx, dy) || 1;
+      if ((dx * p.cover.nx + dy * p.cover.ny) / L > C.frontDot) return true;
+    }
     if (wantFire) {
       if (!p.peek) {
         const side = this.coverEdge(p);
-        if (!side) {
-          if (manual && time >= (p.edgeHintAt || 0)) { p.edgeHintAt = time + C.edgeHintEvery; this.events.emit('coverEdge'); }
-          return false;
-        }
+        if (!side) return false;
         p.peek = { side, k: 0, baseX: p.x, baseY: p.y, until: 0 };
       }
       p.peek.until = time + C.peekHold;
