@@ -81,10 +81,21 @@ export function renderImpostor(renderer, geometry, texture, cfg) {
   const sun = new THREE.DirectionalLight(0xffffff, L.sun ?? 1.0);
   sun.position.set(-0.32, 0.8, 0.3); // (the level's sun: up, from the left and towards the camera)
   scene.add(sun);
+  // D104 (user: shadows in the foliage — less of a flat picture): `selfShadow` — a real shadow map in the bake: the upper
+  // leaf clusters shade the lower ones and the branches (the model is height 1 around the origin)
+  const selfShadow = !!L.selfShadow;
+  if (selfShadow) {
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const sc = sun.shadow.camera; sc.left = -0.9; sc.right = 0.9; sc.top = 0.9; sc.bottom = -0.9; sc.near = 0.01; sc.far = 4;
+    sun.shadow.bias = -0.0015; sun.shadow.normalBias = 0.004; sun.shadow.radius = 2;
+    sun.position.multiplyScalar(1.6); sun.target.position.set(0, 0.45, 0); scene.add(sun.target);
+  }
   const mat = new THREE.MeshLambertMaterial({ map: texture });
   const group = new THREE.Group();
   for (const [turn, k] of [[0, 1]].concat(cfg.fill || [])) {
     const mesh = new THREE.Mesh(geometry, mat);
+    mesh.castShadow = mesh.receiveShadow = selfShadow;
     mesh.rotation.y = turn;
     mesh.scale.set(k, k, k);
     mesh.position.y = (1 - k) * (cfg.fillAt ?? 0.62); // shrunk about the crown, not the base
@@ -113,17 +124,21 @@ export function renderImpostor(renderer, geometry, texture, cfg) {
   rt.texture.colorSpace = THREE.SRGBColorSpace; // (written as sRGB — read back as sRGB: no double darkening)
   const prevTarget = renderer.getRenderTarget(), prevClear = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
   const out = new Uint8Array(W * turns * H * 4), cell = new Uint8Array(W * H * 4);
+  const prevShadow = renderer.shadowMap.enabled, prevType = renderer.shadowMap.type;
+  if (selfShadow) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.needsUpdate = true; }
   renderer.setRenderTarget(rt);
   renderer.setClearColor(0x000000, 0);
   for (let r = 0; r < turns; r++) {
     group.rotation.y = -r * (Math.PI / 2) + (cfg.turn || 0);
     renderer.clear();
+    if (selfShadow) renderer.shadowMap.needsUpdate = true;
     renderer.render(scene, cam);
     renderer.readRenderTargetPixels(rt, 0, 0, W, H, cell);
     if (cfg.look) grade(cell, W, H, cfg.look);
     for (let y = 0; y < H; y++) out.set(cell.subarray(y * W * 4, (y + 1) * W * 4), (y * W * turns + r * W) * 4);
   }
   renderer.setRenderTarget(prevTarget);
+  if (selfShadow) { renderer.shadowMap.enabled = prevShadow; renderer.shadowMap.type = prevType; renderer.shadowMap.needsUpdate = true; sun.shadow.map && sun.shadow.map.dispose(); }
   renderer.setClearColor(prevClear, prevAlpha);
   rt.dispose();
   mat.dispose();
@@ -261,6 +276,25 @@ function grade(px, W, H, L) {
   const lx = -0.5, ly = 0.55, lz = 0.67;
   const a = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? 0 : px[(y * W + x) * 4 + 3]);
   const R = Math.max(2, Math.round(W / 90));
+  // D104: `depth` — local contrast of the light (each pixel against its neighbourhood's mean, opaque pixels only): the
+  // leaf clusters stand out from the shaded hollows between them (a cheap ambient occlusion of the crown)
+  const depth = L.depth ?? 0;
+  let blur = null;
+  if (depth > 0) {
+    const lum = new Float32Array(W * H), cov = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) { const o = px[i * 4 + 3] > 40 ? 1 : 0; cov[i] = o; lum[i] = o * (0.3 * px[i * 4] + 0.59 * px[i * 4 + 1] + 0.11 * px[i * 4 + 2]) / 255; }
+    const box = (src, rad) => { // separable box blur (twice ≈ gaussian)
+      const t = new Float32Array(W * H), o = new Float32Array(W * H);
+      for (let y = 0; y < H; y++) { let s = 0; for (let x = -rad; x <= rad; x++) s += src[y * W + Math.min(W - 1, Math.max(0, x))]; for (let x = 0; x < W; x++) { t[y * W + x] = s / (2 * rad + 1); s += src[y * W + Math.min(W - 1, x + rad + 1)] - src[y * W + Math.max(0, x - rad)]; } }
+      for (let x = 0; x < W; x++) { let s = 0; for (let y = -rad; y <= rad; y++) s += t[Math.min(H - 1, Math.max(0, y)) * W + x]; for (let y = 0; y < H; y++) { o[y * W + x] = s / (2 * rad + 1); s += t[Math.min(H - 1, y + rad + 1) * W + x] - t[Math.max(0, y - rad) * W + x]; } }
+      return o;
+    };
+    const rad = Math.max(3, Math.round(W / 45));
+    const bl = box(box(lum, rad), rad), bc = box(box(cov, rad), rad);
+    blur = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) blur[i] = bc[i] > 0.05 ? bl[i] / bc[i] : 0;
+    blur.lum = lum;
+  }
   for (let y = 0; y < H; y++) {
     const v = (y - bot) / span;
     const ao = 1 - shade * Math.pow(1 - Math.min(1, Math.max(0, v)), 1.6);
@@ -273,6 +307,7 @@ function grade(px, W, H, L) {
       const gm = mix * Math.min(1, Math.max(0, (g - Math.max(r, b)) * 6));
       r += (lum * tr - r) * gm; g += (lum * tg - g) * gm; b += (lum * tb - b) * gm;
       let k = ao * gain;
+      if (blur) { const l = blur.lum[y * W + x], m = blur[y * W + x]; if (m > 0.01) k *= Math.max(0.4, Math.min(1.3, 1 + depth * (l - m) / m)); }
       if (sphere > 0) {
         const nx = (x - cx) / rx, ny = (y - cy) / ry, q = Math.min(1, nx * nx + ny * ny), nz = Math.sqrt(1 - q);
         const d = Math.max(0, nx * lx + ny * ly + nz * lz);
