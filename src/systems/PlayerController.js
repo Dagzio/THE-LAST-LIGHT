@@ -145,15 +145,21 @@ export class PlayerController {
     if (!p.cover || p.cover.kind !== 'high' || p.dodging || !p.alive) { p.peek = null; return wantFire; }
     // D99 (user): aimed away from the wall (in front of him) he simply fires from where he stands — leaning out of the
     // corner is only for an aim behind the wall; aimed into the wall away from a corner the trigger does nothing (no hint)
-    // D100 (user: by a corner he fired into the wall's end): only when the line to the aim is clear of the wall close by
-    if (wantFire && !p.peek && p.hasAim) {
-      const dx = p.aimX - p.x, dy = p.aimY - p.y, L = Math.hypot(dx, dy) || 1;
-      if ((dx * p.cover.nx + dy * p.cover.ny) / L > C.frontDot && this._clearShot(p)) return true;
-    }
+    // D105 (user video: from the corner he swung round and fired back along / into his own wall): one rule — a shot is
+    // allowed only if the line from where it leaves to the aim never crosses his own cover (and no wall right at the
+    // barrel). From where he stands it is clear → he fires there; else, at an edge, if leaning out gives a clear line →
+    // he leans out; otherwise the trigger does nothing (no round wasted into the wall)
+    // from where he stands: only in front of him (not back along the wall he leans on) and clear of it
+    if (wantFire && !p.peek && p.hasAim && this._inFront(p) && this._shotOk(p, p.x, p.y)) return true;
     if (wantFire) {
       if (!p.peek) {
         const side = this.coverEdge(p);
-        if (!side) return false;
+        if (!side || !p.hasAim) return false;
+        const tx = -p.cover.ny * side, ty = p.cover.nx * side;
+        // leaning out only for an aim past this corner (on its open side — never back along the wall)
+        if ((p.aimX - p.x) * tx + (p.aimY - p.y) * ty <= 0) return false;
+        const lx = p.x + tx * C.peekOut, ly = p.y + ty * C.peekOut;
+        if (!this._shotOk(p, lx, ly)) return false;
         p.peek = { side, k: 0, baseX: p.x, baseY: p.y, until: 0 };
       }
       p.peek.until = time + C.peekHold;
@@ -174,17 +180,34 @@ export class PlayerController {
     // barrel was still behind the corner and the wall took the shot): it fires only once he is fully out
     // D100: fully out, and still no wall right in front of the barrel (the aim past the corner's own end) — else no
     // shot (no round wasted into the wall)
-    return wantFire && pk.k >= 1 && this._clearShot(p);
+    return wantFire && pk.k >= 1 && this._shotOk(p, p.x, p.y);
   }
 
-  /** D100: is the line from him to the aim free of walls / tall cover for the first COVER.clearShot units? */
-  _clearShot(p) {
-    if (!this.world || !p.hasAim) return true;
-    const dx = p.aimX - p.x, dy = p.aimY - p.y, L = Math.hypot(dx, dy);
-    if (L < 1) return false;
-    const n = Math.min(L, COVER.clearShot), t = this.world.segmentHit(p.x, p.y, p.x + (dx / L) * n, p.y + (dy / L) * n, 0, null, BLOCK.BULLET);
-    return t === Infinity;
+  /** D105: the aim in front of him (away from the wall he leans on, not along it). */
+  _inFront(p) {
+    const dx = p.aimX - p.x, dy = p.aimY - p.y, L = Math.hypot(dx, dy) || 1;
+    return (dx * p.cover.nx + dy * p.cover.ny) / L > COVER.frontDot;
   }
+
+  /**
+   * D105: may a round leave from (x, y) to his aim? — the whole line (up to SHOT_REACH) clear of his own cover (the
+   * object he is against: its shape / its parts' group), and the first COVER.clearShot units clear of any wall.
+   */
+  _shotOk(p, x, y) {
+    if (!this.world || !p.hasAim) return !!p.hasAim;
+    const dx = p.aimX - x, dy = p.aimY - y, L = Math.hypot(dx, dy);
+    if (L < 1) return false;
+    const own = this.world.coverAt(p.peek ? p.peek.baseX : p.x, p.peek ? p.peek.baseY : p.y, p.radius + COVER.reach, OWN);
+    const shape = own && own.shape, group = shape && shape.group;
+    if (shape) {
+      const n = Math.min(L, SHOT_REACH);
+      const t = this.world.segmentHit(x, y, x + (dx / L) * n, y + (dy / L) * n, 6, (s) => s === shape || (!!group && s.group === group), BLOCK.BULLET);
+      if (t !== Infinity) return false;
+    }
+    const n = Math.min(L, COVER.clearShot);
+    return this.world.segmentHit(x, y, x + (dx / L) * n, y + (dy / L) * n, 0, null, BLOCK.BULLET) === Infinity;
+  }
+
 
   /** In cover: steps up to the object first, then moves only along it (kneeling / sneaking sideways). */
   _coverMove(p, dt, time) {
@@ -254,5 +277,7 @@ export class PlayerController {
 const CONTACT = { shape: null, nx: 0, ny: 0, gap: 0 };
 const EDGE = { shape: null, nx: 0, ny: 0, gap: 0 }; // D87: the edge probes (CONTACT stays the hero's own contact)
 const PROBE0 = { shape: null, nx: 0, ny: 0, gap: 0 }; // D90: his own contact for the probes
+const OWN = { shape: null, nx: 0, ny: 0, gap: 0 };    // D105: the cover he is against
+const SHOT_REACH = 900;                                 // D105: units of the line checked against his own cover
 
 function clamp(v, min, max) { return v < min ? min : v > max ? max : v; }
