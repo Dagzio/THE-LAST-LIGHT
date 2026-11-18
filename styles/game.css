@@ -1366,6 +1366,11 @@ body[data-mode="stealth"] #screen-game .stealth-hud { display: inline-flex; }
 body.map-over .ctx-prompt { display: none; }
 /* D83 touch: the cover button — next to an object one can hide behind; lit (tap leaves) while in cover */
 .cover-neon { display: none; }
+/* D109: the cover icon — a filled crouching man and a brick wall (dark seams), a little larger than the line icons */
+.cover-neon .ico-cover { width: 60%; height: 60%; }
+.ico-cover .fill { fill: #fff; }
+.ico-cover .seam { stroke: #2a3036; stroke-width: 1.1; stroke-linecap: butt; }
+.ico-cover .limb { stroke-width: 3.3; }
 .cover-neon.on { display: flex; animation: interactPulse 1s ease-in-out infinite alternate; }
 .cover-neon.active { animation: none; box-shadow: 0 0 0 2px #8fd8ff, 0 0 16px rgba(143, 216, 255, 0.75); }
 .interact-neon.on ~ .cover-neon.on:not(.active) { display: none; } /* a crate in reach comes first */
