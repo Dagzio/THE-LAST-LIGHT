@@ -270,7 +270,9 @@ export class MissionRun {
     if (shooting || this.grenadePreview.active) p.faceAimUntil = time + FACING.aimHold;
     const moving = p.dodging || Math.hypot(p.vx, p.vy) > 1;
     const mouse = p.hasAim && !this.autoFire;
-    const firing = time < p.faceAimUntil;
+    // D95 (user: back in cover he first stood facing the wall, then turned): in cover the aim pose lasts only while he
+    // fires / leans out / aims a grenade — then at once the cover pose (back to the wall / kneeling)
+    const firing = p.cover ? shooting || !!p.peek || this.grenadePreview.active : time < p.faceAimUntil;
     const cover = p.cover && !firing ? p.cover : null; // D83: in cover he keeps facing it while moving along it
     p.aimPose = false;
     if (p.dodging) p.bodyAngle = Math.atan2(p.dodgeDirY, p.dodgeDirX);

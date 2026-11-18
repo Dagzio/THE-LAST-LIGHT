@@ -137,13 +137,13 @@ export const OFFICE = {
     { type: 'archive_shelf', x: 420, y: 1540, rot: 0 }, { type: 'archive_shelf', x: 420, y: 1620, rot: 0 },
     { type: 'archive_shelf', x: 590, y: 1540, rot: 0 }, { type: 'archive_shelf', x: 590, y: 1620, rot: 0 },
     { type: 'filing_cabinet', x: 272, y: 1480, rot: 3 }, { type: 'filing_cabinet', x: 272, y: 1506, rot: 3 },
-    { type: 'boxes', x: 290, y: 1670 }, { type: 'boxes_tall', x: 722, y: 1478 }, { type: 'trolley', x: 700, y: 1672 },
+    { type: 'boxes', x: 290, y: 1670 }, { type: 'boxes_tall', x: 722, y: 1478 }, 
     { type: 'papers', x: 500, y: 1580 },
     // --- security
     { type: 'console', x: 2050, y: 1158, rot: 0 }, { type: 'exec_chair', x: 2050, y: 1198, rot: 2 },
     { type: 'filing_cabinet', x: 1672, y: 1380, rot: 3 }, { type: 'filing_cabinet', x: 1672, y: 1404, rot: 3 },
     { type: 'server_rack', x: 1675, y: 1170, rot: 3 }, { type: 'tv_wall', x: 1760, y: 1141.5, rot: 0 },
-    { type: 'boxes', x: 2110, y: 1420 }, { type: 'broken_monitor', x: 1840, y: 1250, rot: 2 },
+    { type: 'boxes', x: 2110, y: 1420 }, 
     { type: 'filing_cabinet', x: 1758, y: 1428, rot: 2 }, { type: 'filing_cabinet', x: 1780, y: 1428, rot: 2 },
     { type: 'filing_cabinet', x: 1802, y: 1428, rot: 2 },
     { type: 'alarm_light', x: 1960, y: 1141.5, rot: 0 }, { type: 'papers', x: 1900, y: 1330, rot: 2 },
@@ -165,7 +165,7 @@ export const OFFICE = {
     { type: 'plant', x: 272, y: 272 }, { type: 'plant', x: 1278, y: 272 }, { type: 'plant', x: 272, y: 928 },
     { type: 'plant', x: 760, y: 928 }, { type: 'boxes', x: 300, y: 830 }, { type: 'boxes_tall', x: 300, y: 870 },
     { type: 'overturned_chair', x: 700, y: 545, rot: 2 }, { type: 'papers', x: 790, y: 560 },
-    { type: 'broken_monitor', x: 620, y: 520, rot: 1 }, { type: 'exit_sign', x: 261.5, y: 400, rot: 3 },
+    { type: 'exit_sign', x: 261.5, y: 400, rot: 3 },
     ...[600, 622, 644, 670, 692, 714].map((y) => ({ type: 'filing_cabinet', x: 272, y, rot: 3 })),
     { type: 'wall_clock', x: 1100, y: 261.5, rot: 0 },
     // D83 (the reference): planters with plants between the desk blocks (low cover), more papers, a second printer
@@ -187,7 +187,7 @@ export const OFFICE = {
     // --- print room
     { type: 'printer', x: 1323, y: 700, rot: 3 }, { type: 'printer', x: 1323, y: 780, rot: 3 },
     { type: 'archive_shelf', x: 1660, y: 639, rot: 0 }, { type: 'archive_shelf', x: 1740, y: 639, rot: 0 },
-    { type: 'boxes', x: 1650, y: 700 }, { type: 'trolley', x: 1440, y: 900 }, { type: 'boxes_tall', x: 1322, y: 920 },
+    { type: 'boxes', x: 1650, y: 700 }, { type: 'boxes_tall', x: 1322, y: 920 },
     { type: 'papers', x: 1460, y: 740, rot: 2 }, { type: 'papers', x: 1600, y: 860 }, { type: 'boxes', x: 1760, y: 920 },
     { type: 'shredder', x: 1380, y: 642, rot: 0 }, { type: 'recycling_bin', x: 1430, y: 642 },
     // --- server room

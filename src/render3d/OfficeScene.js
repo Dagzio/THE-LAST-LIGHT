@@ -351,7 +351,9 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     if (hasView(p) || p.drawn === false) continue; // D85: drawn as a view box (it casts its own silhouette shadow)
     if (!hasSprite(p)) { buildProp(pb, p); continue; }
     const t = PROP_TYPES[p.type];
-    if (shadows && t && !t.flat && !t.wall) buildProp(shadowOnly, p);
+    // D95 (user: wrong shadows): a sprite card casts no 3D shadow — its primitive stand-in cast a different shape; the
+    // soft contact shadow under it stays
+
   }
   for (const d of level.doors) {
     const hw = d.width / 2;

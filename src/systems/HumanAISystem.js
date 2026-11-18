@@ -53,7 +53,7 @@ export class HumanAISystem {
         ai.thinkAt = time + T.thinkInterval * (0.85 + 0.3 * this.rng.next());
         if (this.stealth && ai.mode !== 'combat') this._perceiveStealth(e, player, time);
         else this._perceive(e, player, enemies, time);
-        if (this.stealth && ai.mode !== 'combat') this._lookForBodies(e, enemies, time);
+        if (this.stealth && !this.noBodies && ai.mode !== 'combat') this._lookForBodies(e, enemies, time); // D95: not in the lessons
       }
       this._behave(e, player, dt, time);
       this._shoot(e, player, time);

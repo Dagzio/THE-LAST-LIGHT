@@ -19,6 +19,13 @@ export class TutorialDirector {
     run.player.sneak = false;
     run.player.stance = 'stand';
     run.player.minHp = TUTORIAL.minHp;          // D89: the lessons never end in a defeat
+    run.ai.noBodies = true;                     // D95 (user): no "body found" (no search) in the lessons
+    // D95 (user): an enemy never leaves his own yard (never follows the hero through a gate back to the yard before)
+    this.homes = new Map();
+    for (const e of run.enemies) {
+      const zid = run.levelWorld.zoneAt(e.x, e.y), z = zid && run.level.zones.find((q) => q.id === zid);
+      if (z) this.homes.set(e, z.rect);
+    }
     this.steps = TUTORIAL.steps;
     this.hintAt = -Infinity;
     this.index = -1;
@@ -234,6 +241,13 @@ export class TutorialDirector {
 
   update(dt, time) {
     const run = this.run, p = run.player;
+    // D95: each enemy kept inside his yard (the gate gaps are on the yard's edge — he stops at them)
+    for (const [e, r] of this.homes) {
+      if (!e.alive) continue;
+      const m = e.radius + 2;
+      e.x = Math.min(r[2] - m, Math.max(r[0] + m, e.x));
+      e.y = Math.min(r[3] - m, Math.max(r[1] + m, e.y));
+    }
     this._check();
     const s = this.step;
     if (this.pendingDialogue) { const id = this.pendingDialogue; this.pendingDialogue = null; run.events.emit('dialogue', id); }

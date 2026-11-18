@@ -422,7 +422,8 @@ export class HumanView {
       if (w < 1e-3) continue;
       const id = this.idOf.get(a), dur = a.getClip().duration;
       const max = /run|Run/.test(id) ? A.runRateMax : A.walkRateMax;
-      const rate = Math.min(max, Math.max(0.6, sp / (R[id] || 30)));
+      // D95 (user: feet sliding after a stop): standing (he has stopped, the walk only fading out) the legs hold still
+      const rate = sp < 2 ? 0 : Math.min(max, Math.max(0.6, sp / (R[id] || 30)));
       fsum += (w * rate) / dur;
       wsum += w;
     }
@@ -588,7 +589,12 @@ export class HumanView {
     const PR = this.pRel[this.pRelId];
     for (const r0 of Object.values(this.pRel)) { r0.u.setEffectiveWeight(0); r0.l.setEffectiveWeight(0); }
     const wr = PR ? w.reload : 0; // the reload weight of the last frame (like w.aim below)
-    if (pistol) { L.pIdle.setEffectiveWeight(stand * (1 - wr)); if (PR) PR.l.setEffectiveWeight(stand * wr); }
+    // D95 (user: running, reloading and stopping slid the feet): the reload clip's own legs (it takes a step) only for a
+    // reload begun standing still; begun on the move he keeps the pistol stance's planted legs
+    if (st.reload >= 0 && !this.wasReloading) this.relStill = sp < 2;
+    this.wasReloading = st.reload >= 0;
+    const relLegs = PR && this.relStill ? wr : 0;
+    if (pistol) { L.pIdle.setEffectiveWeight(stand * (1 - relLegs)); if (PR) PR.l.setEffectiveWeight(stand * relLegs); }
     else { L.fire.setEffectiveWeight(stand * w.aim); L.idle.setEffectiveWeight(stand * (1 - w.aim)); }
     fwdWalk.setEffectiveWeight(move * f * (1 - run) * normal);
     fwdRun.setEffectiveWeight(move * f * run * normal);

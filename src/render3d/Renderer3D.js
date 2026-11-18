@@ -744,7 +744,10 @@ export class Renderer3D {
     if (paused && this.pausedDrawn && !falling) return false;
     this.alpha = paused ? 1 : Math.min(1, Math.max(0, alpha));
     const p = run.player;
-    if (!paused || falling) this.rig.follow(this._lx(p), this._ly(p), frameDt, this.map.width, this.map.height);
+    // D95 (user: the aim drifted while leaning out): leaning out of the corner the camera stays on his spot in cover — the
+    // cursor's ground point (the aim) does not slide with the lean, the shots go where he points
+    const pk = p.peek, fx = pk ? pk.baseX : this._lx(p), fy = pk ? pk.baseY : this._ly(p);
+    if (!paused || falling) this.rig.follow(fx, fy, frameDt, this.map.width, this.map.height);
     this._placeCamera(time);
     this._sync(run, time);
     this.renderer.render(this.scene, this.camera);
