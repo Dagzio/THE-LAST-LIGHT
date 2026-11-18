@@ -138,7 +138,10 @@ export class LevelWorld {
       } else d.target = 0;
       const prevOpen = d.open;
       const step = dt / DOOR.openTime;
-      d.open = d.target > d.open ? Math.min(1, d.open + step) : Math.max(0, d.open - step);
+      // D94 (user video: the open gates flickered): at its target the door stays put — before, an open door (target 1 =
+      // open 1) fell into the closing branch, dropped a step and reopened the next one (every 1/60 s)
+      if (d.target > d.open) d.open = Math.min(d.target, d.open + step);
+      else if (d.target < d.open) d.open = Math.max(d.target, d.open - step);
       if (prevOpen === 0 && d.open > 0) d.lastChangeAt = time;
       d.shape.on = d.open < DOOR.passable;
     }
