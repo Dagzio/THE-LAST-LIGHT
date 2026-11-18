@@ -19,7 +19,11 @@ export const PROP_TYPES = {
   armchair: { w: 30, d: 28, h: 25 },
   coffee_table: { w: 32, d: 32, h: 14, shape: 'circle', r: 16 },
   round_table: { w: 36, d: 36, h: 23, shape: 'circle', r: 18, cover: 'low' },
-  reception: { w: 150, d: 40, h: 34, cover: 'low' },
+  // D97 (user: the curved desk collided as a box): parts — collision boxes [x0, z0, x1, z1] in parts of w × d (z front-
+  // ward), the desk's U-shape traced from its top picture's outline (data/viewOutlines.js), 10 strips
+  reception: { w: 150, d: 40, h: 34, cover: 'low', parts: [[-0.5, -0.475, -0.4, 0.0], [-0.4, -0.225, -0.3, 0.275], [-0.3, 0.0, -0.2, 0.375],
+    [-0.2, 0.125, -0.1, 0.475], [-0.1, 0.15, 0.0, 0.5], [0.0, 0.15, 0.1, 0.5], [0.1, 0.125, 0.2, 0.475], [0.2, 0.025, 0.3, 0.4],
+    [0.3, -0.225, 0.4, 0.275], [0.4, -0.475, 0.5, 0.0]] },
   filing_cabinet: { w: 20, d: 24, h: 42, cover: 'high' },
   archive_shelf: { w: 70, d: 18, h: 62, cover: 'high' },
   bookcase: { w: 50, d: 14, h: 56, cover: 'high' },
@@ -122,6 +126,21 @@ export function propBlocks(t) {
   if (t.sight !== false && t.h > EYE_HEIGHT) m |= SIGHT;
   if (t.cover === 'low') m |= LOW;
   return m;
+}
+
+/**
+ * D97: the collision boxes of a placed prop with `parts` (world [minX, minY, maxX, maxY] each), or null. The quarter
+ * turns as the renderer turns the prop (three.js about +Y by −rot·90°: local (x, z) → (x cos + z sin, −x sin + z cos)).
+ */
+export function propParts(p) {
+  const T = PROP_TYPES[p.type];
+  if (!T || !T.parts) return null;
+  const a = -((p.rot | 0) & 3) * (Math.PI / 2), c = Math.round(Math.cos(a)), s = Math.round(Math.sin(a));
+  return T.parts.map(([x0, z0, x1, z1]) => {
+    const pts = [[x0, z0], [x1, z0], [x0, z1], [x1, z1]].map(([x, z]) => [x * T.w, z * T.d]).map(([x, z]) => [x * c + z * s, -x * s + z * c]);
+    const xs = pts.map((q) => q[0]), zs = pts.map((q) => q[1]);
+    return [p.x + Math.min(...xs), p.y + Math.min(...zs), p.x + Math.max(...xs), p.y + Math.max(...zs)];
+  });
 }
 
 /** Footprint box of a placed prop (rot = quarter turns) → [minX, minY, maxX, maxY]. */

@@ -371,12 +371,13 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   for (const p of level.props) {
     const t = PROP_TYPES[p.type];
     if (!t || t.flat || t.wall || t.decor || p.solid === false || !(t.h > 2)) continue;
-    const [x0, y0, x1, y1] = propBox(p);
     const pad = 6 + Math.min(16, t.h * 0.22);
-    const ao = new THREE.PlaneGeometry(x1 - x0 + 2 * pad, y1 - y0 + 2 * pad);
-    ao.rotateX(-Math.PI / 2);
-    ao.translate((x0 + x1) / 2, 0.45, (y0 + y1) / 2);
-    put('aoBox', ao.toNonIndexed());
+    for (const [x0, y0, x1, y1] of [propBox(p)]) { // (one soft quad — overlapping quads under parts would stack darker)
+      const ao = new THREE.PlaneGeometry(x1 - x0 + 2 * pad, y1 - y0 + 2 * pad);
+      ao.rotateX(-Math.PI / 2);
+      ao.translate((x0 + x1) / 2, 0.45, (y0 + y1) / 2);
+      put('aoBox', ao.toNonIndexed());
+    }
   }
 
   // D83: the baked lights — a soft additive pool per light, in its own colour / strength (render3d/officeLights.js)

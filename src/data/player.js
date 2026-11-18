@@ -69,7 +69,7 @@ export const COVER = {
   edgeStop: 13,
   edgeProbe: 16,            // units along the cover: no cover there (or only its corner) → he stands at an edge
   peekOut: 24,              // units he leans out past the edge (his body clears the corner — and can be hit)
-  peekIn: 0.16,             // s to lean out / back
+  peekIn: 0.34,             // s to lean out / back (D97, user: 0.16 was a jerk)
   peekHold: 0.45,           // s he stays out after the last shot
   edgeHintEvery: 1.5,       // s between the "move to the edge" hints
 };

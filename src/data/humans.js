@@ -3,12 +3,13 @@
 // later locations are added here as new types (their own models when the user provides them).
 // Speeds in units/s (the hero runs 95), view in units / degrees, times in s.
 
+// D97 (user): the enemies notice the hero 20 % closer (view range × 0.8: 430 → 344, 470 → 376, 450 → 360)
 export const HUMAN_TYPES = {
   thug: {
     id: 'thug', nameKey: 'enemy.thug', model: 'enemy', weapon: 'enemy_pistol',
     hp: 45, armor: 0, radius: 15, scale: 1,
     speed: { patrol: 30, combat: 76 },
-    view: { range: 430, fov: 120, near: 80 },   // near: noticed at any angle this close
+    view: { range: 344, fov: 120, near: 80 },   // near: noticed at any angle this close
     reaction: 0.6,                              // s from first sight to the first shot
     keepRange: 220,                             // likes to fight from about here
     tint: 0xffffff,
@@ -17,7 +18,7 @@ export const HUMAN_TYPES = {
     id: 'gunman', nameKey: 'enemy.gunman', model: 'enemy', weapon: 'enemy_rifle',
     hp: 60, armor: 0, radius: 15, scale: 1,
     speed: { patrol: 30, combat: 70 },
-    view: { range: 470, fov: 110, near: 80 },
+    view: { range: 376, fov: 110, near: 80 },
     reaction: 0.65,
     keepRange: 280,
     tint: 0xc9d2e0,
@@ -26,7 +27,7 @@ export const HUMAN_TYPES = {
     id: 'heavy', nameKey: 'enemy.heavy', model: 'enemy', weapon: 'enemy_heavy',
     hp: 150, armor: 2, radius: 17, scale: 1.08,
     speed: { patrol: 26, combat: 54 },
-    view: { range: 450, fov: 110, near: 90 },
+    view: { range: 360, fov: 110, near: 90 },
     reaction: 0.5,
     keepRange: 200,
     tint: 0x8c8f96,

@@ -89,7 +89,9 @@ export const FOOTSTEPS = { sfx: 'steps', minSpeed: 8, minRate: 0.5, maxRate: 2.0
 // rugs) `steps3`, the training ground `steps1`. The volume follows his stance (FOOTSTEP_GAIN).
 export const STEP_SETS = {
   hard: { sfx: 'steps', gain: 1, slices: [[0.05, 0.42], [0.57, 0.42], [1.08, 0.42], [1.58, 0.42], [2.11, 0.42], [2.58, 0.42], [3.09, 0.3]] },
-  carpet: { sfx: 'steps3', gain: 1, slices: [[0.06, 0.32], [0.55, 0.3], [0.86, 0.3], [1.17, 0.32], [1.58, 0.34]] },
+  // D97 (user: the carpet steps were barely heard): its recording peaks 3.5× lower than `steps` (0.027 vs 0.094,
+  // measured) — levelled to the hard floor's
+  carpet: { sfx: 'steps3', gain: 3.5, slices: [[0.06, 0.32], [0.55, 0.3], [0.86, 0.3], [1.17, 0.32], [1.58, 0.34]] },
   outdoor: { sfx: 'steps1', gain: 0.9, slices: [[0.09, 0.4], [0.58, 0.4], [1.38, 0.32], [2.02, 0.4], [2.6, 0.42], [3.26, 0.42], [3.78, 0.36]] },
 };
 /** The floors (data/levels zones `floor`) that sound like carpet; rugs (props) too. */

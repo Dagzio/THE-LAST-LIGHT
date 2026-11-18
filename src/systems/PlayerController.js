@@ -128,8 +128,10 @@ export class PlayerController {
     const g0 = w.coverAt(p.x, p.y, p.radius + COVER.reach, PROBE0);
     if (!g0) return true;
     const tx = -g0.ny, ty = g0.nx, off = g0.gap - 1;
-    const g = w.coverAt(p.x + tx * s * d - g0.nx * off, p.y + ty * s * d - g0.ny * off, 3, EDGE);
-    return !g || (!!kind && g.shape.cover !== kind) || (!!g.shape.box && Math.abs(g.nx) < 0.97 && Math.abs(g.ny) < 0.97);
+    // D97: along a curved prop (its boxes, one group) the next box steps back — look further for it
+    const grp = g0.shape.group, g = w.coverAt(p.x + tx * s * d - g0.nx * off, p.y + ty * s * d - g0.ny * off, grp ? 16 : 3, EDGE);
+    if (grp) return !g || g.shape.group !== grp;
+    return !g || (!!kind && g.shape.cover !== kind) || (!g.shape.group && !!g.shape.box && Math.abs(g.nx) < 0.97 && Math.abs(g.ny) < 0.97); // D97: a group's joints are no end
   }
 
   /**
@@ -160,7 +162,9 @@ export class PlayerController {
     p.vx = 0; p.vy = 0;
     if (this.world) this.world.pushOut(p);
     if (!out && pk.k <= 0) { p.x = pk.baseX; p.y = pk.baseY; p.peek = null; return false; }
-    return wantFire && pk.k >= 0.7;
+    // D97 (user: the first shot after leaning out made a sound and took a round but no bullet flew — half out, the
+    // barrel was still behind the corner and the wall took the shot): it fires only once he is fully out
+    return wantFire && pk.k >= 1;
   }
 
   /** In cover: steps up to the object first, then moves only along it (kneeling / sneaking sideways). */
@@ -190,7 +194,7 @@ export class PlayerController {
       const wasFace = Math.abs(p.cover.nx) >= 0.97 || Math.abs(p.cover.ny) >= 0.97;
       let c = this.world ? this.world.coverAt(p.x, p.y, reach, CONTACT) : null;
       // past the object's end (the nearest point is its corner): back to where he was — he stops at the edge
-      if (!c || (wasFace && time >= p.coverSnapUntil && c.shape.box && Math.abs(c.nx) < 0.97 && Math.abs(c.ny) < 0.97)) {
+      if (!c || (wasFace && time >= p.coverSnapUntil && c.shape.box && !c.shape.group && Math.abs(c.nx) < 0.97 && Math.abs(c.ny) < 0.97)) {
         p.x = x0; p.y = y0; p.vx = 0; p.vy = 0;
         c = this.world ? this.world.coverAt(p.x, p.y, reach, CONTACT) : null;
       }
