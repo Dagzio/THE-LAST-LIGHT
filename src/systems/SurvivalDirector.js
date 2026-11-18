@@ -42,7 +42,6 @@ export class SurvivalDirector {
     this.inView = null;
   }
 
-  get autoFireAllowed() { return true; }
 
   update(dt, time) {
     const run = this.run, t = run.stats.time, C = survivalCurves(t);

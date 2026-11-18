@@ -139,7 +139,7 @@ export function officeMaterials(aniso = 4) {
   m.propCards = new THREE.MeshBasicMaterial({ map: propAtlasTexture(aniso), vertexColors: true, transparent: true, alphaTest: 0.04, depthWrite: true, side: THREE.DoubleSide });
   m.shadowOnly = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
   // D85: the furniture view boxes (the user's 5-view sheets): lit, cut out by alpha, both sides in the shadow map
-  m.propViews = new THREE.MeshLambertMaterial({ map: propViewTexture(aniso), vertexColors: true, alphaTest: 0.5, shadowSide: THREE.DoubleSide });
+  m.propViews = new THREE.MeshLambertMaterial({ map: propViewTexture(aniso), vertexColors: true, alphaTest: 0.5, shadowSide: THREE.DoubleSide, side: THREE.DoubleSide }); // D93: outline walls seen through the gaps
   m.propViewsTraining = new THREE.MeshLambertMaterial({ map: propViewTexture(aniso, 'training'), vertexColors: true, alphaTest: 0.5, shadowSide: THREE.DoubleSide, side: THREE.DoubleSide });
   sharedMats = m;
   return m;

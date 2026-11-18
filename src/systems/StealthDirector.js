@@ -89,7 +89,6 @@ export class StealthDirector {
   }
 
   /** On touch the gun never fires by itself in stealth (it would give the hero away); after the alarm it may. */
-  get autoFireAllowed() { return this.alarmRaised; }
 
   /** How visible the hero is now (0…1): the light where he stands and his stance (HUD eye). */
   get heroVisibility() {
@@ -221,6 +220,10 @@ export class StealthDirector {
     p.x = td.fromX + (bx - td.fromX) * s;
     p.y = td.fromY + (by - td.fromY) * s;
     p.vx = 0; p.vy = 0;
+    // D93 (user sounds): the blows of the clip — the kick, then the hand (clip times measured on the skeleton)
+    const ct = T.clipFrom + (T.clipTo - T.clipFrom) * Math.min(1, k / T.duration);
+    if (!td.kicked && ct >= T.kickAt) { td.kicked = true; run.events.emit('takedownBlow', 'kick', e); }
+    if (!td.punched && ct >= T.punchAt) { td.punched = true; run.events.emit('takedownBlow', 'punch', e); }
     if (!td.killed && k >= T.killAt) {
       td.killed = true;
       e.killedBy = 'takedown';

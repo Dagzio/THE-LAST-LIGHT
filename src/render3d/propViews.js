@@ -13,6 +13,7 @@ import { PROP_MODELS } from '../data/propModels.js';
 import { PROP_TYPES } from '../data/props.js';
 import { lightAt } from './officeLights.js';
 import { CAMERA } from '../config/camera.js';
+import { VIEW_OUTLINES } from '../data/viewOutlines.js';
 
 // D90: foliage drawn as one picture turned to the camera (it never turns: no yaw) — leaning back by this angle
 const SPRITE_LEAN = Math.PI / 2 - (CAMERA.tilt * Math.PI) / 180;
@@ -52,7 +53,7 @@ function viewOf(p) {
   if (Array.isArray(id)) id = id[(Math.abs(Math.round(p.x * 7 + p.y * 13)) >>> 0) % id.length];
   const A = VIEW_ATLASES[m.atlas || 'office'];
   const item = A.items[id];
-  return item ? { m, item, A } : null;
+  return item ? { m, item, A, id, outline: (VIEW_OUTLINES[m.atlas || 'office'] || {})[id] || null } : null;
 }
 
 /** True when the prop is drawn as a view box (its old sprite / 3D build is not used). */
@@ -68,6 +69,39 @@ function quad(rect, w, h, A) {
   const u0 = (rx + 0.5) / W, u1 = (rx + rw - 0.5) / W, v0 = 1 - (ry + rh - 0.5) / H, v1 = 1 - (ry + 0.5) / H;
   const uv = g.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) > 0.5 ? u1 : u0, uv.getY(i) > 0.5 ? v1 : v0);
+  return g;
+}
+
+/**
+ * D93: the walls along one outline loop ([x, z] parts of the footprint) — each wall shows the side picture it faces
+ * (front / back / left / right by its outward normal), projected straight onto it (the picture's x / the depth → u).
+ */
+function outlineWalls(loop, W, D, H, item, A) {
+  let area = 0;
+  for (let i = 0; i < loop.length; i++) { const [x0, z0] = loop[i], [x1, z1] = loop[(i + 1) % loop.length]; area += x0 * z1 - x1 * z0; }
+  const sgn = area >= 0 ? 1 : -1; // (x, z) loop turning: the outward normal side
+  const pos = [], nor = [], uv = [];
+  const uvOf = (view, x, z, y) => {
+    const r = item[view] || item.front || item.back;
+    const u = view === 'front' ? (x + W / 2) / W : view === 'back' ? (W / 2 - x) / W : view === 'left' ? (z + D / 2) / D : (D / 2 - z) / D;
+    const [rx, ry, rw, rh] = r;
+    return [(rx + 0.5 + Math.min(1, Math.max(0, u)) * (rw - 1)) / A.width, 1 - (ry + 0.5 + (1 - y / H) * (rh - 1)) / A.height];
+  };
+  for (let i = 0; i < loop.length; i++) {
+    const x0 = loop[i][0] * W, z0 = loop[i][1] * D, x1 = loop[(i + 1) % loop.length][0] * W, z1 = loop[(i + 1) % loop.length][1] * D;
+    const ex = x1 - x0, ez = z1 - z0, L = Math.hypot(ex, ez);
+    if (L < 0.3) continue;
+    const nx = (ez / L) * sgn, nz = (-ex / L) * sgn; // outward (the loop's area > 0: counter-clockwise in x / z)
+    const view = Math.abs(nz) >= Math.abs(nx) ? (nz > 0 ? 'front' : 'back') : nx > 0 ? 'right' : 'left';
+    const a = [x0, 0, z0], b = [x1, 0, z1], c = [x1, H, z1], d = [x0, H, z0];
+    // outward-facing winding (seen from the normal's side: a → b → c counter-clockwise)
+    const tri = sgn > 0 ? [a, c, b, a, d, c] : [a, b, c, a, c, d]; // ((b - a) × (c - a) ∝ (-ez, 0, ex): inward for sgn > 0)
+    for (const p of tri) { pos.push(p[0], p[1], p[2]); nor.push(nx, 0, nz); uv.push(...uvOf(view, p[0], p[2], p[1])); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   return g;
 }
 
@@ -108,6 +142,13 @@ function propFaces(p, out) {
   const Hv = front ? (W * front[3]) / front[2] : t.h;
   const faces = [];
   if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, Hv * (m.top ?? 1), 0); faces.push(g); }
+  // D93 (user: boxes with gaps at the corners): the side walls follow the top picture's outline, the side pictures
+  // projected onto them (a curved desk gets a curved front, a chair one body) — the box sides only without an outline
+  if (v.outline && !m.box) {
+    for (const loop of v.outline) faces.push(outlineWalls(loop, W, D, Hv, item, A));
+    for (const g of faces) out.push(g.applyMatrix4(base));
+    return;
+  }
   if (item.front) { const g = quad(item.front, W, Hv, A); g.translate(0, Hv / 2, D / 2); faces.push(g); }
   if (item.back) { const g = quad(item.back, W, Hv, A); g.rotateY(Math.PI); g.translate(0, Hv / 2, -D / 2); faces.push(g); }
   if (item.left) { const g = quad(item.left, D, Hv, A); g.rotateY(-Math.PI / 2); g.translate(-W / 2, Hv / 2, 0); faces.push(g); }

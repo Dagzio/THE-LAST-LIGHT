@@ -27,7 +27,7 @@ export const TRAINING = {
   outside: 'grass',
   enemyModel: 'enemyTraining', // D89: the user's training enemy model (data/humanModels.js), the office one elsewhere
   noXray: true,                // D90 (user): no X-ray silhouette of the hero through the walls here
-  footsteps: 'steps1',         // D89: the user's second steps recording (data/sounds.js LEVEL_FOOTSTEPS)
+  footsteps: 'outdoor',        // D89 / D93: the user's steps1 on every floor here (data/sounds.js STEP_SETS)
   lighting: { hemi: 1.15, key: 1.55, exposure: 1.0, sky: 0xe4eeff, ground: 0x55663a, sun: 0xfff0d6, background: 0x6c8748 },
   width: 2400,
   height: 1800,

@@ -9,6 +9,8 @@
 //   top   — the top picture's height as a part of the box height (the top view shows everything from above: drawn a
 //           little lower it sits on the main surface rather than on the highest point);
 //   wall  — hangs on a wall: only the front picture, centred at height `at` (units).
+// D93: the side walls follow the top picture's outline (data/viewOutlines.js) — `box: true` keeps the plain box;
+//   sprite — thin / leafy things: the front picture as one quad turned to the camera.
 export const PROP_MODELS = {
   workstation: { view: 'workstation', top: 0.9 },
   terminal: { view: 'workstation', top: 0.9 },
@@ -41,10 +43,11 @@ export const PROP_MODELS = {
   boxes: { view: 'closed_boxes', top: 1 },
   boxes_tall: { view: 'flight_cases', top: 1 },
   open_box: { view: 'open_box', top: 1 },
-  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], top: 0.75 },
+  // D93: thin / leafy things — one picture turned to the camera (the outline walls suit solid furniture)
+  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], top: 0.75, sprite: { lean: 1 } },
   planter: { view: 'long_planter', top: 0.8 },
   whiteboard: { view: 'mobile_whiteboard', top: 1 },
-  coat_stand: { view: 'coat_stand', top: 0.9 },
+  coat_stand: { view: 'coat_stand', top: 0.9, sprite: { lean: 1 } },
   steel_bin: { view: 'steel_bin', top: 1 },
   recycling_bin: { view: 'recycling_bin', top: 1 },
   desk_lamp: { view: 'desk_lamp', top: 0.8 },

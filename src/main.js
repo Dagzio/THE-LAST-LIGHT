@@ -1,8 +1,8 @@
 // Game start (imported by boot.js after the preload): wires platform services, the runtime and the UI.
-// No globals are created (except window.__game while the dev asset viewer flag is on).
-import { DEBUG_ENABLED, DEBUG_MODELS } from './config/constants.js';
-import { MUSIC_FILES, SFX_FILES, AUDIO_DIR, ENEMY_KILL_SFX, FOOTSTEPS, footstepsOf, PLAYER_HURT_SFX } from './data/sounds.js';
-import { PLAYER } from './data/player.js';
+// No globals are created (except window.__game while the dev viewer or the test cheats are on — never in a release).
+import { DEBUG_ENABLED, DEBUG_MODELS, CHEATS } from './config/constants.js';
+import { MUSIC_FILES, SFX_FILES, AUDIO_DIR, ENEMY_KILL_SFX, FOOTSTEPS, STEP_SETS, CARPET_FLOORS, CARPET_PROPS, FOOTSTEP_GAIN, PLAYER_HURT_SFX } from './data/sounds.js';
+import { propBox } from './data/props.js';
 import { STATES } from './core/GameStateMachine.js';
 import { WeaponAudio } from './platform/WeaponAudio.js';
 import { installBrowserHygiene } from './platform/BrowserHygiene.js';
@@ -14,6 +14,7 @@ import { Game } from './core/Game.js';
 import { UIManager } from './ui/UIManager.js';
 import { HUD } from './ui/HUD.js';
 import { DialogueView } from './ui/DialogueView.js';
+import { LoadingView } from './ui/LoadingView.js';
 import { TouchControls } from './ui/TouchControls.js';
 import { preloadIcons } from './data/icons.js';
 import { initDebugOverlay } from './ui/DebugOverlay.js';
@@ -57,37 +58,43 @@ function wireCombatSounds(events, game) {
   events.on('playerHit', () => {
     Sfx.play(PLAYER_HURT_SFX[Math.floor(Math.random() * PLAYER_HURT_SFX.length)], 0.96 + Math.random() * 0.08, { voices: 1 });
   });
-  // footsteps: the recorded loop while the hero walks, at his speed; off when he stops, rolls, dies or the game is not running
-  // D89: the level picks its recording (data/sounds.js footstepsOf)
-  const steps = { h: null, level: null, fs: FOOTSTEPS };
+  // D93 (user: every sound in exact step): one step per foot the animation puts down (render3d/humans.js footfalls) —
+  // a slice of the recording of the floor under him (data/sounds.js STEP_SETS: hard / carpet / outdoor), as loud as
+  // his stance allows (FOOTSTEP_GAIN). Nothing while he stops, rolls, dies or the game is not running.
+  const steps = { level: null, rugs: [], feet: undefined, last: {} };
   game.onFrame(() => {
     const run = game.run, p = run && run.player;
-    if (run && run.level !== steps.level) { steps.level = run.level; steps.fs = footstepsOf(run.level); if (steps.h) { steps.h.stop(); steps.h = null; } }
-    const FS = steps.fs;
-    const speed = p ? Math.hypot(p.vx, p.vy) : 0;
-    const walking = !!p && game.sm.is(STATES.RUNNING) && p.alive && !p.dodging && speed > FS.minSpeed;
-    const hero = game.renderer3d && game.renderer3d.hero;
-    // D90: one step per foot put down (the recording's uneven steps cut into slices — data/sounds.js LEVEL_FOOTSTEPS)
-    if (FS.slices) {
-      const n = hero ? hero.footfalls : 0;
-      if (walking && n !== steps.feet && steps.feet !== undefined) {
-        let i = Math.floor(Math.random() * FS.slices.length);
-        if (i === steps.slice) i = (i + 1) % FS.slices.length;
-        steps.slice = i;
-        const [at, len] = FS.slices[i];
-        const loud = p.cover || p.stance === 'crouch' || speed < 70 ? FS.quiet : 1;
-        Sfx.play(FS.sfx, 0.96 + Math.random() * 0.08, { offset: at, dur: len, gain: FS.gain * loud, voices: 2 });
-      }
-      steps.feet = n;
-      return;
+    if (!run) return;
+    if (run.level !== steps.level) {
+      steps.level = run.level; steps.feet = undefined;
+      steps.rugs = run.level.props.filter((q) => CARPET_PROPS.has(q.type)).map(propBox);
     }
-    if (!walking) { if (steps.h) { steps.h.stop(); steps.h = null; } return; }
-    // D87: the pace of the legs animation (2 steps per gait cycle) against the recording's own pace
-    const pace = hero && hero.gaitHz > 0 ? (2 * hero.gaitHz) / FS.stepsPerSec : speed / (FS.refSpeed || PLAYER.moveSpeed);
-    const rate = Math.min(FS.maxRate, Math.max(FS.minRate, pace));
-    if (!steps.h || steps.h.done) steps.h = Sfx.loop(FS.sfx, rate);
-    else steps.h.rate(rate);
+    const hero = game.renderer3d && game.renderer3d.hero;
+    const n = hero ? hero.footfalls : 0;
+    const speed = Math.hypot(p.vx, p.vy);
+    const walking = game.sm.is(STATES.RUNNING) && p.alive && !p.dodging && !p.takedown && speed > FOOTSTEPS.minSpeed;
+    if (walking && steps.feet !== undefined && n !== steps.feet) {
+      const set = STEP_SETS[stepSetAt(run, p, steps.rugs)];
+      const last = steps.last[set.sfx];
+      let i = Math.floor(Math.random() * set.slices.length);
+      if (i === last) i = (i + 1) % set.slices.length;
+      steps.last[set.sfx] = i;
+      const [at, len] = set.slices[i];
+      const stance = p.cover || p.stance === 'crouch' || p.crouched ? 'crouch' : run.controller.speedProfile && p.moveMode === 'walk' ? 'walk' : 'run';
+      Sfx.play(set.sfx, 0.96 + Math.random() * 0.08, { offset: at, dur: len, gain: set.gain * FOOTSTEP_GAIN[stance], voices: 2 });
+    }
+    steps.feet = n;
   });
+  // D93 (user files): the takedown's two blows on the clip's contact frames
+  events.on('takedownBlow', (kind) => Sfx.play(kind === 'kick' ? 'legPunch' : 'handPunch', 0.97 + Math.random() * 0.06, { voices: 1 }));
+}
+
+/** D93: which step recording the floor under him asks for (the level's own set, else carpet / hard). */
+function stepSetAt(run, p, rugs) {
+  if (run.level.footsteps && STEP_SETS[run.level.footsteps]) return run.level.footsteps;
+  for (const r of rugs) if (p.x >= r[0] && p.x <= r[2] && p.y >= r[1] && p.y <= r[3]) return 'carpet';
+  const zid = run.levelWorld.zoneAt(p.x, p.y), z = zid && run.level.zones.find((q) => q.id === zid);
+  return z && CARPET_FLOORS.has(z.floor) ? 'carpet' : 'hard';
 }
 
 /** Light camera shake for heavy impacts (presentation only, on the game clock). */
@@ -108,6 +115,7 @@ export function startGame(boot) {
   const ui = new UIManager(game);
   new HUD(game);
   new DialogueView(game); // D88 (before game.start: its keys come before the game's input)
+  new LoadingView(game); // D93: the level's loading screen
   new TouchControls(game);
   preloadIcons();
   wireCombatSounds(game.events, game);
@@ -120,10 +128,8 @@ export function startGame(boot) {
   initOrientationGuard({ onBlock: () => ui.autoPause() });
 
   if (DEBUG_ENABLED) initDebugOverlay(game); // H5: off in the project (constant false)
-  if (DEBUG_MODELS) {
-    window.__game = game; // dev asset viewer reads the live renderer through it
-    import('./dev/debug-models.js').then((m) => m.initModelViewer()).catch((e) => console.error(e));
-  }
+  if (DEBUG_MODELS || CHEATS) window.__game = game; // the dev viewer / the test builds read the live game (never in a release)
+  if (DEBUG_MODELS) import('./dev/debug-models.js').then((m) => m.initModelViewer()).catch((e) => console.error(e));
 
   game.start();
   ui.runSplash(boot);

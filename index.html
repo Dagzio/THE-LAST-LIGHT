@@ -141,6 +141,16 @@
 
     <!-- D88: dialogue (the handler / the hero): portrait + the user's frame, the text typed letter by letter; the game
          waits meanwhile. NEXT finishes the line / goes on, SKIP closes the whole dialogue. -->
+    <!-- D93: the level's loading screen (the level's art, name, mode, a progress bar) until the run starts -->
+    <div class="level-loading" id="levelLoading" hidden>
+      <img class="ll-bg" id="llBg" alt="" draggable="false">
+      <div class="ll-panel">
+        <b class="ll-name" id="llName"></b>
+        <span class="ll-mode" id="llMode"></span>
+        <div class="load-bar ll-bar"><span class="load-track"><i id="llFill"></i></span></div>
+        <span class="ll-text" id="llText"></span>
+      </div>
+    </div>
     <div class="dlg" id="dialogue" hidden>
       <img class="dlg-portrait" id="dlgPortrait" alt="" draggable="false">
       <div class="dlg-box">
@@ -214,6 +224,8 @@
     <!-- Touch controls (touch devices only, decision D12) -->
     <div class="touch-controls" id="touchControls">
       <div class="touch-stick" id="touchStick"><div class="touch-knob" id="touchKnob"></div></div>
+      <!-- D93: the trigger zone (the right part of the screen) — shown only when a lesson lights it up -->
+      <div class="touch-fire-zone" id="touchFireZone"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.4"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5"/></svg></div>
       <div class="touch-actions">
         <div class="touch-col touch-col-left">
           <button class="neon-btn neon-small grenade-neon" id="grenadeBtn" data-action="armGrenade" data-nosfx data-i18n-aria="aria.grenade">

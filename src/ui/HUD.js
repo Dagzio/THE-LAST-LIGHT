@@ -22,6 +22,7 @@ const TAG_OBSTACLES = '.ring-btn, .hud-objective, .stealth-hud, .hud-plate, .hud
 /** D90: the HUD element of each control lit up by the training ground: [keyboard, touch] selectors. */
 const TUT_UI = {
   interact: ['#cratePrompt', '#interactBtn'],
+  fire: [null, '#touchFireZone'], // D93: touch — the right half of the screen is the trigger
   weapon: ['#hudWeapon', '#hudWeapon'],
   reload: ['#hudWeapon', '[data-touch-action="reload"]'],
   cover: ['#coverPrompt', '#coverBtn'],
@@ -244,6 +245,9 @@ export class HUD {
     const c = this.cache, touch = !!this.game.touchMode, key = ui ? `${touch}|${Object.entries(ui).join(';')}` : '';
     if (key === c.tutFocusKey) return;
     c.tutFocusKey = key;
+    // D93: the slot of the gun the lesson wants pulses too (touch: tap that very button)
+    this._tutSlot = ui && ui.weapon && touch ? +ui.weapon : 0;
+    c.slots = '';
     for (const el of this._tutEls || []) { el.classList.remove('tut-focus'); const tag = el.querySelector(':scope > .tut-tag'); if (tag) tag.remove(); if (el.dataset.tutPos) { el.style.position = ''; delete el.dataset.tutPos; } }
     this._tutEls = [];
     if (!ui) return;
@@ -382,14 +386,14 @@ export class HUD {
     if (mag !== c.mag) { c.mag = mag; el.mag.textContent = String(mag); }
     // D85: the first slot is the mode's pistol; D88: three slots (pistol, SMG, M4A1) — the M4A1 slot only once seen
     const slotIds = [run.slotWeapon(0) || HERO_WEAPONS[0], HERO_WEAPONS[1], HERO_WEAPONS[2]].filter((id, i) => i < 2 || run.inventory.includes(id));
-    const slots = slotIds.map((id, i) => (run.inventory.includes(id) ? (id === w.weaponId ? `[${i + 1}]` : String(i + 1)) : '')).join(' ');
+    const slots = slotIds.map((id, i) => (run.inventory.includes(id) ? (id === w.weaponId ? `[${i + 1}]` : String(i + 1)) : '')).join(' ') + `|${this._tutSlot || 0}`;
     if (slots !== c.slots) {
       c.slots = slots;
       el.slots.replaceChildren(...slotIds.map((id, i) => {
         const s = document.createElement('i');
         s.textContent = String(i + 1);
         s.dataset.weapon = id; // D91: a tap on a slot takes that weapon (UIManager)
-        s.className = `slot${run.inventory.includes(id) ? '' : ' none'}${id === w.weaponId ? ' on' : ''}`;
+        s.className = `slot${run.inventory.includes(id) ? '' : ' none'}${id === w.weaponId ? ' on' : ''}${this._tutSlot === i + 1 && id !== w.weaponId ? ' tut-slot' : ''}`; // D93
         return s;
       }));
       el.weapon.classList.toggle('multi', run.inventory.length > 1);
@@ -425,12 +429,13 @@ export class HUD {
     const objKey = o ? o.textKey : '';
     if (run.modeId === 'tutorial') {
       // D88: the lesson — "TRAINING 3/17", its text with the progress, the PC keys as chips
-      const m = run.mode, key = `${m.index}|${o ? o.n : ''}`;
+      const m = run.mode, key = `${m.index}|${o ? o.n : ''}|${!!this.game.touchMode}`;
       if (key !== c.tutKey) {
         const fresh = !c.tutKey.startsWith(`${m.index}|`);
         c.tutKey = key;
         el.objKicker.textContent = T('hud.tutorial', { n: Math.min(m.index + 1, m.steps.length), total: m.steps.length });
-        el.objText.replaceChildren(document.createTextNode(o ? T(o.textKey, { n: o.n, of: o.of }) : ''));
+        const tk = o && this.game.touchMode && o.touchKey ? o.touchKey : o && o.textKey; // D93: the phone's own text
+        el.objText.replaceChildren(document.createTextNode(o ? T(tk, { n: o.n, of: o.of }) : ''));
         if (o && !this.game.touchMode) for (const k of o.keys) { const b = document.createElement('kbd'); b.className = 'obj-key'; b.textContent = k.startsWith('key.') ? T(k) : k; el.objText.append(' ', b); }
         this._fitObjective();
         if (fresh) { el.objective.classList.remove('pop'); void el.objective.offsetWidth; el.objective.classList.add('pop'); invalidateHudBlockers(); }

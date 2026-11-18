@@ -525,3 +525,5 @@
   .map-card:hover { border-color: rgba(170, 178, 255, 0.6); }
   .check-row:hover { color: #fff; }
 }
+/* D93 (user): TAP TO PLAY is never two lines on a phone — one line, its font shrunk to the screen when needed */
+.tap-prompt { white-space: nowrap; max-width: calc(100vw - 2 * (var(--safe-l, 0px) + 16px)); font-size: min(calc(30px * var(--fs)), 5.2vw); letter-spacing: min(0.18em, 0.9vw); }

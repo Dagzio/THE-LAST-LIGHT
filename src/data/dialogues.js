@@ -38,6 +38,15 @@ export const DIALOGUES = {
   'tut.ambush': [H('dlg.t.ambush.1'), K('dlg.t.ambush.2'), H('dlg.t.ambush.3')],
   'tut.medkit': [H('dlg.t.medkit.1')],
   'tut.end': [H('dlg.t.end.1'), K('dlg.t.end.2')],
+  // D93: the phone's variants ('<id>.touch', DialogueView picks it on touch): the controls explained in Lira's words
+  'tut.start.touch': [H('dlg.t.start.1'), K('dlg.t.start.2'), H('dlg.t.start.3'), H('dlg.tt.move')],
+  'tut.range.touch': [H('dlg.t.range.1'), K('dlg.t.range.2'), H('dlg.t.range.3'), H('dlg.tt.aim')],
+  'tut.switch.touch': [H('dlg.tt.switch')],
+  'tut.cover.touch': [H('dlg.t.cover.1'), K('dlg.t.cover.2'), H('dlg.t.cover.3'), H('dlg.tt.cover')],
+  'tut.peek.touch': [H('dlg.tt.peek')],
+  'tut.stealth.touch': [H('dlg.t.stealth.1'), K('dlg.t.stealth.2'), H('dlg.t.stealth.3'), H('dlg.tt.stealth')],
+  'tut.grenade.touch': [H('dlg.t.grenade.1'), H('dlg.tt.grenade')],
+  'tut.roll.touch': [H('dlg.t.roll.1'), K('dlg.t.roll.2'), H('dlg.t.roll.3'), H('dlg.tt.roll')],
 };
 
 /**

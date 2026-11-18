@@ -100,6 +100,7 @@ export class Game {
 
   // ---------------- simulation ----------------
   update(dt) {
+    if (this.loading) return; // D93: the level is still loading (its loading screen is up) — nothing moves yet
     if (!this.sm.simulating || this.dialogueOpen) return; // D88: a dialogue on screen — the game waits
     if (this.renderer3d && this.renderer3d.busy()) return; // shaders compiling / context lost: the game waits
     this.clock.advance(dt);
@@ -117,7 +118,8 @@ export class Game {
   render(alpha, frameDt) {
     this.presentationTime += frameDt;
     if (this.sm.inMap && this.run && this.renderer3d) {
-      this.renderer3d.render(this.run, frameDt, this.clock.time, !this.sm.is(STATES.RUNNING) || !!this.dialogueOpen, alpha);
+      this.renderer3d.render(this.run, frameDt, this.clock.time, !this.loading && (!this.sm.is(STATES.RUNNING) || !!this.dialogueOpen), alpha);
+      if (this.loading) this._pollLoading();
     } else {
       this.viewport.ensure(); // menus: the still picture is CSS (#menuBg); only the input surface follows the size
     }
@@ -249,9 +251,27 @@ export class Game {
     this.input.releaseAll();
     this.loop.resetTiming();
     document.body.dataset.mode = resolved.modeId; // D88: the training ground → 'tutorial'
+    // D93 (user: black screen + the dialogue first): the level loads behind its loading screen; the run (and its first
+    // dialogue) starts once everything is on screen (_pollLoading)
+    this.loading = true;
+    this.loadP = 0;
     const ok = this.sm.set(STATES.RUNNING);
-    if (ok) this.events.emit('mapStarted', level.id, modeId);
+    if (ok) this.events.emit('mapLoading', level.id, resolved.modeId);
+    else this.loading = false;
     return ok;
+  }
+
+  /** D93: the level's load, each frame while it runs: progress for the loading screen; once ready — the run starts. */
+  _pollLoading() {
+    const r3 = this.renderer3d, st = r3 ? r3.loadProgress() : { p: 1, ready: true };
+    this.loadP = Math.max(this.loadP, st.p);
+    this.events.emit('mapLoadProgress', this.loadP);
+    if (!st.ready || !this.run) return;
+    this.loading = false;
+    this.input.releaseAll();
+    this.loop.resetTiming();
+    this.events.emit('mapLoadProgress', 1);
+    this.events.emit('mapStarted', this.mapId, this.modeId);
   }
 
   /** Pause from the level; resume returns there (02_SPEC §2, C3). */
@@ -280,6 +300,7 @@ export class Game {
   }
 
   _disposeRun() {
+    this.loading = false; // D93
     if (this.run) this.run.dispose();
     this.run = null;
   }

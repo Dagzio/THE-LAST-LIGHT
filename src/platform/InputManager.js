@@ -124,6 +124,9 @@ export class InputManager {
     return false;
   }
 
+  /** D93: was it pressed since the last step (without taking the press) — a quick tap still fires one shot. */
+  peekPressed(action) { return this.pressedQueue.has(action); }
+
   /** True once per press; call from fixed update. */
   consumePressed(action) {
     if (!this.pressedQueue.has(action)) return false;

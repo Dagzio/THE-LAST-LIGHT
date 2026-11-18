@@ -43,6 +43,11 @@ export const SFX_FILES = {
   // keeper (user files, player/): D56 footsteps — one whole walking loop (FOOTSTEPS below); hurt — 2 takes (D53)
   steps: { file: 'player/steps.mp3', gain: 1 },
   steps1: { file: 'player/steps1.mp3', gain: 1 },                     // D89 (user file): the training ground's steps
+  steps3: { file: 'player/steps3.mp3', gain: 1 },                     // D93 (user file): steps on the office carpet
+  // D93 (user files): the takedown's blows — the kick, then the hand (StealthDirector `takedownBlow`); the leading
+  // silence trimmed so the hit sounds on the clip's contact frame
+  legPunch: { file: 'player/leg-punch.mp3', trim: 0.12, gain: 1 },
+  handPunch: { file: 'player/hand-punch.mp3', trim: 0.11, gain: 1 },
   playerHurt1: { file: 'player/player-hitted1.mp3', gain: 1 },
   playerHurt2: { file: 'player/player-hitted2.mp3', trim: 0.025, gain: 1 },
   // D53 replacements of synthesized sounds: CC0 packs (sfx/CREDITS.txt), mixed / levelled into the file (gain 1)
@@ -78,11 +83,20 @@ export const FOOTSTEPS = { sfx: 'steps', minSpeed: 8, minRate: 0.5, maxRate: 2.0
 // D90 (user: the steps follow his speed): its steps are uneven (0.3–0.8 s apart) — looped, they never matched the
 // legs. So each foot put down by the animation (render3d/humans.js footfalls) plays ONE step cut from the recording:
 // slices [start, length] (s) measured on its loudness (browser decode), one at random, never the same twice.
-export const LEVEL_FOOTSTEPS = {
-  steps1: { sfx: 'steps1', stepsPerSec: 1.93, slices: [[0.09, 0.4], [0.58, 0.4], [1.38, 0.32], [2.02, 0.4], [2.6, 0.42], [3.26, 0.42], [3.78, 0.36]],
-    gain: 0.9, quiet: 0.55 /* × while sneaking / slow */ },
+// D93 (user: every sound in exact step): every recording is cut into steps — each foot put down by the animation plays
+// one slice [start, length] (s, measured on the loudness in the browser), at random, never the same twice in a row.
+// The recording follows the floor under him: the office's hard floors `steps`, its carpets (the open-plan carpet, the
+// rugs) `steps3`, the training ground `steps1`. The volume follows his stance (FOOTSTEP_GAIN).
+export const STEP_SETS = {
+  hard: { sfx: 'steps', gain: 1, slices: [[0.05, 0.42], [0.57, 0.42], [1.08, 0.42], [1.58, 0.42], [2.11, 0.42], [2.58, 0.42], [3.09, 0.3]] },
+  carpet: { sfx: 'steps3', gain: 1, slices: [[0.06, 0.32], [0.55, 0.3], [0.86, 0.3], [1.17, 0.32], [1.58, 0.34]] },
+  outdoor: { sfx: 'steps1', gain: 0.9, slices: [[0.09, 0.4], [0.58, 0.4], [1.38, 0.32], [2.02, 0.4], [2.6, 0.42], [3.26, 0.42], [3.78, 0.36]] },
 };
-export const footstepsOf = (level) => ({ ...FOOTSTEPS, ...((level && LEVEL_FOOTSTEPS[level.footsteps]) || {}) });
+/** The floors (data/levels zones `floor`) that sound like carpet; rugs (props) too. */
+export const CARPET_FLOORS = new Set(['carpet']);
+export const CARPET_PROPS = new Set(['rug_large', 'rug_small']);
+/** D93 (user): crouched (or in cover) — quiet; walking upright in stealth — softer; running / the normal pace — full. */
+export const FOOTSTEP_GAIN = { crouch: 0.42, walk: 0.72, run: 1 };
 /** The keeper is hurt (D53): one of the user's two takes at random (synth 'playerHurt' while they load). */
 export const PLAYER_HURT_SFX = ['playerHurt1', 'playerHurt2'];
 

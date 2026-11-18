@@ -1,6 +1,6 @@
-// Touch adapter (decision D12, 04_ARCH §15): a floating virtual stick in the left part of the screen, manual aim
-// in the right part (user decision 2026-11-06: the keeper turns to the point under the finger and fires while the
-// finger is down; dragging moves the aim point) and neon action buttons (DASH, RELOAD) bottom-right. It only feeds InputManager sources — gameplay code is the
+// Touch adapter (decision D12, 04_ARCH §15): a floating virtual stick in the left part of the screen; D93 (user): the
+// right part is the trigger (a tap fires once, a hold keeps firing) while the aim locks onto the nearest target by
+// itself (MissionRun aim assist); neon action buttons (DASH, RELOAD…) bottom-right. It only feeds InputManager sources — gameplay code is the
 // same for keyboard and touch. Shown only on touch devices. Multi-touch: each pointer is tracked by id.
 import { STATES } from '../core/GameStateMachine.js';
 
@@ -72,16 +72,19 @@ export class TouchControls {
 
   _aimDown(e) {
     if (this.aimPointer !== null) return;
-    // D75 (user decision): no manual fire on mobile — the gun shoots by itself; a tap here only throws an armed grenade
+    // D93 (user): the right part of the screen is the trigger — a tap fires, a hold keeps firing; the aim is the aim
+    // assist's (the nearest target locked). With a grenade armed the finger also picks where it lands.
     const run = this.game.run;
-    if (!run || !run.grenadeArmed) return;
+    if (!run) return;
     this.aimPointer = e.pointerId;
-    this.input.setAimClient(e.clientX, e.clientY);
+    this.aimGrenade = !!run.grenadeArmed;
+    if (this.aimGrenade) this.input.setAimClient(e.clientX, e.clientY);
     this.input.setSourceAction(SOURCE, 'fire', true);
+    document.body.classList.add('touch-firing');
   }
 
   _stickMove(e) {
-    if (e.pointerId === this.aimPointer) { this.input.setAimClient(e.clientX, e.clientY); return; }
+    if (e.pointerId === this.aimPointer) { if (this.aimGrenade) this.input.setAimClient(e.clientX, e.clientY); return; }
     if (e.pointerId !== this.stickPointer) return;
     let dx = e.clientX - this.baseX;
     let dy = e.clientY - this.baseY;
@@ -97,7 +100,9 @@ export class TouchControls {
     if (e.pointerId === this.aimPointer) {
       this.aimPointer = null;
       this.input.setSourceAction(SOURCE, 'fire', false);
-      this.input.clearAim(); // the keeper keeps facing the last direction
+      if (this.aimGrenade) this.input.clearAim(); // the keeper keeps facing the last direction
+      this.aimGrenade = false;
+      document.body.classList.remove('touch-firing');
       return;
     }
     if (e.pointerId !== this.stickPointer) return;
@@ -111,6 +116,8 @@ export class TouchControls {
   reset() {
     this.stickPointer = null;
     if (this.aimPointer !== null) { this.aimPointer = null; this.input.clearAim(); }
+    this.aimGrenade = false;
+    document.body.classList.remove('touch-firing');
     this.input.setSourceAction(SOURCE, 'fire', false);
     this.input.setSourceAxis(SOURCE, 0, 0);
     this.root.classList.remove('stick-active');

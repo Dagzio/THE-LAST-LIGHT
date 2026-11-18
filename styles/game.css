@@ -1495,3 +1495,29 @@ body.dlg-open .obj-arrow { display: none; }
 .obj-arrow.alt { width: 34px; height: 34px; box-shadow: 0 0 0 2px #7fd6ff, 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 12px rgba(127, 214, 255, 0.5); }
 .obj-arrow.alt svg { stroke: #9fe2ff; }
 body.dlg-open .obj-arrow.alt { display: none; }
+
+/* ===== D93: the level's loading screen — the level's art (cover), a dark veil, the name / mode and the bar low down ===== */
+.level-loading { position: absolute; inset: 0; z-index: 40; background: #05070b; overflow: hidden; pointer-events: auto; transition: opacity 0.35s ease; }
+.level-loading[hidden] { display: none; }
+.level-loading.out { opacity: 0; pointer-events: none; }
+.ll-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(0.62) saturate(0.95); transform: scale(1.04); animation: llZoom 14s ease-out forwards; }
+@keyframes llZoom { to { transform: scale(1.12); } }
+.level-loading::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(3, 5, 9, 0.92) 0%, rgba(3, 5, 9, 0.45) 38%, rgba(3, 5, 9, 0) 70%); pointer-events: none; }
+.ll-panel {
+  --bw: min(56vw, 640px); --bh: calc(var(--bw) * 0.045);
+  position: absolute; z-index: 1; left: 50%; bottom: calc(var(--safe-b, 0px) + max(28px, 9vh)); translate: -50% 0; width: var(--bw);
+  display: flex; flex-direction: column; align-items: center; gap: max(6px, 1.2vh); text-align: center;
+}
+.ll-name { font: 800 max(26px, calc(46px * var(--fs))) / 1 var(--font-display); font-stretch: condensed; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; text-shadow: 0 3px 10px rgba(0, 0, 0, 0.8); white-space: nowrap; }
+.ll-mode { font: 800 max(13px, calc(17px * var(--fs))) / 1 var(--font-display); letter-spacing: 0.22em; text-transform: uppercase; color: #ffcf3a; }
+.ll-mode:empty { display: none; }
+.ll-bar { width: 100%; margin-top: max(6px, 1vh); }
+.ll-text { font: 800 max(12px, calc(14px * var(--fs))) / 1 var(--font-display); letter-spacing: 0.2em; color: #b8c0ca; white-space: nowrap; }
+body.level-loading #screen-game .hud-top, body.level-loading #screen-game .hud-player, body.level-loading #screen-game .touch-controls,
+body.level-loading #screen-game .corner, body.level-loading #screen-game .kiosk-prompt, body.level-loading #screen-game .offscreen { visibility: hidden; }
+/* D93: the touch trigger zone (the right part of the screen) — invisible, except when a lesson lights it up */
+.touch-fire-zone { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: 96px; height: 96px; display: none; place-items: center; border-radius: 50%; pointer-events: none; }
+.touch-fire-zone svg { width: 62%; height: 62%; fill: none; stroke: #ffcf3a; stroke-width: 1.6; }
+.touch-fire-zone.tut-focus { display: grid; left: auto; right: calc(var(--safe-r, 0px) + 33%); top: 46%; translate: 50% -50%; background: rgba(10, 12, 16, 0.35); outline-offset: 6px; border-radius: 50%; }
+body.touch-firing .touch-fire-zone.tut-focus { background: rgba(255, 90, 60, 0.35); }
+.hud-slots .slot.tut-slot { border-color: #ffcf3a; color: #ffcf3a; animation: tutFocus 1s ease-in-out infinite; outline: 2px solid #ffcf3a; outline-offset: 2px; } /* D93 */

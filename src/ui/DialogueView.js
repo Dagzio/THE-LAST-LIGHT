@@ -59,6 +59,8 @@ export class DialogueView {
   open(id) {
     if (!DIALOGUES[id] || this.played.has(id)) return false;
     this.played.add(id);
+    if (this.game.touchMode && DIALOGUES[`${id}.touch`]) id = `${id}.touch`; // D93: the phone's own variant
+    this.played.add(id);
     if (this.lines) { this.queue.push(id); return true; }
     this._start(id);
     return true;

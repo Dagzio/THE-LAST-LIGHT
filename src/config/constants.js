@@ -4,7 +4,7 @@
 export const DEBUG_ENABLED = false;
 
 /** Dev 3D asset viewer (H5 3D guide: asset-viewer-3d.md). TRUE while the user works with models — MUST be false in a release. */
-export const DEBUG_MODELS = true;
+export const DEBUG_MODELS = false; // D93 (user): the viewer is out of the main menu
 
 /**
  * Test cheats (user request 2026-11-09): tap the menu logo → every level unlocked. TRUE while the game is being
@@ -12,7 +12,7 @@ export const DEBUG_MODELS = true;
  */
 export const CHEATS = true;
 
-export const BUILD_VERSION = '0.19.2-killlist-training';
+export const BUILD_VERSION = '0.20.0-killlist-training';
 
 /** Prefix for every localStorage key of the game (H5 §9). KILL LIST (D78): its own prefix, a new profile schema. */
 export const STORAGE_PREFIX = 'kl.';

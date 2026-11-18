@@ -17,6 +17,15 @@ import { STEALTH } from '../data/stealth.js';
 import { StealthOverlay } from './StealthOverlay.js';
 import { BLOCK } from '../systems/Collision.js';
 
+// D93 (user: the level showed black with the dialogue on top): the textures still downloading (every TextureLoader goes
+// through the default manager) — the level counts as loaded only once none is pending
+const TEX = { started: 0, done: 0 };
+{
+  const LM = THREE.DefaultLoadingManager, start = LM.itemStart, end = LM.itemEnd;
+  LM.itemStart = (url) => { TEX.started++; start(url); };
+  LM.itemEnd = (url) => { TEX.done++; end(url); };
+}
+
 const BLOCK_MOVE = BLOCK.MOVE;
 import { CAMERA, CAMERA_TOUCH } from '../config/camera.js';
 import { QUALITY_PRESETS, antialiasFor, TOUCH } from '../config/settings.js';
@@ -560,6 +569,8 @@ export class Renderer3D {
   loadMap(level, spawnX, spawnY) {
     this.unloadMap();
     this.map = level;
+    // D93: the load's progress — the scene built (now), the shaders warmed, the textures arrived, the first frames drawn
+    const ls = this.loadState = { t0: performance.now(), warmed: false, tex0: TEX.done, texWant: 0, frames: 0 };
     this.bodyYaw = undefined;
     this.gAimAt = undefined;
     this.shakeUntil = 0;
@@ -580,11 +591,12 @@ export class Renderer3D {
     this.rig.snap(spawnX, spawnY, level.width, level.height);
     this._placeCamera();
     this.pausedDrawn = false;
+    ls.texWant = TEX.started - ls.tex0; // (the scene's textures were asked for while it was built)
     return this.assetsReady.then(() => {
       if (this.map !== level) return null;
       this.hero = this._newView('hero', 0xffffff, 'pistol');
       return this._warmAll();
-    });
+    }).then(() => { ls.warmed = true; });
   }
 
   /** Every material the level may show is compiled now (an enemy view per type, the guns), not on first sight. */
@@ -596,6 +608,7 @@ export class Renderer3D {
   }
 
   unloadMap() {
+    this.loadState = null; // D93
     if (this.stealthOverlay) { this.stealthOverlay.dispose(); this.stealthOverlay = null; }
     if (this.office) { this.scene.remove(this.office.group); this.office.dispose(); this.office = null; }
     if (this.pickupGroup) {
@@ -613,6 +626,20 @@ export class Renderer3D {
   noise(x, y, r) { if (this.stealthOverlay && this.map && this.map.modeId === 'stealth') this.stealthOverlay.addNoise(x, y, r, this.lastSyncTime); } // D90: not on the training ground
 
   busy() { return this.guard.busy(); }
+
+  /**
+   * D93: the level's load — progress 0…1 and whether it is ready to play (shaders warmed, no texture downloading,
+   * two frames already on screen: the first frame uploads the textures and compiles what the warm-up missed).
+   */
+  loadProgress() {
+    const ls = this.loadState;
+    if (!ls) return { p: 1, ready: true };
+    const pending = TEX.started - TEX.done, want = Math.max(1, ls.texWant), got = Math.max(0, want - pending);
+    const t = (performance.now() - ls.t0) / 1000;
+    const warm = ls.warmed ? 1 : Math.min(0.9, t / 2.5);            // (no real progress inside the warm-up: eased on time)
+    const p = 0.1 + 0.45 * warm + 0.3 * Math.min(1, got / want) + 0.15 * Math.min(1, ls.frames / 2);
+    return { p: Math.min(1, p), ready: ls.warmed && pending === 0 && ls.frames >= 2 };
+  }
 
   // ---------------- quality (applied live, H5 3D guide §3) ----------------
   applyQuality(quality) {
@@ -721,6 +748,7 @@ export class Renderer3D {
     this._placeCamera(time);
     this._sync(run, time);
     this.renderer.render(this.scene, this.camera);
+    if (this.loadState && this.loadState.warmed && TEX.started === TEX.done) this.loadState.frames++; // D93
     this.pausedDrawn = paused && !falling;
     if (!paused) this._adapt(frameDt);
     return true;
@@ -903,8 +931,16 @@ export class Renderer3D {
     }
 
     // ---- reticle (live cursor with this frame's camera)
-    this.reticle.visible = p.alive && p.hasAim && !run.autoFire;
-    if (this.reticle.visible) {
+    // D93 (mobile aim assist): the crosshair sits on the locked target (red while the trigger is held)
+    const lock = run.autoFire && p.alive && run.autoAim.target;
+    if (lock) {
+      const L = lock, lx = L.prevX !== undefined ? this._lx(L) : L.x, ly = L.prevY !== undefined ? this._ly(L) : L.y;
+      this.reticle.visible = true;
+      this.reticle.position.set(lx, 1.4, ly);
+      this.reticle.material.color.setHex(time - run.weapon.lastShotAt < 0.25 ? 0xff5a3c : 0xffe9c2);
+      const s = 1.15 + 0.08 * Math.sin(time * 6); this.reticle.scale.set(s, 1, s);
+    } else { this.reticle.visible = p.alive && p.hasAim && !run.autoFire; this.reticle.scale.set(1, 1, 1); this.reticle.material.color.setHex(0xffe9c2); }
+    if (this.reticle.visible && !lock) {
       const a = this.aimClient && this.aimClient();
       if (a && a.active) { this.screenToGround(a.clientX, a.clientY, AIM_PT); this.reticle.position.set(AIM_PT.x, 1.4, AIM_PT.y); }
       else this.reticle.position.set(p.aimX, 1.4, p.aimY);

@@ -280,6 +280,7 @@ export class MissionRun {
       p.bodyAngle = p.aimAngle - (p.hasAim ? barrelOffsetAngle(muzzleOf(this.weapon.stats.gun), d) : 0);
       p.aimPose = true;
     } else if (moving) p.bodyAngle = Math.atan2(p.facingY, p.facingX);
+    // D93 (mobile aim assist): no target locked — the gun points where he faces; a target locked — he keeps it aimed
     if (this.autoFire && !this.autoAim.target && !this.grenadeArmed && time >= p.faceAimUntil) p.aimAngle = p.bodyAngle;
   }
 
@@ -498,15 +499,16 @@ export class MissionRun {
     for (let n = 0; n < 3; n++) if (input.consumePressed(`weapon${n + 1}`)) { const id = this.slotWeapon(n); if (id) this.switchWeapon(id); }
     if (input.consumePressed('interact')) this.interact(time);
 
-    const autoFire = this.autoFire && (!this.mode || this.mode.autoFireAllowed !== false); // D85: never breaks stealth
-    let fire = autoFire ? false : (this.autoFire ? false : input.isDown('fire'));
+    // D93 (user): the mobile version no longer fires by itself — the aim locks onto the nearest target in reach (aim
+    // assist, `autoFire` = the touch flag), the trigger is the player's (a tap / hold on the screen, TouchControls)
+    const fire = input.isDown('fire') || (this.autoFire && !!input.peekPressed && input.peekPressed('fire')); // (a quick tap: one shot)
     // D89: a mode may give other things to aim at (the training ground's range: the targets)
     const aimAt = (this.mode && this.mode.aimTargets) || this.enemies;
-    if (autoFire && !this.holdFire && !this.grenadeArmed) fire = !!this.autoAim.update(p, aimAt, this.weapon.stats.range, this._peekFrom(p));
+    if (this.autoFire && !this.grenadeArmed && p.alive) this.autoAim.update(p, aimAt, this.weapon.stats.range, this._peekFrom(p));
     else this.autoAim.reset();
     const trigger = fire && !this.holdFire && !this.grenadeArmed && !p.dodging && !p.takedown; // D82: no shots mid-roll
-    // D87: behind high cover — only leaning out of its corner (else the trigger does nothing; a hint for manual fire)
-    const shooting = this.controller.peekGate(p, trigger, !autoFire, dt, time);
+    // D87: behind high cover — only leaning out of its corner (else the trigger does nothing; a hint says so)
+    const shooting = this.controller.peekGate(p, trigger, true, dt, time);
     this._outOfAmmo(trigger, time);
     this.weapons.update(this.weapon, p, shooting, input.consumePressed('reload'), time);
     this._grenadeInput(input, time);

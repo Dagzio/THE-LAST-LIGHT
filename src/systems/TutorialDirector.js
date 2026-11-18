@@ -46,7 +46,7 @@ export class TutorialDirector {
   /** The HUD objective of the lesson on: { textKey, n, of, keys }. */
   get objective() {
     const s = this.step;
-    return s ? { id: s.id, textKey: s.textKey, n: Math.min(this.count, s.need || 0), of: s.need || 0, keys: s.keys || [] } : null;
+    return s ? { id: s.id, textKey: s.textKey, touchKey: s.touchKey || null, n: Math.min(this.count, s.need || 0), of: s.need || 0, keys: s.keys || [] } : null;
   }
 
   objectiveTarget(out) {
@@ -125,7 +125,6 @@ export class TutorialDirector {
   }
 
   // the stealth director's flags the HUD reads
-  get autoFireAllowed() { return !this.inStealth; }
   get heroVisibility() { return this.stealth.heroVisibility; }
 
   _next(i) {
