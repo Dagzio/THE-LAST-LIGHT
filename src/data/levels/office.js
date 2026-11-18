@@ -100,8 +100,10 @@ export const OFFICE = {
     { type: 'armchair', x: 1475, y: 1458, rot: 3 }, { type: 'armchair', x: 1475, y: 1542, rot: 3 },
     { type: 'plant', x: 782, y: 1162 }, { type: 'plant', x: 1618, y: 1162 }, { type: 'plant', x: 782, y: 1668 },
     { type: 'plant', x: 1618, y: 1668 }, { type: 'plant', x: 1100, y: 1668 }, { type: 'plant', x: 1300, y: 1668 },
-    { type: 'turnstile', x: 1060, y: 1140 }, { type: 'turnstile', x: 1150, y: 1140 },
-    { type: 'turnstile', x: 1250, y: 1140 }, { type: 'turnstile', x: 1340, y: 1140 },
+    // D106 (user): the 4 turnstiles spaced evenly across the 300 gap — the passages by the walls as wide as between them
+    // (5 passages of 52, the turnstile 10 wide)
+    { type: 'turnstile', x: 1107, y: 1140 }, { type: 'turnstile', x: 1169, y: 1140 },
+    { type: 'turnstile', x: 1231, y: 1140 }, { type: 'turnstile', x: 1293, y: 1140 },
     { type: 'plant', x: 1622, y: 1300 },
     { type: 'rug_large', x: 862, y: 1500 }, { type: 'rug_large', x: 1538, y: 1500 },
     { type: 'papers', x: 1150, y: 1450, rot: 1 }, { type: 'overturned_chair', x: 1290, y: 1300, rot: 3 },

@@ -525,7 +525,11 @@ export class MissionRun {
     else this.autoAim.reset();
     const trigger = fire && !this.holdFire && !this.grenadeArmed && !p.dodging && !p.takedown; // D82: no shots mid-roll
     // D87: behind high cover — only leaning out of its corner (else the trigger does nothing; a hint says so)
-    const shooting = this.controller.peekGate(p, trigger, true, dt, time);
+    // D106 (user: holding fire through a reload in cover he walked in place): while the gun reloads (or is empty) in cover
+    // the trigger does not lean him out / turn him to aim — he reloads in the cover pose
+    const canShoot = !this.weapon.reloading && (this.weapon.ammo > 0 || this.weapon.reserve > 0);
+    if (!canShoot && p.peek) p.peek.until = 0; // (a reload: back to the wall at once — the reload plays there)
+    const shooting = this.controller.peekGate(p, trigger && (canShoot || !p.cover), true, dt, time);
     this._outOfAmmo(trigger, time);
     this.weapons.update(this.weapon, p, shooting, input.consumePressed('reload'), time);
     this._grenadeInput(input, time);

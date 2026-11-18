@@ -376,13 +376,21 @@ export class HumanView {
       peekL: held('peekL', 0), peekR: held('peekR', 0), highL: loop('coverL'), highR: loop('coverR'),
       toCrouch: held('toCrouch'), toStand: held('toStand'),
     };
-    this.takedownAct = C.takedown ? held('takedown') : null; // D85 stealth: the takedown from behind
+    // D106: the lower half of each full-body cover clip (the legs kept while the upper body reloads in cover)
+    this.coverLower = new Map();
+    const coverIds = { coverIdle: 'crouchPose', lowIdle: 'crouchIdle2', lowFire: 'crouchFire', pKneel: 'pKneel', coverSL: 'crouchL', coverSR: 'crouchR', peekL: 'peekL', peekR: 'peekR', highL: 'coverL', highR: 'coverR' };
+    for (const [k, id] of Object.entries(coverIds)) {
+      const a = this.cv[k];
+      if (!a || !C[id]) continue;
+      const lo = act(C[id].lower); lo.timeScale = 0;
+      this.coverLower.set(a, lo);
+    } // D85 stealth: the takedown from behind
     this.takedownDur = C.takedown ? C.takedown.duration : 1;
     this.crouchIdle = this.cv.lowIdle; this.crouchWalk = null; // (dev viewer)
     this.trans = null;       // { a: action, from, to (clip s), dur (s), age (s) } — a stand ↔ kneel transition playing
     this.lowWas = false;
     this.busy = loop('files'); // D83: a posted enemy going through the files (until alerted)
-    this.w = { move: 0, run: 0, aim: 0, reload: 0, dead: 0, throw: 0, dodge: 0, low: 0, high: 0, lowAim: 0, busy: 0, f: 1, b: 0, l: 0, r: 0 };
+    this.w = { move: 0, run: 0, aim: 0, reload: 0, dead: 0, throw: 0, dodge: 0, low: 0, high: 0, lowAim: 0, busy: 0, coverReload: 0, f: 1, b: 0, l: 0, r: 0 };
     this.dodgeId = 'dodge';
     // D84: the user's two pistol reloads ("Pistol Reload" with a step, "Pistol Reloading Idle" in place): upper body +
     // its own legs while standing (no twist against Pistol Idle's hips); the time follows the reload's progress
@@ -669,6 +677,7 @@ export class HumanView {
     const cm = Math.min(1, sp / 10), lr = l + r || 1, shL = l / lr, shR = r / lr;
     const fw = (a, v) => { if (a) a.setEffectiveWeight(a.getEffectiveWeight() + v); };
     for (const a of Object.values(cv)) if (a) a.setEffectiveWeight(0);
+    for (const a of this.coverLower.values()) a.setEffectiveWeight(0);
     const lw = lowW * live * (1 - tr), hw = highW * live * (1 - tr);
     const inLow = st.cover === 'low' && !!cv.coverIdle;
     fw(inLow ? cv.coverIdle : cv.lowIdle, lw * (1 - cm) * (1 - lowAim)); // D90: back to low cover — Male Crouch Pose
@@ -697,6 +706,21 @@ export class HumanView {
     fw(cv.highL, hw * cm * shL); fw(cv.highR, hw * cm * shR);
     // the crouch / cover set in step too (its own clips; the stand clips are idle while it plays)
     if (lw + hw > 1e-3) this._gaitStep(dt, sp, [cv.walk, cv.lowL, cv.lowR, cv.coverSL, cv.coverSR, cv.highL, cv.highR], crouchBack);
+    // D106 (user): reloading in cover (not leaning out) — the cover pose keeps its legs (its lower half), the upper body
+    // plays the gun's reload clip (eased in / out)
+    const rc = ease('coverReload', !dead && st.reload >= 0 && (st.cover === 'low' || st.cover === 'high') && !(peekK > 0) ? 1 : 0, 2);
+    if (rc > 0.001 && lw + hw > 1e-3) {
+      for (const [a, lo] of this.coverLower) {
+        const wa = a.getEffectiveWeight();
+        if (wa < 1e-4) continue;
+        a.setEffectiveWeight(wa * (1 - rc)); lo.setEffectiveWeight(wa * rc); lo.time = a.time;
+      }
+      const RU = pistol ? PR && PR.u : U.reload;
+      if (RU) {
+        RU.setEffectiveWeight(RU.getEffectiveWeight() + rc * (lw + hw));
+        if (st.reload >= 0) RU.time = Math.min(0.999, st.reload) * (pistol ? PR.dur : this.reloadDur);
+      }
+    }
     if (this.trans) this.trans.a.setEffectiveWeight(tr);
     if (this.busy) this.busy.setEffectiveWeight(busyW * live);
     // D86: the mixer writes a bone only when its blended value CHANGED since the last frame — a held pose (the rifle aim
