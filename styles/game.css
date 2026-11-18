@@ -509,77 +509,171 @@ body.map-over .intro-card { display: none; }
 .result-btns > button { min-width: calc(220px * var(--fs)); }
 .result-btns [hidden] { display: none; }
 
-/* ===================== Results: the keeper's journal page (D42) ===================== */
+/* ===================== Results: the field tablet (D110, user: "a tablet, glitches, modern fonts") ===================== */
+/* Was the keeper's journal page (D42). Same ids — ResultsView counts the lines up, then the status lands. System fonts only. */
 .result-panel { gap: calc(18px * var(--fs)); }
 .journal {
+  --acc: #ff3b4e;            /* defeat: red */
+  --acc2: #ff8a5c;
+  --tab-font: Bahnschrift, 'DIN Alternate', 'Roboto Condensed', 'Arial Narrow', 'Segoe UI', system-ui, sans-serif;
+  --tab-mono: ui-monospace, 'Cascadia Mono', 'Roboto Mono', 'SF Mono', Consolas, 'Courier New', monospace;
   position: relative;
-  width: min(560px, 92vw);
-  padding: calc(26px * var(--fs)) calc(34px * var(--fs)) calc(30px * var(--fs));
-  font-family: Georgia, 'Times New Roman', 'Noto Serif', serif;
-  color: #3b2a1a;
+  width: min(600px, 92vw);
+  padding: calc(14px * var(--fs));
+  border-radius: calc(26px * var(--fs));
+  /* the rugged body: dark rubber with a lighter rim, screws in the corners */
   background:
-    repeating-linear-gradient(180deg, transparent 0 27px, rgba(120, 90, 50, 0.13) 27px 28px),
-    radial-gradient(ellipse at 30% 20%, #f3e3c3, #e2c99a 70%, #c9a978);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(120, 80, 30, 0.35);
-  /* D56 (user decision): the page and all its text stand straight */
+    radial-gradient(circle at 18px 18px, #3b4148 0 3px, transparent 4px),
+    radial-gradient(circle at calc(100% - 18px) 18px, #3b4148 0 3px, transparent 4px),
+    radial-gradient(circle at 18px calc(100% - 18px), #3b4148 0 3px, transparent 4px),
+    radial-gradient(circle at calc(100% - 18px) calc(100% - 18px), #3b4148 0 3px, transparent 4px),
+    linear-gradient(160deg, #2a2f35, #14171b 55%, #1d2126);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.7), inset 0 0 0 2px #3a4047, inset 0 2px 0 rgba(255, 255, 255, 0.08);
+  font-family: var(--tab-font);
+  color: #dfe9ee;
   cursor: pointer;
-  animation: journalIn 0.35s ease-out;
+  animation: tabIn 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
-@keyframes journalIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
-.journal-kicker { font: 700 calc(13px * var(--fs)) / 1.2 var(--font-display); letter-spacing: 0.18em; color: #7a5a34; text-transform: uppercase; }
-.journal-title { margin-top: 4px; font-size: calc(30px * var(--fs)); line-height: 1.1; font-weight: 700; font-style: italic; color: #4a1a12; }
-.journal.won .journal-title { color: #2f3d1c; }
-.journal-sub { margin: 6px 0 calc(14px * var(--fs)); font-size: calc(16px * var(--fs)); line-height: 1.35; font-style: italic; color: #5b4630; }
-.journal-lines { list-style: none; display: flex; flex-direction: column; gap: calc(6px * var(--fs)); }
-.journal-lines li { display: flex; align-items: baseline; gap: 8px; font-size: calc(19px * var(--fs)); opacity: 0; transform: translateX(-6px); transition: opacity 0.2s, transform 0.2s; }
+.journal.won { --acc: #3ff0c8; --acc2: #9dffb0; } /* victory: teal */
+@keyframes journalIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } } /* (the tutorial card) */
+@keyframes tabIn { from { opacity: 0; transform: translateY(26px) scale(0.94); } to { opacity: 1; transform: none; } }
+.tab-screen {
+  position: relative;
+  overflow: hidden;
+  padding: calc(14px * var(--fs)) calc(22px * var(--fs)) calc(18px * var(--fs));
+  border-radius: calc(14px * var(--fs));
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--acc) 22%, transparent), transparent 60%),
+    linear-gradient(180deg, #0a141a, #060b0f);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc) 45%, transparent), inset 0 0 40px rgba(0, 0, 0, 0.8);
+}
+/* scanlines + a slow light bar rolling down the screen */
+.tab-screen::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 3px);
+}
+.tab-screen::after {
+  content: ''; position: absolute; left: 0; right: 0; top: -30%; height: 30%; pointer-events: none; z-index: 2;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--acc) 10%, transparent), transparent);
+  animation: tabRoll 4.5s linear infinite;
+}
+@keyframes tabRoll { to { top: 100%; } }
+/* the boot: the picture tears into shifted slices for a moment */
+.journal.boot .tab-screen { animation: tabBoot 0.7s steps(1) both; }
+@keyframes tabBoot {
+  0% { opacity: 0; }
+  8% { opacity: 1; clip-path: inset(40% 0 52% 0); transform: translateX(-8px); filter: hue-rotate(60deg) brightness(1.8); }
+  16% { clip-path: inset(10% 0 70% 0); transform: translateX(10px); }
+  24% { clip-path: inset(0 0 0 0); transform: none; filter: brightness(2.2) contrast(1.4); }
+  32% { clip-path: inset(62% 0 18% 0); transform: translateX(-5px); filter: none; }
+  40% { clip-path: inset(0 0 0 0); transform: translateX(3px); }
+  48%, 100% { clip-path: none; transform: none; filter: none; opacity: 1; }
+}
+.tab-bar { display: flex; align-items: center; gap: 10px; padding-bottom: calc(8px * var(--fs)); margin-bottom: calc(10px * var(--fs)); border-bottom: 1px solid color-mix(in srgb, var(--acc) 35%, transparent); }
+.tab-rec { width: 9px; height: 9px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 8px var(--acc); animation: tabBlink 1s steps(2) infinite; flex: none; }
+@keyframes tabBlink { 50% { opacity: 0.15; } }
+.journal-kicker { flex: 1; min-width: 0; font: 600 calc(13px * var(--fs)) / 1.2 var(--tab-mono); letter-spacing: 0.16em; color: color-mix(in srgb, var(--acc) 70%, #fff); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab-sig { display: flex; align-items: flex-end; gap: 2px; height: 12px; flex: none; }
+.tab-sig i { width: 3px; background: var(--acc); opacity: 0.85; }
+.tab-sig i:nth-child(1) { height: 30%; } .tab-sig i:nth-child(2) { height: 55%; } .tab-sig i:nth-child(3) { height: 80%; } .tab-sig i:nth-child(4) { height: 100%; opacity: 0.3; }
+.tab-bat { width: 22px; height: 11px; border: 1.5px solid #9fb2bb; border-radius: 2px; padding: 1px; position: relative; flex: none; }
+.tab-bat::after { content: ''; position: absolute; right: -4px; top: 3px; width: 2px; height: 4px; background: #9fb2bb; }
+.tab-bat i { display: block; height: 100%; width: 62%; background: #9fb2bb; }
+/* the title: big, condensed, with a colour split; now and then it tears (two copies sliced and shifted) */
+.journal-title {
+  position: relative;
+  margin-top: 2px;
+  font: 800 calc(40px * var(--fs)) / 1 var(--tab-font);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f4fbff;
+  text-shadow: 2px 0 color-mix(in srgb, var(--acc) 80%, transparent), -2px 0 rgba(80, 200, 255, 0.55), 0 0 18px color-mix(in srgb, var(--acc) 45%, transparent);
+}
+.journal-title::before, .journal-title::after, .journal-stamp::before, .journal-stamp::after {
+  content: attr(data-text); position: absolute; inset: 0; pointer-events: none; overflow: hidden; clip-path: inset(0 0 100% 0);
+}
+.journal-title::before { color: var(--acc); text-shadow: none; animation: glitchA 3.4s steps(1) infinite 1s; }
+.journal-title::after { color: #7fe6ff; text-shadow: none; animation: glitchB 2.9s steps(1) infinite 1.4s; }
+@keyframes glitchA {
+  0%, 86%, 100% { clip-path: inset(0 0 100% 0); transform: none; }
+  87% { clip-path: inset(12% 0 58% 0); transform: translateX(-6px); }
+  89% { clip-path: inset(48% 0 22% 0); transform: translateX(5px); }
+  91% { clip-path: inset(70% 0 6% 0); transform: translateX(-3px); }
+  93% { clip-path: inset(30% 0 50% 0); transform: translateX(7px); }
+}
+@keyframes glitchB {
+  0%, 90%, 100% { clip-path: inset(0 0 100% 0); transform: none; }
+  91% { clip-path: inset(60% 0 12% 0); transform: translateX(6px); }
+  93% { clip-path: inset(5% 0 75% 0); transform: translateX(-7px); }
+  95% { clip-path: inset(38% 0 40% 0); transform: translateX(4px); }
+}
+.journal-sub { margin: calc(8px * var(--fs)) 0 calc(14px * var(--fs)); font: 400 calc(16px * var(--fs)) / 1.35 'Segoe UI', Roboto, system-ui, sans-serif; color: #a9bcc5; }
+.journal-lines { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: calc(6px * var(--fs)) calc(12px * var(--fs)); }
+.journal-lines li {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: calc(7px * var(--fs)) calc(10px * var(--fs));
+  border-left: 2px solid var(--acc);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--acc) 12%, transparent), transparent);
+  opacity: 0; transform: translateX(-8px); transition: opacity 0.18s, transform 0.18s;
+}
 .journal-lines li.in { opacity: 1; transform: none; }
-.jl-label { white-space: nowrap; }
-.jl-dots { flex: 1; border-bottom: 2px dotted rgba(80, 55, 30, 0.45); translate: 0 -4px; min-width: 20px; }
-.jl-value { font-family: var(--font-display); font-weight: 800; font-size: 1.1em; color: #2a1a0e; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.journal-divider { height: 0; margin: 4px 0; border-top: 1px solid rgba(80, 55, 30, 0.35); opacity: 1 !important; transform: none !important; }
+.jl-label { font: 600 calc(12px * var(--fs)) / 1.2 var(--tab-font); letter-spacing: 0.14em; text-transform: uppercase; color: #8aa0aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jl-dots { display: none; }
+.jl-value { font: 700 calc(24px * var(--fs)) / 1.05 var(--tab-mono); color: #f4fbff; white-space: nowrap; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px color-mix(in srgb, var(--acc) 50%, transparent); }
+.journal-divider { display: none; }
+/* the status: lands with a glitch at the end of the count-up */
 .journal-stamp {
-  /* its own row under the lines, centred on the page, straight (D56) — never covers the numbers */
   position: relative;
   display: table;
-  margin: calc(12px * var(--fs)) auto 0;
-  padding: 0.12em 0.5em;
-  font: 800 calc(30px * var(--fs)) / 1 var(--font-display);
-  letter-spacing: 0.08em;
-  color: rgba(150, 28, 22, 0.88);
-  border: 4px double rgba(150, 28, 22, 0.88);
+  margin: calc(14px * var(--fs)) auto 0;
+  padding: 0.28em 0.9em;
+  font: 800 calc(22px * var(--fs)) / 1 var(--tab-font);
+  letter-spacing: 0.22em;
   text-transform: uppercase;
+  color: var(--acc);
+  border: 2px solid var(--acc);
+  background: color-mix(in srgb, var(--acc) 12%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--acc) 40%, transparent), inset 0 0 12px color-mix(in srgb, var(--acc) 25%, transparent);
   opacity: 0;
-  scale: 2.4;
   pointer-events: none;
-  mix-blend-mode: multiply;
 }
-.journal.won .journal-stamp { color: rgba(32, 82, 52, 0.9); border-color: rgba(32, 82, 52, 0.9); }
-.journal.stamped .journal-stamp { animation: stampIn 0.22s ease-in forwards; }
-@keyframes stampIn { to { opacity: 1; scale: 1; } }
-.journal.congrats { width: min(620px, 94vw); }
-.journal.congrats .journal-title { font-size: calc(34px * var(--fs)); }
-/* Phones (Phase 9): H5 minimums (kicker 12, sub 14, lines 15, title 22); Congrats lines in two columns — this map |
-   the whole campaign — so the page and its buttons fit a 300 px high screen. */
+.journal-stamp::before { color: #fff; padding: inherit; animation: glitchA 2.6s steps(1) infinite 0.6s; }
+.journal-stamp::after { color: #7fe6ff; padding: inherit; animation: glitchB 3.1s steps(1) infinite 1.1s; }
+.journal.stamped .journal-stamp { animation: statusIn 0.45s steps(1) forwards; }
+@keyframes statusIn {
+  0% { opacity: 1; clip-path: inset(0 0 70% 0); transform: translateX(-10px) scale(1.15); }
+  20% { clip-path: inset(55% 0 0 0); transform: translateX(8px) scale(1.15); }
+  40% { clip-path: inset(20% 0 30% 0); transform: translateX(-4px) scale(1.05); }
+  60%, 100% { opacity: 1; clip-path: none; transform: none; }
+}
+.journal.congrats { width: min(640px, 94vw); }
+@media (prefers-reduced-motion: reduce) {
+  .tab-screen::after, .journal-title::before, .journal-title::after, .journal-stamp::before, .journal-stamp::after, .tab-rec { animation: none; }
+}
+/* Phones: H5 minimums (labels 12, sub 14, title 22); the tablet and its buttons fit a 300 px high screen. */
 @media (max-height: 500px) {
-  .journal { padding: 12px 20px 14px; width: min(560px, 90vw); }
-  .journal.congrats { width: min(640px, 94vw); }
-  .journal-title, .journal.congrats .journal-title { font-size: 22px; }
-  .journal-sub { font-size: 14px; line-height: 1.25; margin: 2px 0 6px; }
+  .journal { padding: 8px; width: min(600px, 86vw); border-radius: 18px; }
+  .journal.congrats { width: min(640px, 92vw); }
+  .tab-screen { padding: 8px 14px 10px; border-radius: 10px; }
+  .tab-bar { padding-bottom: 5px; margin-bottom: 6px; }
   .journal-kicker { font-size: 12px; }
-  .journal-lines { gap: 2px; }
-  .journal-lines li { font-size: 15px; }
-  .journal.congrats .journal-lines { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, auto); grid-auto-flow: column; column-gap: 22px; row-gap: 2px; }
-  .journal.congrats .journal-divider { display: none; }
-  .journal-stamp { font-size: 18px; border-width: 3px; margin-top: 4px; }
+  .journal-title { font-size: 24px; }
+  .journal-sub { font-size: 14px; line-height: 1.25; margin: 3px 0 7px; }
+  .journal-lines { grid-template-columns: repeat(3, 1fr); gap: 4px 8px; }
+  .journal-lines:has(> li:nth-child(4):last-child) { grid-template-columns: repeat(4, 1fr); } /* 4 lines: one row */
+  .journal-lines li { padding: 3px 8px; }
+  .jl-label { font-size: 12px; }
+  .jl-value { font-size: 17px; }
+  .journal-stamp { font-size: 16px; margin-top: 7px; border-width: 1.5px; }
   .result-panel { gap: 8px; }
   .result-btns > button { min-width: 170px; min-height: 48px; }
   .result-panel .result-btns .brush-btn { font-size: 22px; }
   .result-panel .result-btns .flat-btn { font-size: 18px; }
 }
 @media (max-height: 359px) {
-  .journal { padding: 10px 18px 10px; }
+  .tab-screen { padding: 6px 12px 8px; }
   .journal-sub { margin-bottom: 4px; }
-  .journal-stamp { font-size: 16px; margin-top: 2px; }
+  .journal-stamp { font-size: 14px; margin-top: 5px; }
 }
 
 /* ===================== Tutorial hint (D11 / D43): spotlight + arrow + card ===================== */

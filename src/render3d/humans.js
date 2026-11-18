@@ -388,6 +388,9 @@ export class HumanView {
     // D108: restored (lost in the D106 edit — the takedown clip never played)
     this.takedownAct = C.takedown ? held('takedown') : null; // D85 stealth: the takedown from behind
     this.takedownDur = C.takedown ? C.takedown.duration : 1;
+    // D110: the legs of the stand ↔ kneel clips — standing up from low cover with the pistol (its arms on top)
+    const lower = (id) => { if (!C[id]) return null; const a = act(C[id].lower); a.timeScale = 0; return a; };
+    this.riseLo = { up: lower('toStand'), down: lower('toCrouch') };
     this.crouchIdle = this.cv.lowIdle; this.crouchWalk = null; // (dev viewer)
     this.trans = null;       // { a: action, from, to (clip s), dur (s), age (s) } — a stand ↔ kneel transition playing
     this.lowWas = false;
@@ -553,13 +556,19 @@ export class HumanView {
     const dg = 1 - (1 - (this.dodges[this.dodgeId] ? w.dodge : 0)) * (1 - (w.td || 0));
     const cv = this.cv;
     const lowOn = !dead && !rolling && !tdOn && (st.cover === 'low' || !!st.crouch) && !!cv.lowIdle;
+    // D110 (user): firing from low cover he stands up ("Crouch To Standing With Rifle"), fires standing and sits back
+    // ("Stand To Crouch"); st.rise 0 kneeling … 1 standing drives the clip's time. The kneeling layers fade out as the clip
+    // comes in, the standing layers (aim) take over at the top; the pistol keeps the clip's legs and its own arms
+    const riseK = lowOn && st.cover === 'low' && st.rise > 0 ? Math.min(1, st.rise) : 0;
+    const riseClipW = riseK > 0 && riseK < 1 ? smooth(0, 0.12, riseK) * (1 - smooth(0.88, 1, riseK)) : 0;
+    const kneelK = 1 - smooth(0, 0.12, riseK);
     // D87: aiming in high cover = leaning out of its corner ("Female Peek And Aim" by the lean, st.peek 0…1)
     const peekK = st.cover === 'high' ? st.peek || 0 : 0;
     // D101 (user video: the peek looked awful — the Peek And Aim clips lean / aim sideways and down while the rounds fly
     // to the aim behind the wall): back to the wall he holds the cover pose; leaning out it fades away (by the lean)
     // into the plain standing aim pose while the body turns to the aim through the open side (MissionRun)
     const highOn = !dead && !rolling && st.cover === 'high' && (!st.aim || peekK > 0) && !!(cv.peekL || cv.peekR);
-    const lowW = ease('low', lowOn ? 1 : 0, 1.3) * (1 - dg);
+    const lowW = ease('low', lowOn ? 1 : 0, 1.3) * (1 - dg) * kneelK;
     const highW = ease('high', highOn ? 1 : 0, 1.3) * (1 - dg) * (1 - lowW) * (1 - smooth(0, 1, peekK));
     const busyW = ease('busy', st.busy && !dead && this.busy ? 1 : 0, 0.8) * (1 - dg) * (1 - lowW) * (1 - highW);
     // stand ↔ kneel: the user's transition clips, a short part of each, blended over the layers
@@ -573,13 +582,13 @@ export class HumanView {
       const T = this.trans;
       T.age += Math.max(0, dt);
       const q = T.age / T.dur;
-      if (q >= 1 || rolling || dead) { T.a.setEffectiveWeight(0); this.trans = null; } else {
+      if (q >= 1 || rolling || dead || riseK > 0) { T.a.setEffectiveWeight(0); this.trans = null; } else {
         tr = (1 - smooth(0.55, 1, q)) * live * (1 - dg);
         T.a.time = T.from + (T.to - T.from) * smooth(0, 1, q);
       }
     }
     const fullW = lowW + highW + busyW;
-    const normal = live * (1 - dg) * (1 - fullW) * (1 - tr); // what is left for the leg + upper-body layers
+    const normal = live * (1 - dg) * (1 - fullW) * (1 - tr) * (1 - riseClipW); // what is left for the leg + upper-body layers
 
     // ---- legs: direction weights (forward / back / left / right) and walk → run by speed
     const sp = dead ? 0 : st.speed;
@@ -724,6 +733,16 @@ export class HumanView {
       }
     }
     if (this.trans) this.trans.a.setEffectiveWeight(tr);
+    // D110: standing up from / sitting back behind low cover (the clip's time from the rise; the pistol: legs + its arms)
+    for (const a of Object.values(this.riseLo)) if (a) a.setEffectiveWeight(0);
+    if (riseClipW > 0) {
+      const R = A.rise, up = !!st.riseUp, a = up ? cv.toStand : cv.toCrouch, lo = up ? this.riseLo.up : this.riseLo.down;
+      const t = up ? R.upFrom + (R.upTo - R.upFrom) * riseK : R.downFrom + (R.downTo - R.downFrom) * (1 - riseK);
+      if (pistol && lo && U.pIdle) {
+        lo.time = t; lo.setEffectiveWeight(riseClipW * live);
+        U.pIdle.setEffectiveWeight(U.pIdle.getEffectiveWeight() + riseClipW * live);
+      } else if (a) { a.time = t; a.setEffectiveWeight(riseClipW * live); }
+    }
     if (this.busy) this.busy.setEffectiveWeight(busyW * live);
     // D86: the mixer writes a bone only when its blended value CHANGED since the last frame — a held pose (the rifle aim
     // is one still frame) would keep (and pile up) last frame's procedural turns. So the bones touched after the mixer

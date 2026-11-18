@@ -13,6 +13,10 @@ const H = (key) => ['handler', key], K = (key) => ['hero', key];
 
 /** id → lines [speaker, locale key]. */
 export const DIALOGUES = {
+  // ---- D110 (user: a story chain): the recruitment call before the training ground, the briefing before the office.
+  // Story dialogues (id 'story.*') play until their level is cleared (a replay of a cleared level skips them)
+  'story.recruit': [H('dlg.sr.1'), K('dlg.sr.2'), H('dlg.sr.3'), K('dlg.sr.4'), H('dlg.sr.5'), K('dlg.sr.6'), H('dlg.sr.7'), K('dlg.sr.8'), H('dlg.sr.9')],
+  'story.office': [H('dlg.so.1'), K('dlg.so.2'), H('dlg.so.3'), K('dlg.so.4'), H('dlg.so.5'), K('dlg.so.6'), H('dlg.so.7')],
   // ---- office · mission
   'office.start': [H('dlg.os.1'), K('dlg.os.2'), H('dlg.os.3'), K('dlg.os.4'), H('dlg.os.5'), K('dlg.os.6')], // D92: + the SMG / medkits
   'office.keycard': [K('dlg.ok.1'), H('dlg.ok.2')],
@@ -51,11 +55,12 @@ export const DIALOGUES = {
 
 /**
  * Which dialogue a level / mode plays on which event of the run (not the tutorial — its lessons ask for theirs):
- * start (the level began), keycard / drive (picked up), copy (ORPHEUS copied).
+ * start (the level began), keycard / drive (picked up), copy (ORPHEUS copied). A list plays its dialogues in order.
  */
 export const LEVEL_DIALOGUES = {
+  training: { tutorial: { start: ['story.recruit'] } }, // D110: the lessons' own dialogues queue after it
   office: {
-    mission: { start: 'office.start', keycard: 'office.keycard', drive: 'office.drive' },
+    mission: { start: ['story.office', 'office.start'], keycard: 'office.keycard', drive: 'office.drive' },
     stealth: { start: 'stealth.start', keycard: 'stealth.keycard', copy: 'stealth.copy' },
     survival: { start: 'survival.start' },
   },

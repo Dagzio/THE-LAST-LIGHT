@@ -13,7 +13,7 @@ import { parseSkinnedGLB, loadGLB, blobTexture } from './glb.js';
 import { HUMAN_MODELS, HUMAN_ANIM, GUN_MODELS, gunModelOf, enemyModelOf } from '../data/humanModels.js';
 import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
-import { dodgeOf } from '../data/player.js';
+import { dodgeOf, AIM_HEIGHT } from '../data/player.js';
 import { STEALTH } from '../data/stealth.js';
 import { StealthOverlay } from './StealthOverlay.js';
 import { BLOCK } from '../systems/Collision.js';
@@ -713,12 +713,12 @@ export class Renderer3D {
     this.sun.position.set(tx + SUN_DIR.x, ty + SUN_DIR.y, tz + SUN_DIR.z);
   }
 
-  /** Client (CSS px) → ground point in world units. */
-  screenToGround(clientX, clientY, out = {}) {
+  /** Client (CSS px) → point in world units on the plane at height h (0: the ground; D110: the gun's height for the aim). */
+  screenToGround(clientX, clientY, out = {}, h = 0) {
     if (!(this.cssW > 0)) this._resize(true);
     NDC.set(((clientX - this.viewLeft) / Math.max(1, this.cssW)) * 2 - 1, -((clientY - this.viewTop) / Math.max(1, this.cssH)) * 2 + 1);
     V.set(NDC.x, NDC.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
-    const t = -this.camera.position.y / (V.y || -1e-6);
+    const t = (h - this.camera.position.y) / (V.y || -1e-6);
     out.x = this.camera.position.x + V.x * t;
     out.y = this.camera.position.z + V.z * t;
     return out;
@@ -818,12 +818,22 @@ export class Renderer3D {
     // ---- hero
     const tgt = Number.isFinite(p.bodyAngle) ? p.bodyAngle : p.aimAngle;
     if (this.bodyYaw === undefined || !p.alive) this.bodyYaw = this.bodyYaw ?? tgt;
+    const yaw0 = this.bodyYaw;
     if (p.alive) this.bodyYaw += Math.atan2(Math.sin(tgt - this.bodyYaw), Math.cos(tgt - this.bodyYaw)) * Math.min(1, dt * 20);
+    // D110 (user): turning on the spot he steps — the turn rate (smoothed) drives the side steps below
+    const rate = dt > 0 ? (this.bodyYaw - yaw0) / dt : 0;
+    this.turnRate = (this.turnRate || 0) + (rate - (this.turnRate || 0)) * Math.min(1, dt * 10);
     const hx = this._lx(p), hy = this._ly(p);
     const h = this.hero;
     h.setGun(gunModelOf(run.weapon.weaponId));
-    const speed = p.alive ? Math.hypot(p.vx, p.vy) : 0;
-    const moveDir = Math.atan2(p.vy, p.vx);
+    let speed = p.alive ? Math.hypot(p.vx, p.vy) : 0;
+    let moveDir = Math.atan2(p.vy, p.vx);
+    const T = HUMAN_ANIM.turnSteps;
+    if (p.alive && speed < T.below && !p.cover && !p.dodging && !p.takedown && Math.abs(this.turnRate) > T.from) {
+      // standing and turning: small side steps toward the turn (right turn → right side), paced by the turn rate
+      speed = Math.min(T.maxSpeed, (Math.abs(this.turnRate) - T.from) * T.radius + T.minSpeed);
+      moveDir = this.bodyYaw + Math.sign(this.turnRate) * Math.PI / 2;
+    }
     const w = run.weapon;
     if (!p.alive) this.heroDeadAge += this.frameDt || 0; else this.heroDeadAge = 0;
     const gAim = run.grenadePreview.active;
@@ -847,6 +857,7 @@ export class Renderer3D {
       crouch: p.alive && !p.cover && p.stance === 'crouch',                                                                        // D85: stealth crouch
       peek: p.alive && p.peek ? p.peek.k : 0,                                                                                       // D87: leaning out of the corner
       peekSide: p.peek ? p.peek.side : 0,                                                                                           // D90: +1 his right, −1 his left
+      rise: p.alive && p.rise ? p.rise.k : 0, riseUp: !!(p.rise && p.rise.up),                                                     // D110: standing up from low cover
       takedown: p.alive && p.takedown ? Math.min(1, Math.max(0, (time - p.takedown.t0) / STEALTH.takedown.duration)) : -1,         // D85: the takedown clip
       takedownFrom: STEALTH.takedown.clipFrom, takedownTo: STEALTH.takedown.clipTo,
     });
@@ -953,14 +964,15 @@ export class Renderer3D {
     if (lock) {
       const L = lock, lx = L.prevX !== undefined ? this._lx(L) : L.x, ly = L.prevY !== undefined ? this._ly(L) : L.y;
       this.reticle.visible = true;
-      this.reticle.position.set(lx, 1.4, ly);
+      this.reticle.position.set(lx, AIM_HEIGHT, ly); // D110: on his chest — where the rounds fly (not at his feet)
       this.reticle.material.color.setHex(time - run.weapon.lastShotAt < 0.25 ? 0xff5a3c : 0xffe9c2);
       const s = 1.15 + 0.08 * Math.sin(time * 6); this.reticle.scale.set(s, 1, s);
     } else { this.reticle.visible = p.alive && p.hasAim && !run.autoFire; this.reticle.scale.set(1, 1, 1); this.reticle.material.color.setHex(0xffe9c2); }
     if (this.reticle.visible && !lock) {
       const a = this.aimClient && this.aimClient();
-      if (a && a.active) { this.screenToGround(a.clientX, a.clientY, AIM_PT); this.reticle.position.set(AIM_PT.x, 1.4, AIM_PT.y); }
-      else this.reticle.position.set(p.aimX, 1.4, p.aimY);
+      // D110: the reticle on the gun-height plane (the aim point's plane) — right under the cursor, on the rounds' line
+      if (a && a.active) { this.screenToGround(a.clientX, a.clientY, AIM_PT, AIM_HEIGHT); this.reticle.position.set(AIM_PT.x, AIM_HEIGHT, AIM_PT.y); }
+      else this.reticle.position.set(p.aimX, AIM_HEIGHT, p.aimY);
     }
 
     // ---- tracers

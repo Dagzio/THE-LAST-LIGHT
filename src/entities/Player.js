@@ -31,6 +31,7 @@ export class Player {
     this.coverSnapUntil = 0;   // steps up to the object until this time
     this.coverAwayFor = 0;     // s he has pushed away from the object
     this.exposedUntil = 0;     // kneeling fire from low cover: exposed until this time
+    this.rise = null;          // D110: standing up from low cover to fire { k 0…1, until, up } (PlayerController._riseGate)
     this.crouched = false;
     // D85 stealth: stance (C) and how he moves; a takedown in progress locks him
     this.stance = 'stand';     // 'stand' | 'crouch'

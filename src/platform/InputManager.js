@@ -96,10 +96,13 @@ export class InputManager {
   /** Touch released: keep the current facing, no aim point. */
   clearAim() { this.aim.active = false; }
 
-  /** Aim point on the ground in world units, or null when there is none (the keeper keeps his facing). */
-  getAimWorld(out) {
+  /**
+   * Aim point in world units, or null when there is none (the keeper keeps his facing). h: the height of the plane the
+   * cursor ray is cut with (0: the ground — grenades; D110: the gun's height for shots, so they fly under the cursor).
+   */
+  getAimWorld(out, h = 0) {
     if (!this.aim.active || !this.pointerMapper) return null;
-    return this.pointerMapper(this.aim.clientX, this.aim.clientY, out);
+    return this.pointerMapper(this.aim.clientX, this.aim.clientY, out, h);
   }
 
   // ---- source API for adapters (touch controls) ----

@@ -1,6 +1,6 @@
 // Player movement and dodge (02_SPEC §4). Reads only abstract input (getMove / consumePressed / pointerWorld),
 // never keys or DOM — keyboard and touch drive it the same way.
-import { PLAYER, COVER, dodgeTravel, dodgeOf } from '../data/player.js';
+import { PLAYER, COVER, AIM_HEIGHT, dodgeTravel, dodgeOf } from '../data/player.js';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../config/constants.js';
 import { BLOCK } from './Collision.js';
 
@@ -42,7 +42,9 @@ export class PlayerController {
     }
 
     // The keeper always faces the aim point (cursor / finger); without one he keeps his facing.
-    const a = input.getAimWorld ? input.getAimWorld(aim) : null;
+    // D110 (user screenshot: the rounds passed beside the reticle): the cursor ray is cut at the gun's height — the rounds
+    // fly at that height, so on the screen they now go right under the cursor (cut at the ground they flew above it)
+    const a = input.getAimWorld ? input.getAimWorld(aim, AIM_HEIGHT) : null;
     player.hasAim = !!a;
     if (a) {
       const dx = a.x - player.x, dy = a.y - player.y;
@@ -142,6 +144,8 @@ export class PlayerController {
    */
   peekGate(p, wantFire, manual, dt, time) {
     const C = COVER;
+    if (p.cover && p.cover.kind === 'low' && !p.dodging && p.alive) { p.peek = null; return this._riseGate(p, wantFire, dt, time); }
+    p.rise = null;
     if (!p.cover || p.cover.kind !== 'high' || p.dodging || !p.alive) { p.peek = null; return wantFire; }
     // D99 (user): aimed away from the wall (in front of him) he simply fires from where he stands — leaning out of the
     // corner is only for an aim behind the wall; aimed into the wall away from a corner the trigger does nothing (no hint)
@@ -181,6 +185,31 @@ export class PlayerController {
     // D100: fully out, and still no wall right in front of the barrel (the aim past the corner's own end) — else no
     // shot (no round wasted into the wall)
     return wantFire && pk.k >= 1 && this._shotOk(p, p.x, p.y);
+  }
+
+  /**
+   * D110 (user): the trigger behind LOW cover — he first stands up ("Crouch To Standing With Rifle", riseIn s), fires
+   * standing, and riseHold s after the last shot (or at once for a reload / an empty gun — the trigger is not passed
+   * then) sits back down ("Stand To Crouch", sitIn s). p.rise = { k: 0 kneeling … 1 standing, until, up } — he is exposed
+   * while it lasts (MissionRun._updateCover). → may he fire now (only fully up).
+   */
+  _riseGate(p, wantFire, dt, time) {
+    const C = COVER;
+    if (wantFire) {
+      if (!p.rise) p.rise = { k: 0, until: 0, up: true, queued: false };
+      p.rise.until = time + C.riseHold;
+      // a quick tap / click shorter than the stand-up still fires — once he is up
+      if (p.rise.k < 1) p.rise.queued = true;
+    }
+    const r = p.rise;
+    if (!r) return false;
+    r.up = time < r.until;
+    r.k = Math.min(1, Math.max(0, r.k + (r.up ? dt / C.riseIn : -dt / C.sitIn)));
+    if (!r.up && r.k <= 0) { p.rise = null; return false; }
+    if (r.k < 1) return false;
+    const fire = wantFire || r.queued;
+    r.queued = false;
+    return fire;
   }
 
   /**

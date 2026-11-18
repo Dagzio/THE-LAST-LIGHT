@@ -62,6 +62,10 @@ export const COVER = {
   exitDot: 0.6,             // pushing away from the object this directly…
   exitHold: 0.3,            // …for this long leaves the cover
   popUp: 0.5,               // s he stays exposed after a shot from low cover
+  // D110 (user): firing from low cover he stands up first, then fires; after the last shot / for a reload he sits back
+  riseIn: 0.4,              // s to stand up from behind low cover (no shot before he is up)
+  sitIn: 0.4,               // s to sit back down
+  riseHold: 0.5,            // s he stays up after the last shot
   // D87 (user request): behind HIGH cover he can shoot only from its corner — he leans out past the edge ("Female Peek
   // And Aim"), really exposed there; away from an edge the trigger does nothing (a hint says so). Low cover: over it.
   // D90 (user): the corner is his limit — moving along, he stops when his centre is edgeStop from the end of the face
@@ -87,6 +91,8 @@ export const MUZZLE = {
   rifle: { f: 24, s: 7.2, h: 41.7 },   // (enemies' rifles)
 };
 export const muzzleOf = (gun) => MUZZLE[gun] || MUZZLE.pistol;
+/** D110: the height the rounds fly at (≈ the muzzles above) — the mouse aim and its reticle use this plane. */
+export const AIM_HEIGHT = 41;
 
 /**
  * D82: the barrel runs beside the body's centre (mz.s to the right), so a body turned straight at the aim point would

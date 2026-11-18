@@ -52,7 +52,10 @@ export class DialogueView {
     const run = this.game.run;
     if (!run) return;
     const set = (LEVEL_DIALOGUES[run.mapId] || {})[run.modeId];
-    if (set && set[kind]) this.open(set[kind]);
+    if (!set || !set[kind]) return;
+    // D110: a list plays in order (the waiting ones queue); the story ones only until the level is cleared
+    const cleared = this.game.isMapCleared && this.game.isMapCleared(run.mapId);
+    for (const id of [].concat(set[kind])) if (!(cleared && id.startsWith('story.'))) this.open(id);
   }
 
   /** Opens a dialogue by id (once per run); another one open → it waits. */

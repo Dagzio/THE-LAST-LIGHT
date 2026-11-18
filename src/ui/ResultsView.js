@@ -90,8 +90,13 @@ export class ResultsView {
       ];
       if (s.won && s.best > 0) rows.push(['result.best', Math.round(s.best), clock]);
     }
+    // D110: the tablet's glitch layers repeat the title / status text (CSS attr(data-text))
+    el.title.dataset.text = el.title.textContent;
+    el.stamp.dataset.text = el.stamp.textContent;
     el.lines.replaceChildren();
     this.items = [];
+    // D110: the tablet boots again with a glitch on every new result
+    if (animate) { el.journal.classList.remove('boot'); void el.journal.offsetWidth; el.journal.classList.add('boot'); }
     for (const row of rows) {
       const li = document.createElement('li');
       if (!row) { li.className = 'journal-divider'; el.lines.append(li); continue; }

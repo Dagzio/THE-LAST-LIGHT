@@ -255,7 +255,8 @@ export class MissionRun {
   /** D82 / D83: kneeling behind low cover he is shielded — except while firing over it and a moment after. */
   _updateCover(p, shooting, time) {
     if (shooting && p.cover && p.cover.kind === 'low') p.exposedUntil = time + COVER.popUp;
-    p.crouched = !!p.cover && p.cover.kind === 'low' && p.alive && !p.dodging && time >= p.exposedUntil;
+    // D110: standing up to fire over it (p.rise) he is exposed too
+    p.crouched = !!p.cover && p.cover.kind === 'low' && p.alive && !p.dodging && !p.rise && time >= p.exposedUntil;
   }
 
   /**
@@ -272,7 +273,8 @@ export class MissionRun {
     const mouse = p.hasAim && !this.autoFire;
     // D95 (user: back in cover he first stood facing the wall, then turned): in cover the aim pose lasts only while he
     // fires / leans out / aims a grenade — then at once the cover pose (back to the wall / kneeling)
-    const firing = p.cover ? shooting || !!p.peek || this.grenadePreview.active : time < p.faceAimUntil;
+    // D110: standing up from low cover to fire he already turns to the aim
+    const firing = p.cover ? shooting || !!p.peek || !!(p.rise && p.rise.up) || this.grenadePreview.active : time < p.faceAimUntil;
     const cover = p.cover && !firing ? p.cover : null; // D83: in cover he keeps facing it while moving along it
     p.aimPose = false;
     if (p.dodging) p.bodyAngle = Math.atan2(p.dodgeDirY, p.dodgeDirX);
@@ -376,6 +378,9 @@ export class MissionRun {
       } else if (d <= INTERACT.pickupRadius + p.radius) this._pickup(pk, time);
     }
     this.interactTarget = best;
+    // D110 (user): crates (weapons, rounds, grenades, medkits) open by themselves once he is in reach — not on the training
+    // ground (its lessons teach E / the button; level.manualCrates)
+    if (best && best.def.kind === 'crate' && !this.level.manualCrates && !this.over) this.interact(time);
     // D85: what a dead enemy carried (the supervisor's key card) is taken by walking over his body; D88: his rounds too
     for (const e of this.enemies) {
       if (e.alive || (!e.carries && !(e.ammoDrop > 0))) continue;
@@ -531,6 +536,7 @@ export class MissionRun {
     // the trigger does not lean him out / turn him to aim — he reloads in the cover pose
     const canShoot = !this.weapon.reloading && (this.weapon.ammo > 0 || this.weapon.reserve > 0);
     if (!canShoot && p.peek) p.peek.until = 0; // (a reload: back to the wall at once — the reload plays there)
+    if (!canShoot && p.rise) p.rise.until = 0; // D110: …behind low cover he sits back down to reload
     const shooting = this.controller.peekGate(p, trigger && (canShoot || !p.cover), true, dt, time);
     this._outOfAmmo(trigger, time);
     this.weapons.update(this.weapon, p, shooting, input.consumePressed('reload'), time);

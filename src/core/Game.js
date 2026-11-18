@@ -252,7 +252,7 @@ export class Game {
     this.run = new MissionRun(resolved, createRunSeed(), this.events);
     this.run.particles.setQualityFactor(QUALITY_PRESETS[this.quality].particles);
     this.renderer3d.loadMap(resolved, this.run.player.x, this.run.player.y); // warm-up: no step until shaders are ready
-    this.input.pointerMapper = (cx, cy, out) => this.renderer3d.screenToGround(cx, cy, out);
+    this.input.pointerMapper = (cx, cy, out, h = 0) => this.renderer3d.screenToGround(cx, cy, out, h);
     this.input.releaseAll();
     this.loop.resetTiming();
     document.body.dataset.mode = resolved.modeId; // D88: the training ground → 'tutorial'

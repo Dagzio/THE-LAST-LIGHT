@@ -215,6 +215,13 @@ export class TutorialDirector {
     this.run.events.emit('tutorialHint', e.tag === 'grenade' ? 'banner.useGrenade' : e.tag === 'stealth' ? 'banner.useTakedown' : 'banner.notYet');
   }
 
+  /** D110: is the hero inside the yard of the lesson's spot (a spot outside every yard — the exit — counts as anywhere)? */
+  _inLessonYard(s, p) {
+    if (!s || !s.target) return true;
+    const W = this.run.levelWorld, yard = W.zoneAt(s.target[0], s.target[1]);
+    return !yard || W.zoneAt(p.x, p.y) === yard;
+  }
+
   _onMat(p) {
     const m = this.run.level.rollMat;
     return !!m && p.x >= m[0] && p.x <= m[2] && p.y >= m[1] && p.y <= m[3];
@@ -250,8 +257,10 @@ export class TutorialDirector {
     }
     this._check();
     const s = this.step;
-    // D108: a lesson's dialogue waits for the takedown in progress to end (it froze the takedown clip mid-blow)
-    if (this.pendingDialogue && !p.takedown) { const id = this.pendingDialogue; this.pendingDialogue = null; run.events.emit('dialogue', id); }
+    // D108: a lesson's dialogue waits for the takedown in progress to end (it froze the takedown clip mid-blow).
+    // D110 (user: the roll briefing started in the grenade yard): a lesson held in another yard is briefed once the hero
+    // walks in through its gate — the yard's own lessons follow one another at once
+    if (this.pendingDialogue && !p.takedown && this._inLessonYard(s, p)) { const id = this.pendingDialogue; this.pendingDialogue = null; run.events.emit('dialogue', id); }
     // the roll lesson: a roll that started or is passing over the mats
     if (s && s.id === 'roll' && p.dodging && this._onMat(p)) this._done();
     // D89: the grenade lesson never runs dry — out of grenades with dummies standing, the instructor hands one more

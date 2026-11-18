@@ -164,14 +164,22 @@
       </div>
     </div>
 
-    <!-- Level result: the case file page — lines count up one by one, then the stamp. Tap the page to skip. -->
+    <!-- Level result. D110 (user): a field tablet — it boots with a glitch, the lines count up one by one, then the status
+         lands. Tap the screen to skip. -->
     <div class="result-panel" id="resultPanel">
-      <article class="journal" id="journal">
-        <p class="journal-kicker" id="jKicker"></p>
-        <h2 class="journal-title" id="resultTitle"></h2>
-        <p class="journal-sub" id="jSub"></p>
-        <ul class="journal-lines" id="jLines"></ul>
-        <div class="journal-stamp" id="jStamp"></div>
+      <article class="journal tablet" id="journal">
+        <div class="tab-screen">
+          <div class="tab-bar">
+            <span class="tab-rec"></span>
+            <p class="journal-kicker" id="jKicker"></p>
+            <span class="tab-sig" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            <span class="tab-bat" aria-hidden="true"><i></i></span>
+          </div>
+          <h2 class="journal-title" id="resultTitle"></h2>
+          <p class="journal-sub" id="jSub"></p>
+          <ul class="journal-lines" id="jLines"></ul>
+          <div class="journal-stamp" id="jStamp"></div>
+        </div>
       </article>
       <div class="result-btns">
         <button class="brush-btn" data-action="continueCampaign" id="resultContinue" data-i18n="result.continue" hidden></button>
