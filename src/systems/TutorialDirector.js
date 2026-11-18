@@ -250,7 +250,8 @@ export class TutorialDirector {
     }
     this._check();
     const s = this.step;
-    if (this.pendingDialogue) { const id = this.pendingDialogue; this.pendingDialogue = null; run.events.emit('dialogue', id); }
+    // D108: a lesson's dialogue waits for the takedown in progress to end (it froze the takedown clip mid-blow)
+    if (this.pendingDialogue && !p.takedown) { const id = this.pendingDialogue; this.pendingDialogue = null; run.events.emit('dialogue', id); }
     // the roll lesson: a roll that started or is passing over the mats
     if (s && s.id === 'roll' && p.dodging && this._onMat(p)) this._done();
     // D89: the grenade lesson never runs dry — out of grenades with dummies standing, the instructor hands one more

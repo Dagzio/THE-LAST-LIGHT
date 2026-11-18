@@ -384,7 +384,9 @@ export class HumanView {
       if (!a || !C[id]) continue;
       const lo = act(C[id].lower); lo.timeScale = 0;
       this.coverLower.set(a, lo);
-    } // D85 stealth: the takedown from behind
+    }
+    // D108: restored (lost in the D106 edit — the takedown clip never played)
+    this.takedownAct = C.takedown ? held('takedown') : null; // D85 stealth: the takedown from behind
     this.takedownDur = C.takedown ? C.takedown.duration : 1;
     this.crouchIdle = this.cv.lowIdle; this.crouchWalk = null; // (dev viewer)
     this.trans = null;       // { a: action, from, to (clip s), dur (s), age (s) } — a stand ↔ kneel transition playing

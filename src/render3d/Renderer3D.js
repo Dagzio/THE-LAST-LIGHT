@@ -47,8 +47,8 @@ const CHAR_LOOK = {
 const MAX_BULLETS = 200;
 const MAX_BARS = 32;
 const MAX_POOLS = 40;
-const MAX_HL = 12;
-const CAM_LEAD = 0.18; // D107: the phone camera's lead ahead of the moving hero (part of the view) // D90: highlighted objects of a lesson at once
+const MAX_HL = 12; // D90: highlighted objects of a lesson at once
+const CAM_LEAD = 0.18; // D107: the phone camera's lead ahead of the moving hero (part of the view)
 const TILT = (CAMERA.tilt * Math.PI) / 180;
 const SHOT_FLASH = 0.05;
 // D92: the fall of the dead — the clips fall forward ~25 units (hips) and lie ~60 long; the turn towards free room

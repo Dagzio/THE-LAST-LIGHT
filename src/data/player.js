@@ -113,7 +113,13 @@ export const AUTO_AIM = {
   rangeFactor: 0.9,
   switchRatio: 0.7,
   lineOfSight: true,
-  viewInset: 12,
+  // D108 (user: it locked enemies still off the screen — the feet point 12 px inside, the body out / under the HUD): a
+  // new lock only with the whole body (feet and head) inside the screen by this part of its width / height; a locked
+  // target is kept until its body leaves the screen by keepInset (no flicker at the border)
+  viewInsetX: 0.08,
+  viewInsetY: 0.1,
+  keepInset: 0.02,
+  bodyHeight: 56,           // units: the head point checked with the feet
 };
 
 /** Interaction (crates, pickups) and the hero's own noise. */

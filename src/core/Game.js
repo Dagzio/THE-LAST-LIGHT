@@ -36,11 +36,16 @@ export class Game {
     try {
       this.renderer3d = new Renderer3D(canvas3d, this.quality);
       this.renderer3d.aimClient = () => this.input.aim; // live cursor / finger for the reticle (read-only)
-      // D75: mobile auto fire — only at an enemy already on the screen (as of the last drawn frame; read-only)
-      const r3 = this.renderer3d, pt = { x: 0, y: 0 }, inset = AUTO_AIM.viewInset;
-      this.inView = (x, y) => {
-        r3.projectToScreen(x, y, 16, pt);
-        return pt.x >= inset && pt.x <= r3.viewW - inset && pt.y >= inset && pt.y <= r3.viewH - inset;
+      // D75: mobile aim assist — only at an enemy already on the screen (as of the last drawn frame; read-only).
+      // D108: the whole body (feet and head) well inside; `keep` (the locked target) — just inside the screen
+      const r3 = this.renderer3d, pt = { x: 0, y: 0 }, A = AUTO_AIM;
+      const inside = (ix, iy) => pt.x >= ix && pt.x <= r3.viewW - ix && pt.y >= iy && pt.y <= r3.viewH - iy;
+      this.inView = (x, y, keep = false) => {
+        const W = r3.viewW, H = r3.viewH, ix = (keep ? A.keepInset : A.viewInsetX) * W, iy = (keep ? A.keepInset : A.viewInsetY) * H;
+        r3.projectToScreen(x, y, 0, pt);
+        if (!inside(ix, iy)) return false;
+        r3.projectToScreen(x, y, A.bodyHeight, pt);
+        return inside(ix, iy);
       };
       // D82: enemies open fire only from the screen (the whole body inside, a little margin)
       const aiInset = AI_TUNING.onScreenInset;

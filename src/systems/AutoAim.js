@@ -21,7 +21,9 @@ export class AutoAim {
     if (this.ok && !this.ok(e)) return false;
     const d = Math.hypot(e.x - o.x, e.y - o.y) - (e.radius || 0);
     if (!(d <= reach)) return false;
-    if (this.inView && !this.inView(e.x, e.y)) return false; // D75: never at an enemy still off the screen
+    // D75: never at an enemy still off the screen (D108: a new lock — the whole body well inside; the locked one is kept
+    // while it is still on the screen)
+    if (this.inView && !this.inView(e.x, e.y, e === this.target)) return false;
     return !this.cfg.lineOfSight || !this.world || this.world.clear(o.x, o.y, e.x, e.y);
   }
 
