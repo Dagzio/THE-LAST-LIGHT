@@ -220,6 +220,29 @@ function lowPolyFaces(p, m, item, A, t, base, W, D, surf, outline, out) {
     for (const g of faces) out.push(g.applyMatrix4(base));
     return;
   }
+  if (m.cross && !m.wall) {
+    // D111 (user: the chairs / plants from the atlases too): open frames narrower than their footprint (a chair's seat
+    // and back, a pot under its leaves) — the front and side pictures as two crossing planes through the middle, the
+    // top picture laid at `topAt` (a part of the height: the seat, the middle of the crown)
+    const H = heightOf(m, item, t, W, D);
+    const sideP = item.left || item.right;
+    // split at the seat: what rises above it (a chair's back) stands where the side picture shows it (item.up), not in
+    // the middle of the seat (a thin fin of the back's profile showed above it)
+    const s = item.up && surf < 0.97 ? surf : 1, [ux, uz] = item.up || [0, 0];
+    const plane = (pic, w, f0, f1, ry, x, z) => {
+      if (!pic || f1 <= f0) return;
+      const h = H * (f1 - f0), g = quadBand(pic, w, h, A, f0, f1);
+      if (ry) g.rotateY(ry);
+      g.translate(x, H * f0 + h / 2, z); faces.push(g);
+    };
+    plane(front, W, 0, s, 0, 0, 0);
+    plane(sideP, D, 0, s, -Math.PI / 2, 0, 0);
+    plane(front, W, s, 1, 0, 0, uz * D);
+    plane(sideP, D, s, 1, -Math.PI / 2, ux * W, 0);
+    if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, H * Math.min(1, Math.max(0.03, m.topAt ?? surf)), 0); faces.push(g); }
+    for (const g of faces) out.push(g.applyMatrix4(base));
+    return;
+  }
   if (m.wall) {
     const h = (W * front[3]) / front[2], dep = Math.max(1, t.d || 2), y = m.at || 40;
     const g = quad(front, W, h, A); g.translate(0, y, dep + 0.3); faces.push(g);
@@ -260,11 +283,12 @@ function cellFaces(m, item, A, W, D, H, surf, outline, faces) {
     side(item.right, D, Math.PI / 2, W / 2, 0);
   }
   if (s < 0.97) {
-    // above the surface: the front picture's upper part across the middle, the side picture's along it
-    const hu = H - Hs;
-    if (front) { const g = quadBand(front, W, hu, A, s, 1); g.translate(0, Hs + hu / 2, 0); faces.push(g); }
+    // above the surface: the front picture's upper part across, the side picture's along — crossing where the pictures
+    // show it stands (item.up: a monitor behind the middle, a coffee machine at the back), else in the middle
+    const hu = H - Hs, [ux, uz] = item.up || [0, 0];
+    if (front) { const g = quadBand(front, W, hu, A, s, 1); g.translate(0, Hs + hu / 2, uz * D); faces.push(g); }
     const sideP = item.left || item.right;
-    if (sideP) { const g = quadBand(sideP, D, hu, A, s, 1); g.rotateY(-Math.PI / 2); g.translate(0, Hs + hu / 2, 0); faces.push(g); }
+    if (sideP) { const g = quadBand(sideP, D, hu, A, s, 1); g.rotateY(-Math.PI / 2); g.translate(ux * W, Hs + hu / 2, 0); faces.push(g); }
   }
 }
 

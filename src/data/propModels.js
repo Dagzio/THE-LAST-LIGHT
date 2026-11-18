@@ -13,20 +13,20 @@
 // render3d/propViews.js lowPolyFaces; the training ground keeps its own atlas and the older `top` factor.
 // D93: the side walls follow the top picture's outline (data/viewOutlines.js) — `box: true` keeps the plain box;
 //   sprite — thin / leafy things: the front picture as one quad turned to the camera.
+//   cross  — D111: open frames (chairs, potted plants): front + side pictures crossing in the middle, the top at `topAt`.
+//   model  — D96: drawn from a baked picture of the user's 3D model (render3d/propModels3d.js) — only the training tree
+//            now (D111: the office chairs, armchair and plants went back to the atlas, their models removed).
 export const PROP_MODELS = {
   workstation: { view: 'workstation' },
   terminal: { view: 'workstation' },
   exec_desk: { view: 'executive_desk' },
-  // D99 (user models): the desk chairs — the wheeled office chair (as the executive one)
-  chair: { view: 'mesh_chair', model: { file: 'exec_chair.glb', height: 32, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
-  // D96 (user models, assets/models/props): `model` — drawn from the 3D model (render3d/propModels3d.js); the view is the
-  // fallback while it loads. height — units; impostor — a camera-facing picture rendered from the model; fill — extra
-  // copies [turn rad, scale] rendered into it (a denser crown)
-  // D99: a 4-turn impostor (50 chairs × 2–7.5 k triangles would break the budget); brighter (user: too dark)
-  exec_chair: { view: 'executive_chair', model: { file: 'exec_chair.glb', height: 34, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
-  chair_meeting: { view: 'cantilever_chair', model: { file: 'meeting_chair.glb', height: 29, impostor: true, turns: true, bakeH: 256, vary: false, look: { gain: 1.1 } } },
+  // D111 (user): the chairs from the atlases (their 3D models removed) — `cross`: the front and side pictures as two
+  // crossing planes through the middle, the top picture at the seat (the measured surface); render3d/propViews.js
+  chair: { view: 'mesh_chair', cross: true },
+  exec_chair: { view: 'executive_chair', cross: true },
+  chair_meeting: { view: 'cantilever_chair', cross: true },
   conf_table: { view: 'conference_table' },
-  armchair: { view: 'lounge_armchair', model: { file: 'armchair.glb', height: 26, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.6, gain: 1.4 } } },
+  armchair: { view: 'lounge_armchair', surf: 1 }, // (a padded block, as the sofa)
   sofa: { view: 'sofa', surf: 1 }, // (its back rest is not something standing on a surface)
   coffee_table: { view: 'marble_coffee_table' },
   round_table: { view: 'round_meeting_table', drawH: 23 }, // D111: the table height of the other desks (cover)
@@ -51,18 +51,15 @@ export const PROP_MODELS = {
   boxes: { view: 'closed_boxes', pack: [2, 2, 2] },
   boxes_tall: { view: 'flight_cases', pack: [1, 2, 5] },
   open_box: { view: 'open_box' },
-  // D93: thin / leafy things — one picture turned to the camera (the outline walls suit solid furniture)
-  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], sprite: { lean: 1 },
-    model: { file: ['plant_broadleaf.glb', 'plant_palm.glb', 'plant_snake.glb', 'plant_dracaena.glb'], height: 42, impostor: true } },
+  // D111 (user): the potted plants from the atlases (their 3D models removed) — a cross through the pot, the crown seen
+  // from above laid in its middle
+  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], cross: true, topAt: 0.72 },
   planter: { view: 'long_planter', box: true }, // D111: its top view is the leaves — the box keeps the planter's own shape
   whiteboard: { view: 'mobile_whiteboard' },
   coat_stand: { view: 'coat_stand', sprite: { lean: 1 } },
   steel_bin: { view: 'steel_bin' },
   recycling_bin: { view: 'recycling_bin' },
   desk_lamp: { view: 'desk_lamp' },
-  // D111: the rugs — the user's new rug (lies on the floor)
-  rug_large: { view: 'rug', flatTop: true },
-  rug_small: { view: 'rug', flatTop: true },
   // on the walls
   wall_light: { view: 'wall_light', wall: true, at: 66 },
   notice_board: { view: 'cork_board', wall: true, at: 40 },
