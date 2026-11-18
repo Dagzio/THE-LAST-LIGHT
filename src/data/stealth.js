@@ -42,7 +42,9 @@ export const STEALTH = {
   // killAt: the clip's 1.9 s → 1.9 / 3.0 × 2.4 ≈ 1.52 s. A guard who sees the struggle raises the alarm (witness))
   // D88: reach 44 → 56, rear arc 140° → 160° (easier to start); the victim is held where he stood (no body push)
   // D93: kickAt / punchAt — clip times (s) of the two blows (the right foot's / hand's speed peak, measured): their sounds
-  takedown: { reach: 56, rearArcDeg: 160, duration: 2.4, killAt: 1.52, snap: 0.2, behind: 24, clipFrom: 0, clipTo: 3.0, kickAt: 0.34, punchAt: 1.9 },
+  // D98 (user): the takedown plays 1.7× faster — duration 2.4 → 1.41 s, the kill 1.52 → 0.89 s (the blows' sounds follow
+  // the clip time by themselves), the step-in 0.2 → 0.12 s
+  takedown: { reach: 56, rearArcDeg: 160, duration: 1.41, killAt: 0.894, snap: 0.12, behind: 24, clipFrom: 0, clipTo: 3.0, kickAt: 0.34, punchAt: 1.9 },
   // D88: a guard who spots the hero (or is wounded, or sees a kill) needs `radio` s to raise the alarm — downed before
   // that, there is no alarm (a red bar over him shows the call)
   spotted: { radio: 2.0 },

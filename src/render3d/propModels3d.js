@@ -53,13 +53,19 @@ export function bakeImpostors(renderer) {
   for (const m of Object.values(PROP_MODELS)) if (m.model && m.model.impostor) for (const f of [].concat(m.model.file)) if (raw.has(f) && !baked.has(f)) todo.push([f, m.model]);
   if (!todo.length) return;
   const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a80, 2.2));
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8a80, 2.2);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xffffff, 1.0);
   sun.position.set(-0.3, 1, 0.35);
   scene.add(sun);
   const prevTarget = renderer.getRenderTarget(), prevClear = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
   for (const [f, cfg] of todo) {
     const { geometry, texture } = raw.get(f);
+    // D98: a model may ask for its own light (a tree: less fill, a stronger key from the scene's sun side — volume)
+    const L = cfg.look || {};
+    hemi.intensity = L.hemi ?? 2.2;
+    sun.intensity = L.sun ?? 1.0;
+    sun.position.set(-0.32, 0.8, 0.3); // (the level's sun: up, from the left and towards the camera)
     const group = new THREE.Group();
     const mat = new THREE.MeshLambertMaterial({ map: texture });
     // the model + its fill copies (turned, shrunk towards the crown's middle)
@@ -99,6 +105,7 @@ export function bakeImpostors(renderer) {
     rt.dispose();
     scene.remove(group);
     mat.dispose();
+    if (cfg.look) grade(px, W, H, cfg.look);
     const tex = new THREE.DataTexture(px, W, H, THREE.RGBAFormat);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.magFilter = THREE.LinearFilter;
@@ -133,7 +140,10 @@ export function buildPropModels(props, shadows) {
         const g = new THREE.PlaneGeometry((b.w1 - b.w0) * s, (b.y1 - b.y0) * s);
         g.translate(((b.w0 + b.w1) / 2) * s, ((b.y0 + b.y1) / 2) * s, 0);     // the model's base point at the origin
         g.rotateX(-LEAN);
-        g.translate(p.x, p.elev || 0, p.y);
+        // D98: the part of the picture below the base point (the crown's near side) would sink under the ground and be cut
+        // off flat — the quad is moved along the camera's view line (the picture stays put on screen) until it is above
+        const low = Math.min(0, b.y0 * s) * Math.cos(LEAN), t = -low / Math.cos(TILT) + 0.5;
+        g.translate(p.x, (p.elev || 0) + t * Math.cos(TILT), p.y + t * Math.sin(TILT));
         parts.push(g);
       }
       const geo = mergeQuads(parts);
@@ -190,4 +200,46 @@ function mergeQuads(parts) {
   out.setIndex(idx);
   out.computeBoundingSphere();
   return out;
+}
+
+/**
+ * D98 (user: the trees looked flat and too green for the place): the baked picture graded —
+ *   tint / mix: the colour pulled towards the level's palette (olive greens of the grass), keeping its light and shade;
+ *   shade: the crown darker towards its bottom and its inner (lower) side — the ambient occlusion of a real crown;
+ *   rim: its upper-left edge (the sun side) a little lighter. px: RGBA bytes, rows bottom-up (WebGL readback).
+ */
+function grade(px, W, H, L) {
+  const [tr, tg, tb] = L.tint || [1, 1, 1], mix = L.mix ?? 0, shade = L.shade ?? 0, rim = L.rim ?? 0, sphere = L.sphere ?? 0;
+  // the picture's opaque rows (bottom-up) — the shading follows the crown, not the whole picture
+  let top = 0, bot = H;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x += 4) if (px[(y * W + x) * 4 + 3] > 40) { bot = Math.min(bot, y); top = Math.max(top, y); }
+  const span = Math.max(1, top - bot);
+  // D98: the crown as a ball — its middle and size from the opaque pixels; a light from the sun's side (up-left, front)
+  let cx = 0, cy = 0, n = 0, x0 = W, x1 = 0;
+  for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) if (px[(y * W + x) * 4 + 3] > 40) { cx += x; cy += y; n++; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+  cx /= n || 1; cy /= n || 1;
+  const rx = Math.max(1, (x1 - x0) / 2), ry = Math.max(1, span / 2);
+  const lx = -0.5, ly = 0.55, lz = 0.67;
+  // the alpha a few px up-left (rim: the edge facing the sun)
+  const a = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? 0 : px[(y * W + x) * 4 + 3]);
+  const R = Math.max(2, Math.round(W / 90));
+  for (let y = 0; y < H; y++) {
+    const v = (y - bot) / span; // 0 bottom … 1 top
+    const ao = 1 - shade * Math.pow(1 - Math.min(1, Math.max(0, v)), 1.6);
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (px[i + 3] < 8) continue;
+      let r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
+      const lum = 0.3 * r + 0.59 * g + 0.11 * b;
+      r += (lum * tr - r) * mix; g += (lum * tg - g) * mix; b += (lum * tb - b) * mix;
+      let k = ao;
+      if (sphere > 0) { // lambert on the ball's normal, eased (never black: 1 − sphere … 1 + sphere / 2)
+        const nx = (x - cx) / rx, ny = (y - cy) / ry, q = Math.min(1, nx * nx + ny * ny), nz = Math.sqrt(1 - q);
+        const d = Math.max(0, nx * lx + ny * ly + nz * lz);
+        k *= 1 - sphere + sphere * 1.5 * d;
+      }
+      if (rim > 0 && a(x - R, y + R) < 40) k *= 1 + rim; // the up-left neighbour is outside the crown: a lit edge
+      px[i] = Math.min(255, r * k * 255); px[i + 1] = Math.min(255, g * k * 255); px[i + 2] = Math.min(255, b * k * 255);
+    }
+  }
 }

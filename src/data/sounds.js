@@ -47,6 +47,7 @@ export const SFX_FILES = {
   // D93 (user files): the takedown's blows — the kick, then the hand (StealthDirector `takedownBlow`); the leading
   // silence trimmed so the hit sounds on the clip's contact frame
   legPunch: { file: 'player/leg-punch.mp3', trim: 0.12, gain: 1 },
+  flip: { file: 'player/flip.mp3', trim: 0.04, gain: 1 },             // D98 (user file): the roll (≈ 1 s, the roll's own length)
   handPunch: { file: 'player/hand-punch.mp3', trim: 0.11, gain: 1 },
   playerHurt1: { file: 'player/player-hitted1.mp3', gain: 1 },
   playerHurt2: { file: 'player/player-hitted2.mp3', trim: 0.025, gain: 1 },

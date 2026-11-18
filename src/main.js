@@ -85,6 +85,8 @@ function wireCombatSounds(events, game) {
     }
     steps.feet = n;
   });
+  // D98 (user file): the roll — its whoosh from the dive
+  events.on('dash', () => Sfx.play('flip', 0.97 + Math.random() * 0.06, { voices: 1 }));
   // D93 (user files): the takedown's two blows on the clip's contact frames
   events.on('takedownBlow', (kind) => Sfx.play(kind === 'kick' ? 'legPunch' : 'handPunch', 0.97 + Math.random() * 0.06, { voices: 1 }));
 }

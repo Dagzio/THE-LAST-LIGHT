@@ -70,7 +70,10 @@ export const PROP_MODELS = {
   // D90: foliage — one picture turned to the camera (render3d/propViews.js `sprite`), not a box of views
   // D96: the user's tree model; the crown made denser (two more copies turned / shrunk fill the holes in the leaves)
   tree: { view: 'deciduous_tree', top: 1, atlas: 'training', drawW: 120, drawD: 120, sprite: { lean: 1 },
-    model: { file: 'tree.glb', height: 150, impostor: true, fill: [[1.1, 0.93], [2.3, 0.86], [3.6, 0.95]], fillAt: 0.62 } },
+    // D98 (user: flat, too green): a stronger key light + less fill, the crown's bottom shaded, a lit sun-side edge, the
+    // colour pulled to the yard's olive grass
+    model: { file: 'tree.glb', height: 150, impostor: true, fill: [[1.1, 0.93], [2.3, 0.86], [3.6, 0.95]], fillAt: 0.62,
+      look: { hemi: 1.1, sun: 2.4, tint: [1.55, 1.6, 0.62], mix: 0.55, shade: 0.3, rim: 0.22, sphere: 0.55 } } },
   boulder: { view: 'boulder', top: 1, atlas: 'training' },
   bush: { view: 'leafy_bush', top: 0.9, atlas: 'training', sprite: { lean: 1 } },
   grass_tuft: { view: 'grass_tuft', top: 0.8, atlas: 'training', sprite: { lean: 1 } },
