@@ -544,9 +544,12 @@ export class HumanView {
     const lowOn = !dead && !rolling && !tdOn && (st.cover === 'low' || !!st.crouch) && !!cv.lowIdle;
     // D87: aiming in high cover = leaning out of its corner ("Female Peek And Aim" by the lean, st.peek 0…1)
     const peekK = st.cover === 'high' ? st.peek || 0 : 0;
+    // D101 (user video: the peek looked awful — the Peek And Aim clips lean / aim sideways and down while the rounds fly
+    // to the aim behind the wall): back to the wall he holds the cover pose; leaning out it fades away (by the lean)
+    // into the plain standing aim pose while the body turns to the aim through the open side (MissionRun)
     const highOn = !dead && !rolling && st.cover === 'high' && (!st.aim || peekK > 0) && !!(cv.peekL || cv.peekR);
     const lowW = ease('low', lowOn ? 1 : 0, 1.3) * (1 - dg);
-    const highW = ease('high', highOn ? 1 : 0, 1.3) * (1 - dg) * (1 - lowW);
+    const highW = ease('high', highOn ? 1 : 0, 1.3) * (1 - dg) * (1 - lowW) * (1 - smooth(0, 1, peekK));
     const busyW = ease('busy', st.busy && !dead && this.busy ? 1 : 0, 0.8) * (1 - dg) * (1 - lowW) * (1 - highW);
     // stand ↔ kneel: the user's transition clips, a short part of each, blended over the layers
     if (lowOn !== this.lowWas) {
@@ -687,7 +690,7 @@ export class HumanView {
     // right, −1 his left)
     const peekA = (st.peekSide < 0 ? cv.peekL : cv.peekR) || cv.peekL || cv.peekR;
     fw(peekA, hw * (1 - cm));
-    if (peekA) peekA.time = peekK > 0 ? A.peekFrom + (A.peekHoldAt - A.peekFrom) * smooth(0, 1, peekK) : 0; // (0 → back to the wall)
+    if (peekA) peekA.time = 0; // D101: only its first frame — back to the wall, the gun up (the lean is the aim pose)
     fw(cv.highL, hw * cm * shL); fw(cv.highR, hw * cm * shR);
     // the crouch / cover set in step too (its own clips; the stand clips are idle while it plays)
     if (lw + hw > 1e-3) this._gaitStep(dt, sp, [cv.walk, cv.lowL, cv.lowR, cv.coverSL, cv.coverSR, cv.highL, cv.highR], crouchBack);

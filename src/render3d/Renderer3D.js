@@ -840,7 +840,7 @@ export class Renderer3D {
       takedownFrom: STEALTH.takedown.clipFrom, takedownTo: STEALTH.takedown.clipTo,
     });
     // D90: in cover the model hugs the object (eased in / out; facing it to fire over low cover — no hug)
-    const hugOn = p.alive && p.cover && !p.dodging && (p.cover.kind === 'high' || !run.heroAiming);
+    const hugOn = p.alive && p.cover && !p.dodging && !p.peek && (p.cover.kind === 'high' || !run.heroAiming); // (D101: not leaning out)
     const hug = hugOn ? (p.cover.kind === 'low' ? HUMAN_ANIM.coverHugLow : HUMAN_ANIM.coverHugHigh) : 0;
     const hk = Math.min(1, (this.frameDt || 0) * 12);
     this.hugX = (this.hugX || 0) + ((hugOn ? -p.cover.nx * hug : 0) - (this.hugX || 0)) * hk;

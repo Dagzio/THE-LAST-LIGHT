@@ -186,7 +186,8 @@ export function buildPropModels(props, shadows) {
       const geo = mergeQuads(parts);
       const mat = new THREE.MeshLambertMaterial({ map: b.texture, alphaTest: 0.45, side: THREE.DoubleSide });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.castShadow = shadows;
+      mesh.castShadow = shadows && m.castShadow !== false;
+      if (m.groundShadow) out.push(groundShadows(list, m));
       mesh.receiveShadow = false;
       mesh.matrixAutoUpdate = false;
       out.push(mesh);
@@ -268,7 +269,9 @@ function grade(px, W, H, L) {
       if (px[i + 3] < 8) continue;
       let r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
       const lum = 0.3 * r + 0.59 * g + 0.11 * b;
-      r += (lum * tr - r) * mix; g += (lum * tg - g) * mix; b += (lum * tb - b) * mix;
+      // D101: only the foliage takes the tint (by its greenness) — the trunk keeps its bark brown
+      const gm = mix * Math.min(1, Math.max(0, (g - Math.max(r, b)) * 6));
+      r += (lum * tr - r) * gm; g += (lum * tg - g) * gm; b += (lum * tb - b) * gm;
       let k = ao * gain;
       if (sphere > 0) {
         const nx = (x - cx) / rx, ny = (y - cy) / ry, q = Math.min(1, nx * nx + ny * ny), nz = Math.sqrt(1 - q);
@@ -279,4 +282,31 @@ function grade(px, W, H, L) {
       px[i] = Math.min(255, r * k * 255); px[i + 1] = Math.min(255, g * k * 255); px[i + 2] = Math.min(255, b * k * 255);
     }
   }
+}
+
+// D101: the level's sun casts towards +x / −z (render3d/Renderer3D.js SUN_DIR −260, 820, 300 → shadows the other way)
+const SHADOW_DIR = new THREE.Vector2(260, -300).normalize();
+let shadowTex = null;
+
+/** D101: soft ground shadows under model props (a tree: from its trunk towards the sun's shadow side) — one mesh. */
+function groundShadows(list, m) {
+  if (!shadowTex) {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31);
+    gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.65)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    shadowTex = new THREE.CanvasTexture(c);
+  }
+  const G = m.groundShadow, parts = [];
+  for (const p of list) {
+    const h = m.height * (p.scale || 1), r = h * G.r, o = h * G.off;
+    const q = new THREE.PlaneGeometry(r * 2, r * 1.7);
+    q.rotateX(-Math.PI / 2);
+    q.translate(p.x + SHADOW_DIR.x * o, 0.6, p.y + SHADOW_DIR.y * o);
+    parts.push(q);
+  }
+  const mesh = new THREE.Mesh(mergeQuads(parts), new THREE.MeshBasicMaterial({ map: shadowTex, color: 0x000000, transparent: true, opacity: G.alpha ?? 0.5, depthWrite: false }));
+  mesh.renderOrder = 2;
+  mesh.matrixAutoUpdate = false;
+  return mesh;
 }

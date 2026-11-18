@@ -276,9 +276,21 @@ export class MissionRun {
     const cover = p.cover && !firing ? p.cover : null; // D83: in cover he keeps facing it while moving along it
     p.aimPose = false;
     if (p.dodging) p.bodyAngle = Math.atan2(p.dodgeDirY, p.dodgeDirX);
-    // D100 (user: the body spun around before / in the lean): leaning out of the corner he stays back to the wall — the
-    // user's Peek And Aim Left / Right clips do the lean and the aim themselves (no aim pose turning him to the aim)
-    else if (p.peek && p.cover) p.bodyAngle = Math.atan2(p.cover.ny, p.cover.nx);
+    // D101 (user video: the peek looked awful): leaning out of the corner he turns from his back-to-the-wall facing to
+    // the aim as he leans (by the lean k), always through the OPEN side of the corner (never through the wall), and
+    // holds the gun up in the plain aim pose once mostly out — the shots then leave along the barrel
+    else if (p.peek && p.cover) {
+      const n = Math.atan2(p.cover.ny, p.cover.nx), pk = p.peek;
+      const d = Math.hypot(p.aimX - p.x, p.aimY - p.y);
+      const aimA = p.hasAim ? p.aimAngle - barrelOffsetAngle(muzzleOf(this.weapon.stats.gun), d) : n;
+      const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+      const open = Math.atan2(p.cover.nx * pk.side, -p.cover.ny * pk.side), sgn = Math.sign(wrap(open - n)) || 1;
+      let delta = wrap(aimA - n);
+      if (Math.sign(delta) !== sgn && Math.abs(delta) > 0.05) delta += sgn * 2 * Math.PI;
+      const k = pk.k * pk.k * (3 - 2 * pk.k);
+      p.bodyAngle = n + delta * k;
+      p.aimPose = p.hasAim && pk.k > 0.15; // (the gun up through the turn)
+    }
     else if (cover) p.bodyAngle = Math.atan2(cover.ny, cover.nx); // D90 (user): back to it, low cover too (turns to fire)
     else if (firing || (mouse && (!moving || FACING.alwaysAimMouse))) {
       const d = Math.hypot(p.aimX - p.x, p.aimY - p.y);
