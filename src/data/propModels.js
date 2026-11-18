@@ -73,14 +73,9 @@ export const PROP_MODELS = {
   // D99 (user): the user's second, detailed tree (60 MB, 2 M triangles) — its picture baked OFFLINE from the model
   // (tools/bake-impostor.html: 785 × 768 webp, 79 KB) — the game never loads the model
   tree: { view: 'deciduous_tree', top: 1, atlas: 'training', drawW: 120, drawD: 120, sprite: { lean: 1 },
-    // D100 (user: the trees looked like huge bushes): baked from 62° off the vertical (tools/bake-impostor.html tilt=62)
-    // — the trunk and the height show; drawn 170 high
-    // D101 (user: tilt it more, put it on the ground, foliage in the place's tone): baked from 74°, the foliage graded to
-    // the olive grass (the trunk keeps its brown); no cast shadow from the lifted picture (it fell away from the trunk —
-    // the tree seemed to float): a soft ground shadow from the trunk instead (`groundShadow`: radius, offset — parts of
-    // the height, along the level sun's shadow direction)
-    model: { file: 'tree_big', height: 175, lift: 75, castShadow: false, groundShadow: { r: 0.36, off: 0.22, alpha: 0.5 },
-      baked: { file: 'tree_big.webp', frame: [-0.4816, 0.4816, -0.0391, 0.9916] } } },
+    // D103 (user: back on the ground, much less tilt — mostly from above, a bit of trunk, volume as the first one): baked
+    // from 48° (the D99 volume look + the olive foliage), standing on its base (no lift), its own cast shadow
+    model: { file: 'tree_big', height: 150, baked: { file: 'tree_big.webp', frame: [-0.4816, 0.4816, -0.0666, 0.8943] } } },
   boulder: { view: 'boulder', top: 1, atlas: 'training' },
   bush: { view: 'leafy_bush', top: 0.9, atlas: 'training', sprite: { lean: 1 } },
   grass_tuft: { view: 'grass_tuft', top: 0.8, atlas: 'training', sprite: { lean: 1 } },
