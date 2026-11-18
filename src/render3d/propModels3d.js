@@ -18,7 +18,6 @@ import { CAMERA } from '../config/camera.js';
 const DIR = 'assets/models/props/';
 const TILT = (CAMERA.tilt * Math.PI) / 180;
 const LEAN = Math.PI / 2 - TILT;                  // the sprite quad leans back by this (faces the camera)
-const UP = new THREE.Vector3(0, Math.sin(TILT), -Math.cos(TILT)); // the camera's up on the ground plane's frame
 const BAKE_H = 512;                               // px: the impostor picture's height (cfg.bakeH overrides)
 
 const raw = new Map();     // file → { geometry (height 1, base at y 0), texture }
@@ -73,6 +72,10 @@ export function modelOf(p) {
  */
 export function renderImpostor(renderer, geometry, texture, cfg) {
   const L = cfg.look || {}, turns = cfg.turns ? 4 : 1, H = cfg.bakeH || BAKE_H;
+  // D100 (user: the trees looked like huge bushes): a picture may be taken from lower than the game camera (bakeTilt,
+  // degrees from the vertical) — a tree then shows its trunk and height (the usual top-down game cheat)
+  const tilt = cfg.bakeTilt != null ? (cfg.bakeTilt * Math.PI) / 180 : TILT;
+  const up = new THREE.Vector3(0, Math.sin(tilt), -Math.cos(tilt));
   const scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a80, L.hemi ?? 2.2));
   const sun = new THREE.DirectionalLight(0xffffff, L.sun ?? 1.0);
@@ -95,7 +98,7 @@ export function renderImpostor(renderer, geometry, texture, cfg) {
     const a = -r * (Math.PI / 2) + (cfg.turn || 0), c = Math.cos(a), s = Math.sin(a);
     for (let i = 0; i < pos.count; i += 2) {
       v.fromBufferAttribute(pos, i);
-      const x = v.x * c + v.z * s, z = -v.x * s + v.z * c, u = v.y * UP.y + z * UP.z;
+      const x = v.x * c + v.z * s, z = -v.x * s + v.z * c, u = v.y * up.y + z * up.z;
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (u < y0) y0 = u; if (u > y1) y1 = u;
     }
   }
@@ -103,8 +106,8 @@ export function renderImpostor(renderer, geometry, texture, cfg) {
   x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
   const W = Math.max(16, Math.round((H * (x1 - x0)) / (y1 - y0)));
   const cam = new THREE.OrthographicCamera(x0, x1, y1, y0, 0.01, 20);
-  cam.position.set(0, Math.cos(TILT) * 8, Math.sin(TILT) * 8);
-  cam.up.copy(UP);
+  cam.position.set(0, Math.cos(tilt) * 8, Math.sin(tilt) * 8);
+  cam.up.copy(up);
   cam.lookAt(0, 0, 0);
   const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4 });
   rt.texture.colorSpace = THREE.SRGBColorSpace; // (written as sRGB — read back as sRGB: no double darkening)
@@ -174,7 +177,9 @@ export function buildPropModels(props, shadows) {
         g.rotateX(-LEAN);
         // D98: the part of the picture below the base point (the crown's near side) would sink under the ground and be
         // cut off flat — the quad is moved along the camera's view line (the picture stays put on screen) above it
-        const low = Math.min(0, fy0 * s) * Math.cos(LEAN), t = -low / Math.cos(TILT) + 0.5;
+        // D100: `lift` — moved further along it (a tall tree's picture leans back over the yard walls behind it and was cut
+        // by them; lifted towards the camera it passes over them, the same on screen)
+        const low = Math.min(0, fy0 * s) * Math.cos(LEAN), t = -low / Math.cos(TILT) + 0.5 + (m.lift || 0);
         g.translate(p.x, (p.elev || 0) + t * Math.cos(TILT), p.y + t * Math.sin(TILT));
         parts.push(g);
       }

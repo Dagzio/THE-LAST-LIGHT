@@ -276,6 +276,9 @@ export class MissionRun {
     const cover = p.cover && !firing ? p.cover : null; // D83: in cover he keeps facing it while moving along it
     p.aimPose = false;
     if (p.dodging) p.bodyAngle = Math.atan2(p.dodgeDirY, p.dodgeDirX);
+    // D100 (user: the body spun around before / in the lean): leaning out of the corner he stays back to the wall — the
+    // user's Peek And Aim Left / Right clips do the lean and the aim themselves (no aim pose turning him to the aim)
+    else if (p.peek && p.cover) p.bodyAngle = Math.atan2(p.cover.ny, p.cover.nx);
     else if (cover) p.bodyAngle = Math.atan2(cover.ny, cover.nx); // D90 (user): back to it, low cover too (turns to fire)
     else if (firing || (mouse && (!moving || FACING.alwaysAimMouse))) {
       const d = Math.hypot(p.aimX - p.x, p.aimY - p.y);

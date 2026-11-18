@@ -2,6 +2,7 @@
 // never keys or DOM — keyboard and touch drive it the same way.
 import { PLAYER, COVER, dodgeTravel, dodgeOf } from '../data/player.js';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../config/constants.js';
+import { BLOCK } from './Collision.js';
 
 const move = { x: 0, y: 0 }; // reused
 const aim = { x: 0, y: 0 };
@@ -144,9 +145,10 @@ export class PlayerController {
     if (!p.cover || p.cover.kind !== 'high' || p.dodging || !p.alive) { p.peek = null; return wantFire; }
     // D99 (user): aimed away from the wall (in front of him) he simply fires from where he stands — leaning out of the
     // corner is only for an aim behind the wall; aimed into the wall away from a corner the trigger does nothing (no hint)
+    // D100 (user: by a corner he fired into the wall's end): only when the line to the aim is clear of the wall close by
     if (wantFire && !p.peek && p.hasAim) {
       const dx = p.aimX - p.x, dy = p.aimY - p.y, L = Math.hypot(dx, dy) || 1;
-      if ((dx * p.cover.nx + dy * p.cover.ny) / L > C.frontDot) return true;
+      if ((dx * p.cover.nx + dy * p.cover.ny) / L > C.frontDot && this._clearShot(p)) return true;
     }
     if (wantFire) {
       if (!p.peek) {
@@ -167,7 +169,18 @@ export class PlayerController {
     if (!out && pk.k <= 0) { p.x = pk.baseX; p.y = pk.baseY; p.peek = null; return false; }
     // D97 (user: the first shot after leaning out made a sound and took a round but no bullet flew — half out, the
     // barrel was still behind the corner and the wall took the shot): it fires only once he is fully out
-    return wantFire && pk.k >= 1;
+    // D100: fully out, and still no wall right in front of the barrel (the aim past the corner's own end) — else no
+    // shot (no round wasted into the wall)
+    return wantFire && pk.k >= 1 && this._clearShot(p);
+  }
+
+  /** D100: is the line from him to the aim free of walls / tall cover for the first COVER.clearShot units? */
+  _clearShot(p) {
+    if (!this.world || !p.hasAim) return true;
+    const dx = p.aimX - p.x, dy = p.aimY - p.y, L = Math.hypot(dx, dy);
+    if (L < 1) return false;
+    const n = Math.min(L, COVER.clearShot), t = this.world.segmentHit(p.x, p.y, p.x + (dx / L) * n, p.y + (dy / L) * n, 0, null, BLOCK.BULLET);
+    return t === Infinity;
   }
 
   /** In cover: steps up to the object first, then moves only along it (kneeling / sneaking sideways). */

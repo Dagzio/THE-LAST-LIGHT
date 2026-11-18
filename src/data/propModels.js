@@ -73,7 +73,9 @@ export const PROP_MODELS = {
   // D99 (user): the user's second, detailed tree (60 MB, 2 M triangles) — its picture baked OFFLINE from the model
   // (tools/bake-impostor.html: 785 × 768 webp, 79 KB) — the game never loads the model
   tree: { view: 'deciduous_tree', top: 1, atlas: 'training', drawW: 120, drawD: 120, sprite: { lean: 1 },
-    model: { file: 'tree_big', height: 150, baked: { file: 'tree_big.webp', frame: [-0.4816, 0.4816, -0.2466, 0.6959] } } },
+    // D100 (user: the trees looked like huge bushes): baked from 62° off the vertical (tools/bake-impostor.html tilt=62)
+    // — the trunk and the height show; drawn 170 high
+    model: { file: 'tree_big', height: 170, lift: 75, baked: { file: 'tree_big.webp', frame: [-0.4816, 0.4816, -0.0526, 0.9566] } } },
   boulder: { view: 'boulder', top: 1, atlas: 'training' },
   bush: { view: 'leafy_bush', top: 0.9, atlas: 'training', sprite: { lean: 1 } },
   grass_tuft: { view: 'grass_tuft', top: 0.8, atlas: 'training', sprite: { lean: 1 } },
