@@ -47,7 +47,8 @@ const CHAR_LOOK = {
 const MAX_BULLETS = 200;
 const MAX_BARS = 32;
 const MAX_POOLS = 40;
-const MAX_HL = 12; // D90: highlighted objects of a lesson at once
+const MAX_HL = 12;
+const CAM_LEAD = 0.18; // D107: the phone camera's lead ahead of the moving hero (part of the view) // D90: highlighted objects of a lesson at once
 const TILT = (CAMERA.tilt * Math.PI) / 180;
 const SHOT_FLASH = 0.05;
 // D92: the fall of the dead — the clips fall forward ~25 units (hips) and lie ~60 long; the turn towards free room
@@ -571,6 +572,7 @@ export class Renderer3D {
   /** Builds the level and returns the shader warm-up promise (no frames until it is ready). */
   loadMap(level, spawnX, spawnY) {
     this.unloadMap();
+    this.leadX = 0; this.leadY = 0; // D107
     this.map = level;
     // D93: the load's progress — the scene built (now), the shaders warmed, the textures arrived, the first frames drawn
     const ls = this.loadState = { t0: performance.now(), warmed: false, tex0: TEX.done, texWant: 0, frames: 0 };
@@ -750,7 +752,16 @@ export class Renderer3D {
     // D95 (user: the aim drifted while leaning out): leaning out of the corner the camera stays on his spot in cover — the
     // cursor's ground point (the aim) does not slide with the lean, the shots go where he points
     const pk = p.peek, fx = pk ? pk.baseX : this._lx(p), fy = pk ? pk.baseY : this._ly(p);
-    if (!paused || falling) this.rig.follow(fx, fy, frameDt, this.map.width, this.map.height);
+    // D107 (user, the phone): the camera leads ahead of the moving hero (~18 % of the view towards where he walks, eased),
+    // centred on him again when he stands; a level zone may frame higher on a phone (the top hint covered the targets)
+    if (!paused && run.autoFire) {
+      const sp = Math.hypot(p.vx, p.vy), v = this.rig.view, k = Math.min(1, frameDt * 2.2);
+      const lx = sp > 8 && !p.cover ? (p.vx / sp) * v.w * CAM_LEAD : 0, ly = sp > 8 && !p.cover ? (p.vy / sp) * v.h * CAM_LEAD : 0;
+      const zid = run.levelWorld.zoneAt(p.x, p.y), zo = (this.map.touchFrame || {})[zid];
+      this.leadX = (this.leadX || 0) + (lx - (this.leadX || 0)) * k;
+      this.leadY = (this.leadY || 0) + (ly + (zo ? zo * v.h : 0) - (this.leadY || 0)) * k;
+    } else if (!run.autoFire) { this.leadX = 0; this.leadY = 0; }
+    if (!paused || falling) this.rig.follow(fx + (this.leadX || 0), fy + (this.leadY || 0), frameDt, this.map.width, this.map.height);
     this._placeCamera(time);
     this._sync(run, time);
     this.renderer.render(this.scene, this.camera);

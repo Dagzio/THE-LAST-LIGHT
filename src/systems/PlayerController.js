@@ -183,6 +183,28 @@ export class PlayerController {
     return wantFire && pk.k >= 1 && this._shotOk(p, p.x, p.y);
   }
 
+  /**
+   * D107: could he fire at (ax, ay) from his high cover right now (from where he stands, or leaning out of its corner)?
+   * — the mobile aim assist locks only such targets. Not in high cover: always.
+   */
+  canFireAt(p, ax, ay) {
+    if (!p.cover || p.cover.kind !== 'high') return true;
+    const sx = p.aimX, sy = p.aimY, sh = p.hasAim;
+    p.aimX = ax; p.aimY = ay; p.hasAim = true;
+    let ok = false;
+    if (p.peek) ok = this._shotOk(p, p.x, p.y) || this._shotOk(p, p.peek.baseX, p.peek.baseY);
+    else if (this._inFront(p) && this._shotOk(p, p.x, p.y)) ok = true;
+    else {
+      const side = this.coverEdge(p);
+      if (side) {
+        const tx = -p.cover.ny * side, ty = p.cover.nx * side;
+        if ((ax - p.x) * tx + (ay - p.y) * ty > 0) ok = this._shotOk(p, p.x + tx * COVER.peekOut, p.y + ty * COVER.peekOut);
+      }
+    }
+    p.aimX = sx; p.aimY = sy; p.hasAim = sh;
+    return ok;
+  }
+
   /** D105: the aim in front of him (away from the wall he leans on, not along it). */
   _inFront(p) {
     const dx = p.aimX - p.x, dy = p.aimY - p.y, L = Math.hypot(dx, dy) || 1;

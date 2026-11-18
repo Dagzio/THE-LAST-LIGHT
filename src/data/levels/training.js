@@ -26,6 +26,8 @@ export const TRAINING = {
   outdoor: true,             // render: no night windows / wall lamps / baseboards; the ground goes on outside
   outside: 'grass',
   enemyModel: 'enemyTraining', // D89: the user's training enemy model (data/humanModels.js), the office one elsewhere
+  // D107 (user): on a phone the cover yard is framed higher (part of the view; − = north) — the top hint covered the dummies
+  touchFrame: { cover: -0.2, range: -0.18 },
   noXray: true,                // D90 (user): no X-ray silhouette of the hero through the walls here
   footsteps: 'outdoor',        // D89 / D93: the user's steps1 on every floor here (data/sounds.js STEP_SETS)
   lighting: { hemi: 1.15, key: 1.55, exposure: 1.0, sky: 0xe4eeff, ground: 0x55663a, sun: 0xfff0d6, background: 0x6c8748 },

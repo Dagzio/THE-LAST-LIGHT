@@ -18,6 +18,7 @@ export class AutoAim {
 
   _valid(e, o, reach) {
     if (!e || !e.alive || e.bulletProof) return false; // D89: never at a target rounds cannot fell (training ground)
+    if (this.ok && !this.ok(e)) return false;
     const d = Math.hypot(e.x - o.x, e.y - o.y) - (e.radius || 0);
     if (!(d <= reach)) return false;
     if (this.inView && !this.inView(e.x, e.y)) return false; // D75: never at an enemy still off the screen
@@ -32,7 +33,8 @@ export class AutoAim {
    *   spot — the auto fire then leans him out), default his own position
    * @returns {object|null} the enemy aimed at (the keeper's aimAngle / aimX / aimY are set), or null
    */
-  update(p, enemies, range, from = null) {
+  update(p, enemies, range, from = null, ok = null) {
+    this.ok = ok; // D107: a target he can really fire at (high cover: only in front / past its corner)
     if (!p.alive || !(range > 0)) { this.target = null; return null; }
     const reach = range * this.cfg.rangeFactor, o = from || p;
     let best = null, bestD = Infinity;

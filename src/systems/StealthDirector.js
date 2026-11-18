@@ -113,7 +113,9 @@ export class StealthDirector {
     if (input.consumePressed('crouch')) p.sneak = !p.sneak;
     input.getMove(M);
     const tilt = Math.hypot(M.x, M.y);
-    const running = (input.isDown('run') || (input.analogActive() && tilt >= 0.95)) && tilt > 0.1;
+    // D107 (user: on a phone the full stick made him run — the stealth yard could not be sneaked): like on PC he sneaks by
+    // default; only the run key runs (the phone has none — it never runs in stealth)
+    const running = input.isDown('run') && tilt > 0.1;
     p.stance = p.dodging || running ? 'stand' : p.sneak ? 'crouch' : 'stand';
     p.moveMode = p.stance === 'crouch' || p.crouched ? 'crouch' : running ? 'run' : 'walk';
     // running is heard (walking and crouching are silent — NEW GAME.docx)

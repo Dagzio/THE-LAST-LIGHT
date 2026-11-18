@@ -521,7 +521,9 @@ export class MissionRun {
     const fire = input.isDown('fire') || (this.autoFire && !!input.peekPressed && input.peekPressed('fire')); // (a quick tap: one shot)
     // D89: a mode may give other things to aim at (the training ground's range: the targets)
     const aimAt = (this.mode && this.mode.aimTargets) || this.enemies;
-    if (this.autoFire && !this.grenadeArmed && p.alive) this.autoAim.update(p, aimAt, this.weapon.stats.range, this._peekFrom(p));
+    // D107 (user): in cover the aim still locks — in high cover only a target he can really fire at from there
+    const coverOk = p.cover && p.cover.kind === 'high' ? this._coverOk || (this._coverOk = (e) => this.controller.canFireAt(this.player, e.x, e.y)) : null;
+    if (this.autoFire && !this.grenadeArmed && p.alive) this.autoAim.update(p, aimAt, this.weapon.stats.range, this._peekFrom(p), coverOk);
     else this.autoAim.reset();
     const trigger = fire && !this.holdFire && !this.grenadeArmed && !p.dodging && !p.takedown; // D82: no shots mid-roll
     // D87: behind high cover — only leaning out of its corner (else the trigger does nothing; a hint says so)

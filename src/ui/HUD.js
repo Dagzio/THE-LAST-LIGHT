@@ -27,7 +27,6 @@ const TUT_UI = {
   reload: ['#hudWeapon', '[data-touch-action="reload"]'],
   cover: ['#coverPrompt', '#coverBtn'],
   takedown: ['#ctxPrompt', '#interactBtn'],
-  crouch: [null, '#crouchBtn'],
   grenade: ['#hudGrenade', '#grenadeBtn'],
   dash: ['.hud-actions .act-dash', '[data-touch-action="dash"]'],
 };
@@ -48,7 +47,7 @@ export class HUD {
       coverPrompt: $('coverPrompt'), coverBtn: $('coverBtn'),
       // D85 stealth
       stealth: $('stealthHud'), alertLabel: $('alertLabel'), vis: $('visLabel'), visText: $('visText'),
-      ctx: $('ctxPrompt'), ctxKey: $('ctxKey'), ctxText: $('ctxText'), crouchBtn: $('crouchBtn'),
+      ctx: $('ctxPrompt'), ctxKey: $('ctxKey'), ctxText: $('ctxText'),
       gBtns: [[$('grenadeBtn'), $('grenadeBtnCount')], [$('hudGrenade'), $('hudGrenadeCount')]].filter((b) => b[0]),
     };
     this.labelSize = new Map();
@@ -199,8 +198,6 @@ export class HUD {
       const v = m.heroVisibility, vis = v < 0.38 ? 'hidden' : v < 0.7 ? 'dim' : 'lit';
       if (vis !== c.vis) { c.vis = vis; el.vis.dataset.vis = vis; el.visText.textContent = T(`vis.${vis}`); }
     }
-    const crouch = p.stance === 'crouch';
-    if (crouch !== c.crouch && el.crouchBtn) { c.crouch = crouch; el.crouchBtn.classList.toggle('on', crouch); }
     // the context label over the target
     let key = '', x = 0, y = 0, h = 66;
     const it = run.interactTarget;

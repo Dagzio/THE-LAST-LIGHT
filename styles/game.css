@@ -1361,9 +1361,6 @@ body[data-mode="stealth"] #screen-game .stealth-hud { display: inline-flex; }
 .vis-label[data-vis="hidden"] { color: #6f8fb0; }
 .vis-label[data-vis="dim"] { color: #c4ccd6; }
 .vis-label[data-vis="lit"] { color: #ffd98a; }
-.crouch-neon { display: none; }
-body[data-mode="stealth"] .crouch-neon { display: inline-flex; }
-.crouch-neon.on { box-shadow: 0 0 0 2px #8fd8ff, 0 0 16px rgba(143, 216, 255, 0.75); }
 .ctx-prompt { pointer-events: none; }
 .ctx-prompt.takedown .kiosk-key { background: #c0261c; color: #fff; }
 body.map-over .ctx-prompt { display: none; }
@@ -1444,7 +1441,6 @@ body.map-over .dlg { display: none; }
   display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 3px; vertical-align: 1px;
   font: 800 0.72em / 1.3 var(--font-display); letter-spacing: 0.06em; color: #1b1e22; background: #f2d27a;
 }
-body[data-mode="tutorial"] .crouch-neon { display: inline-flex; }
 body.dlg-open #screen-game .hud-player, body.dlg-open #screen-game .touch-controls, body.dlg-open #screen-game .kiosk-prompt { visibility: hidden; }
 .dlg-rest { visibility: hidden; } /* D90: the letters not typed yet keep their place */
 /* D90 (user): the training ground lights up the control of the lesson — a pulsing gold glow + a tag with the key / TAP */
@@ -1518,6 +1514,6 @@ body.level-loading #screen-game .corner, body.level-loading #screen-game .kiosk-
 /* D93: the touch trigger zone (the right part of the screen) — invisible, except when a lesson lights it up */
 .touch-fire-zone { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: 96px; height: 96px; display: none; place-items: center; border-radius: 50%; pointer-events: none; }
 .touch-fire-zone svg { width: 62%; height: 62%; fill: none; stroke: #ffcf3a; stroke-width: 1.6; }
-.touch-fire-zone.tut-focus { display: grid; left: auto; right: calc(var(--safe-r, 0px) + 33%); top: 46%; translate: 50% -50%; background: rgba(10, 12, 16, 0.35); outline-offset: 6px; border-radius: 50%; }
+.touch-fire-zone.tut-focus { display: grid; left: auto; right: calc(var(--safe-r, 0px) + 33%); top: 66%; /* D107: lower, clear of the view */ translate: 50% -50%; background: rgba(10, 12, 16, 0.35); outline-offset: 6px; border-radius: 50%; }
 body.touch-firing .touch-fire-zone.tut-focus { background: rgba(255, 90, 60, 0.35); }
 .hud-slots .slot.tut-slot { border-color: #ffcf3a; color: #ffcf3a; animation: tutFocus 1s ease-in-out infinite; outline: 2px solid #ffcf3a; outline-offset: 2px; } /* D93 */
