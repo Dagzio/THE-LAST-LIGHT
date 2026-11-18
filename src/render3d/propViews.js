@@ -14,6 +14,7 @@ import { PROP_TYPES } from '../data/props.js';
 import { lightAt } from './officeLights.js';
 import { CAMERA } from '../config/camera.js';
 import { VIEW_OUTLINES } from '../data/viewOutlines.js';
+import { hasModel } from './propModels3d.js';
 
 // D90: foliage drawn as one picture turned to the camera (it never turns: no yaw) — leaning back by this angle
 const SPRITE_LEAN = Math.PI / 2 - (CAMERA.tilt * Math.PI) / 180;
@@ -164,7 +165,7 @@ function propFaces(p, out) {
 export function buildPropViews(props, lights = null, atlas = 'office') {
   const parts = [];
   for (const p of props) {
-    if (p.drawn === false) continue;
+    if (p.drawn === false || hasModel(p)) continue; // D96: drawn from its 3D model
     const m = PROP_MODELS[p.type];
     if (!m || (m.atlas || 'office') !== atlas) continue;
     propFaces(p, parts);

@@ -16,7 +16,10 @@ export const PROP_MODELS = {
   terminal: { view: 'workstation', top: 0.9 },
   exec_desk: { view: 'executive_desk', top: 0.9 },
   chair: { view: 'mesh_chair', top: 0.8 },
-  exec_chair: { view: 'executive_chair', top: 0.8 },
+  // D96 (user models, assets/models/props): `model` — drawn from the 3D model (render3d/propModels3d.js); the view is the
+  // fallback while it loads. height — units; impostor — a camera-facing picture rendered from the model; fill — extra
+  // copies [turn rad, scale] rendered into it (a denser crown)
+  exec_chair: { view: 'executive_chair', top: 0.8, model: { file: 'exec_chair.glb', height: 34 } },
   chair_meeting: { view: 'cantilever_chair', top: 0.8 },
   conf_table: { view: 'conference_table', top: 1 },
   armchair: { view: 'lounge_armchair', top: 0.85 },
@@ -44,7 +47,8 @@ export const PROP_MODELS = {
   boxes_tall: { view: 'flight_cases', top: 1 },
   open_box: { view: 'open_box', top: 1 },
   // D93: thin / leafy things — one picture turned to the camera (the outline walls suit solid furniture)
-  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], top: 0.75, sprite: { lean: 1 } },
+  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], top: 0.75, sprite: { lean: 1 },
+    model: { file: ['plant_broadleaf.glb', 'plant_palm.glb', 'plant_snake.glb', 'plant_dracaena.glb'], height: 42, impostor: true } },
   planter: { view: 'long_planter', top: 0.8 },
   whiteboard: { view: 'mobile_whiteboard', top: 1 },
   coat_stand: { view: 'coat_stand', top: 0.9, sprite: { lean: 1 } },
@@ -64,7 +68,9 @@ export const PROP_MODELS = {
   security_camera: { view: 'security_camera', wall: true, at: 70 },
   // D88: the training ground — the user's sheets in their own atlas (data/trainingViews.js)
   // D90: foliage — one picture turned to the camera (render3d/propViews.js `sprite`), not a box of views
-  tree: { view: 'deciduous_tree', top: 1, atlas: 'training', drawW: 120, drawD: 120, sprite: { lean: 1 } },
+  // D96: the user's tree model; the crown made denser (two more copies turned / shrunk fill the holes in the leaves)
+  tree: { view: 'deciduous_tree', top: 1, atlas: 'training', drawW: 120, drawD: 120, sprite: { lean: 1 },
+    model: { file: 'tree.glb', height: 150, impostor: true, fill: [[1.1, 0.93], [2.3, 0.86], [3.6, 0.95]], fillAt: 0.62 } },
   boulder: { view: 'boulder', top: 1, atlas: 'training' },
   bush: { view: 'leafy_bush', top: 0.9, atlas: 'training', sprite: { lean: 1 } },
   grass_tuft: { view: 'grass_tuft', top: 0.8, atlas: 'training', sprite: { lean: 1 } },

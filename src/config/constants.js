@@ -12,7 +12,7 @@ export const DEBUG_MODELS = false; // D93 (user): the viewer is out of the main 
  */
 export const CHEATS = true;
 
-export const BUILD_VERSION = '0.20.2-killlist-training';
+export const BUILD_VERSION = '0.21.0-killlist-training';
 
 /** Prefix for every localStorage key of the game (H5 §9). KILL LIST (D78): its own prefix, a new profile schema. */
 export const STORAGE_PREFIX = 'kl.';

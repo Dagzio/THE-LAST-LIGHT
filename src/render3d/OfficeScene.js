@@ -12,6 +12,7 @@ import { TILE, tileUV } from './officeAtlas.js';
 import { buildPropCards, hasSprite, propAtlasTexture, preloadPropAtlas } from './propSprites.js';
 import { levelLights, LIGHT_KINDS } from './officeLights.js';
 import { buildPropViews, hasView, propViewTexture, preloadPropViews, VIEW_ATLASES } from './propViews.js';
+import { buildPropModels } from './propModels3d.js';
 
 const POOL_GAIN = 0.9;    // D83: floor pool brightness per unit of light power
 // D83: floor decal kinds → atlas tiles (render3d/officeAtlas.js)
@@ -451,6 +452,9 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     group.add(vm);
     meshes.push(vm);
   }
+  // D96: the props drawn from the user's 3D models (impostor pictures / instanced meshes)
+  const modelMeshes = buildPropModels(level.props, shadows);
+  for (const mm of modelMeshes) group.add(mm);
   // the old sprite cards: only the props without views (overturned chair, broken monitor, papers, trolley)
   const cardGeo = buildPropCards({ ...level, props: level.props.filter((p) => !hasView(p)) }, lights);
   if (cardGeo) {
@@ -558,6 +562,8 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     },
     dispose() {
       for (const m of meshes) m.geometry.dispose();
+      // D96: their own materials; the merged impostor quads (an instanced model keeps the shared, cached geometry)
+      for (const mm of modelMeshes) { mm.material.dispose(); if (!mm.isInstancedMesh) mm.geometry.dispose(); }
       leafGeo.dispose();
       if (gateGeo) gateGeo.dispose();
       lockMesh.geometry.dispose();

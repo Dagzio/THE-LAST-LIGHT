@@ -7,6 +7,7 @@ import * as THREE from '../../lib/three.module.js';
 import { createRenderGuard, cpuCanvas } from './render-guard.js';
 import { createMaterials } from './materials.js';
 import { buildOfficeScene, officeMaterials, preloadOfficeTextures, setOfficeAnisotropy } from './OfficeScene.js';
+import { preloadPropModels, bakeImpostors } from './propModels3d.js';
 import { HumanTemplate, bakeGunGeometry } from './humans.js';
 import { parseSkinnedGLB, loadGLB, blobTexture } from './glb.js';
 import { HUMAN_MODELS, HUMAN_ANIM, GUN_MODELS, gunModelOf, enemyModelOf } from '../data/humanModels.js';
@@ -156,8 +157,10 @@ export class Renderer3D {
       Promise.all(Object.entries(GUN_MODELS).map(([id, e]) => loadGLB(e.file).then((m) => [id, m]))),
       loadGLB('assets/models/grenade.min.glb'),
       preloadOfficeTextures(),
+      preloadPropModels(), // D96: the user's prop models (trees, plants, the executive chair)
     ]);
     this.anims = animRes;
+    try { bakeImpostors(this.renderer); } catch (e) { console.error('prop impostors failed (the pictures stay)', e); } // D96
     this.templates = {};
     // phones: the 4K body textures are drawn at 2K (the files stay unchanged — user request: no compression)
     const maxTex = TOUCH ? 2048 : 4096;
