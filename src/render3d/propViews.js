@@ -76,10 +76,11 @@ function quad(rect, w, h, A) {
 /**
  * D111: a quad showing only a horizontal band of a picture — from f0 to f1 of its height (parts from the bottom).
  */
-function quadBand(rect, w, h, A, f0, f1) {
+function quadBand(rect, w, h, A, f0, f1, s0 = 0, s1 = 1) {
   const g = new THREE.PlaneGeometry(w, h).toNonIndexed();
   const [rx, ry, rw, rh] = rect;
-  const u0 = (rx + 0.5) / A.width, u1 = (rx + rw - 0.5) / A.width;
+  // D112: s0 … s1 — a part of the picture's width (a pot's columns)
+  const u0 = (rx + 0.5 + (rw - 1) * s0) / A.width, u1 = (rx + 0.5 + (rw - 1) * s1) / A.width;
   const vAt = (f) => 1 - (ry + rh - 0.5 - (rh - 1) * f) / A.height;
   const v0 = vAt(f0), v1 = vAt(f1);
   const uv = g.attributes.uv;
@@ -92,7 +93,7 @@ function quadBand(rect, w, h, A, f0, f1) {
  * (front / back / left / right by its outward normal), projected straight onto it (the picture's x / the depth → u).
  * D111: Hw — the walls' own height (up to the main surface); the pictures keep their mapping over the whole height H.
  */
-function outlineWalls(loop, W, D, H, item, A, Hw = H, inset = 0) {
+function outlineWalls(loop, W, D, H, item, A, Hw = H, inset = 0, y0 = 0) {
   let area = 0;
   for (let i = 0; i < loop.length; i++) { const [x0, z0] = loop[i], [x1, z1] = loop[(i + 1) % loop.length]; area += x0 * z1 - x1 * z0; }
   const sgn = area >= 0 ? 1 : -1; // (x, z) loop turning: the outward normal side
@@ -122,10 +123,56 @@ function outlineWalls(loop, W, D, H, item, A, Hw = H, inset = 0) {
     if (L < 0.3) continue;
     const nx = (ez / L) * sgn, nz = (-ex / L) * sgn; // outward (the loop's area > 0: counter-clockwise in x / z)
     const view = Math.abs(nz) >= Math.abs(nx) ? (nz > 0 ? 'front' : 'back') : nx > 0 ? 'right' : 'left';
-    const a = [x0, 0, z0], b = [x1, 0, z1], c = [x1, Hw, z1], d = [x0, Hw, z0];
+    const a = [x0, y0, z0], b = [x1, y0, z1], c = [x1, Hw, z1], d = [x0, Hw, z0];
     // outward-facing winding (seen from the normal's side: a → b → c counter-clockwise)
     const tri = sgn > 0 ? [a, c, b, a, d, c] : [a, b, c, a, c, d]; // ((b - a) × (c - a) ∝ (-ez, 0, ex): inward for sgn > 0)
     for (const p of tri) { pos.push(p[0], p[1], p[2]); nor.push(nx, 0, nz); uv.push(...uvOf(view, p[0], p[2], p[1])); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return g;
+}
+
+/** D112: the convex hull of a loop of [x, z] points (counter-clockwise; monotone chain). */
+function hull(loop) {
+  const p = [...loop].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+
+/**
+ * D112: a plant's crown — a closed "bulb" through rings of the top picture's outline: rings = [[y, scale, cx, cz], …]
+ * (the outline scaled about cx / cz). Every vertex takes the side picture its band faces at its own x / z and height,
+ * so the narrow bottom shows the stems in the pictures' middle and the widest ring the whole crown.
+ */
+function crownWalls(loop, W, D, H, item, A, rings) {
+  let area = 0;
+  for (let i = 0; i < loop.length; i++) { const [x0, z0] = loop[i], [x1, z1] = loop[(i + 1) % loop.length]; area += x0 * z1 - x1 * z0; }
+  const sgn = area >= 0 ? 1 : -1, n = loop.length;
+  const R = rings.map(([y, s, cx, cz]) => loop.map(([x, z]) => [cx + (x * W - cx) * s, y, cz + (z * D - cz) * s]));
+  const uvOf = (view, p) => {
+    const r = item[view] || item.front || item.back;
+    const [x, y, z] = p;
+    const u = view === 'front' ? (x + W / 2) / W : view === 'back' ? (W / 2 - x) / W : view === 'left' ? (z + D / 2) / D : (D / 2 - z) / D;
+    const [rx, ry, rw, rh] = r;
+    return [(rx + 0.5 + Math.min(1, Math.max(0, u)) * (rw - 1)) / A.width, 1 - (ry + 0.5 + (1 - Math.min(1, y / H)) * (rh - 1)) / A.height];
+  };
+  const pos = [], nor = [], uv = [];
+  for (let k = 0; k + 1 < R.length; k++) {
+    for (let i = 0; i < n; i++) {
+      const a = R[k][i], b = R[k][(i + 1) % n], c = R[k + 1][(i + 1) % n], d = R[k + 1][i];
+      const mx = ((a[0] + d[0]) - (b[0] + c[0])) / 2, mz = ((a[2] + d[2]) - (b[2] + c[2])) / 2, L = Math.hypot(mx, mz);
+      if (L < 0.2) continue;
+      const nx = (-mz / L) * sgn, nz = (mx / L) * sgn; // outward (as outlineWalls: the edge b − a turned)
+      const view = Math.abs(nz) >= Math.abs(nx) ? (nz > 0 ? 'front' : 'back') : nx > 0 ? 'right' : 'left';
+      const tri = sgn > 0 ? [a, c, b, a, d, c] : [a, b, c, a, c, d];
+      for (const p of tri) { pos.push(p[0], p[1], p[2]); nor.push(nx, 0, nz); uv.push(...uvOf(view, p)); }
+    }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -220,26 +267,34 @@ function lowPolyFaces(p, m, item, A, t, base, W, D, surf, outline, out) {
     for (const g of faces) out.push(g.applyMatrix4(base));
     return;
   }
-  if (m.cross && !m.wall) {
-    // D111 (user: the chairs / plants from the atlases too): open frames narrower than their footprint (a chair's seat
-    // and back, a pot under its leaves) — the front and side pictures as two crossing planes through the middle, the
-    // top picture laid at `topAt` (a part of the height: the seat, the middle of the crown)
-    const H = heightOf(m, item, t, W, D);
-    const sideP = item.left || item.right;
-    // split at the seat: what rises above it (a chair's back) stands where the side picture shows it (item.up), not in
-    // the middle of the seat (a thin fin of the back's profile showed above it)
-    const s = item.up && surf < 0.97 ? surf : 1, [ux, uz] = item.up || [0, 0];
-    const plane = (pic, w, f0, f1, ry, x, z) => {
-      if (!pic || f1 <= f0) return;
-      const h = H * (f1 - f0), g = quadBand(pic, w, h, A, f0, f1);
+  if (m.pot && item.pot && !m.wall) {
+    // D112 (user: the plants must have a solid pot joined by its texture, no crossing planes): the pot — a box of its
+    // measured size (item.pot: height, x0…x1 of the width, z0…z1 of the depth), each side showing that side picture's
+    // pot band (its own columns: the texture meets at the corners), the soil on top; the crown — walls along the top
+    // picture's outline from the pot's rim up (the leaves band of the pictures), the rosette seen from above on top
+    const H = heightOf(m, item, t, W, D), [ph, x0, x1, z0, z1] = item.pot, Hp = H * ph;
+    const px0 = (x0 - 0.5) * W, px1 = (x1 - 0.5) * W, pz0 = (z0 - 0.5) * D, pz1 = (z1 - 0.5) * D;
+    const pw = px1 - px0, pd = pz1 - pz0, cx = (px0 + px1) / 2, cz = (pz0 + pz1) / 2;
+    const side = (rect, w, s0, s1, ry, x, z) => {
+      if (!rect) return;
+      const g = quadBand(rect, w, Hp, A, 0, ph, s0, s1);
       if (ry) g.rotateY(ry);
-      g.translate(x, H * f0 + h / 2, z); faces.push(g);
+      g.translate(x, Hp / 2, z); faces.push(g);
     };
-    plane(front, W, 0, s, 0, 0, 0);
-    plane(sideP, D, 0, s, -Math.PI / 2, 0, 0);
-    plane(front, W, s, 1, 0, 0, uz * D);
-    plane(sideP, D, s, 1, -Math.PI / 2, ux * W, 0);
-    if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, H * Math.min(1, Math.max(0.03, m.topAt ?? surf)), 0); faces.push(g); }
+    side(item.front, pw, x0, x1, 0, cx, pz1);
+    side(item.back, pw, 1 - x1, 1 - x0, Math.PI, cx, pz0);       // (the back picture runs right → left)
+    side(item.left, pd, z0, z1, -Math.PI / 2, px0, cz);          // (the left one back → front)
+    side(item.right, pd, 1 - z1, 1 - z0, Math.PI / 2, px1, cz);
+    if (front) { const g = quadBand(front, pw, pd, A, Math.max(0, ph - 0.03), ph, x0, x1); g.rotateX(-Math.PI / 2); g.translate(cx, Hp - 0.3, cz); faces.push(g); }
+    if (outline) {
+      // the crown: from the pot's rim (the outline shrunk to the pot) out to the whole crown at its middle, a little in
+      // again at the top — a rounded volume, not a column
+      const sPot = Math.min(1, Math.max(pw / W, pd / D)), yMid = Hp + (H - Hp) * 0.55;
+      const rings = [[Hp, sPot, cx, cz], [yMid, 1, 0, 0], [H, 0.75, 0, 0]];
+      // (the convex hull of the leaves' outline: the star of leaf tips made the bulb's sides a row of slats)
+      for (const loop of outline) faces.push(crownWalls(hull(loop), W, D, H, item, A, rings));
+    }
+    if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, H * (m.topAt ?? 0.82), 0); faces.push(g); }
     for (const g of faces) out.push(g.applyMatrix4(base));
     return;
   }

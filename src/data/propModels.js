@@ -13,18 +13,19 @@
 // render3d/propViews.js lowPolyFaces; the training ground keeps its own atlas and the older `top` factor.
 // D93: the side walls follow the top picture's outline (data/viewOutlines.js) — `box: true` keeps the plain box;
 //   sprite — thin / leafy things: the front picture as one quad turned to the camera.
-//   cross  — D111: open frames (chairs, potted plants): front + side pictures crossing in the middle, the top at `topAt`.
-//   model  — D96: drawn from a baked picture of the user's 3D model (render3d/propModels3d.js) — only the training tree
-//            now (D111: the office chairs, armchair and plants went back to the atlas, their models removed).
+//   pot    — D112: a potted plant — a solid pot box (the pot band of the pictures wrapped round it) under a crown raised
+//            along the top picture's outline (no crossing planes); the sizes measured by the atlas builder.
+//   model  — D96: drawn from the user's 3D model (render3d/propModels3d.js): the office chairs (impostors) and the
+//            training tree (a baked picture); D112: the plants' and the armchair's models removed (atlas).
 export const PROP_MODELS = {
   workstation: { view: 'workstation' },
   terminal: { view: 'workstation' },
   exec_desk: { view: 'executive_desk' },
-  // D111 (user): the chairs from the atlases (their 3D models removed) — `cross`: the front and side pictures as two
-  // crossing planes through the middle, the top picture at the seat (the measured surface); render3d/propViews.js
-  chair: { view: 'mesh_chair', cross: true },
-  exec_chair: { view: 'executive_chair', cross: true },
-  chair_meeting: { view: 'cantilever_chair', cross: true },
+  // D112 (user): the chairs back on the user's 3D models (D99: 4-turn impostors baked from them, brighter); the view is
+  // the fallback while they load
+  chair: { view: 'mesh_chair', model: { file: 'exec_chair.glb', height: 32, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
+  exec_chair: { view: 'executive_chair', model: { file: 'exec_chair.glb', height: 34, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
+  chair_meeting: { view: 'cantilever_chair', model: { file: 'meeting_chair.glb', height: 29, impostor: true, turns: true, bakeH: 256, vary: false, look: { gain: 1.1 } } },
   conf_table: { view: 'conference_table' },
   armchair: { view: 'lounge_armchair', surf: 1 }, // (a padded block, as the sofa)
   sofa: { view: 'sofa', surf: 1 }, // (its back rest is not something standing on a surface)
@@ -51,15 +52,17 @@ export const PROP_MODELS = {
   boxes: { view: 'closed_boxes', pack: [2, 2, 2] },
   boxes_tall: { view: 'flight_cases', pack: [1, 2, 5] },
   open_box: { view: 'open_box' },
-  // D111 (user): the potted plants from the atlases (their 3D models removed) — a cross through the pot, the crown seen
-  // from above laid in its middle
-  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], cross: true, topAt: 0.72 },
+  // D112 (user): the potted plants from the atlases — a solid pot joined by its texture, the crown above it (`pot`)
+  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], pot: true, topAt: 0.82 },
   planter: { view: 'long_planter', box: true }, // D111: its top view is the leaves — the box keeps the planter's own shape
   whiteboard: { view: 'mobile_whiteboard' },
   coat_stand: { view: 'coat_stand', sprite: { lean: 1 } },
   steel_bin: { view: 'steel_bin' },
   recycling_bin: { view: 'recycling_bin' },
   desk_lamp: { view: 'desk_lamp' },
+  // D112 (user): the new rug again (lies on the floor)
+  rug_large: { view: 'rug', flatTop: true },
+  rug_small: { view: 'rug', flatTop: true },
   // on the walls
   wall_light: { view: 'wall_light', wall: true, at: 66 },
   notice_board: { view: 'cork_board', wall: true, at: 40 },

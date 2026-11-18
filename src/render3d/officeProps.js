@@ -352,7 +352,7 @@ const BUILD = {
 
   exit_sign(b) { b.box('black', 26, 11, 1.6, 0, 70, -0.5); b.quad('screen', TILE.exitSign, 24, 9, 0, 75.5, 0.4); },
 
-  papers(b) { b.decal('decal', TILE.papers, 40, 30, 0, 0, 0.5, 0.3); },
+  papers(b) { b.decal('decal', TILE.papers, 30, 22.5, 0, 0, 0.5, 0.3); }, // D112: −25 %
 
   overturned_chair(b) {
     // the catalogue's chair lying on its back

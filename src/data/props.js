@@ -72,7 +72,7 @@ export const PROP_TYPES = {
   // flat / wall-mounted (no collision)
   rug_large: { w: 170, d: 110, h: 0, flat: true },
   rug_small: { w: 100, d: 66, h: 0, flat: true },
-  papers: { w: 40, d: 30, h: 1, flat: true },
+  papers: { w: 30, d: 22.5, h: 1, flat: true }, // D112 (user): the papers on the floor −25 %
   stairs: { w: 120, d: 70, h: 6, flat: true },
   notice_board: { w: 50, d: 3, h: 30, wall: true },
   tv_wall: { w: 80, d: 3, h: 40, wall: true },

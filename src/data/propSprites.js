@@ -39,6 +39,6 @@ export const PROP_SPRITES = {
   whiteboard: { sprite: 'notice_board', width: 54, squash: 0.9 },
   overturned_chair: { sprite: 'overturned_chair', width: 28, squash: 0.75, iso: true },
   broken_monitor: { sprite: 'damaged_monitor', width: 28, squash: 0.7, iso: true },
-  papers: { sprite: 'papers', width: 42, flat: true },
+  papers: { sprite: 'papers', width: 31.5, flat: true }, // D112 (user): −25 %
   notice_board: { sprite: 'notice_board', width: 50, wall: true },
 };

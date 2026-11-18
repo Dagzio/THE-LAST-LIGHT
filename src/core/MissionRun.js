@@ -342,6 +342,8 @@ export class MissionRun {
       this.events.emit('pickup', 'medkit', d.id);
     }
     this.events.emit('crateOpened', item, count, d.id);
+    // D112 (user): a crate picked up is gone at once (not on the training ground: its chests stay and refill)
+    if (!this.level.manualCrates) pk.taken = true;
     this.interactTarget = null;
     return true;
   }
