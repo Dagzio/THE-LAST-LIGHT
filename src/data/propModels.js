@@ -10,7 +10,7 @@
 //   surf  — D111: the main surface height (a part of the height), overriding the one the atlas builder measured (the
 //           side walls rise to it, the top picture lies on it, what stands above it is drawn in the middle).
 // D111 (user): the office objects from the new atlases (NEW/Office/office new sprites, every view fits its face) —
-// render3d/propViews.js lowPolyFaces; the training ground keeps its own atlas and the older `top` factor.
+// render3d/propViews.js lowPolyFaces; D115: the training ground's new atlases too (its own atlas file).
 // D93: the side walls follow the top picture's outline (data/viewOutlines.js) — `box: true` keeps the plain box;
 //   sprite — thin / leafy things: the front picture as one quad turned to the camera.
 //   pot    — D112: a potted plant — a solid pot box (the pot band of the pictures wrapped round it) under a crown raised
@@ -76,45 +76,48 @@ export const PROP_MODELS = {
   air_conditioner: { view: 'air_conditioner', wall: true, at: 68 },
   security_camera: { view: 'security_camera', wall: true, at: 70 },
   // D88: the training ground — the user's sheets in their own atlas (data/trainingViews.js)
+  // D115 (user: new training-ground atlases, the office's logic): NEW/tutorial/new sprites — the same low-poly bodies as
+  // the office (lowPolyFaces: `surf` / `up` measured by tools/build-training-assets.py; the old `top` factor gone)
   // D90: foliage — one picture turned to the camera (render3d/propViews.js `sprite`), not a box of views
   // D99 (user): the user's second, detailed tree (60 MB, 2 M triangles) — its picture baked OFFLINE from the model
   // (tools/bake-impostor.html: 785 × 768 webp, 79 KB) — the game never loads the model
-  tree: { view: 'deciduous_tree', top: 1, atlas: 'training', drawW: 120, drawD: 120, sprite: { lean: 1 },
+  tree: { view: 'deciduous_tree', atlas: 'training', drawW: 120, drawD: 120, sprite: { lean: 1 },
     // D103 (user: back on the ground, much less tilt — mostly from above, a bit of trunk, volume as the first one): baked
     // from 48° (the D99 volume look + the olive foliage), standing on its base (no lift), its own cast shadow
     // D104 (user: shadows in the foliage): rebaked with a real shadow map (upper clusters shade the lower) + the clusters'
     // local contrast (tools/bake-impostor.html look: selfShadow, hemi 0.9, sun 2.8, depth 0.9, sphere 0.2, olive tint 0.6)
     model: { file: 'tree_big', height: 150, baked: { file: 'tree_big.webp', frame: [-0.4816, 0.4816, -0.0666, 0.8943] } } },
-  boulder: { view: 'boulder', top: 1, atlas: 'training' },
-  bush: { view: 'leafy_bush', top: 0.9, atlas: 'training', sprite: { lean: 1 } },
-  grass_tuft: { view: 'grass_tuft', top: 0.8, atlas: 'training', sprite: { lean: 1 } },
-  flowers: { view: 'wildflower_clump', top: 0.8, atlas: 'training', sprite: { lean: 1 } },
-  canopy: { view: 'camouflage_canopy', top: 1, atlas: 'training' },
-  tent: { view: 'field_tent', top: 1, atlas: 'training' },
-  fabric_screen: { view: 'fabric_screen', top: 1, atlas: 'training' },
-  signal_amber: { view: 'signal_post_amber', top: 1, atlas: 'training' },
-  signal_green: { view: 'signal_post_green', top: 1, atlas: 'training' },
-  blue_hurdle: { view: 'blue_hurdle', top: 1, atlas: 'training' },
-  blue_mat: { view: 'blue_mat', top: 1, atlas: 'training', flatTop: true },
-  concrete_cover: { view: 'concrete_cover', top: 1, atlas: 'training' },
-  jersey_barrier: { view: 'jersey_barrier', top: 1, atlas: 'training' },
-  round_target: { view: 'round_target', top: 1, atlas: 'training' },
-  torso_target: { view: 'torso_target', top: 1, atlas: 'training' },
-  sandbags: { view: 'sandbag_wall', top: 1, atlas: 'training' },
-  steel_cover: { view: 'steel_cover', top: 1, atlas: 'training' },
-  ammo_box: { view: 'ammo_box', top: 1, atlas: 'training' },
-  barrel: { view: 'blue_barrel', top: 1, atlas: 'training' },
-  equipment_case: { view: 'equipment_case', top: 1, atlas: 'training' },
-  supply_chest: { view: 'supply_chest_closed', top: 1, atlas: 'training' },
-  supply_chest_open: { view: 'supply_chest_open', top: 1, atlas: 'training' },
-  weapon_chest: { view: 'weapon_chest_closed', top: 1, atlas: 'training' },
-  weapon_chest_open: { view: 'weapon_chest_open', top: 1, atlas: 'training' },
-  crate_wood: { view: 'wood_storage_crate', top: 1, atlas: 'training' },
-  crate_wood_tall: { view: 'wood_storage_crate', top: 1, atlas: 'training' },
-  workbench: { view: 'wood_workbench', top: 0.9, atlas: 'training' },
-  medical_case: { view: 'medical_case', top: 1, atlas: 'training' },
-  small_medkit: { view: 'small_medkit', top: 1, atlas: 'training' },
-  mesh_fence: { view: 'mesh_fence', top: 1, atlas: 'training' },
-  mesh_gate_closed: { view: 'mesh_gate_closed', top: 1, atlas: 'training' },
-  mesh_gate_open: { view: 'mesh_gate_open', top: 1, atlas: 'training' },
+  boulder: { view: 'boulder', atlas: 'training' },
+  bush: { view: 'leafy_bush', atlas: 'training', sprite: { lean: 1 } },
+  grass_tuft: { view: 'grass_tuft', atlas: 'training', sprite: { lean: 1 } },
+  flowers: { view: 'wildflower_clump', atlas: 'training', sprite: { lean: 1 } },
+  canopy: { view: 'camouflage_canopy', atlas: 'training', box: true }, // D115: the net's notched outline hung threads
+  tent: { view: 'field_tent', atlas: 'training', gable: true }, // D115: walls to the eaves, a two-slope roof
+  fabric_screen: { view: 'fabric_screen', atlas: 'training' },
+  signal_amber: { view: 'signal_post_amber', atlas: 'training' },
+  signal_green: { view: 'signal_post_green', atlas: 'training' },
+  blue_hurdle: { view: 'blue_hurdle', atlas: 'training' },
+  blue_mat: { view: 'blue_mat', atlas: 'training', flatTop: true },
+  concrete_cover: { view: 'concrete_cover', atlas: 'training' },
+  jersey_barrier: { view: 'jersey_barrier', atlas: 'training' },
+  round_target: { view: 'round_target', atlas: 'training' },
+  torso_target: { view: 'torso_target', atlas: 'training' },
+  sandbags: { view: 'sandbag_wall', atlas: 'training' },
+  steel_cover: { view: 'steel_cover', atlas: 'training' },
+  ammo_box: { view: 'ammo_box', atlas: 'training' },
+  barrel: { view: 'blue_barrel', atlas: 'training' },
+  equipment_case: { view: 'equipment_case', atlas: 'training' },
+  // D115: plain box sides (the latch notched the top outline — a slit in the front)
+  supply_chest: { view: 'supply_chest_closed', atlas: 'training', box: true },
+  supply_chest_open: { view: 'supply_chest_open', atlas: 'training', box: true },
+  weapon_chest: { view: 'weapon_chest_closed', atlas: 'training' },
+  weapon_chest_open: { view: 'weapon_chest_open', atlas: 'training' },
+  crate_wood: { view: 'wood_storage_crate', atlas: 'training' },
+  crate_wood_tall: { view: 'wood_storage_crate', atlas: 'training', pack: [1, 1, 2] }, // D115: two crates (its height 60)
+  workbench: { view: 'wood_workbench', atlas: 'training' },
+  medical_case: { view: 'medical_case', atlas: 'training' },
+  small_medkit: { view: 'small_medkit', atlas: 'training' },
+  mesh_fence: { view: 'mesh_fence', atlas: 'training' },
+  mesh_gate_closed: { view: 'mesh_gate_closed', atlas: 'training' },
+  mesh_gate_open: { view: 'mesh_gate_open', atlas: 'training' },
 };

@@ -255,6 +255,30 @@ function lowPolyFaces(p, m, item, A, t, base, W, D, surf, outline, out) {
     for (const g of faces) out.push(g.applyMatrix4(base));
     return;
   }
+  if (m.gable && !m.wall) {
+    // D115 (the field tent: a flat roof over a triangular front left a gap): the side walls up to the eaves (`surf`), the
+    // front / back pictures whole (their gables cut out by the alpha), the roof — two slopes from the eaves to the ridge
+    // along the depth, each showing its half of the top picture
+    const H = heightOf(m, item, t, W, D), s = Math.min(1, Math.max(0.05, surf)), Hs = H * s, rise = H - Hs;
+    // (the pictures are as wide as the roof: the walls stand `k` of the width / depth in from their edges — measured)
+    const k = 0.03, wd = D * (1 - 2 * k);
+    const wall = (rect, ry, x) => { if (!rect) return; const g = quadBand(rect, wd, Hs, A, 0, s, k, 1 - k); g.rotateY(ry); g.translate(x, Hs / 2, 0); faces.push(g); };
+    wall(item.left, -Math.PI / 2, -W * (0.5 - k));
+    wall(item.right, Math.PI / 2, W * (0.5 - k));
+    if (item.front) { const g = quad(item.front, W, H, A); g.translate(0, H / 2, D * (0.5 - k)); faces.push(g); }
+    if (item.back) { const g = quad(item.back, W, H, A); g.rotateY(Math.PI); g.translate(0, H / 2, -D * (0.5 - k)); faces.push(g); }
+    if (item.top) {
+      // (each slope runs a little past its wall — eaves over the walls' tops, no slit under the roof)
+      const L = Math.hypot(W / 2, rise), a = Math.atan2(rise, W / 2), e = 0.06 * L;
+      for (const [s0, s1, sg] of [[0, 0.5, -1], [0.5, 1, 1]]) {
+        const g = quadBand(item.top, L + e, D * 1.02, A, 0, 1, s0, s1);
+        g.rotateX(-Math.PI / 2); g.rotateZ(-sg * a);
+        g.translate((sg * W) / 4 + (sg * e * Math.cos(a)) / 2, Hs + rise / 2 - (e * Math.sin(a)) / 2, 0); faces.push(g);
+      }
+    }
+    for (const g of faces) out.push(g.applyMatrix4(base));
+    return;
+  }
   if (m.wall) {
     const h = (W * front[3]) / front[2], dep = Math.max(1, t.d || 2), y = m.at || 40;
     const g = quad(front, W, h, A); g.translate(0, y, dep + 0.3); faces.push(g);
@@ -299,8 +323,9 @@ function cellFaces(m, item, A, W, D, H, surf, outline, faces) {
     // show it stands (item.up: a monitor behind the middle, a coffee machine at the back), else in the middle
     // D114 (user screenshot: a thin line ran across the desk's keyboard): only the front picture's band stands there —
     // the side picture's band (the monitor's profile) stood across the desk as a sliver
-    const hu = H - Hs, [, uz] = item.up || [0, 0];
-    if (front) { const g = quadBand(front, W, hu, A, s, 1); g.translate(0, Hs + hu / 2, uz * D); faces.push(g); }
+    // D115: item.lid — an open chest: only the lid's band (from `lid` of the picture up) stands on the body's top
+    const f0 = item.lid ?? s, hu = H * (1 - f0), [, uz] = item.up || [0, 0];
+    if (front) { const g = quadBand(front, W, hu, A, f0, 1); g.translate(0, Hs + hu / 2, uz * D); faces.push(g); }
   }
 }
 
