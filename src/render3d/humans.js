@@ -166,6 +166,7 @@ export class HumanTemplate {
         upper: new THREE.AnimationClip(`${id}.upper`, c.duration, upper),
         lower: new THREE.AnimationClip(`${id}.lower`, c.duration, lower),
         duration: c.duration,
+        turn: c.turn || 0, // D114: degrees the clip turns (its Hips' turn taken out by the converter)
       };
     }
     return out;
@@ -391,11 +392,17 @@ export class HumanView {
     // D110: the legs of the stand ↔ kneel clips — standing up from low cover with the pistol (its arms on top)
     const lower = (id) => { if (!C[id]) return null; const a = act(C[id].lower); a.timeScale = 0; return a; };
     this.riseLo = { up: lower('toStand'), down: lower('toCrouch') };
+    // D114 (user): turning on the spot — the legs of the user's turn clips (standing / crouched, right / left)
+    this.turnActs = { R: lower('turnR'), L: lower('turnL'), cR: lower('cTurnR'), cL: lower('cTurnL') };
+    this.turnInfo = {};
+    for (const [k, id] of [['R', 'turnR'], ['L', 'turnL'], ['cR', 'cTurnR'], ['cL', 'cTurnL']]) if (C[id]) this.turnInfo[k] = { dur: C[id].duration, deg: Math.abs(C[id].turn) || 45 };
+    this.turnT = 0;
+    this.turnDir = 0;
     this.crouchIdle = this.cv.lowIdle; this.crouchWalk = null; // (dev viewer)
     this.trans = null;       // { a: action, from, to (clip s), dur (s), age (s) } — a stand ↔ kneel transition playing
     this.lowWas = false;
     this.busy = loop('files'); // D83: a posted enemy going through the files (until alerted)
-    this.w = { move: 0, run: 0, aim: 0, reload: 0, dead: 0, throw: 0, dodge: 0, low: 0, high: 0, lowAim: 0, busy: 0, coverReload: 0, f: 1, b: 0, l: 0, r: 0 };
+    this.w = { move: 0, run: 0, aim: 0, reload: 0, dead: 0, throw: 0, dodge: 0, low: 0, high: 0, lowAim: 0, busy: 0, coverReload: 0, turn: 0, f: 1, b: 0, l: 0, r: 0 };
     this.dodgeId = 'dodge';
     // D84: the user's two pistol reloads ("Pistol Reload" with a step, "Pistol Reloading Idle" in place): upper body +
     // its own legs while standing (no twist against Pistol Idle's hips); the time follows the reload's progress
@@ -627,6 +634,26 @@ export class HumanView {
     if (sideR) sideR.setEffectiveWeight(move * r * normal);
     // D86: all the leg clips in step (one gait phase, offset per clip by its left-foot swing)
     this._gaitStep(dead ? 0 : dt, sp, [fwdWalk, fwdRun, L.back, backRun, sideL, sideR]);
+    // D114 (user: the turn clips, the enemies too): turning on the spot — the turn clip's legs (right / left; crouched in
+    // the stealth crouch), its time following the body's own turn (the clip's degrees over its length, looped); the
+    // stance legs fade meanwhile, the upper body keeps its gun pose
+    const TS = A.turnSteps, turnNow = st.turn || 0;
+    const turning = !dead && !rolling && !tdOn && sp < TS.below && Math.abs(turnNow) > TS.from && st.cover !== 'low' && st.cover !== 'high';
+    if (turning) this.turnDir = turnNow > 0 ? 1 : -1;
+    const tw = ease('turn', turning ? 1 : 0, 1.4);
+    for (const a of Object.values(this.turnActs)) if (a) a.setEffectiveWeight(0);
+    const crouchTurn = lowOn && !!st.crouch;
+    const turnKey = (crouchTurn ? 'c' : '') + (this.turnDir > 0 ? 'R' : 'L'), turnA = this.turnActs[turnKey], TI = this.turnInfo[turnKey];
+    if (tw > 0.001 && turnA && TI) {
+      // (a quick turn plays it at most 2.5× its own pace — no frantic feet)
+      const adv = Math.min(((Math.abs(turnNow) * Math.max(0, dt) * 180) / Math.PI / TI.deg) * TI.dur, Math.max(0, dt) * 2.5);
+      this.turnT = (this.turnT + adv) % TI.dur;
+      turnA.time = this.turnT;
+      if (!crouchTurn) {
+        for (const a of [L.pIdle, L.fire, L.idle, PR && PR.l]) if (a) a.setEffectiveWeight(a.getEffectiveWeight() * (1 - tw));
+        turnA.setEffectiveWeight(stand * tw);
+      }
+    }
 
     // ---- upper body
     const reloading = !dead && st.reload >= 0;
@@ -692,6 +719,13 @@ export class HumanView {
     const lw = lowW * live * (1 - tr), hw = highW * live * (1 - tr);
     const inLow = st.cover === 'low' && !!cv.coverIdle;
     fw(inLow ? cv.coverIdle : cv.lowIdle, lw * (1 - cm) * (1 - lowAim)); // D90: back to low cover — Male Crouch Pose
+    if (crouchTurn && tw > 0.001 && turnA && !inLow && cv.lowIdle) {
+      // D114: crouched and turning (the stealth crouch) — the crouch turn's legs, the crouch idle's arms
+      const wa = cv.lowIdle.getEffectiveWeight();
+      cv.lowIdle.setEffectiveWeight(wa * (1 - tw));
+      turnA.setEffectiveWeight(wa * tw);
+      if (cv.upRifle) cv.upRifle.setEffectiveWeight(cv.upRifle.getEffectiveWeight() + wa * tw);
+    }
     // D88: the Cover/Crouch firing clip for the long guns; D102 (user): the pistol fires kneeling (Pistol Kneeling Idle)
     const lowFireA = pistol && cv.pKneel ? cv.pKneel : cv.lowFire;
     fw(lowFireA, lw * (1 - cm) * lowAim);

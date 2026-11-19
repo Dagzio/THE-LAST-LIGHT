@@ -111,7 +111,6 @@ export const OFFICE = {
     { type: 'floor_lamp', x: 862, y: 1430 }, { type: 'floor_lamp', x: 1538, y: 1430 },
     { type: 'floor_lamp', x: 780, y: 1600 }, { type: 'floor_lamp', x: 1620, y: 1600 },
     { type: 'desk_lamp', x: 1255, y: 1352, elev: 34 },
-    { type: 'papers', x: 1330, y: 1415, rot: 2 }, { type: 'papers', x: 1010, y: 1610, rot: 3 },
     // D85: more of the user's catalogue (water cooler, bins, a coat stand, a camera)
     { type: 'water_cooler', x: 775, y: 1250 }, { type: 'coat_stand', x: 1625, y: 1228 },
     { type: 'steel_bin', x: 960, y: 1590 }, { type: 'steel_bin', x: 1440, y: 1590 },
@@ -134,13 +133,12 @@ export const OFFICE = {
     { type: 'plant', x: 722, y: 1422 },
     { type: 'wall_clock', x: 400, y: 1141.5, rot: 0 },
     { type: 'papers', x: 560, y: 1400, rot: 1 },
-    { type: 'coffee_vending', x: 590, y: 1158, rot: 0 }, { type: 'first_aid', x: 520, y: 1141.5, rot: 0 }, { type: 'recycling_bin', x: 700, y: 1230 },
+    { type: 'coffee_vending', x: 590, y: 1158, rot: 0 }, { type: 'first_aid', x: 625, y: 1141.5, rot: 0 }, { type: 'recycling_bin', x: 700, y: 1230 }, // D114 (user): the first aid was on the door
     // --- archive
     { type: 'archive_shelf', x: 420, y: 1540, rot: 0 }, { type: 'archive_shelf', x: 420, y: 1620, rot: 0 },
     { type: 'archive_shelf', x: 590, y: 1540, rot: 0 }, { type: 'archive_shelf', x: 590, y: 1620, rot: 0 },
     { type: 'filing_cabinet', x: 272, y: 1480, rot: 3 }, { type: 'filing_cabinet', x: 272, y: 1506, rot: 3 },
-    { type: 'boxes', x: 290, y: 1670 }, { type: 'boxes_tall', x: 722, y: 1478 }, 
-    { type: 'papers', x: 500, y: 1580 },
+    { type: 'boxes', x: 290, y: 1670 }, { type: 'boxes_tall', x: 722, y: 1478 },
     // --- security
     { type: 'console', x: 2050, y: 1158, rot: 0 }, { type: 'exec_chair', x: 2050, y: 1198, rot: 2 },
     { type: 'filing_cabinet', x: 1672, y: 1380, rot: 3 }, { type: 'filing_cabinet', x: 1672, y: 1404, rot: 3 },
@@ -158,7 +156,7 @@ export const OFFICE = {
     { type: 'plant', x: 2125, y: 1675 }, { type: 'plant', x: 1680, y: 1478 }, { type: 'plant', x: 2125, y: 1478 },
     { type: 'rug_small', x: 1950, y: 1570 }, { type: 'wall_clock', x: 2000, y: 1461.5, rot: 0 },
     { type: 'floor_lamp', x: 2122, y: 1560 }, { type: 'floor_lamp', x: 1700, y: 1500 },
-    { type: 'desk_lamp', x: 1982, y: 1594, elev: 24 }, { type: 'papers', x: 1870, y: 1640, rot: 1 },
+    { type: 'desk_lamp', x: 1982, y: 1594, elev: 24 }, 
     // --- open space: six blocks of four workstations — D85: two rows back to back, each chair at its desk's front
     ...cluster(450, 400), ...cluster(750, 400), ...cluster(1050, 400),
     ...cluster(450, 680), ...cluster(750, 680), ...cluster(1050, 680),
@@ -172,8 +170,8 @@ export const OFFICE = {
     { type: 'wall_clock', x: 1100, y: 261.5, rot: 0 },
     // D83 (the reference): planters with plants between the desk blocks (low cover), more papers, a second printer
     ...planter(600, 400), ...planter(900, 400), ...planter(600, 680), ...planter(900, 680),
-    { type: 'papers', x: 1000, y: 770, rot: 2 }, { type: 'papers', x: 560, y: 790, rot: 1 }, { type: 'papers', x: 1180, y: 470 },
-    { type: 'papers', x: 380, y: 520, rot: 3 }, { type: 'overturned_chair', x: 1150, y: 560, rot: 0 },
+    { type: 'papers', x: 1000, y: 770, rot: 2 }, { type: 'papers', x: 1180, y: 470 },
+    { type: 'overturned_chair', x: 1150, y: 560, rot: 0 },
     { type: 'printer', x: 1272, y: 330, rot: 1 },
     { type: 'water_cooler', x: 1280, y: 620 }, { type: 'air_conditioner', x: 450, y: 261.5, rot: 0 },
     { type: 'steel_bin', x: 527, y: 455 }, { type: 'steel_bin', x: 827, y: 455 }, { type: 'steel_bin', x: 1127, y: 735 },
@@ -190,7 +188,7 @@ export const OFFICE = {
     { type: 'printer', x: 1323, y: 700, rot: 3 }, { type: 'printer', x: 1323, y: 780, rot: 3 },
     { type: 'archive_shelf', x: 1660, y: 639, rot: 0 }, { type: 'archive_shelf', x: 1740, y: 639, rot: 0 },
     { type: 'boxes', x: 1650, y: 700 }, { type: 'boxes_tall', x: 1322, y: 920 },
-    { type: 'papers', x: 1460, y: 740, rot: 2 }, { type: 'papers', x: 1600, y: 860 }, { type: 'boxes', x: 1760, y: 920 },
+    { type: 'boxes', x: 1760, y: 920 },
     { type: 'shredder', x: 1380, y: 642, rot: 0 }, { type: 'recycling_bin', x: 1430, y: 642 },
     // --- server room
     ...rackRow(1890, 2112, 360), ...rackRow(1890, 2112, 520), ...rackRow(1890, 1994, 680),

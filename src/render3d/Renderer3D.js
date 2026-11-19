@@ -826,14 +826,8 @@ export class Renderer3D {
     const hx = this._lx(p), hy = this._ly(p);
     const h = this.hero;
     h.setGun(gunModelOf(run.weapon.weaponId));
-    let speed = p.alive ? Math.hypot(p.vx, p.vy) : 0;
-    let moveDir = Math.atan2(p.vy, p.vx);
-    const T = HUMAN_ANIM.turnSteps;
-    if (p.alive && speed < T.below && !p.cover && !p.dodging && !p.takedown && Math.abs(this.turnRate) > T.from) {
-      // standing and turning: small side steps toward the turn (right turn → right side), paced by the turn rate
-      speed = Math.min(T.maxSpeed, (Math.abs(this.turnRate) - T.from) * T.radius + T.minSpeed);
-      moveDir = this.bodyYaw + Math.sign(this.turnRate) * Math.PI / 2;
-    }
+    const speed = p.alive ? Math.hypot(p.vx, p.vy) : 0;
+    const moveDir = Math.atan2(p.vy, p.vx);
     const w = run.weapon;
     if (!p.alive) this.heroDeadAge += this.frameDt || 0; else this.heroDeadAge = 0;
     const gAim = run.grenadePreview.active;
@@ -858,6 +852,7 @@ export class Renderer3D {
       peek: p.alive && p.peek ? p.peek.k : 0,                                                                                       // D87: leaning out of the corner
       peekSide: p.peek ? p.peek.side : 0,                                                                                           // D90: +1 his right, −1 his left
       rise: p.alive && p.rise ? p.rise.k : 0, riseUp: !!(p.rise && p.rise.up),                                                     // D110: standing up from low cover
+      turn: p.alive && !p.cover && !p.dodging && !p.takedown ? this.turnRate : 0,                                                  // D114: the turn clips (rad/s)
       takedown: p.alive && p.takedown ? Math.min(1, Math.max(0, (time - p.takedown.t0) / STEALTH.takedown.duration)) : -1,         // D85: the takedown clip
       takedownFrom: STEALTH.takedown.clipFrom, takedownTo: STEALTH.takedown.clipTo,
     });
@@ -895,7 +890,13 @@ export class Renderer3D {
       if (!vis) continue;
       const g = e.gun, ai = e.ai;
       const sp = e.alive ? Math.hypot(e.vx, e.vy) : 0;
+      // D114: the enemies turn on the spot with the same clips — their facing's turn rate (smoothed)
+      if (v.lastFace === undefined) v.lastFace = e.faceAngle;
+      const dFace = Math.atan2(Math.sin(e.faceAngle - v.lastFace), Math.cos(e.faceAngle - v.lastFace));
+      v.lastFace = e.faceAngle;
+      v.turnRate = (v.turnRate || 0) + ((dt > 0 ? dFace / dt : 0) - (v.turnRate || 0)) * Math.min(1, dt * 10);
       v.update(dt, {
+        turn: e.alive ? v.turnRate : 0,
         speed: sp,
         moveRel: sp > 1 ? Math.atan2(e.vy, e.vx) - e.faceAngle : 0,
         shotAge: time - g.lastShotAt,

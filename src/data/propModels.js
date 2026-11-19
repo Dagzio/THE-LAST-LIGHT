@@ -26,7 +26,8 @@ export const PROP_MODELS = {
   chair: { view: 'mesh_chair', model: { file: 'exec_chair.glb', height: 32, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
   exec_chair: { view: 'executive_chair', model: { file: 'exec_chair.glb', height: 34, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
   chair_meeting: { view: 'cantilever_chair', model: { file: 'meeting_chair.glb', height: 29, impostor: true, turns: true, bakeH: 256, vary: false, look: { gain: 1.1 } } },
-  conf_table: { view: 'conference_table' },
+  // D114 (user: odd panels on its sides / ends): a solid base box (its legs and panel, measured) under a thin top slab
+  conf_table: { view: 'conference_table', pot: true, base: true },
   armchair: { view: 'lounge_armchair', surf: 1 }, // (a padded block, as the sofa)
   sofa: { view: 'sofa', surf: 1 }, // (its back rest is not something standing on a surface)
   coffee_table: { view: 'marble_coffee_table' },
@@ -53,7 +54,7 @@ export const PROP_MODELS = {
   boxes_tall: { view: 'flight_cases', pack: [1, 2, 5] },
   open_box: { view: 'open_box' },
   // D112 (user): the potted plants from the atlases — a solid pot joined by its texture, the crown above it (`pot`)
-  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], pot: true, topAt: 0.82 },
+  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], pot: true, topAt: 0.72 },
   planter: { view: 'long_planter', box: true }, // D111: its top view is the leaves — the box keeps the planter's own shape
   whiteboard: { view: 'mobile_whiteboard' },
   coat_stand: { view: 'coat_stand', sprite: { lean: 1 } },

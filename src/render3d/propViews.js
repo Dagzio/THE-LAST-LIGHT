@@ -135,52 +135,6 @@ function outlineWalls(loop, W, D, H, item, A, Hw = H, inset = 0, y0 = 0) {
   return g;
 }
 
-/** D112: the convex hull of a loop of [x, z] points (counter-clockwise; monotone chain). */
-function hull(loop) {
-  const p = [...loop].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-  const lo = [], up = [];
-  for (const q of p) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
-  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
-  return lo.slice(0, -1).concat(up.slice(0, -1));
-}
-
-/**
- * D112: a plant's crown — a closed "bulb" through rings of the top picture's outline: rings = [[y, scale, cx, cz], …]
- * (the outline scaled about cx / cz). Every vertex takes the side picture its band faces at its own x / z and height,
- * so the narrow bottom shows the stems in the pictures' middle and the widest ring the whole crown.
- */
-function crownWalls(loop, W, D, H, item, A, rings) {
-  let area = 0;
-  for (let i = 0; i < loop.length; i++) { const [x0, z0] = loop[i], [x1, z1] = loop[(i + 1) % loop.length]; area += x0 * z1 - x1 * z0; }
-  const sgn = area >= 0 ? 1 : -1, n = loop.length;
-  const R = rings.map(([y, s, cx, cz]) => loop.map(([x, z]) => [cx + (x * W - cx) * s, y, cz + (z * D - cz) * s]));
-  const uvOf = (view, p) => {
-    const r = item[view] || item.front || item.back;
-    const [x, y, z] = p;
-    const u = view === 'front' ? (x + W / 2) / W : view === 'back' ? (W / 2 - x) / W : view === 'left' ? (z + D / 2) / D : (D / 2 - z) / D;
-    const [rx, ry, rw, rh] = r;
-    return [(rx + 0.5 + Math.min(1, Math.max(0, u)) * (rw - 1)) / A.width, 1 - (ry + 0.5 + (1 - Math.min(1, y / H)) * (rh - 1)) / A.height];
-  };
-  const pos = [], nor = [], uv = [];
-  for (let k = 0; k + 1 < R.length; k++) {
-    for (let i = 0; i < n; i++) {
-      const a = R[k][i], b = R[k][(i + 1) % n], c = R[k + 1][(i + 1) % n], d = R[k + 1][i];
-      const mx = ((a[0] + d[0]) - (b[0] + c[0])) / 2, mz = ((a[2] + d[2]) - (b[2] + c[2])) / 2, L = Math.hypot(mx, mz);
-      if (L < 0.2) continue;
-      const nx = (-mz / L) * sgn, nz = (mx / L) * sgn; // outward (as outlineWalls: the edge b − a turned)
-      const view = Math.abs(nz) >= Math.abs(nx) ? (nz > 0 ? 'front' : 'back') : nx > 0 ? 'right' : 'left';
-      const tri = sgn > 0 ? [a, c, b, a, d, c] : [a, b, c, a, c, d];
-      for (const p of tri) { pos.push(p[0], p[1], p[2]); nor.push(nx, 0, nz); uv.push(...uvOf(view, p)); }
-    }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  return g;
-}
-
 /** The faces of one prop (world space). */
 function propFaces(p, out) {
   const v = viewOf(p);
@@ -286,15 +240,18 @@ function lowPolyFaces(p, m, item, A, t, base, W, D, surf, outline, out) {
     side(item.left, pd, z0, z1, -Math.PI / 2, px0, cz);          // (the left one back → front)
     side(item.right, pd, 1 - z1, 1 - z0, Math.PI / 2, px1, cz);
     if (front) { const g = quadBand(front, pw, pd, A, Math.max(0, ph - 0.03), ph, x0, x1); g.rotateX(-Math.PI / 2); g.translate(cx, Hp - 0.3, cz); faces.push(g); }
-    if (outline) {
-      // the crown: from the pot's rim (the outline shrunk to the pot) out to the whole crown at its middle, a little in
-      // again at the top — a rounded volume, not a column
-      const sPot = Math.min(1, Math.max(pw / W, pd / D)), yMid = Hp + (H - Hp) * 0.55;
-      const rings = [[Hp, sPot, cx, cz], [yMid, 1, 0, 0], [H, 0.75, 0, 0]];
-      // (the convex hull of the leaves' outline: the star of leaf tips made the bulb's sides a row of slats)
-      for (const loop of outline) faces.push(crownWalls(hull(loop), W, D, H, item, A, rings));
+    if (m.base) {
+      // D114 (the conference table): the top slab — its edge band along the top picture's outline, the top on it
+      if (outline) { const inset = Math.min(1, 0.02 * Math.min(W, D)); for (const loop of outline) faces.push(outlineWalls(loop, W, D, H, item, A, H, inset, Hp)); }
+      if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, H, 0); faces.push(g); }
+    } else {
+      // D114 (user: the leaves were fine before, only the pot was wrong): the leaves — the front and side pictures above
+      // the pot as two planes through its middle, the rosette seen from above in the crown
+      const hu = H - Hp, sideP = item.left || item.right;
+      if (front) { const g = quadBand(front, W, hu, A, ph, 1); g.translate(cx, Hp + hu / 2, cz); faces.push(g); }
+      if (sideP) { const g = quadBand(sideP, D, hu, A, ph, 1); g.rotateY(-Math.PI / 2); g.translate(cx, Hp + hu / 2, cz); faces.push(g); }
+      if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, H * (m.topAt ?? 0.72), 0); faces.push(g); }
     }
-    if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, H * (m.topAt ?? 0.82), 0); faces.push(g); }
     for (const g of faces) out.push(g.applyMatrix4(base));
     return;
   }
@@ -340,10 +297,10 @@ function cellFaces(m, item, A, W, D, H, surf, outline, faces) {
   if (s < 0.97) {
     // above the surface: the front picture's upper part across, the side picture's along — crossing where the pictures
     // show it stands (item.up: a monitor behind the middle, a coffee machine at the back), else in the middle
-    const hu = H - Hs, [ux, uz] = item.up || [0, 0];
+    // D114 (user screenshot: a thin line ran across the desk's keyboard): only the front picture's band stands there —
+    // the side picture's band (the monitor's profile) stood across the desk as a sliver
+    const hu = H - Hs, [, uz] = item.up || [0, 0];
     if (front) { const g = quadBand(front, W, hu, A, s, 1); g.translate(0, Hs + hu / 2, uz * D); faces.push(g); }
-    const sideP = item.left || item.right;
-    if (sideP) { const g = quadBand(sideP, D, hu, A, s, 1); g.rotateY(-Math.PI / 2); g.translate(ux * W, Hs + hu / 2, 0); faces.push(g); }
   }
 }
 

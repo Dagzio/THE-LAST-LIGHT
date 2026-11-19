@@ -33,9 +33,9 @@ export const HUMAN_ANIM = {
   // circle allows (the circle is wider than the body's depth); presentation only
   coverHugHigh: 7,
   coverHugLow: 6,
-  // D110 (user): turning on the spot (standing, below `below` u/s) faster than `from` rad/s he side-steps toward the turn:
-  // the steps' pace = a foot this far from his axis (radius) moving with the turn, between minSpeed and maxSpeed u/s
-  turnSteps: { below: 8, from: 1.4, radius: 9, minSpeed: 14, maxSpeed: 38 },
+  // D110 / D114 (user): turning on the spot (standing, below `below` u/s) faster than `from` rad/s plays the user's turn
+  // clips' legs (render3d/humans.js; the hero and the enemies)
+  turnSteps: { below: 8, from: 1.4 },
   // D110: standing up from low cover — the parts of "Crouch To Standing With Rifle" / "Stand To Crouch" (s) from the
   // kneel to the upright stance (measured on the Hips height: 21 → 53 / 52 → 22)
   rise: { upFrom: 0.1, upTo: 0.72, downFrom: 0.08, downTo: 0.65 },
