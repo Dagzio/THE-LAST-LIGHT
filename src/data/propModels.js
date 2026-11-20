@@ -15,6 +15,7 @@
 //   sprite — thin / leafy things: the front picture as one quad turned to the camera.
 //   pot    — D112: a potted plant — a solid pot box (the pot band of the pictures wrapped round it) under a crown raised
 //            along the top picture's outline (no crossing planes); the sizes measured by the atlas builder.
+//   build  — D119: built from real parts with the parts of its pictures (render3d/officeBuilds.js).
 //   model  — D96: drawn from the user's 3D model (render3d/propModels3d.js): the office chairs (impostors) and the
 //            training tree (a baked picture); D112: the plants' and the armchair's models removed (atlas).
 export const PROP_MODELS = {
@@ -38,11 +39,11 @@ export const PROP_MODELS = {
   // corners — remodel it): built in code (render3d/confTable.js) — a stadium-shaped top with a crisp walnut texture and
   // its three cable hatches, two steel panel legs and a rail; the view is only the minimap / fallback
   conf_table: { view: 'conference_table', custom: 'confTable' },
-  armchair: { view: 'lounge_armchair', surf: 1 }, // (a padded block, as the sofa)
+  armchair: { view: 'lounge_armchair', build: 'armchair' }, // D119: remodelled (render3d/officeBuilds.js)
   sofa: { view: 'sofa', surf: 1 }, // (its back rest is not something standing on a surface)
   coffee_table: { view: 'marble_coffee_table' },
   // D111: the table height of the other desks (cover); D116: a pedestal table (its top slab, the pedestal under it)
-  round_table: { view: 'round_meeting_table', drawH: 23, pedestal: { top: 0.1 } },
+  round_table: { view: 'round_meeting_table', drawH: 23, build: 'roundTable' }, // D119: remodelled
   reception: { view: 'reception' },
   filing_cabinet: { view: 'filing_cabinet' },
   archive_shelf: { view: 'archive_shelf' },
@@ -54,12 +55,12 @@ export const PROP_MODELS = {
   shredder: { view: 'shredder' },
   server_rack: { view: 'server_rack' },
   server_rack_open: { view: 'network_rack' },
-  console: { view: 'security_console' },
+  console: { view: 'security_console', build: 'console' }, // D119: remodelled
   turnstile: { view: 'turnstile' },
-  coffee_counter: { view: 'coffee_station', drawH: 46 }, // D111: wider than the catalogue station — its own height
+  coffee_counter: { view: 'coffee_station', drawH: 46, build: 'coffeeCounter' }, // D111: its own height; D119: remodelled
   coffee_vending: { view: 'coffee_vending' },
   vending: { view: 'snack_vending' },
-  water_cooler: { view: 'water_cooler', surf: 1 }, // D111: the bottle on the walls (as a cross it read as an X)
+  water_cooler: { view: 'water_cooler', build: 'waterCooler' }, // D119: remodelled (a cabinet, a round bottle)
   // D111: the new catalogue has one box / one case — stacked to fill the footprint (nx, nz, layers)
   boxes: { view: 'closed_boxes', pack: [2, 2, 2] },
   boxes_tall: { view: 'flight_cases', pack: [1, 2, 5] },
@@ -68,7 +69,7 @@ export const PROP_MODELS = {
   // D116 (user: the snake plant looked boxy and wrong): its top picture shows the pot's rim — it lies on the pot, the
   // upright sword leaves are three planes round the middle (`per`: settings of one view of a list)
   plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], pot: true, topAt: 0.72, per: { snake_planter: { topAt: 'pot', leaves: 3 } } },
-  planter: { view: 'long_planter', box: true }, // D111: its top view is the leaves — the box keeps the planter's own shape
+  planter: { view: 'long_planter', build: 'planter' }, // D119: remodelled (a trough, the leaves over it)
   whiteboard: { view: 'mobile_whiteboard' },
   steel_bin: { view: 'steel_bin' },
   recycling_bin: { view: 'recycling_bin' },

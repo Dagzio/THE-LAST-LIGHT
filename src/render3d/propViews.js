@@ -15,6 +15,7 @@ import { lightAt } from './officeLights.js';
 import { CAMERA } from '../config/camera.js';
 import { VIEW_OUTLINES } from '../data/viewOutlines.js';
 import { hasModel } from './propModels3d.js';
+import { OFFICE_BUILDS } from './officeBuilds.js';
 
 // D90: foliage drawn as one picture turned to the camera (it never turns: no yaw) — leaning back by this angle
 const SPRITE_LEAN = Math.PI / 2 - (CAMERA.tilt * Math.PI) / 180;
@@ -144,6 +145,13 @@ function propFaces(p, out) {
   const rot = (p.rot | 0) & 3;
   const base = _m.compose(_p.set(p.x, p.elev || 0, p.y), _q.setFromAxisAngle(UP, -(rot * Math.PI) / 2 - (p.yaw || 0)), _s); // D117: yaw — a turn off the quarter turns
   const W = p.w || m.drawW || t.w, D = m.drawD || Math.max(1, t.d); // (p.w: a fence piece cut to its wall)
+  // D119: a remodelled object — real parts with the parts of its pictures (render3d/officeBuilds.js)
+  if (m.build && OFFICE_BUILDS[m.build]) {
+    const faces = [];
+    OFFICE_BUILDS[m.build]({ item, A, outline: v.outline, outlineWalls }, faces, W, D, heightOf(m, item, t, W, D));
+    for (const g of faces) out.push(g.applyMatrix4(base));
+    return;
+  }
   const front = item.front || item.back;
   // D111: the user's new office atlases (every view fits its bounding face; `surf` — the main surface height)
   const surf = m.surf ?? item.surf;

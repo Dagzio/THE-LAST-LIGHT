@@ -668,7 +668,9 @@ export class HumanView {
     if (pistol) {
       // pistol: Pistol Idle is the ready / aim pose; walking and running swing the arms of their clips; the reload is
       // the user's clip (D84), its time following the reload's progress
-      const moving = move * f;
+      // D119 (user: the enemies' left hand stuck out forward with the pistol): `armsReady` — walking / running he keeps the
+      // two-handed ready pose of Pistol Idle (as the hero does), not the clips' raised gun and swinging left arm
+      const moving = st.armsReady ? 0 : move * f;
       U.pIdle.setEffectiveWeight((am + (PR ? 0 : rl) + relaxed * (1 - moving)) * up);
       if (PR) {
         PR.u.setEffectiveWeight(rl * up);
