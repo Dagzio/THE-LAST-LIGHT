@@ -17,6 +17,7 @@ const CROWN_FILE = 'assets/models/props/tree_crown.bin';
 const CROWN_Y = 1.49;          // m: the crown model's origin above the ground (its leaves start at the trunk's top, 1.79 m)
 const BARK_LIGHT = 1.9;        // vertex colour of the bark (the tile is dark, the crown shades it)
 const LEAF_LIGHT = 1.22;       // …and of the leaves (× their own tint)
+const LEAF_WARM = [2.6, 1.15, 0.75]; // D123: the leaves' tone (r, g, b ×) — the yellow-green of the ground's grass
 let crownGeo = null, crownLoad = null, barkMat = null, leafMat = null;
 
 function texture() {
@@ -67,8 +68,10 @@ function crownGeometry(buf) {
   for (let i = 0; i < n; i++) { ymin = Math.min(ymin, P[i * 3 + 1]); ymax = Math.max(ymax, P[i * 3 + 1]); rmax = Math.max(rmax, Math.hypot(P[i * 3] - cx, P[i * 3 + 2] - cz)); }
   for (let i = 0; i < n; i++) {
     const h = (P[i * 3 + 1] - ymin) / (ymax - ymin || 1), out = Math.min(1, Math.hypot(P[i * 3] - cx, P[i * 3 + 2] - cz) / (rmax || 1));
-    const k = 0.58 + 0.6 * h + 0.3 * out, warm = Math.max(0, h * 0.8 + out * 0.6 - 0.5);
-    CL[i * 3] *= k * (1 + warm * 0.75); CL[i * 3 + 1] *= k * (1 + warm * 0.18); CL[i * 3 + 2] *= k * (1 - warm * 0.3);
+    // D123 (user: more yellow, a tone of sunlight, like the grass and the bushes): the whole crown warmed to their
+    // yellow-green, the sunlit top and rim warmer still
+    const k = 0.62 + 0.55 * h + 0.3 * out, warm = Math.max(0, h * 0.8 + out * 0.6 - 0.45);
+    CL[i * 3] *= k * LEAF_WARM[0] * (1 + warm * 0.9); CL[i * 3 + 1] *= k * LEAF_WARM[1] * (1 + warm * 0.28); CL[i * 3 + 2] *= k * LEAF_WARM[2] * (1 - warm * 0.35);
   }
   // foliage normals: the leaf's own, bent towards where it sits in the crown (out and up) — the crown lit as a volume
   for (let i = 0; i < n; i++) {

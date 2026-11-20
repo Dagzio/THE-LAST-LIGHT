@@ -35,9 +35,11 @@ export const HUMAN_ANIM = {
   coverHugLow: 6,
   // D110 / D114 (user): turning on the spot (standing, below `below` u/s) faster than `from` rad/s plays the user's turn
   // clips' legs (render3d/humans.js; the hero and the enemies)
-  // D122 (user: back to stepping, realistic, the feet not spread): standing, the in-place walk's legs at stride of their
-  // step (blended with the stance), minHz … maxHz gait cycles a second by the turn rate; crouched — the crouch turn clip
-  turnSteps: { below: 8, from: 1.4, stride: 0.5, minHz: 1.3, maxHz: 2.1 },
+  // D123 (user: two steps of the feet following the body, the user's new turn clips; the enemies' own): the turn clip's
+  // frame follows the body's turn so far (its feet stay planted), at most `pace` × the clip's own speed (a faster turn
+  // slides the feet instead of a flurry of steps); still for `settle` s → back to the stance (`blend`: the fade's rate)
+  // (`still` rad/s: slower than this the body counts as still — the last of its eased turn)
+  turnSteps: { below: 8, pace: 2.4, settle: 0.18, blend: 1.6, still: 0.12 },
   // D110: standing up from low cover — the parts of "Crouch To Standing With Rifle" / "Stand To Crouch" (s) from the
   // kneel to the upright stance (measured on the Hips height: 21 → 53 / 52 → 22)
   rise: { upFrom: 0.1, upTo: 0.72, downFrom: 0.08, downTo: 0.65 },

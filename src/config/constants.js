@@ -12,7 +12,7 @@ export const DEBUG_MODELS = true; // D110 (user): the viewer is back in the main
  */
 export const CHEATS = true;
 
-export const BUILD_VERSION = '0.24.6-killlist-story';
+export const BUILD_VERSION = '0.24.7-killlist-story';
 
 /** Prefix for every localStorage key of the game (H5 §9). KILL LIST (D78): its own prefix, a new profile schema. */
 export const STORAGE_PREFIX = 'kl.';

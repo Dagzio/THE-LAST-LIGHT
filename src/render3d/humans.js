@@ -32,6 +32,17 @@ const _axis = new THREE.Vector3();
 const _tq = new THREE.Quaternion(), _tp = new THREE.Quaternion();
 const _q3 = new THREE.Quaternion();
 const FOOTFALLS = [0.25, 0.75]; // D90: gait phases where a foot comes down (0 = the left foot's mid-swing)
+const RAD2DEG = 180 / Math.PI;
+/** D123: the time (s) in a turn clip at which it has turned `deg` (its per-frame turn table, never going back). */
+function turnTime(TI, deg, fps) {
+  const y = TI.yaw, n = y.length;
+  if (deg <= y[0]) return 0;
+  if (deg >= y[n - 1]) return TI.dur * 0.999;
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (y[m] < deg) lo = m; else hi = m; }
+  const f = lo + (deg - y[lo]) / Math.max(1e-6, y[hi] - y[lo]);
+  return Math.min(TI.dur * 0.999, f / fps);
+}
 
 /** One loaded model (hero / enemy): skeleton, clips for that skeleton, gun mounts. */
 export class HumanTemplate {
@@ -167,6 +178,7 @@ export class HumanTemplate {
         lower: new THREE.AnimationClip(`${id}.lower`, c.duration, lower),
         duration: c.duration,
         turn: c.turn || 0, // D114: degrees the clip turns (its Hips' turn taken out by the converter)
+        turnYaw: c.turnYaw || null, turnSteps: c.turnSteps || [], // D123: the turn so far per frame (deg), the feet's landings
       };
     }
     return out;
@@ -276,7 +288,7 @@ export class HumanTemplate {
  * (per-character, stable) pick among the user's variants of the same action.
  */
 function pickClips(C, variant, mixed) {
-  const base = { walk: 'walk', idle: 'idle', run: 'run', hit: 'hit', reload: 'reload', die: 'die' };
+  const base = { walk: 'walk', idle: 'idle', run: 'run', hit: 'hit', reload: 'reload', die: 'die', turnR: 'turnR', turnL: 'turnL' };
   if (!mixed) return base;
   let h = (Math.imul(Math.abs(variant | 0) + 1, 2654435761) >>> 0);
   const pick = (list) => { const id = list[h % list.length]; h = (Math.imul(h ^ (h >>> 15), 2246822519) >>> 0) + 7; return C[id] ? id : list[0]; };
@@ -287,6 +299,8 @@ function pickClips(C, variant, mixed) {
     hit: pick(['hit', 'hit2']),
     reload: pick(['reload', 'reload2']),
     die: pick(['die', 'die2', 'die3']),
+    // D123 (user's clips, signed for the enemies): their own turn on the spot
+    turnR: C.eTurnR ? 'eTurnR' : 'turnR', turnL: C.eTurnL ? 'eTurnL' : 'turnL',
   };
 }
 
@@ -393,11 +407,22 @@ export class HumanView {
     const lower = (id) => { if (!C[id]) return null; const a = act(C[id].lower); a.timeScale = 0; return a; };
     this.riseLo = { up: lower('toStand'), down: lower('toCrouch') };
     // D114 (user): turning on the spot — the legs of the user's turn clips (standing / crouched, right / left)
-    this.turnActs = { R: lower('turnR'), L: lower('turnL'), cR: lower('cTurnR'), cL: lower('cTurnL') };
+    // D123: the hero's / the enemies' own standing turns (pickClips), the crouch turns for both
+    const turnIds = { R: pick.turnR, L: pick.turnL, cR: 'cTurnR', cL: 'cTurnL' };
+    this.turnActs = {};
     this.turnInfo = {};
-    for (const [k, id] of [['R', 'turnR'], ['L', 'turnL'], ['cR', 'cTurnR'], ['cL', 'cTurnL']]) if (C[id]) this.turnInfo[k] = { dur: C[id].duration, deg: Math.abs(C[id].turn) || 45 };
-    this.turnT = 0;
-    this.turnDir = 0;
+    for (const [k, id] of Object.entries(turnIds)) {
+      this.turnActs[k] = lower(id);
+      if (C[id] && C[id].turnYaw && C[id].turnYaw.length > 1) {
+        const y = C[id].turnYaw;
+        this.turnInfo[k] = { dur: C[id].duration, deg: y[y.length - 1], yaw: y, steps: C[id].turnSteps };
+      }
+    }
+    this.turnAcc = 0;        // D123: degrees of the current turn clip turned (its frame follows it)
+    this.turnDir = 1;        // +1 right (the R clips), −1 left
+    this.turnQuiet = 1;      // s since the body last turned
+    this.turnCrouch = false;
+    this.turnStepping = false;
     this.crouchIdle = this.cv.lowIdle; this.crouchWalk = null; // (dev viewer)
     this.trans = null;       // { a: action, from, to (clip s), dur (s), age (s) } — a stand ↔ kneel transition playing
     this.lowWas = false;
@@ -472,7 +497,7 @@ export class HumanView {
    * the whole body was turned back by it and the legs walked crooked). The hips' yaw against the weighted hips of the
    * upper-body clips (at their current times) is taken off the Spine.
    */
-  _torsoFix() {
+  _torsoFix(align = 0) {
     const tpl = this.tpl, fps = tpl.anims.fps, up = tpl.hipsUp;
     let sx = 0, sy = 0, sz = 0, sw = 0, tw = 0;
     for (const a of this.acts) {
@@ -491,6 +516,13 @@ export class HumanView {
     _q.set(sx, sy, sz, sw).normalize();                        // the reference hips (parent frame)
     _q2.copy(_q).multiply(_tq.copy(hips.quaternion).invert()); // C = ref · now⁻¹ (parent frame)
     let ang = 2 * Math.atan2(_q2.x * up.x + _q2.y * up.y + _q2.z * up.z, _q2.w); // (its turn about the vertical, checks)
+    if (align > 0.001) {
+      // D123: turning on the spot the turn clip's pelvis is turned to face where the stance's does (by the turn's weight)
+      // — the legs stepping under the torso, not twisted against it; a steady offset, so the planted foot stays put
+      hips.quaternion.premultiply(_q3.setFromAxisAngle(up, Math.atan2(Math.sin(ang), Math.cos(ang)) * Math.min(1, align)));
+      _q2.copy(_q).multiply(_tq.copy(hips.quaternion).invert());
+      ang = 2 * Math.atan2(_q2.x * up.x + _q2.y * up.y + _q2.z * up.z, _q2.w);
+    }
     this.torsoTwist = -Math.atan2(Math.sin(ang), Math.cos(ang));
     if (1 - Math.abs(_q2.w) < 1e-6) return;
     // the whole correction (turn + lean), not only the yaw: the spine's world rotation gets C (taken to the world)
@@ -638,34 +670,50 @@ export class HumanView {
     // D114 (user: the turn clips, the enemies too): turning on the spot — the turn clip's legs (right / left; crouched in
     // the stealth crouch), its time following the body's own turn (the clip's degrees over its length, looped); the
     // stance legs fade meanwhile, the upper body keeps its gun pose
-    const TS = A.turnSteps, turnNow = st.turn || 0;
-    const turning = !dead && !rolling && !tdOn && sp < TS.below && Math.abs(turnNow) > TS.from && st.cover !== 'low' && st.cover !== 'high';
-    if (turning) this.turnDir = turnNow > 0 ? 1 : -1;
-    const tw = ease('turn', turning ? 1 : 0, 1.4);
-    for (const a of Object.values(this.turnActs)) if (a) a.setEffectiveWeight(0);
+    // D123 (user: not walking on the spot — two steps of the feet with the body; the user's new turn clips, the enemies'
+    // own): the turn clip's legs at the frame whose turn equals the body's own turn so far — the converter took the clip's
+    // Hips turn out (the body turns itself), so the planted foot stays put; a whole clip turned → the next two steps; the
+    // way reversed → back through the clip (past its start → the other way's clip); the body still → back to the stance.
+    // Crouched (the stealth crouch) — the crouch turn clips the same way
+    const TS = A.turnSteps;
+    const turnable = !dead && !rolling && !tdOn && sp < TS.below && st.cover !== 'low' && st.cover !== 'high';
+    const dYaw = turnable && Number.isFinite(st.turnDelta) ? st.turnDelta : 0;
     const crouchTurn = lowOn && !!st.crouch;
-    const turnKey = (crouchTurn ? 'c' : '') + (this.turnDir > 0 ? 'R' : 'L'), turnA = this.turnActs[turnKey], TI = this.turnInfo[turnKey];
-    this.turnStepping = tw > 0.3 && !crouchTurn && !!fwdWalk;
-    if (tw > 0.001 && !crouchTurn && fwdWalk) {
-      // D122 (user: the turn clip looked bad — back to stepping, realistic, the feet not spread): standing and turning he
-      // steps in place — the in-place walk's legs at HALF their stride (blended with the stance: short steps, the feet
-      // close together, never the side-steps' wide stance), paced by the turn (1.3 … 2.1 steps a second each foot)
-      const STEP = A.turnSteps.stride;
-      const hz = Math.min(A.turnSteps.maxHz, Math.max(A.turnSteps.minHz, Math.abs(turnNow) * 0.5));
-      for (const a of [L.pIdle, L.fire, L.idle, PR && PR.l]) if (a) a.setEffectiveWeight(a.getEffectiveWeight() * (1 - tw * STEP));
-      fwdWalk.setEffectiveWeight(fwdWalk.getEffectiveWeight() + stand * tw * STEP);
-      const p0 = this.phase, p1 = p0 + Math.max(0, dt) * hz;
-      for (const at of FOOTFALLS) if ((p0 < at && p1 >= at) || (p0 < at + 1 && p1 >= at + 1)) this.footfalls += 1; // (their footsteps)
-      this.phase = p1 % 1;
-      this.gaitHz = Math.max(this.gaitHz, hz);
-      fwdWalk.timeScale = 0;
-      const ph = this.phase + (this.tpl.gait[this.idOf.get(fwdWalk)] || 0);
-      fwdWalk.time = (ph - Math.floor(ph)) * fwdWalk.getClip().duration * 0.999;
-    } else if (tw > 0.001 && turnA && TI && crouchTurn) {
-      // crouched (the stealth crouch): the crouch turn clip's legs (a quick turn: at most 2.5× its own pace)
-      const adv = Math.min(((Math.abs(turnNow) * Math.max(0, dt) * 180) / Math.PI / TI.deg) * TI.dur, Math.max(0, dt) * 2.5);
-      this.turnT = (this.turnT + adv) % TI.dur;
-      turnA.time = this.turnT;
+    const ck = crouchTurn ? 'c' : '';
+    if (crouchTurn !== this.turnCrouch) { this.turnCrouch = crouchTurn; this.turnAcc = 0; }
+    if (Math.abs(dYaw) > TS.still * Math.max(0, dt)) this.turnQuiet = 0; else this.turnQuiet += Math.max(0, dt);
+    if (Math.abs(dYaw) > 1e-6) {
+      if (this.turnAcc <= 0) this.turnDir = dYaw > 0 ? 1 : -1;
+      const T0 = this.turnInfo[ck + (this.turnDir > 0 ? 'R' : 'L')];
+      if (T0) {
+        const most = (T0.deg / T0.dur) * TS.pace * Math.max(0, dt); // (deg this frame at most)
+        const s = Math.max(-most, Math.min(most, dYaw * this.turnDir * RAD2DEG));
+        let a = this.turnAcc + s;
+        if (a < 0) { this.turnDir = -this.turnDir; a = Math.min(-a, 1); }  // back past the start: the other way's clip
+        else {
+          for (const at of T0.steps) if (this.turnAcc < at && a >= at) this.footfalls += 1; // a foot put down
+          if (a >= T0.deg) { a -= T0.deg; for (const at of T0.steps) if (at <= a) this.footfalls += 1; } // the next two steps
+        }
+        this.turnAcc = a;
+      }
+    }
+    const turning = turnable && this.turnQuiet < TS.settle && this.turnAcc > 0;
+    const tw = ease('turn', turning ? 1 : 0, TS.blend);
+    const wR = ease('turnLR', this.turnDir > 0 ? 1 : 0, TS.blend * 1.5);
+    if (!turning && tw < 0.02) this.turnAcc = 0;
+    this.turnStepping = tw > 0.3 && turning;
+    for (const a of Object.values(this.turnActs)) if (a) a.setEffectiveWeight(0);
+    const turnKey = ck + (this.turnDir > 0 ? 'R' : 'L'), TI = this.turnInfo[turnKey], turnA = this.turnActs[turnKey];
+    if (TI && turnA) turnA.time = turnTime(TI, this.turnAcc, tpl.anims.fps);
+    // the two ways' legs (a reversal crossfades them), each over the stance it replaces
+    const turnLegs = (wa) => {
+      const r = this.turnActs[ck + 'R'], l = this.turnActs[ck + 'L'];
+      if (r && this.turnInfo[ck + 'R']) r.setEffectiveWeight(wa * tw * wR);
+      if (l && this.turnInfo[ck + 'L']) l.setEffectiveWeight(wa * tw * (1 - wR));
+    };
+    if (tw > 0.001 && !crouchTurn) {
+      for (const a of [L.pIdle, L.fire, L.idle, PR && PR.l]) if (a) a.setEffectiveWeight(a.getEffectiveWeight() * (1 - tw));
+      turnLegs(stand);
     }
 
     // ---- upper body
@@ -738,7 +786,7 @@ export class HumanView {
       // D114: crouched and turning (the stealth crouch) — the crouch turn's legs, the crouch idle's arms
       const wa = cv.lowIdle.getEffectiveWeight();
       cv.lowIdle.setEffectiveWeight(wa * (1 - tw));
-      turnA.setEffectiveWeight(wa * tw);
+      turnLegs(wa); // (D123: both ways, crossfaded)
       if (cv.upRifle) cv.upRifle.setEffectiveWeight(cv.upRifle.getEffectiveWeight() + wa * tw);
     }
     // D88: the Cover/Crouch firing clip for the long guns; D102 (user): the pistol fires kneeling (Pistol Kneeling Idle)
@@ -799,7 +847,7 @@ export class HumanView {
     for (const [b, q] of this.touched) b.quaternion.copy(q);
     this.mixer.update(Math.max(0, dt));
     for (const [b, q] of this.touched) q.copy(b.quaternion);
-    if (!dead) this._torsoFix(); // D86: the torso keeps the upper-body clips' pose over the legs' hips
+    if (!dead) this._torsoFix(w.turn); // D86: the torso keeps the upper-body clips' pose over the legs' hips
 
     // the gun goes to the left hand while the right arm throws
     const left = thr > 0.5 && tossT >= A.throwHandOff && tossT < A.throwHandBack;
