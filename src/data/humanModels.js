@@ -35,11 +35,14 @@ export const HUMAN_ANIM = {
   coverHugLow: 6,
   // D110 / D114 (user): turning on the spot (standing, below `below` u/s) faster than `from` rad/s plays the user's turn
   // clips' legs (render3d/humans.js; the hero and the enemies)
-  // D123 (user: two steps of the feet following the body, the user's new turn clips; the enemies' own): the turn clip's
-  // frame follows the body's turn so far (its feet stay planted), at most `pace` × the clip's own speed (a faster turn
-  // slides the feet instead of a flurry of steps); still for `settle` s → back to the stance (`blend`: the fade's rate)
-  // (`still` rad/s: slower than this the body counts as still — the last of its eased turn)
-  turnSteps: { below: 8, pace: 2.4, settle: 0.18, blend: 1.6, still: 0.12 },
+  // D124 (user: the D123 turns looked like sliding round on the spot): standing (below `below` u/s) the legs keep their
+  // own facing while the torso twists over them; twisted past `start`° — or the body still (`still` rad/s) for `settle` s
+  // with the legs off by `square`° — two steps turn the legs under it. Never twisted past `max`° (a fast spin drags the
+  // legs). The enemies / crouched: the turn clip at `clipPace` × its pace (up to `clipPaceMax` for a big twist); the
+  // hero standing: from his stance, the two steps in `ikDur` s (60°; scaled by the turn), up to `ikMax`° at once, the
+  // stepping foot lifted `lift` × his height. `release` 1/s: walking off, the legs swing back under the body;
+  // `blendIn` / `blendOut`: the clip's weight in / out (× blendRate)
+  turnSteps: { below: 8, start: 32, square: 12, settle: 0.25, still: 0.12, max: 95, clipPace: 1.15, clipPaceMax: 1.8, ikDur: 0.5, ikMax: 90, lift: 0.045, release: 10, blendIn: 3, blendOut: 1.4 },
   // D110: standing up from low cover — the parts of "Crouch To Standing With Rifle" / "Stand To Crouch" (s) from the
   // kneel to the upright stance (measured on the Hips height: 21 → 53 / 52 → 22)
   rise: { upFrom: 0.1, upTo: 0.72, downFrom: 0.08, downTo: 0.65 },

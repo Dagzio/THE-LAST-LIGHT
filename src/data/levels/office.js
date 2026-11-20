@@ -151,12 +151,12 @@ export const OFFICE = {
     { type: 'alarm_light', x: 1960, y: 1141.5, rot: 0 }, { type: 'papers', x: 1900, y: 1330, rot: 2 },
     { type: 'security_camera', x: 1690, y: 1141.5, rot: 0 },
     // --- manager
-    { type: 'exec_desk', x: 1950, y: 1600, rot: 0 }, { type: 'exec_chair', x: 1950, y: 1566, rot: 0 },
-    { type: 'armchair', x: 1912, y: 1652, rot: 2 }, { type: 'armchair', x: 1988, y: 1652, rot: 2 },
+    // D124 (user): the two armchairs in front of the desk removed, the chair moved round to the desk's drawers side
+    { type: 'exec_desk', x: 1950, y: 1600, rot: 0 }, { type: 'exec_chair', x: 1950, y: 1634, rot: 2 },
     { type: 'bookcase', x: 1735, y: 1467, rot: 0 }, { type: 'bookcase', x: 1790, y: 1467, rot: 0 },
     { type: 'armchair', x: 1674, y: 1555, rot: 3 }, { type: 'armchair', x: 1674, y: 1607, rot: 3 },
     { type: 'plant', x: 2119, y: 1669 }, { type: 'plant', x: 1681, y: 1481 }, { type: 'plant', x: 2119, y: 1481 },
-    { type: 'rug_small', x: 1950, y: 1570 }, { type: 'wall_clock', x: 2000, y: 1461.5, rot: 0 },
+    { type: 'rug_small', x: 1950, y: 1630 }, { type: 'wall_clock', x: 2000, y: 1461.5, rot: 0 },
     { type: 'floor_lamp', x: 2122, y: 1560 }, { type: 'floor_lamp', x: 1700, y: 1500 },
     { type: 'desk_lamp', x: 1982, y: 1594, elev: 24 }, 
     // --- open space: six blocks of four workstations — D85: two rows back to back, each chair at its desk's front

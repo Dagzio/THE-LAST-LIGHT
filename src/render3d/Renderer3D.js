@@ -897,9 +897,7 @@ export class Renderer3D {
     // ---- hero
     const tgt = Number.isFinite(p.bodyAngle) ? p.bodyAngle : p.aimAngle;
     if (this.bodyYaw === undefined || !p.alive) this.bodyYaw = this.bodyYaw ?? tgt;
-    const yaw0 = this.bodyYaw;
     if (p.alive) this.bodyYaw += Math.atan2(Math.sin(tgt - this.bodyYaw), Math.cos(tgt - this.bodyYaw)) * Math.min(1, dt * 20);
-    // D123: turning on the spot he steps — this frame's turn (bodyYaw − yaw0) drives the turn clip's frame (humans.js)
     const hx = this._lx(p), hy = this._ly(p);
     const h = this.hero;
     h.setGun(gunModelOf(run.weapon.weaponId));
@@ -929,7 +927,6 @@ export class Renderer3D {
       peek: p.alive && p.peek ? p.peek.k : 0,                                                                                       // D87: leaning out of the corner
       peekSide: p.peek ? p.peek.side : 0,                                                                                           // D90: +1 his right, −1 his left
       rise: p.alive && p.rise ? p.rise.k : 0, riseUp: !!(p.rise && p.rise.up),                                                     // D110: standing up from low cover
-      turnDelta: p.alive && !p.cover && !p.dodging && !p.takedown ? this.bodyYaw - yaw0 : 0,                                       // D123: the turn steps (rad this frame)
       takedown: p.alive && p.takedown ? Math.min(1, Math.max(0, (time - p.takedown.t0) / STEALTH.takedown.duration)) : -1,         // D85: the takedown clip
       takedownFrom: STEALTH.takedown.clipFrom, takedownTo: STEALTH.takedown.clipTo,
     });
@@ -941,6 +938,7 @@ export class Renderer3D {
     this.hugY = (this.hugY || 0) + ((hugOn ? -p.cover.ny * hug : 0) - (this.hugY || 0)) * hk;
     h.group.position.set(hx + this.hugX, 0, hy + this.hugY);
     h.group.rotation.y = -(this.bodyYaw - h.aimYaw);
+    h.settleLegs(); // D124: the legs turn on the spot in steps (after the model is placed)
     if (h.xray) h.xray.visible = p.alive && !(this.map && this.map.noXray); // D86; D90: off where the level says so
     h.flash.visible = p.alive && time - w.lastShotAt >= 0 && time - w.lastShotAt < SHOT_FLASH;
     if (h.flash.visible) h.flash.rotation.x = (w.lastShotAt * 97.3) % (Math.PI * 2);
@@ -967,12 +965,7 @@ export class Renderer3D {
       if (!vis) continue;
       const g = e.gun, ai = e.ai;
       const sp = e.alive ? Math.hypot(e.vx, e.vy) : 0;
-      // D114 / D123: the enemies turn on the spot with their own turn clips — their facing's turn this frame
-      if (v.lastFace === undefined) v.lastFace = e.faceAngle;
-      const dFace = Math.atan2(Math.sin(e.faceAngle - v.lastFace), Math.cos(e.faceAngle - v.lastFace));
-      v.lastFace = e.faceAngle;
       v.update(dt, {
-        turnDelta: e.alive ? dFace : 0, // D123: the turn steps (rad this frame)
         speed: sp,
         moveRel: sp > 1 ? Math.atan2(e.vy, e.vx) - e.faceAngle : 0,
         shotAge: time - g.lastShotAt,
@@ -1001,6 +994,7 @@ export class Renderer3D {
       }
       v.group.position.set(ex, 0, ey);
       v.group.rotation.y = -(yaw - v.aimYaw);
+      v.settleLegs(); // D124
       v.flash.visible = e.alive && time - g.lastShotAt >= 0 && time - g.lastShotAt < SHOT_FLASH;
       if (v.flash.visible) v.flash.rotation.x = (g.lastShotAt * 91.7) % (Math.PI * 2);
       if (!e.alive) continue;

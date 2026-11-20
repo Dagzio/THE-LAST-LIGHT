@@ -32,7 +32,26 @@ const _axis = new THREE.Vector3();
 const _tq = new THREE.Quaternion(), _tp = new THREE.Quaternion();
 const _q3 = new THREE.Quaternion();
 const FOOTFALLS = [0.25, 0.75]; // D90: gait phases where a foot comes down (0 = the left foot's mid-swing)
-const RAD2DEG = 180 / Math.PI;
+const RAD2DEG = 180 / Math.PI, DEG2RAD = Math.PI / 180;
+const UPW = new THREE.Vector3(0, 1, 0);
+const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+/** D124: V turned about the vertical through P by a (three's yaw); V itself, changed. */
+function rotY(V, P, a) {
+  const x = V.x - P.x, z = V.z - P.z, c = Math.cos(a), s = Math.sin(a);
+  V.x = P.x + x * c + z * s; V.z = P.z - x * s + z * c;
+  return V;
+}
+/** D124: a turn clip's turn (deg) at time t. */
+function yawAt(TI, t, fps) {
+  const y = TI.yaw, f = Math.max(0, Math.min(y.length - 1, t * fps)), i = Math.min(y.length - 2, Math.floor(f));
+  return y[i] + (y[i + 1] - y[i]) * (f - i);
+}
+/** D124: where turn-clip steps stop — the landing (or the clip's end) past `from`° nearest the turn wanted. */
+function stopFor(TI, from, want) {
+  let best = TI.deg;
+  for (const c of [...TI.steps, TI.deg]) if (c > from + 1 && Math.abs(c - want) < Math.abs(best - want)) best = c;
+  return best;
+}
 /** D123: the time (s) in a turn clip at which it has turned `deg` (its per-frame turn table, never going back). */
 function turnTime(TI, deg, fps) {
   const y = TI.yaw, n = y.length;
@@ -418,10 +437,14 @@ export class HumanView {
         this.turnInfo[k] = { dur: C[id].duration, deg: y[y.length - 1], yaw: y, steps: C[id].turnSteps };
       }
     }
-    this.turnAcc = 0;        // D123: degrees of the current turn clip turned (its frame follows it)
-    this.turnDir = 1;        // +1 right (the R clips), −1 left
-    this.turnQuiet = 1;      // s since the body last turned
-    this.turnCrouch = false;
+    // D124: the legs' own facing (three's world yaw; null = with the body), the steps under way, how this one steps
+    this.legYaw = null;
+    this.legSeq = null;      // { key (clip) | ik, from, to, … } — two steps turning the legs
+    this.legQuiet = 0;       // s since the body last turned against the legs
+    this.lastBodyYaw = null;
+    this.turnKey = '';
+    this.stepClips = pick.turnR !== 'turnR'; // the enemies step with their own clips; the hero from his stance (IK)
+    this.legsOk = false; this.legsCrouch = false; this.legsDt = 0;
     this.turnStepping = false;
     this.crouchIdle = this.cv.lowIdle; this.crouchWalk = null; // (dev viewer)
     this.trans = null;       // { a: action, from, to (clip s), dur (s), age (s) } — a stand ↔ kneel transition playing
@@ -449,7 +472,8 @@ export class HumanView {
     this.phase = Math.random(); // D86: the shared gait phase (cycles) of the locomotion clips (presentation only)
     // D86: the bones turned after the mixer (torso fix, recoil) and their last mixer-given rotation
     // (D120: + the left arm — the pistol's two-handed grip is set by IK after the mixer)
-    this.touched = ['Spine', 'RightHand', 'RightForeArm', 'LeftArm', 'LeftForeArm', 'LeftHand'].filter((n) => bones.get(n)).map((n) => [bones.get(n), bones.get(n).quaternion.clone()]);
+    // (D124: + the hips and the legs — turned / put by IK in settleLegs)
+    this.touched = ['Spine', 'RightHand', 'RightForeArm', 'LeftArm', 'LeftForeArm', 'LeftHand', 'Hips', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'RightUpLeg', 'RightLeg', 'RightFoot'].filter((n) => bones.get(n)).map((n) => [bones.get(n), bones.get(n).quaternion.clone()]);
     this.torsoTwist = 0;        // D86: the last torso fix (rad, dev / checks)
     this.gaitHz = 0;            // D87: the legs' cadence (gait cycles/s) this frame — the footsteps follow it
     this.footfalls = 0;         // D90: feet put down so far (the footstep one-shots follow it)
@@ -497,7 +521,7 @@ export class HumanView {
    * the whole body was turned back by it and the legs walked crooked). The hips' yaw against the weighted hips of the
    * upper-body clips (at their current times) is taken off the Spine.
    */
-  _torsoFix(align = 0) {
+  _torsoFix() {
     const tpl = this.tpl, fps = tpl.anims.fps, up = tpl.hipsUp;
     let sx = 0, sy = 0, sz = 0, sw = 0, tw = 0;
     for (const a of this.acts) {
@@ -516,13 +540,6 @@ export class HumanView {
     _q.set(sx, sy, sz, sw).normalize();                        // the reference hips (parent frame)
     _q2.copy(_q).multiply(_tq.copy(hips.quaternion).invert()); // C = ref · now⁻¹ (parent frame)
     let ang = 2 * Math.atan2(_q2.x * up.x + _q2.y * up.y + _q2.z * up.z, _q2.w); // (its turn about the vertical, checks)
-    if (align > 0.001) {
-      // D123: turning on the spot the turn clip's pelvis is turned to face where the stance's does (by the turn's weight)
-      // — the legs stepping under the torso, not twisted against it; a steady offset, so the planted foot stays put
-      hips.quaternion.premultiply(_q3.setFromAxisAngle(up, Math.atan2(Math.sin(ang), Math.cos(ang)) * Math.min(1, align)));
-      _q2.copy(_q).multiply(_tq.copy(hips.quaternion).invert());
-      ang = 2 * Math.atan2(_q2.x * up.x + _q2.y * up.y + _q2.z * up.z, _q2.w);
-    }
     this.torsoTwist = -Math.atan2(Math.sin(ang), Math.cos(ang));
     if (1 - Math.abs(_q2.w) < 1e-6) return;
     // the whole correction (turn + lean), not only the yaw: the spine's world rotation gets C (taken to the world)
@@ -670,48 +687,25 @@ export class HumanView {
     // D114 (user: the turn clips, the enemies too): turning on the spot — the turn clip's legs (right / left; crouched in
     // the stealth crouch), its time following the body's own turn (the clip's degrees over its length, looped); the
     // stance legs fade meanwhile, the upper body keeps its gun pose
-    // D123 (user: not walking on the spot — two steps of the feet with the body; the user's new turn clips, the enemies'
-    // own): the turn clip's legs at the frame whose turn equals the body's own turn so far — the converter took the clip's
-    // Hips turn out (the body turns itself), so the planted foot stays put; a whole clip turned → the next two steps; the
-    // way reversed → back through the clip (past its start → the other way's clip); the body still → back to the stance.
-    // Crouched (the stealth crouch) — the crouch turn clips the same way
+    // D124 (user: the D123 turns looked like the body just sliding round on the spot — the body turns far faster than a
+    // step): the LEGS lag behind the body and catch up in steps (settleLegs, after the renderer places the model): the
+    // torso twists over them up to `start`°, then two steps turn the legs under it. The enemies step with their own turn
+    // clips (at the clips' own pace, the legs turned by the clip's frame — the planted foot stays put), the hero from his
+    // own stance (procedural, the feet put by IK); crouched — the crouch turn clips. Here: the clip's weight and frame
     const TS = A.turnSteps;
-    const turnable = !dead && !rolling && !tdOn && sp < TS.below && st.cover !== 'low' && st.cover !== 'high';
-    const dYaw = turnable && Number.isFinite(st.turnDelta) ? st.turnDelta : 0;
     const crouchTurn = lowOn && !!st.crouch;
-    const ck = crouchTurn ? 'c' : '';
-    if (crouchTurn !== this.turnCrouch) { this.turnCrouch = crouchTurn; this.turnAcc = 0; }
-    if (Math.abs(dYaw) > TS.still * Math.max(0, dt)) this.turnQuiet = 0; else this.turnQuiet += Math.max(0, dt);
-    if (Math.abs(dYaw) > 1e-6) {
-      if (this.turnAcc <= 0) this.turnDir = dYaw > 0 ? 1 : -1;
-      const T0 = this.turnInfo[ck + (this.turnDir > 0 ? 'R' : 'L')];
-      if (T0) {
-        const most = (T0.deg / T0.dur) * TS.pace * Math.max(0, dt); // (deg this frame at most)
-        const s = Math.max(-most, Math.min(most, dYaw * this.turnDir * RAD2DEG));
-        let a = this.turnAcc + s;
-        if (a < 0) { this.turnDir = -this.turnDir; a = Math.min(-a, 1); }  // back past the start: the other way's clip
-        else {
-          for (const at of T0.steps) if (this.turnAcc < at && a >= at) this.footfalls += 1; // a foot put down
-          if (a >= T0.deg) { a -= T0.deg; for (const at of T0.steps) if (at <= a) this.footfalls += 1; } // the next two steps
-        }
-        this.turnAcc = a;
-      }
-    }
-    const turning = turnable && this.turnQuiet < TS.settle && this.turnAcc > 0;
-    const tw = ease('turn', turning ? 1 : 0, TS.blend);
-    const wR = ease('turnLR', this.turnDir > 0 ? 1 : 0, TS.blend * 1.5);
-    if (!turning && tw < 0.02) this.turnAcc = 0;
-    this.turnStepping = tw > 0.3 && turning;
+    this.legsOk = !dead && !rolling && !tdOn && sp < TS.below && st.cover !== 'low' && st.cover !== 'high' && !this.trans && riseK <= 0;
+    this.legsCrouch = crouchTurn;
+    this.legsDt = Math.max(0, dt);
+    if (!this.legsOk && this.legSeq) this.legSeq = null;
+    const sq = this.legSeq;
     for (const a of Object.values(this.turnActs)) if (a) a.setEffectiveWeight(0);
-    const turnKey = ck + (this.turnDir > 0 ? 'R' : 'L'), TI = this.turnInfo[turnKey], turnA = this.turnActs[turnKey];
-    if (TI && turnA) turnA.time = turnTime(TI, this.turnAcc, tpl.anims.fps);
-    // the two ways' legs (a reversal crossfades them), each over the stance it replaces
-    const turnLegs = (wa) => {
-      const r = this.turnActs[ck + 'R'], l = this.turnActs[ck + 'L'];
-      if (r && this.turnInfo[ck + 'R']) r.setEffectiveWeight(wa * tw * wR);
-      if (l && this.turnInfo[ck + 'L']) l.setEffectiveWeight(wa * tw * (1 - wR));
-    };
-    if (tw > 0.001 && !crouchTurn) {
+    const clipOn = !!(sq && sq.key && sq.crouch === crouchTurn);
+    const tw = ease('turn', clipOn ? 1 : 0, clipOn ? TS.blendIn : TS.blendOut);
+    if (clipOn) { this.turnKey = sq.key; this.turnActs[sq.key].time = sq.time; }
+    const turnA = this.turnKey && (this.turnKey[0] === 'c') === crouchTurn ? this.turnActs[this.turnKey] : null;
+    const turnLegs = (wa) => { if (turnA) turnA.setEffectiveWeight(wa * tw); };
+    if (tw > 0.001 && !crouchTurn && turnA) {
       for (const a of [L.pIdle, L.fire, L.idle, PR && PR.l]) if (a) a.setEffectiveWeight(a.getEffectiveWeight() * (1 - tw));
       turnLegs(stand);
     }
@@ -847,7 +841,7 @@ export class HumanView {
     for (const [b, q] of this.touched) b.quaternion.copy(q);
     this.mixer.update(Math.max(0, dt));
     for (const [b, q] of this.touched) q.copy(b.quaternion);
-    if (!dead) this._torsoFix(w.turn); // D86: the torso keeps the upper-body clips' pose over the legs' hips
+    if (!dead) this._torsoFix(); // D86: the torso keeps the upper-body clips' pose over the legs' hips
 
     // the gun goes to the left hand while the right arm throws
     const left = thr > 0.5 && tossT >= A.throwHandOff && tossT < A.throwHandBack;
@@ -923,6 +917,145 @@ export class HumanView {
     H.parent.updateMatrixWorld(true);
     H.quaternion.copy(H.parent.getWorldQuaternion(_q3).invert().multiply(hq));
     H.updateMatrixWorld(true);
+  }
+
+  /** D124: two-bone IK — the end of A → B → C (thigh → shin → foot, …) onto the world point T, blended by k. */
+  _reach(UA, FA, H, T, k) {
+    const A = UA.getWorldPosition(new THREE.Vector3()), B = FA.getWorldPosition(new THREE.Vector3()), C = H.getWorldPosition(new THREE.Vector3());
+    const tgt = T.clone().lerp(C, 1 - k);
+    const a = A.distanceTo(B), b = B.distanceTo(C), d = Math.min(a + b - 1e-3, Math.max(Math.abs(a - b) + 1e-3, A.distanceTo(tgt)));
+    const BA = A.clone().sub(B), BC = C.clone().sub(B);
+    const cur = BA.angleTo(BC), want = Math.acos(Math.min(1, Math.max(-1, (a * a + b * b - d * d) / (2 * a * b))));
+    const n = new THREE.Vector3().crossVectors(BA, BC);
+    if (n.lengthSq() > 1e-8) this._rotateWorld(FA, n.normalize(), want - cur); // (the joint bends in its own plane)
+    const C2 = H.getWorldPosition(new THREE.Vector3()), AC = C2.sub(A), AT = tgt.sub(A);
+    const ax = new THREE.Vector3().crossVectors(AC, AT);
+    if (ax.lengthSq() > 1e-10) this._rotateWorld(UA, ax.normalize(), AC.angleTo(AT));
+  }
+
+  /**
+   * D124 (user: the turns looked like sliding round on the spot; the enemies with their own turn clips, the hero from
+   * his own stance, two natural steps): called by the renderer once the model is placed for the frame. The legs keep
+   * their own facing (legYaw) while the torso twists over them (the upper body stays on the aim); twisted past
+   * TS.start° — or the body still with the legs off by TS.square° — two steps turn the legs under the body:
+   *  - with a turn clip (the enemies; anyone crouched): the clip from its start at its own pace, the legs turned by the
+   *    clip's own turn at each frame (its Hips turn was taken out by the converter) — the planted foot stays put; it
+   *    stops on the landing nearest the twist (one step or both); twisted further → on to the next landing;
+   *  - the hero standing: from his own stance — the pelvis turns, the foot on the turn's side steps first, then the
+   *    other; each foot put by IK (the planted one where it stood, the stepping one along a low arc to its new place).
+   */
+  settleLegs() {
+    const TS = HUMAN_ANIM.turnSteps, dt = this.legsDt, gY = this.group.rotation.y;
+    const hips = this.bones.get('Hips'), spine = this.bones.get('Spine');
+    if (!hips || !spine) return;
+    this.group.updateMatrixWorld(true);
+    const bodyTurn = this.lastBodyYaw === null ? 0 : wrapA(gY - this.lastBodyYaw);
+    this.lastBodyYaw = gY;
+    if (this.legYaw === null) this.legYaw = gY;
+    let seq = this.legSeq;
+    if (!this.legsOk || (seq && seq.key && seq.crouch !== this.legsCrouch) || (seq && seq.ik && this.legsCrouch)) this.legSeq = seq = null;
+    if (!this.legsOk) {
+      this.legYaw = gY + wrapA(this.legYaw - gY) * Math.max(0, 1 - dt * TS.release); // (walking off: back under the body)
+    } else if (seq && seq.key) this.legYaw = seq.from + seq.dir * seq.shown * DEG2RAD; // (the clip's frame shown now)
+    else if (seq && seq.ik) {
+      // the body still turning the same way early in the steps: they reach further (a quick 90° = one pair of steps)
+      const want = wrapA(gY - seq.from) * seq.dir, have = (seq.to - seq.from) * seq.dir, most = TS.ikMax * DEG2RAD;
+      if (seq.u < 0.4 && want > have + 0.02 && have < most) {
+        const amount = Math.min(most, want);
+        seq.to = seq.from + seq.dir * amount;
+        for (const f of ['Left', 'Right']) seq.E[f] = rotY(seq.S[f].clone(), seq.P, seq.dir * amount);
+      }
+      seq.u = Math.min(1, seq.u + dt / seq.dur); this.legYaw = seq.from + (seq.to - seq.from) * smooth(0, 0.9, seq.u); }
+    // never twisted past TS.max (a fast spin drags the legs round)
+    const mx = TS.max * DEG2RAD, tw0 = wrapA(gY - this.legYaw);
+    if (Math.abs(tw0) > mx) {
+      const sh = tw0 - Math.sign(tw0) * mx;
+      this.legYaw += sh;
+      if (seq) { seq.from += sh; seq.to += sh; if (seq.ik) for (const f of ['Left', 'Right']) { rotY(seq.S[f], seq.P, sh); rotY(seq.E[f], seq.P, sh); seq.Sq[f].premultiply(_q3.setFromAxisAngle(UPW, sh)); } }
+    }
+    // the legs turned to their own facing, the torso turned back (the upper body as the clips have it)
+    const off = wrapA(this.legYaw - gY);
+    if (Math.abs(off) > 1e-4) { this._rotateWorld(hips, UPW, off); this._rotateWorld(spine, UPW, -off); }
+    if (!this.legsOk) { this.turnStepping = false; return; }
+    // the hero's steps: the feet put by IK
+    if (seq && seq.ik) this._ikSteps(seq);
+    // what next
+    const twist = wrapA(gY - this.legYaw); // (+ = the body turned to the legs' left — three's yaw)
+    if (Math.abs(bodyTurn) > TS.still * dt) this.legQuiet = 0; else this.legQuiet += dt;
+    if (seq && seq.ik && seq.u >= 1) { this.legYaw = seq.to; this.legSeq = seq = null; }
+    if (seq && seq.key) this._clipSteps(seq, twist, dt);
+    else if (!seq) {
+      const need = Math.abs(twist) > TS.start * DEG2RAD || (this.legQuiet > TS.settle && Math.abs(twist) > TS.square * DEG2RAD);
+      if (need) this.legSeq = this._startSteps(twist);
+    }
+    this.turnStepping = !!this.legSeq;
+  }
+
+  /** D124: two steps begin — by the turn clip (the enemies / crouched) or from the stance (the hero). */
+  _startSteps(twist) {
+    const TS = HUMAN_ANIM.turnSteps, dir = twist > 0 ? 1 : -1, deg = Math.abs(twist) * RAD2DEG;
+    if (this.stepClips || this.legsCrouch) {
+      const key = (this.legsCrouch ? 'c' : '') + (dir > 0 ? 'L' : 'R'), TI = this.turnInfo[key];
+      if (!TI || !this.turnActs[key]) return null;
+      return { key, crouch: this.legsCrouch, dir, from: this.legYaw, to: this.legYaw, time: 0, shown: 0, stopAt: stopFor(TI, 0, deg), hold: 0 };
+    }
+    const amount = Math.min(TS.ikMax, deg) * DEG2RAD;
+    const hips = this.bones.get('Hips');
+    const P = hips.getWorldPosition(new THREE.Vector3());
+    const S = {}, E = {}, Sq = {};
+    for (const f of ['Left', 'Right']) {
+      const b = this.bones.get(f + 'Foot');
+      if (!b || !this.bones.get(f + 'UpLeg') || !this.bones.get(f + 'Leg')) return null;
+      S[f] = b.getWorldPosition(new THREE.Vector3());
+      Sq[f] = b.getWorldQuaternion(new THREE.Quaternion());
+      E[f] = rotY(S[f].clone(), P, dir * amount);
+    }
+    return { ik: true, dir, from: this.legYaw, to: this.legYaw + dir * amount, u: 0, dur: Math.min(0.62, Math.max(0.34, TS.ikDur * (0.6 + (amount * RAD2DEG) / 150))), first: dir < 0 ? 'Right' : 'Left', P, S, E, Sq, landed: {} };
+  }
+
+  /** D124: the clip steps go on — its frame at its own pace up to the landing chosen, then held / extended / ended. */
+  _clipSteps(seq, twist, dt) {
+    const TS = HUMAN_ANIM.turnSteps, TI = this.turnInfo[seq.key], fps = this.tpl.anims.fps;
+    const left = twist * seq.dir * RAD2DEG; // (the twist still to turn, along the clip's way)
+    if (seq.shown >= seq.stopAt - 1e-3) {
+      // on a landing: more twist the same way → on to the next landing (past the clip's end: its start again)
+      if (left > TS.square) {
+        if (seq.stopAt < TI.deg - 1e-3) seq.stopAt = stopFor(TI, seq.shown, seq.shown + left);
+        else if (left > TS.start * 0.6) { this.legSeq = { ...seq, from: this.legYaw, time: 0, shown: 0, stopAt: stopFor(TI, 0, left), hold: 0 }; return; }
+      } else if (left < -TS.start) { this.legSeq = null; return; } // the other way: ended (a new pair of steps follows)
+      seq.hold += dt;
+      if (seq.hold > TS.settle && this.legQuiet > TS.settle * 0.5) { this.legSeq = null; return; } // done: back to the stance
+    }
+    if (seq.shown < seq.stopAt - 1e-3) {
+      seq.hold = 0;
+      const pace = left > 60 ? TS.clipPaceMax : TS.clipPace;
+      const tEnd = turnTime(TI, seq.stopAt, fps);
+      const t1 = Math.min(tEnd, seq.time + dt * pace);
+      const a1 = t1 >= tEnd ? seq.stopAt : Math.min(seq.stopAt, yawAt(TI, t1, fps));
+      for (const at of TI.steps) if (seq.shown < at && a1 >= at) this.footfalls += 1; // a foot put down
+      seq.time = t1; seq.shown = a1;
+    }
+  }
+
+  /** D124: the hero's two steps from his stance — each foot to its place by IK (after the legs were turned). */
+  _ikSteps(seq) {
+    const TS = HUMAN_ANIM.turnSteps, u = seq.u, k = 1 - smooth(0.9, 1, u), lift = this.tpl.height * TS.lift;
+    for (const f of ['Left', 'Right']) {
+      const v = f === seq.first ? clamp01(u / 0.5) : clamp01((u - 0.42) / 0.5);
+      if (v >= 1 && !seq.landed[f]) { seq.landed[f] = true; this.footfalls += 1; } // put down
+      const sv = smooth(0, 1, v);
+      const T = seq.S[f].clone().lerp(seq.E[f], sv);
+      T.y += lift * Math.sin(Math.PI * v);
+      const UA = this.bones.get(f + 'UpLeg'), FA = this.bones.get(f + 'Leg'), H = this.bones.get(f + 'Foot');
+      this._reach(UA, FA, H, T, k);
+      // the foot keeps its own turn on the ground (turned with its step), not the pelvis'
+      const want = _q.copy(seq.Sq[f]).premultiply(_q3.setFromAxisAngle(UPW, (seq.to - seq.from) * sv));
+      const now = H.getWorldQuaternion(_tq);
+      now.slerp(want, k);
+      H.parent.updateMatrixWorld(true);
+      H.quaternion.copy(H.parent.getWorldQuaternion(_tp).invert().multiply(now));
+      H.updateMatrixWorld(true);
+    }
   }
 
   /** The procedural kick of a shot (after the clips). D84: the pistol reload is the user's clip now (no IK). */
