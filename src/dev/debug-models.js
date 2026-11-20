@@ -1,19 +1,23 @@
 // KILL LIST — dev tool (constants.js → DEBUG_MODELS): 3D model viewer (H5 guide engines/asset-viewer-3d.md).
 // A "3D models" button in the main menu opens a window with every character animation (the user's hero / enemy
-// models + the converted Mixamo clips, exactly as the game builds them) and every office prop (render3d/officeProps.js)
-// on its own, with size / triangle info and a PNG snapshot. Dev only — MUST be off in a release.
+// models + every converted clip, exactly as the game builds them) and every prop of the levels as the game draws it,
+// with size / triangle info and a PNG snapshot. Dev only — MUST be off in a release.
+// D116 (user: bring the viewer up to the current models): the props come from the game's own builders — the atlas
+// bodies (office / training: render3d/propViews.js), the model impostors (render3d/propModels3d.js: chairs, the fallen
+// chairs, the tree), the props built in code (render3d/confTable.js) and the older procedural ones still drawn
+// (render3d/officeProps.js: papers, cable trays, stairs…); the clip list is read from the loaded animation set.
 import * as THREE from '../../lib/three.module.js';
 import { PropBuilder, PROP_BUILDERS } from '../render3d/officeProps.js';
 import { officeMaterials } from '../render3d/OfficeScene.js';
+import { buildPropViews, propViewTexture } from '../render3d/propViews.js';
+import { buildPropModels, hasModel } from '../render3d/propModels3d.js';
+import { buildCustomProps } from '../render3d/confTable.js';
 import { PROP_TYPES, propBlocks } from '../data/props.js';
+import { PROP_MODELS } from '../data/propModels.js';
 import { HUMAN_ANIM } from '../data/humanModels.js';
 
-// D82: + the roll, the crouch, the enemies' variants and the pistol reload as the game draws it (D84: the user's clips)
-const CLIPS = ['idle', 'walk', 'run', 'back', 'strafeL', 'strafeR', 'fire', 'reload', 'pReload (game)', 'hit', 'throw', 'pIdle', 'pWalk', 'pRun', 'die', 'die2',
-  'dodge', 'crouchWalk', 'idle2', 'run2', 'run3', 'hit2', 'reload2', 'die3', 'backRun', 'pStrafeL', 'pStrafeR',
-  // D83: the enemies' rifle walk, the second roll, the cover set, the busy idle
-  'pReload', 'pReload2', 'rwalk', 'dodge2', 'crouchIdle2', 'crouchFire', 'crouchL', 'crouchR', 'toCrouch', 'toStand', 'coverL', 'coverR', 'peekL', 'peekR', 'crouchPose', 'pKneel', 'files', 'takedown'];
 const GAME_RELOAD = 'pReload (game)';
+const blockNames = (b) => ['move', 'bullets', 'sight', 'low cover'].filter((_, i) => b & (1 << i)).join('+') || '—';
 const CSS = `
 #dbg-models-btn { position: fixed; right: max(30px, env(safe-area-inset-right)); bottom: 30px; z-index: 9000;
   font: 800 13px/1 system-ui, sans-serif; color: #fff; background: rgba(10, 20, 40, .82); border: 1px dashed #ffd166;
@@ -81,8 +85,21 @@ async function open() {
 
   const entries = [];
   const GROUPS = { hero: 'Hero (player.glb)', enemy: 'Enemy (enemy.glb)', enemyTraining: 'Training enemy (enemy_training.glb)' };
-  for (const key of Object.keys(GROUPS)) for (const c of CLIPS) entries.push({ group: GROUPS[key], name: `${key} · ${c}`, kind: 'human', key, clip: c });
-  for (const type of Object.keys(PROP_BUILDERS)) entries.push({ group: 'Office props', name: type, kind: 'prop', type });
+  for (const key of Object.keys(GROUPS)) {
+    const tpl = r3 && r3.templates && r3.templates[key];
+    const clips = tpl ? Object.keys(tpl.clips).sort() : [];
+    for (const c of [...clips, GAME_RELOAD]) entries.push({ group: GROUPS[key], name: `${key} · ${c}`, kind: 'human', key, clip: c });
+  }
+  // the props as the game draws them (data/propModels.js): office, training ground; then the older procedural ones
+  const level = (m) => (m.atlas === 'training' ? 'Training ground props' : 'Office props');
+  for (const [type, m] of Object.entries(PROP_MODELS)) {
+    if (!PROP_TYPES[type]) continue;
+    const how = m.custom ? 'custom' : m.model ? 'model' : 'view';
+    entries.push({ group: level(m), name: `${type}${how === 'view' ? '' : how === 'model' ? ' (model)' : ' (built)'}`, kind: 'prop', how, type, atlas: m.atlas || 'office' });
+  }
+  for (const type of Object.keys(PROP_BUILDERS)) if (!PROP_MODELS[type]) entries.push({ group: 'Other props (procedural)', name: type, kind: 'prop', how: 'builder', type });
+  const viewMats = {};
+  const viewMat = (atlas) => viewMats[atlas] || (viewMats[atlas] = new THREE.MeshLambertMaterial({ map: propViewTexture(4, atlas), vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide }));
   const list = el.querySelector('.list');
   let lastGroup = '';
   for (const e of entries) {
@@ -96,7 +113,11 @@ async function open() {
 
   function clear() {
     if (view) { view.dispose(); view = null; }
-    if (current) { scene.remove(current); current.traverse((o) => { if (o.isMesh && o.userData.own) o.geometry.dispose(); }); current = null; }
+    if (current) {
+      scene.remove(current);
+      current.traverse((o) => { if (o.isMesh && o.userData.own) { if (!o.isInstancedMesh) o.geometry.dispose(); if (o.userData.ownMat) o.material.dispose(); } });
+      current = null;
+    }
   }
 
   function show(e) {
@@ -108,7 +129,7 @@ async function open() {
       view = tpl.instantiate(new THREE.MeshLambertMaterial({ map: tpl.texture }));
       for (const [id, g] of Object.entries(r3.gunGeos || {})) view.addGun(id, g.geometry, g.material);
       view.setGun(e.clip.startsWith('p') ? 'pistol' : e.key === 'hero' ? 'smg' : 'rifle');
-      for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die, view.dodge, view.crouchIdle, view.crouchWalk, ...Object.values(view.cv || {}), view.busy, view.takedownAct, ...Object.values(view.dodges || {}).map((d) => d.a), ...Object.values(view.pRel || {}).flatMap((r) => [r.u, r.l])]) if (a) a.setEffectiveWeight(0);
+      for (const a of [...Object.values(view.L), ...Object.values(view.U), view.die, view.dodge, view.crouchIdle, view.crouchWalk, ...Object.values(view.cv || {}), view.busy, view.takedownAct, ...Object.values(view.turnActs || {}),...Object.values(view.dodges || {}).map((d) => d.a), ...Object.values(view.pRel || {}).flatMap((r) => [r.u, r.l])]) if (a) a.setEffectiveWeight(0);
       clipName = e.clip;
       gameT = 0;
       const C = tpl.clips[e.clip === GAME_RELOAD ? 'pIdle' : e.clip];
@@ -124,18 +145,39 @@ async function open() {
       const tris = (view.mesh.geometry.index ? view.mesh.geometry.index.count : view.mesh.geometry.attributes.position.count) / 3;
       info.textContent = `${e.name}\nheight ${tpl.height} units · ${Math.round(tris)} triangles · ${tpl.skeleton.bones.length} bones\nclip ${C.duration.toFixed(2)} s · root speed ${(tpl.rootSpeed[e.clip] || 0).toFixed(1)} units/s · gun yaw ${(tpl.mounts[view.set].yaw * 57.3).toFixed(1)}°`;
     } else {
-      const b = new PropBuilder();
-      b.place(0, 0, 0);
-      PROP_BUILDERS[e.type](b);
-      const mats = officeMaterials();
       const g = new THREE.Group();
-      let tris = 0;
-      for (const [k, parts] of b.parts) for (const geo of parts) { const m = new THREE.Mesh(geo, mats[k] || mats.metal); m.userData.own = true; g.add(m); tris += geo.attributes.position.count / 3; }
+      let tris = 0, how = e.how;
+      const add = (mesh, ownMat) => {
+        mesh.userData.own = true; mesh.userData.ownMat = ownMat;
+        mesh.matrixAutoUpdate = true;
+        g.add(mesh);
+        const geo = mesh.geometry;
+        tris += ((geo.index ? geo.index.count : geo.attributes.position.count) / 3) * (mesh.isInstancedMesh ? mesh.count : 1);
+      };
+      const p = { type: e.type, x: 0, y: 0, rot: 0 };
+      if (how === 'custom') for (const m of buildCustomProps([p], false)) add(m, true);
+      if (how === 'model') {
+        if (hasModel(p)) for (const m of buildPropModels([p], false)) add(m, true);
+        else how = 'view'; // (not loaded: the game draws its atlas view)
+      }
+      if (how === 'view') { const geo = buildPropViews([p], null, e.atlas); if (geo) add(new THREE.Mesh(geo, viewMat(e.atlas)), false); }
+      let mats = 0;
+      if (how === 'builder') {
+        const b = new PropBuilder();
+        b.place(0, 0, 0);
+        PROP_BUILDERS[e.type](b);
+        const om = officeMaterials();
+        for (const [k, parts] of b.parts) for (const geo of parts) add(new THREE.Mesh(geo, om[k] || om.metal), false);
+        mats = b.parts.size;
+      }
       current = g;
       scene.add(g);
       const T = PROP_TYPES[e.type] || { w: 40, d: 40, h: 40 };
-      orbit.target.set(0, T.h / 2, 0); orbit.dist = Math.max(80, Math.max(T.w, T.d, T.h) * 2.4);
-      info.textContent = `${e.name}\nfootprint ${T.w} × ${T.d}, height ${T.h} units · blocks ${['—', 'move', '', 'move+bullets', '', '', '', 'move+bullets+sight'][propBlocks(T)] || propBlocks(T)} · ${Math.round(tris)} triangles · ${b.parts.size} materials`;
+      const box = new THREE.Box3().setFromObject(g), size = box.getSize(new THREE.Vector3());
+      const hgt = Number.isFinite(size.y) && size.y > 0 ? size.y : T.h;
+      orbit.target.set(0, hgt / 2, 0); orbit.dist = Math.max(80, Math.max(T.w, T.d, hgt) * 2.4);
+      const what = { view: `atlas view (${e.atlas})`, model: 'model impostor (a picture facing the game camera)', custom: 'built in code', builder: `procedural · ${mats} materials` }[how];
+      info.textContent = `${e.name}\n${what}\nfootprint ${T.w} × ${T.d}, collision height ${T.h} units · drawn ${size.x.toFixed(0)} × ${size.z.toFixed(0)} × ${hgt.toFixed(0)} · blocks ${blockNames(propBlocks(T))} · ${Math.round(tris)} triangles`;
     }
   }
 

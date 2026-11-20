@@ -166,7 +166,19 @@
 
     <!-- Level result. D110 (user): a field tablet — it boots with a glitch, the lines count up one by one, then the status
          lands. Tap the screen to skip. -->
+    <!-- D116 (user): the defeat — a whole screen, red on black, alive (noise, scratches, a flicker, the title tearing);
+         the victory tablet stands on the same dark screen, its buttons inside the tablet. -->
     <div class="result-panel" id="resultPanel">
+      <div class="rs-fx" aria-hidden="true"><i class="rs-noise"></i><i class="rs-scratch"></i><i class="rs-dust"></i><i class="rs-vig"></i></div>
+      <section class="fail-screen" id="failScreen">
+        <h2 class="fail-title" id="failTitle"></h2>
+        <i class="fail-rule"></i>
+        <p class="fail-reason" id="failReason"></p>
+        <div class="fail-btns">
+          <button class="tab-btn retry" data-action="retryMap" id="failRetry"></button>
+          <button class="tab-btn menu" data-action="resultMenu" data-i18n="defeat.menu"></button>
+        </div>
+      </section>
       <article class="journal tablet" id="journal">
         <div class="tab-screen">
           <div class="tab-bar">
@@ -179,13 +191,13 @@
           <p class="journal-sub" id="jSub"></p>
           <ul class="journal-lines" id="jLines"></ul>
           <div class="journal-stamp" id="jStamp"></div>
+          <div class="result-btns">
+            <button class="tab-btn next" data-action="continueCampaign" id="resultContinue" data-i18n="result.continue" hidden></button>
+            <button class="tab-btn retry" data-action="retryMap" id="resultRetry"></button>
+            <button class="tab-btn menu" data-action="resultMenu" data-i18n="defeat.menu"></button>
+          </div>
         </div>
       </article>
-      <div class="result-btns">
-        <button class="brush-btn" data-action="continueCampaign" id="resultContinue" data-i18n="result.continue" hidden></button>
-        <button class="brush-btn" data-action="retryMap" id="resultRetry"></button>
-        <button class="flat-btn" data-action="resultMenu" data-i18n="defeat.menu"></button>
-      </div>
     </div>
 
     <!-- Arrow at the screen edge towards the current objective while it is off screen -->

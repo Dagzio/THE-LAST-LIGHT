@@ -17,6 +17,7 @@ export class ResultsView {
     this.el = {
       journal: $('journal'), kicker: $('jKicker'), title: $('resultTitle'), sub: $('jSub'), lines: $('jLines'),
       stamp: $('jStamp'), retry: $('resultRetry'), cont: $('resultContinue'),
+      panel: $('resultPanel'), failTitle: $('failTitle'), failReason: $('failReason'), failRetry: $('failRetry'),
     };
     this.raf = 0;
     this.items = [];
@@ -43,6 +44,17 @@ export class ResultsView {
     cancelAnimationFrame(this.raf);
     const el = this.el;
     const congrats = s.last;
+    // D116 (user): a defeat is a whole screen — "FAILED", a line, the reason (survival keeps its tablet: its records);
+    // a stealth lesson failed on the training ground restarts the lesson only (its checkpoint)
+    const failed = !s.won && s.modeId !== 'survival';
+    el.panel.classList.toggle('failed', failed);
+    if (failed) {
+      el.failTitle.textContent = T('fail.title');
+      el.failTitle.dataset.text = el.failTitle.textContent;
+      el.failReason.textContent = T(s.checkpoint ? 'fail.tutDetected' : s.reason === 'detected' ? 'result.detectedText' : 'result.lostText');
+      el.failRetry.textContent = T(s.checkpoint ? 'fail.retryTask' : 'defeat.retry');
+      if (animate) { el.panel.classList.remove('fail-in'); void el.panel.offsetWidth; el.panel.classList.add('fail-in'); Sfx.play('stamp'); }
+    }
     el.journal.classList.toggle('won', s.won);
     el.journal.classList.toggle('congrats', congrats);
     el.kicker.textContent = T('result.kicker', { map: T(s.mapNameKey) });
@@ -113,7 +125,7 @@ export class ResultsView {
     el.retry.textContent = T(s.won ? 'victory.again' : 'defeat.retry');
     el.cont.hidden = !s.won || congrats;
 
-    if (!animate) { this._showAll(); return; }
+    if (!animate || failed) { this._showAll(); return; } // (a defeat shows no tablet: nothing to count up)
     el.journal.classList.remove('stamped');
     for (const it of this.items) it.li.classList.remove('in');
     const t0 = performance.now() + 250;

@@ -26,12 +26,19 @@ export const PROP_MODELS = {
   chair: { view: 'mesh_chair', model: { file: 'exec_chair.glb', height: 32, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
   exec_chair: { view: 'executive_chair', model: { file: 'exec_chair.glb', height: 34, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
   chair_meeting: { view: 'cantilever_chair', model: { file: 'meeting_chair.glb', height: 29, impostor: true, turns: true, bakeH: 256, vary: false, look: { gain: 1.1 } } },
-  // D114 (user: odd panels on its sides / ends): a solid base box (its legs and panel, measured) under a thin top slab
-  conf_table: { view: 'conference_table', pot: true, base: true },
+  // D116 (user: the fallen chairs — our office chair, lying): the same models laid on their side (`lie`: the turn about
+  // their depth axis), their own pictures (`key`); the view is the fallback while they load
+  chair_down: { view: 'mesh_chair', model: { file: 'exec_chair.glb', key: 'exec_chair_down', lie: Math.PI / 2, height: 32, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
+  chair_meeting_down: { view: 'cantilever_chair', model: { file: 'meeting_chair.glb', key: 'meeting_chair_down', lie: -Math.PI / 2, height: 29, impostor: true, turns: true, bakeH: 256, vary: false, look: { gain: 1.1 } } },
+  // D114 (user: odd panels on its sides / ends): a solid base box under a thin top slab; D116 (user: poor quality, square
+  // corners — remodel it): built in code (render3d/confTable.js) — a stadium-shaped top with a crisp walnut texture and
+  // its three cable hatches, two steel panel legs and a rail; the view is only the minimap / fallback
+  conf_table: { view: 'conference_table', custom: 'confTable' },
   armchair: { view: 'lounge_armchair', surf: 1 }, // (a padded block, as the sofa)
   sofa: { view: 'sofa', surf: 1 }, // (its back rest is not something standing on a surface)
   coffee_table: { view: 'marble_coffee_table' },
-  round_table: { view: 'round_meeting_table', drawH: 23 }, // D111: the table height of the other desks (cover)
+  // D111: the table height of the other desks (cover); D116: a pedestal table (its top slab, the pedestal under it)
+  round_table: { view: 'round_meeting_table', drawH: 23, pedestal: { top: 0.1 } },
   reception: { view: 'reception' },
   filing_cabinet: { view: 'filing_cabinet' },
   archive_shelf: { view: 'archive_shelf' },
@@ -54,10 +61,11 @@ export const PROP_MODELS = {
   boxes_tall: { view: 'flight_cases', pack: [1, 2, 5] },
   open_box: { view: 'open_box' },
   // D112 (user): the potted plants from the atlases — a solid pot joined by its texture, the crown above it (`pot`)
-  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], pot: true, topAt: 0.72 },
+  // D116 (user: the snake plant looked boxy and wrong): its top picture shows the pot's rim — it lies on the pot, the
+  // upright sword leaves are three planes round the middle (`per`: settings of one view of a list)
+  plant: { view: ['broadleaf_planter', 'palm_planter', 'snake_planter'], pot: true, topAt: 0.72, per: { snake_planter: { topAt: 'pot', leaves: 3 } } },
   planter: { view: 'long_planter', box: true }, // D111: its top view is the leaves — the box keeps the planter's own shape
   whiteboard: { view: 'mobile_whiteboard' },
-  coat_stand: { view: 'coat_stand', sprite: { lean: 1 } },
   steel_bin: { view: 'steel_bin' },
   recycling_bin: { view: 'recycling_bin' },
   desk_lamp: { view: 'desk_lamp' },
@@ -92,8 +100,9 @@ export const PROP_MODELS = {
   grass_tuft: { view: 'grass_tuft', atlas: 'training', sprite: { lean: 1 } },
   flowers: { view: 'wildflower_clump', atlas: 'training', sprite: { lean: 1 } },
   canopy: { view: 'camouflage_canopy', atlas: 'training', box: true }, // D115: the net's notched outline hung threads
+  // (D116: its legs collide as `canopy_pole` props — not drawn)
   tent: { view: 'field_tent', atlas: 'training', gable: true }, // D115: walls to the eaves, a two-slope roof
-  fabric_screen: { view: 'fabric_screen', atlas: 'training' },
+  fabric_screen: { view: 'fabric_screen', atlas: 'training' }, // (D116: brightened in the atlas — its cloth was near black)
   signal_amber: { view: 'signal_post_amber', atlas: 'training' },
   signal_green: { view: 'signal_post_green', atlas: 'training' },
   blue_hurdle: { view: 'blue_hurdle', atlas: 'training' },

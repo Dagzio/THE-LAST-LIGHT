@@ -218,14 +218,19 @@ export class Game {
       intel: r.intel, intelTotal: r.level.pickups.filter((p) => p.kind === 'intel').length,
       takedowns: r.stats.takedowns || 0, threat: r.stats.threat || 0,
       bestKills: mb ? mb.kills || 0 : 0, newRecord: !!(this.progress.lastResult && this.progress.lastResult.run === r && this.progress.lastResult.newRecord),
+      checkpoint: r.defeat ? r.checkpoint || null : null, // D116: a lesson failed — its restart point
     };
   }
 
-  /** RETRY / PLAY AGAIN after the level is over: a completely fresh run of the same level (and mode). */
+  /**
+   * RETRY / PLAY AGAIN after the level is over: a completely fresh run of the same level (and mode). D116: a run that
+   * failed at a checkpoint (the training ground's stealth lesson) starts again from that checkpoint.
+   */
   retryMap() {
     const level = getLevel(this.mapId);
     if (!this.sm.mapOver || !level) return false;
-    return this._startRun(level, this.modeId || 'mission');
+    const cp = this.run && this.run.defeat ? this.run.checkpoint || null : null;
+    return this._startRun(level, this.modeId || 'mission', cp);
   }
 
   /** Game speed (1 = normal). Presentation-side controller, the simulation stays fixed-step. */
@@ -243,13 +248,14 @@ export class Game {
   /** E / the touch button / the label: open the crate in reach. */
   interact() { return !!(this.run && this.sm.is(STATES.RUNNING) && this.run.interact(this.clock.time)); }
 
-  _startRun(level, modeId = 'mission') {
+  _startRun(level, modeId = 'mission', checkpoint = null) {
     this.mapId = level.id;
     this.modeId = modeId;
     this.clock.reset();
     this._disposeRun();
     const resolved = resolveLevel(level, modeId); // D85: the level as the mode has it (same office, other job)
     this.run = new MissionRun(resolved, createRunSeed(), this.events);
+    if (checkpoint && this.run.mode && this.run.mode.applyCheckpoint) this.run.mode.applyCheckpoint(checkpoint); // D116
     this.run.particles.setQualityFactor(QUALITY_PRESETS[this.quality].particles);
     this.renderer3d.loadMap(resolved, this.run.player.x, this.run.player.y); // warm-up: no step until shaders are ready
     this.input.pointerMapper = (cx, cy, out, h = 0) => this.renderer3d.screenToGround(cx, cy, out, h);

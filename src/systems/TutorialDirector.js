@@ -1,7 +1,8 @@
 // D88 (user request): the TUTORIAL director — the lessons of the training ground (data/tutorial.js) one by one: which
 // lesson is on, its progress, its gate. The stealth yard borrows the stealth rules (StealthDirector: the sneak, the
-// takedown) — but nothing there fails the run: a guard who saw the hero calms down after a moment. Dummies stand and
-// never shoot; only the ambush yard shoots back (and then the medkit makes sense). Pure simulation, game clock only.
+// takedown); D116: a guard who fully spots the hero fails the lesson — the retry starts at its checkpoint (the yard's
+// gate). Dummies stand and never shoot; only the ambush yard shoots back (and then the medkit makes sense). Pure
+// simulation, game clock only.
 import { TUTORIAL } from '../data/tutorial.js';
 import { STEALTH } from '../data/stealth.js';
 import { StealthDirector } from './StealthDirector.js';
@@ -182,7 +183,10 @@ export class TutorialDirector {
       // nothing left to take (every body emptied, or no gun for those rounds) — the lesson is over anyway
       if (!run.enemies.some((e) => !e.alive && e.ammoDrop > 0 && (e.tag === 'cover1' || e.tag === 'cover2'))) this._done();
     } else if (s.id === 'takedown') {
-      if ((run.stats.takedowns | 0) >= 1) this._done();
+      // D116 (user): both guards of the yard taken down — then the gate opens
+      const group = run.enemies.filter((e) => e.tag === 'stealth');
+      this.count = group.filter((e) => !e.alive).length;
+      if (group.length && this.count >= group.length) this._done();
     } else if (s.id === 'grenades') {
       if ((run.grenades.stock.frag | 0) > 0) this._done();
     }
@@ -281,18 +285,42 @@ export class TutorialDirector {
       }
       run.events.emit('ambush');
     }
-    // the stealth yard: a guard who saw the hero says so, then calms down (no alarm in the lessons)
-    for (const e of run.enemies) {
-      if (!e.alive || e.tag !== 'stealth') continue;
-      const ai = e.ai;
-      if (ai.mode !== 'combat') { ai.calmAt = NaN; continue; }
-      if (!Number.isFinite(ai.calmAt)) {
-        ai.calmAt = time + TUTORIAL.spottedReset;
+    // D116 (user): the stealth yard — a guard who fully spots the hero fails the lesson (a defeat screen); the retry
+    // starts this lesson again from its gate (applyCheckpoint). (D88–D115: he only said so and calmed down.)
+    if (s && s.id === 'takedown') {
+      for (const e of run.enemies) {
+        if (!e.alive || e.tag !== 'stealth' || e.ai.mode !== 'combat') continue;
         run.events.emit('tutorialSpotted', e);
-        if (!this.spottedSaid) { this.spottedSaid = true; run.events.emit('dialogue', 'tut.spotted'); }
-      } else if (time >= ai.calmAt) {
-        ai.mode = 'return'; ai.suspicion = 0; ai.aware = false; ai.investigate = false; ai.radioAt = NaN; ai.routeGoalX = NaN; ai.calmAt = NaN;
+        run.checkpoint = 'stealth';
+        run._setDefeat('detected');
+        break;
       }
     }
+  }
+
+  /**
+   * D116: a run started again at a lesson's checkpoint — 'stealth': before the stealth yard's gate (the path from the
+   * cover yard), the lessons before it done (their gates open, the armory's guns carried, the cover yard's dummies gone).
+   */
+  applyCheckpoint(id) {
+    const cp = TUTORIAL.checkpoints[id];
+    const i = cp ? this.steps.findIndex((s) => s.id === cp.step) : -1;
+    if (i < 0) return false;
+    const run = this.run, p = run.player;
+    for (const w of cp.weapons) if (!run.inventory.includes(w)) run.giveWeapon(w, false);
+    run.switchWeapon(cp.weapons[cp.weapons.length - 1]);
+    for (const s of this.steps.slice(0, i)) {
+      const d = s.opens && run.doors.find((x) => x.id === s.opens);
+      if (d) d.locked = false;
+    }
+    for (let k = run.enemies.length - 1; k >= 0; k--) if (cp.clear.includes(run.enemies[k].tag)) run.enemies.splice(k, 1);
+    for (const pk of run.pickups) if (cp.taken.includes(pk.def.id)) pk.taken = true;
+    p.x = p.prevX = cp.at[0]; p.y = p.prevY = cp.at[1];
+    p.aimAngle = p.bodyAngle = cp.at[2] || 0;
+    p.facingX = Math.cos(p.aimAngle); p.facingY = Math.sin(p.aimAngle);
+    this._next(i);
+    this.pendingDialogue = null; // (the lesson's briefing was heard already)
+    run.checkpoint = id;
+    return true;
   }
 }

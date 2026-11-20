@@ -12,6 +12,7 @@ import { TILE, tileUV } from './officeAtlas.js';
 import { buildPropCards, hasSprite, propAtlasTexture, preloadPropAtlas } from './propSprites.js';
 import { levelLights, LIGHT_KINDS } from './officeLights.js';
 import { buildPropViews, hasView, propViewTexture, preloadPropViews, VIEW_ATLASES } from './propViews.js';
+import { buildCustomProps } from './confTable.js';
 import { buildPropModels } from './propModels3d.js';
 
 const POOL_GAIN = 0.9;    // D83: floor pool brightness per unit of light power
@@ -453,6 +454,8 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     group.add(vm);
     meshes.push(vm);
   }
+  // D116: props built in code (the conference table)
+  for (const cm of buildCustomProps(allProps, shadows)) { group.add(cm); meshes.push(cm); }
   // D96: the props drawn from the user's 3D models (impostor pictures / instanced meshes)
   const modelMeshes = buildPropModels(level.props, shadows);
   for (const mm of modelMeshes) group.add(mm);
@@ -562,7 +565,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
       if (key !== lockKey) lockKey = placeLocks((id) => { const st = run.doors.find((x) => x.id === id); return !!(st && st.locked); });
     },
     dispose() {
-      for (const m of meshes) m.geometry.dispose();
+      for (const m of meshes) { m.geometry.dispose(); if (m.userData.ownMaterial) m.material.dispose(); }
       // D96: their own materials; the merged impostor quads (an instanced model keeps the shared, cached geometry)
       for (const mm of modelMeshes) { mm.material.dispose(); if (!mm.isInstancedMesh) mm.geometry.dispose(); }
       leafGeo.dispose();

@@ -1016,11 +1016,11 @@ export class Renderer3D {
     if (pv.active) {
       const G = GRENADES[gs.selected] || GRENADES.frag;
       this._flat(this.aimRing, pv.x, pv.y, G.radius, 1.5, 0.55 + 0.25 * Math.sin(time * 10));
-      const n = GRENADE_RULES.previewDots, d = Math.hypot(pv.x - p.x, pv.y - p.y), H = GRENADE_RULES.arcHeight + d * 0.12;
+      // D116: the dots along the real way (its bounces), spread by the time it takes
+      const n = GRENADE_RULES.previewDots, w = pv.way, T = w.dt.reduce((a, b) => a + b, 0) || 1;
       Q.identity(); S.setScalar(1);
       for (let i = 0; i < n; i++) {
-        const t = (i + 1) / (n + 1);
-        P.set(p.x + (pv.x - p.x) * t, 40 + 4 * H * t * (1 - t) - 36 * t, p.y + (pv.y - p.y) * t);
+        grenadeAt(w.pts, w.dt, ((i + 1) / (n + 1)) * T, P);
         M.compose(P, Q, S);
         this.aimDots.setMatrixAt(i, M);
       }
@@ -1030,9 +1030,12 @@ export class Renderer3D {
     let k = 0;
     for (const g of gs.flying) {
       if (k >= 8) break;
-      const t = Math.min(1, Math.max(0, (time - g.t0) / (g.t1 - g.t0)));
-      const d = Math.hypot(g.x1 - g.x0, g.y1 - g.y0), H = GRENADE_RULES.arcHeight + d * 0.12;
-      P.set(g.x0 + (g.x1 - g.x0) * t, 40 + 4 * H * t * (1 - t) - 34 * t, g.y0 + (g.y1 - g.y0) * t);
+      if (g.pts) {
+        grenadeAt(g.pts, g.dt, Math.max(0, time - g.t0), P);
+      } else {
+        const t = Math.min(1, Math.max(0, (time - g.t0) / (g.t1 - g.t0)));
+        P.set(g.x0 + (g.x1 - g.x0) * t, 40 + 4 * GRENADE_RULES.arcHeight * t * (1 - t) - 36 * t, g.y0 + (g.y1 - g.y0) * t);
+      }
       Q.setFromAxisAngle(UP, time * 9); S.setScalar(1);
       M.compose(P, Q, S);
       this.grenadeMesh.setMatrixAt(k++, M);
@@ -1107,6 +1110,22 @@ export class Renderer3D {
     const r = this.renderer.info.render;
     return { calls: r.calls, triangles: r.triangles, pixelRatio: this.pixelRatio };
   }
+}
+
+/**
+ * D116: a grenade's spot (x, height, z) `t` s after the throw along its legs (pts: [x, y, …], dts: s per leg) — a low
+ * lob from the hand, each bounce lower and shorter; presentation only.
+ */
+function grenadeAt(pts, dts, t, out) {
+  const legs = dts.length;
+  let k = 0;
+  while (k < legs - 1 && t > dts[k]) { t -= dts[k]; k++; }
+  const f = dts[k] > 0 ? Math.min(1, Math.max(0, t / dts[k])) : 1;
+  const x0 = pts[k * 2], y0 = pts[k * 2 + 1], x1 = pts[k * 2 + 2], y1 = pts[k * 2 + 3];
+  const len = Math.hypot(x1 - x0, y1 - y0), last = k === legs - 1;
+  const hs = k === 0 ? 40 : 22 * Math.pow(0.5, k - 1), he = last ? 4 : 22 * Math.pow(0.5, k);
+  const bump = k === 0 ? Math.min(GRENADE_RULES.arcHeight, 8 + 0.1 * len) : Math.min(10, 0.12 * len) * Math.pow(0.6, k - 1);
+  return out.set(x0 + (x1 - x0) * f, hs + (he - hs) * f + 4 * bump * f * (1 - f), y0 + (y1 - y0) * f);
 }
 
 /** D84: which of the user's two pistol reload clips a reload plays — from its start time (stable, presentation only). */

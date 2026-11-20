@@ -16,8 +16,13 @@ export const GRENADE_RULES = {
   capPerType: 3,
   maxThrowRange: 320,       // world units from the hero
   tapThrowRange: 220,       // touch tap without dragging: straight ahead
-  flightTime: 0.55,         // s from the throw to the blast (game clock)
-  arcHeight: 70,            // presentation: peak height of the lob (+ 0.12 × distance)
+  flightTime: 0.55,         // s from the throw to the blast (game clock) — a throw that hits nothing on its way
+  // D116 (user: no throws over walls into other rooms, a ricochet): a low lob that bounces off walls / doors / tall props
+  radius: 3,                // world units: the grenade's size against the walls
+  bounce: 0.45,             // a bounce keeps this part of the distance left and of the speed
+  bounceMin: 12,            // world units: it always rolls back at least this far off a face
+  maxBounces: 3,
+  arcHeight: 26,            // presentation: the lob's bump over its straight drop from the hand (low — under the walls)
   previewDots: 14,          // dotted trajectory while aiming
 };
 

@@ -14,6 +14,8 @@ import { TUTORIAL } from '../tutorial.js';
 const W = (x0, y0, x1, y1, style, gaps = []) => ({ x0, y0, x1, y1, style, gaps });
 const G = (id, x, y, axis, zones) => ({ id, x, y, axis, width: 90, kind: 'gate', lock: 'step', zones });
 const Y = 'yard', F = 'fence';
+// D116 (user: the canopy's legs had no collision): a canopy and its four legs (stop walkers; not drawn — the canopy is)
+const canopy = (x, y) => [{ type: 'canopy', x, y }, ...[[-58, -43], [58, -43], [-58, 43], [58, 43]].map(([dx, dy]) => ({ type: 'canopy_pole', x: x + dx, y: y + dy, drawn: false }))];
 
 export const TRAINING = {
   id: 'training',
@@ -111,9 +113,9 @@ export const TRAINING = {
   props: [
     // --- A armory: two open weapon chests (SMG, M4A1), a workbench, cases, a canopy
     { type: 'weapon_chest_open', x: 290, y: 1320, rot: 0 }, { type: 'weapon_chest_open', x: 500, y: 1320, rot: 0 },
-    { type: 'canopy', x: 250, y: 1555 }, // D89: over the cases, not over the SMG chest (it hid the chest)
+    ...canopy(250, 1555), // D89: over the cases, not over the SMG chest (it hid the chest)
     { type: 'workbench', x: 600, y: 1480, rot: 1 }, { type: 'ammo_box', x: 600, y: 1460, rot: 1, elev: 24 }, { type: 'ammo_box', x: 600, y: 1500, rot: 1, elev: 24 },
-    { type: 'equipment_case', x: 200, y: 1600 }, { type: 'crate_wood', x: 600, y: 1610 }, { type: 'barrel', x: 190, y: 1450 }, { type: 'barrel', x: 190, y: 1480 },
+    { type: 'equipment_case', x: 238, y: 1572 }, { type: 'crate_wood', x: 600, y: 1610 }, { type: 'barrel', x: 190, y: 1450 }, { type: 'barrel', x: 190, y: 1480 },
     { type: 'signal_green', x: 460, y: 1215 },
     // --- B range: targets along the north line, a sandbag backstop, the ammo table
     { type: 'sandbags', x: 270, y: 712 }, { type: 'sandbags', x: 530, y: 712 },
@@ -132,7 +134,7 @@ export const TRAINING = {
     // --- D stealth yard: crates, screens, a tent — places to sneak between
     { type: 'crate_wood', x: 1090, y: 410 }, { type: 'crate_wood', x: 1122, y: 440 }, { type: 'crate_wood_tall', x: 1180, y: 320 },
     { type: 'fabric_screen', x: 1010, y: 500, rot: 1 }, { type: 'fabric_screen', x: 1320, y: 300 }, { type: 'tent', x: 1440, y: 480 },
-    { type: 'crate_wood', x: 1400, y: 300 }, { type: 'barrel', x: 960, y: 160 }, { type: 'signal_amber', x: 1505, y: 405 },
+    { type: 'crate_wood', x: 1460, y: 240 }, { type: 'barrel', x: 960, y: 160 }, { type: 'signal_amber', x: 1505, y: 405 },
     // --- E grenade yard: three dummies behind sandbags, the open grenade chest
     { type: 'sandbags', x: 2110, y: 340 }, { type: 'sandbags', x: 2020, y: 340 },
     { type: 'supply_chest_open', x: 1800, y: 490, rot: 0 }, { type: 'barrel', x: 1730, y: 160 }, { type: 'crate_wood', x: 2200, y: 520 },
@@ -149,13 +151,13 @@ export const TRAINING = {
     { type: 'signal_amber', x: 1755, y: 1485 },
     // --- H medic: the medical table, a tent, a canopy
     { type: 'workbench', x: 1150, y: 1330, rot: 0 }, { type: 'medical_case', x: 1135, y: 1330, elev: 24 }, { type: 'small_medkit', x: 1170, y: 1335, elev: 24 },
-    { type: 'tent', x: 1030, y: 1270 }, { type: 'canopy', x: 1330, y: 1290 }, { type: 'equipment_case', x: 1390, y: 1600 },
+    { type: 'tent', x: 1030, y: 1270 }, ...canopy(1330, 1290), { type: 'equipment_case', x: 1390, y: 1600 },
     { type: 'signal_amber', x: 1260, y: 1625 },
     // --- the field round the yards (outside the walls): trees, bushes, rocks, grass
-    ...[[820, 760], [1100, 820], [1400, 760], [1640, 900], [880, 1080], [1250, 1050], [1560, 1120], [760, 1500], [700, 900],
-      [60, 300], [60, 900], [60, 1500], [2340, 300], [2340, 900], [2340, 1500], [800, 60], [1600, 60], [500, 1740], [1700, 1740], [2100, 1740]]
+    // D116 (user): half the trees (20 → 10), each crown clear of the yard walls
+    ...[[1100, 820], [1400, 760], [1250, 1050], [880, 1080], [1560, 1120], [60, 900], [2340, 300], [2340, 1500], [500, 1740], [2100, 1740]]
       .map(([x, y]) => ({ type: 'tree', x, y })),
-    ...[[960, 700], [1180, 940], [1500, 980], [820, 1200], [1620, 1300], [880, 1650], [2300, 600], [100, 650], [1450, 680]]
+    ...[[960, 700], [1180, 940], [1500, 980], [820, 1200], [1620, 1300], [880, 1650], [2300, 600], [100, 650], [1480, 640]]
       .map(([x, y], i) => ({ type: i % 3 === 2 ? 'boulder' : 'bush', x, y })),
     ...[[1000, 900], [1320, 920], [1700, 1000], [780, 1300], [900, 1400], [1600, 660], [1300, 700], [1040, 1100]]
       .map(([x, y], i) => ({ type: i % 2 ? 'flowers' : 'grass_tuft', x, y })),
@@ -167,8 +169,11 @@ export const TRAINING = {
   enemies: [
     { type: 'thug', x: 290, y: 325, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'cover1' },
     { type: 'gunman', x: 705, y: 325, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'cover2' },
-    { type: 'thug', x: 1000, y: 200, angle: 0, harmless: true, bulletProof: true, tag: 'stealth', patrol: [[1000, 200, 1.6, 0], [1440, 200, 1.6, Math.PI / 2]] },
-    { type: 'thug', x: 1250, y: 530, angle: 0, harmless: true, bulletProof: true, tag: 'stealth' },
+    // D116 (user): both guards patrol, the opposite ways — north–south lines (one goes south while the other goes north);
+    // walking along them or waiting at their ends (facing away from it) they never look into the west entrance: the
+    // hero is not caught just stepping in (fully spotted now fails the lesson)
+    { type: 'thug', x: 1250, y: 170, angle: Math.PI / 2, harmless: true, bulletProof: true, tag: 'stealth', patrol: [[1250, 170, 3.5, 0], [1250, 550, 3.5, 0]] },
+    { type: 'thug', x: 1380, y: 560, angle: -Math.PI / 2, harmless: true, bulletProof: true, tag: 'stealth', patrol: [[1380, 560, 3.5, 0], [1380, 170, 3.5, 0]] },
     { type: 'thug', x: 2080, y: 290, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'grenade' },
     { type: 'thug', x: 2120, y: 310, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'grenade' },
     { type: 'thug', x: 2160, y: 285, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'grenade' },

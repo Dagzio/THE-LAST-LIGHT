@@ -42,6 +42,9 @@ export const PROP_TYPES = {
   plant: { w: 18, d: 18, h: 44, shape: 'circle', r: 9, bullet: false, sight: false },
   whiteboard: { w: 54, d: 10, h: 48, cover: 'high' },
   overturned_chair: { w: 24, d: 18, h: 16 },
+  // D116 (user): the fallen chairs — the office chairs lying on their side (render: their models laid down)
+  chair_down: { w: 30, d: 20, h: 18 },
+  chair_meeting_down: { w: 28, d: 18, h: 16 },
   broken_monitor: { w: 26, d: 18, h: 8 },
   // D83 lights and decor of the reference (render3d/officeLights.js lights them): a floor lamp stands (a thin pole —
   // stops walkers only); a planter is low cover with plants on it; the rest blocks nothing
@@ -61,7 +64,6 @@ export const PROP_TYPES = {
   coffee_vending: { w: 16, d: 18, h: 42, cover: 'high' },
   water_cooler: { w: 12, d: 12, h: 39, shape: 'circle', r: 6, bullet: false },
   open_box: { w: 18, d: 15, h: 12 },
-  coat_stand: { w: 15, d: 15, h: 54, shape: 'circle', r: 4, bullet: false, sight: false },
   steel_bin: { w: 10, d: 10, h: 20, shape: 'circle', r: 5 },
   recycling_bin: { w: 13, d: 12, h: 20 },
   fire_hose: { w: 24, d: 6, h: 20, wall: true },
@@ -72,7 +74,7 @@ export const PROP_TYPES = {
   // flat / wall-mounted (no collision)
   rug_large: { w: 170, d: 110, h: 0, flat: true },
   rug_small: { w: 100, d: 66, h: 0, flat: true },
-  papers: { w: 21, d: 15.75, h: 1, flat: true }, // D112 / D114 (user): the papers on the floor −25 %, then −30 %
+  papers: { w: 14.7, d: 11, h: 1, flat: true }, // D112 / D114 / D116 (user): the papers on the floor −25 %, −30 %, −30 %
   stairs: { w: 120, d: 70, h: 6, flat: true },
   notice_board: { w: 50, d: 3, h: 30, wall: true },
   tv_wall: { w: 80, d: 3, h: 40, wall: true },
@@ -88,6 +90,7 @@ export const PROP_TYPES = {
   grass_tuft: { w: 15, d: 15, h: 13, decor: true },
   flowers: { w: 18, d: 15, h: 15, decor: true },
   canopy: { w: 120, d: 90, h: 78, decor: true },
+  canopy_pole: { w: 4, d: 4, h: 78, shape: 'circle', r: 3, bullet: false, sight: false }, // D116: the canopy's legs stop walkers (not drawn)
   tent: { w: 66, d: 54, h: 54, cover: 'high' },
   fabric_screen: { w: 60, d: 5, h: 66, bullet: false, cover: 'high' },
   signal_amber: { w: 8, d: 8, h: 57, shape: 'circle', r: 4, bullet: false, sight: false },

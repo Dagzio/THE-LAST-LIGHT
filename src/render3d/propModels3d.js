@@ -21,30 +21,50 @@ const LEAN = Math.PI / 2 - TILT;                  // the sprite quad leans back 
 const BAKE_H = 512;                               // px: the impostor picture's height (cfg.bakeH overrides)
 
 const raw = new Map();     // file → { geometry (height 1, base at y 0), texture }
-const baked = new Map();   // file → { texture, frame: [x0, x1, y0, y1] (units for a model of height 1), cells }
+const baked = new Map();   // key → { texture, frame: [x0, x1, y0, y1] (units for a model of height 1), cells }
+const loading = new Map(); // file → its load (a file shared by two entries loads once)
 
-/** The model entries (each file once). */
+/**
+ * The model entries: { f: the file, cfg, key } — key: the picture's name (D116: `key` — a second picture of the same
+ * file, e.g. the office chair lying on its side, `lie`).
+ */
 function entries() {
   const out = [];
-  for (const m of Object.values(PROP_MODELS)) if (m.model) for (const f of [].concat(m.model.file)) out.push([f, m.model]);
+  for (const m of Object.values(PROP_MODELS)) if (m.model) for (const f of [].concat(m.model.file)) out.push({ f, cfg: m.model, key: m.model.key || f });
   return out;
 }
 
 /** Loads every prop model / offline-baked picture (once; a missing file keeps the old view picture). */
 export function preloadPropModels() {
-  return Promise.all(entries().map(([f, cfg]) => {
-    if (raw.has(f) || baked.has(f)) return null;
+  return Promise.all(entries().map(({ f, cfg, key }) => {
+    if (baked.has(key) || (!cfg.baked && raw.has(f))) return null;
     if (cfg.baked) {
       return new Promise((res) => {
         const t = new THREE.TextureLoader().load(DIR + cfg.baked.file, () => {
-          baked.set(f, { texture: t, frame: cfg.baked.frame, cells: 1 });
+          baked.set(key, { texture: t, frame: cfg.baked.frame, cells: 1 });
           res();
         }, undefined, () => res());
         t.colorSpace = THREE.SRGBColorSpace;
       });
     }
-    return loadGLB(DIR + f).then((m) => { if (m) { normalise(m.geometry); raw.set(f, m); } });
+    if (!loading.has(f)) loading.set(f, loadGLB(DIR + f).then((m) => { if (m) { normalise(m.geometry); raw.set(f, m); } }));
+    return loading.get(f);
   }));
+}
+
+/**
+ * D116 (user: the fallen chairs — our office chair lying down): the model (height 1, base at y 0) laid on its side —
+ * turned `lie` rad about its depth axis, its lowest point back on the floor; the size kept (height 1 = the chair's).
+ */
+function lyingGeometry(g, lie) {
+  const out = g.clone();
+  out.rotateZ(lie);
+  out.computeBoundingBox();
+  const b = out.boundingBox;
+  out.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
+  out.computeBoundingBox();
+  out.computeBoundingSphere();
+  return out;
 }
 
 /** Height 1, base at y 0, centred on x / z (the files come in metres or centimetres). */
@@ -63,7 +83,8 @@ export function modelOf(p) {
   if (!m) return null;
   let f = m.file;
   if (Array.isArray(f)) f = f[(Math.abs(Math.round(p.x * 7 + p.y * 13)) >>> 0) % f.length];
-  return raw.has(f) || baked.has(f) ? { m, file: f } : null;
+  const key = m.key || f; // D116: its own picture of a shared file
+  return raw.has(f) || baked.has(key) ? { m, file: key, src: f } : null;
 }
 
 /**
@@ -150,17 +171,19 @@ export function renderImpostor(renderer, geometry, texture, cfg) {
  * into plain textures).
  */
 export function bakeImpostors(renderer) {
-  for (const [f, cfg] of entries()) {
-    if (!cfg.impostor || cfg.baked || baked.has(f) || !raw.has(f)) continue;
-    const { geometry, texture } = raw.get(f);
+  for (const { f, cfg, key } of entries()) {
+    if (!cfg.impostor || cfg.baked || baked.has(key) || !raw.has(f)) continue;
+    const { geometry: g0, texture } = raw.get(f);
+    const geometry = cfg.lie ? lyingGeometry(g0, cfg.lie) : g0;
     const r = renderImpostor(renderer, geometry, texture, cfg);
+    if (geometry !== g0) geometry.dispose();
     const tex = new THREE.DataTexture(r.px, r.W * r.turns, r.H, THREE.RGBAFormat);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.magFilter = THREE.LinearFilter;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.generateMipmaps = true;
     tex.needsUpdate = true;
-    baked.set(f, { texture: tex, frame: r.frame, cells: r.turns });
+    baked.set(key, { texture: tex, frame: r.frame, cells: r.turns });
   }
 }
 
@@ -175,10 +198,10 @@ export function buildPropModels(props, shadows) {
     const mo = modelOf(p);
     if (!mo) continue;
     if ((mo.m.impostor || mo.m.baked) && !baked.has(mo.file)) continue;
-    (groups.get(mo.file) || groups.set(mo.file, { m: mo.m, list: [] }).get(mo.file)).list.push(p);
+    (groups.get(mo.file) || groups.set(mo.file, { m: mo.m, src: mo.src, list: [] }).get(mo.file)).list.push(p);
   }
   const out = [];
-  for (const [file, { m, list }] of groups) {
+  for (const [file, { m, src, list }] of groups) {
     if (m.impostor || m.baked) {
       const b = baked.get(file), [fx0, fx1, fy0, fy1] = b.frame, parts = [];
       for (const p of list) {
@@ -207,7 +230,7 @@ export function buildPropModels(props, shadows) {
       mesh.matrixAutoUpdate = false;
       out.push(mesh);
     } else {
-      const { geometry, texture } = raw.get(file);
+      const { geometry, texture } = raw.get(src);
       const mat = new THREE.MeshLambertMaterial({ map: texture });
       const im = new THREE.InstancedMesh(geometry, mat, list.length);
       const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);

@@ -676,6 +676,134 @@ body.map-over .intro-card { display: none; }
   .journal-stamp { font-size: 14px; margin-top: 5px; }
 }
 
+/* ===================== D116 (user): the result on a whole dark screen, alive; the defeat — "FAILED" ===================== */
+.result-panel { background: #040405; }
+body.victory .result-panel { background: radial-gradient(ellipse at 50% 40%, #0b1a1a, #030506 70%); }
+.result-panel.failed { background: radial-gradient(ellipse at 50% 45%, #140506, #020203 72%); }
+/* the living background: film noise, scratches, dust, a vignette — all CSS, no frame work for the game */
+.rs-fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.rs-fx i { position: absolute; inset: 0; display: block; }
+.rs-noise {
+  inset: -50% !important;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.07) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.05) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.06) 0 1px, transparent 1.5px);
+  background-size: 7px 7px, 11px 11px, 13px 13px;
+  animation: rsNoise 0.5s steps(5) infinite;
+  opacity: 0.8;
+}
+@keyframes rsNoise {
+  0% { transform: translate(0, 0); } 20% { transform: translate(-3%, 2%); } 40% { transform: translate(2%, -3%); }
+  60% { transform: translate(-1%, 3%); } 80% { transform: translate(3%, 1%); } 100% { transform: translate(0, 0); }
+}
+.rs-scratch {
+  background:
+    linear-gradient(90deg, transparent 0 calc(23% - 1px), rgba(255, 255, 255, 0.10) calc(23% - 1px) 23%, transparent 23%),
+    linear-gradient(90deg, transparent 0 calc(71% - 1px), rgba(255, 255, 255, 0.07) calc(71% - 1px) 71%, transparent 71%);
+  animation: rsScratch 2.3s steps(1) infinite;
+}
+@keyframes rsScratch {
+  0% { transform: translateX(0); opacity: 0.9; } 12% { transform: translateX(14vw); opacity: 0.3; } 30% { transform: translateX(-9vw); opacity: 0.8; }
+  48% { opacity: 0; } 61% { transform: translateX(5vw); opacity: 0.7; } 80% { transform: translateX(-17vw); opacity: 0.4; } 100% { transform: translateX(0); opacity: 0.9; }
+}
+.rs-dust {
+  background-image:
+    radial-gradient(circle at 12% 22%, rgba(255, 255, 255, 0.35) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 83% 17%, rgba(255, 255, 255, 0.25) 0 1px, transparent 2px),
+    radial-gradient(circle at 64% 78%, rgba(255, 255, 255, 0.3) 0 1.4px, transparent 2.2px),
+    radial-gradient(circle at 31% 69%, rgba(255, 255, 255, 0.2) 0 1px, transparent 2px);
+  animation: rsDust 0.9s steps(3) infinite;
+}
+@keyframes rsDust { 33% { transform: translate(6vw, -4vh) scale(1.2); opacity: 0.4; } 66% { transform: translate(-8vw, 5vh); opacity: 0.8; } }
+.rs-vig { background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.85)); animation: rsFlicker 3.7s steps(1) infinite; }
+@keyframes rsFlicker { 0%, 100% { opacity: 1; } 7% { opacity: 0.75; } 8% { opacity: 1; } 43% { opacity: 0.85; } 44% { opacity: 1; } 71% { opacity: 0.7; } 72% { opacity: 1; } }
+
+/* the defeat: the title slams in, the rule draws out, the reason fades in; then it keeps breathing and tearing */
+.fail-screen { display: none; position: relative; z-index: 1; flex-direction: column; align-items: center; text-align: center; width: min(720px, 92vw); }
+.result-panel.failed .fail-screen { display: flex; }
+.result-panel.failed .journal { display: none; }
+.result-panel .journal { z-index: 1; }
+.fail-title {
+  position: relative;
+  font: 900 calc(118px * var(--fs)) / 0.95 Impact, Haettenschweiler, 'Arial Narrow Bold', 'Bahnschrift', 'Franklin Gothic Medium', sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #d4161c;
+  text-shadow: 0 0 22px rgba(220, 20, 28, 0.55), 3px 0 rgba(255, 60, 60, 0.35), -3px 0 rgba(120, 0, 0, 0.6);
+  /* a worn print: the ink broken by thin dark streaks */
+  -webkit-mask-image: repeating-linear-gradient(176deg, #000 0 7px, rgba(0, 0, 0, 0.55) 7px 8px, #000 8px 15px, rgba(0, 0, 0, 0.75) 15px 16px);
+  mask-image: repeating-linear-gradient(176deg, #000 0 7px, rgba(0, 0, 0, 0.55) 7px 8px, #000 8px 15px, rgba(0, 0, 0, 0.75) 15px 16px);
+  animation: failBreath 2.4s ease-in-out infinite, failJitter 4.1s steps(1) infinite;
+}
+.fail-title::before, .fail-title::after { content: attr(data-text); position: absolute; inset: 0; pointer-events: none; clip-path: inset(0 0 100% 0); }
+.fail-title::before { color: #ff4a3d; animation: glitchA 2.7s steps(1) infinite 0.9s; }
+.fail-title::after { color: #5a0003; animation: glitchB 3.3s steps(1) infinite 1.3s; }
+@keyframes failBreath { 50% { color: #a80f14; text-shadow: 0 0 34px rgba(220, 20, 28, 0.8), 3px 0 rgba(255, 60, 60, 0.35), -3px 0 rgba(120, 0, 0, 0.6); } }
+@keyframes failJitter { 0%, 100% { transform: none; } 31% { transform: translate(-2px, 1px) skewX(-2deg); } 32% { transform: none; } 67% { transform: translate(3px, -1px); } 68% { transform: none; } 90% { transform: translate(-1px, 2px) skewX(3deg); } 91% { transform: none; } }
+.fail-rule { display: block; width: 72%; height: 2px; margin: calc(16px * var(--fs)) 0 calc(14px * var(--fs)); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55) 15%, rgba(255, 255, 255, 0.55) 85%, transparent); }
+.fail-reason { font: 400 calc(22px * var(--fs)) / 1.35 'Segoe UI', Roboto, system-ui, sans-serif; color: #d8d8d8; text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); }
+.fail-btns { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: calc(18px * var(--fs)); margin-top: calc(34px * var(--fs)); }
+.result-panel.fail-in .fail-title { animation: failSlam 0.55s cubic-bezier(0.2, 0.9, 0.2, 1) both, failBreath 2.4s ease-in-out 0.6s infinite, failJitter 4.1s steps(1) 0.6s infinite; }
+.result-panel.fail-in .fail-rule { animation: failRule 0.5s ease-out 0.45s both; }
+.result-panel.fail-in .fail-reason { animation: failFade 0.6s ease-out 0.75s both; }
+.result-panel.fail-in .fail-btns { animation: failFade 0.5s ease-out 1.1s both; }
+@keyframes failSlam {
+  0% { opacity: 0; transform: scale(1.9); filter: blur(10px); }
+  55% { opacity: 1; transform: scale(0.96); filter: blur(0); }
+  70% { transform: scale(1.03) translateX(-4px); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes failRule { from { transform: scaleX(0); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes failFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* the buttons: the tablet's own — outlined, mono, they light up on hover (next green, retry red, menu grey) */
+.journal .result-btns { margin-top: calc(16px * var(--fs)); padding-top: calc(12px * var(--fs)); border-top: 1px solid color-mix(in srgb, var(--acc) 30%, transparent); gap: calc(12px * var(--fs)); position: relative; z-index: 3; }
+.journal .result-btns > button { min-width: 0; }
+.tab-btn {
+  --btn: #9aa6ad;
+  min-height: 48px;
+  padding: calc(10px * var(--fs)) calc(18px * var(--fs));
+  font: 700 calc(18px * var(--fs)) / 1 var(--tab-font, Bahnschrift, 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif);
+  font-family: Bahnschrift, 'DIN Alternate', 'Roboto Condensed', 'Arial Narrow', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #d9e2e6;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
+  border: 1.5px solid color-mix(in srgb, var(--btn) 70%, transparent);
+  border-radius: 6px;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.tab-btn.next { --hov: #39e07a; }
+.tab-btn.retry { --hov: #ff3b4e; }
+.tab-btn.menu { --hov: #9aa6ad; }
+.tab-btn:focus-visible { outline: 2px solid var(--hov); outline-offset: 2px; }
+.tab-btn:active { transform: translateY(1px); }
+@media (hover: hover) {
+  .tab-btn:hover {
+    color: #fff;
+    border-color: var(--hov);
+    background-color: color-mix(in srgb, var(--hov) 26%, transparent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--hov) 55%, transparent), inset 0 0 14px color-mix(in srgb, var(--hov) 35%, transparent);
+  }
+}
+.fail-btns .tab-btn { min-width: calc(200px * var(--fs)); --btn: #c9474b; }
+.fail-btns .tab-btn.menu { --btn: #8d969b; }
+@media (prefers-reduced-motion: reduce) {
+  .rs-noise, .rs-scratch, .rs-dust, .rs-vig, .fail-title, .fail-title::before, .fail-title::after { animation: none !important; }
+}
+@media (max-height: 500px) {
+  .fail-title { font-size: 64px; }
+  .fail-reason { font-size: 15px; }
+  .fail-rule { margin: 8px 0 7px; }
+  .fail-btns { margin-top: 14px; }
+  .fail-btns .tab-btn { min-width: 160px; }
+  .tab-btn { min-height: 44px; font-size: 14px; padding: 8px 12px; }
+  .journal .result-btns { margin-top: 7px; padding-top: 7px; gap: 8px; }
+}
+
 /* ===================== Tutorial hint (D11 / D43): spotlight + arrow + card ===================== */
 .tutorial { position: fixed; inset: 0; z-index: 61; pointer-events: auto; }
 .tutorial[hidden] { display: none; }

@@ -156,6 +156,7 @@ export class CollisionWorld {
     let best = Infinity;
     if (a < 1e-12) return best;
     const pad = radius;
+    this.hitShape = null; // D116: the shape of the first hit (a grenade's bounce reads its face)
     this._query(Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, mask, (s) => {
       if (filter && !filter(s)) return false;
       let t;
@@ -170,17 +171,34 @@ export class CollisionWorld {
         const R = s.r + radius;
         const fx = x0 - s.x, fy = y0 - s.y;
         const cc = fx * fx + fy * fy - R * R;
-        if (cc <= 0 && fx * fx + fy * fy >= s.r * s.r && (fx * dx + fy * dy) < 0) { best = 0; return false; } // D82: same for circles (moving into it)
+        if (cc <= 0 && fx * fx + fy * fy >= s.r * s.r && (fx * dx + fy * dy) < 0) { best = 0; this.hitShape = s; return false; } // D82: same for circles (moving into it)
         if (cc <= 0) return false; // starts inside → ignore
         const b = 2 * (fx * dx + fy * dy);
         const disc = b * b - 4 * a * cc;
         if (disc < 0) return false;
         t = (-b - Math.sqrt(disc)) / (2 * a);
       }
-      if (t >= 0 && t <= 1 && t < best) best = t;
+      if (t >= 0 && t <= 1 && t < best) { best = t; this.hitShape = s; }
       return false;
     });
     return best;
+  }
+
+  /**
+   * D116: the outward normal of shape `s` (inflated by `radius`) at the point (x, y) on its surface → out {nx, ny}.
+   */
+  static normalAt(s, x, y, radius, out) {
+    if (!s.box) {
+      const dx = x - s.x, dy = y - s.y, d = Math.hypot(dx, dy) || 1;
+      out.nx = dx / d; out.ny = dy / d;
+      return out;
+    }
+    // the face the point is nearest to (an inflated box: its faces are `radius` out)
+    const l = Math.abs(x - (s.minX - radius)), r = Math.abs(x - (s.maxX + radius)), t = Math.abs(y - (s.minY - radius)), b = Math.abs(y - (s.maxY + radius));
+    const m = Math.min(l, r, t, b);
+    out.nx = m === l ? -1 : m === r ? 1 : 0;
+    out.ny = out.nx ? 0 : m === t ? -1 : 1;
+    return out;
   }
 
   /** Line of sight between two points: false if a shape blocking `mask` (sight by default) is in between. */

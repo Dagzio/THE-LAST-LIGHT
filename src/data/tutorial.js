@@ -14,7 +14,6 @@
 //   touchKey — D93: the objective's text on a phone (the buttons / the stick / the tap, no PC keys).
 export const TUTORIAL = {
   hitsNear: 18,          // units: a round stopped this close to a target is a hit on it
-  spottedReset: 2.5,     // s: a stealth-yard guard who saw the hero calms down after this (no alarm in the lessons)
   minHp: 1,              // D89: the hero's HP never drops below this here (the ambush hurts, never kills)
   hintEvery: 2.5,        // s between two "rounds won't do" hints
   steps: [
@@ -33,12 +32,20 @@ export const TUTORIAL = {
     { id: 'kill', tag: 'cover2', touchKey: 'tut.tobj.peek', textKey: 'tut.obj.peek', keys: ['Q', 'key.lmb'], dialogue: 'tut.peek', target: [610, 450],
       hl: [{ rect: [540, 422, 680, 438] }, { tag: 'cover2' }], ui: { cover: 'Q' } },
     { id: 'loot', textKey: 'tut.obj.loot', dialogue: 'tut.loot', target: [460, 310], opens: 'gC', hl: [{ bodies: ['cover1', 'cover2'] }] },
-    { id: 'takedown', touchKey: 'tut.tobj.stealth', textKey: 'tut.obj.stealth', keys: ['F'], dialogue: 'tut.stealth', target: [1250, 530], opens: 'gD',
+    // D116 (user): both guards (they patrol in opposite directions); fully spotted — the lesson fails (its checkpoint)
+    { id: 'takedown', touchKey: 'tut.tobj.stealth', textKey: 'tut.obj.stealth', keys: ['F'], dialogue: 'tut.stealth', target: [1250, 540], opens: 'gD', need: 2,
       hl: [{ tag: 'stealth' }], ui: { takedown: 'F' } }, // D107: no crouch button (he sneaks by himself here)
     { id: 'grenades', touchKey: 'tut.tobj.grenadeTake', textKey: 'tut.obj.grenadeTake', keys: ['E'], dialogue: 'tut.grenade', target: [1800, 490], hl: [{ pickup: 'grenade_chest' }], ui: { interact: 'E' } },
     { id: 'kill', tag: 'grenade', touchKey: 'tut.tobj.grenadeThrow', textKey: 'tut.obj.grenadeThrow', keys: ['G', 'key.lmb'], target: [2120, 300], opens: 'gE', hl: [{ tag: 'grenade' }], ui: { grenade: 'G' } },
-    { id: 'roll', touchKey: 'tut.tobj.roll', textKey: 'tut.obj.roll', keys: ['key.space'], dialogue: 'tut.roll', target: [1990, 890], opens: 'gF', hl: [{ rect: [1930, 872, 2050, 908] }, { arrow: [1990, 815, 1990, 965] }], ui: { dash: 'key.space' } },
+    // D116 (user): the way to roll runs ALONG the mats (west → east), not across them
+    { id: 'roll', touchKey: 'tut.tobj.roll', textKey: 'tut.obj.roll', keys: ['key.space'], dialogue: 'tut.roll', target: [1990, 890], opens: 'gF', hl: [{ rect: [1930, 872, 2050, 908] }, { arrow: [1880, 890, 2100, 890] }], ui: { dash: 'key.space' } },
     { id: 'kill', tag: 'ambush', touchKey: 'tut.tobj.ambush', textKey: 'tut.obj.ambush', dialogue: 'tut.ambush', target: [1990, 1420], opens: 'gG', ambush: true, hl: [{ tag: 'ambush' }] },
     { id: 'medkit', touchKey: 'tut.tobj.medkit', textKey: 'tut.obj.medkit', keys: ['E'], dialogue: 'tut.medkit', target: [1150, 1330], opens: 'gH', hl: [{ pickup: 'medkit_case' }], ui: { interact: 'E' } },
     { id: 'exit', textKey: 'tut.obj.exit', dialogue: 'tut.end', target: [1200, 1745], hl: [{ rect: 'exit' }] },
-  ],};
+  ],
+  // D116 (user): where a failed lesson starts again (systems/TutorialDirector.js applyCheckpoint): its step, the hero's
+  // spot [x, y, facing], the guns he carries by then, the enemies of the yards behind him (gone), pickups already taken
+  checkpoints: {
+    stealth: { step: 'takedown', at: [850, 340, 0], weapons: ['smg', 'rifle'], clear: ['cover1', 'cover2'], taken: [] },
+  },
+};

@@ -77,7 +77,7 @@ export class MissionRun {
     this.projectileSystem.player = this.player;
     this.grenades = new GrenadeSystem(this.rng, events);
     this.grenades.world = this.world;
-    this.grenadePreview = { active: false, x: 0, y: 0 };
+    this.grenadePreview = { active: false, x: 0, y: 0, way: { pts: [], dt: [], bounces: 0 } }; // D116: way — its bounces
     this._gTarget = { x: 0, y: 0 };
     this.grenadeArmed = null;
     this._gWaitUp = false;
@@ -235,9 +235,11 @@ export class MissionRun {
     let a = input.getAimWorld ? input.getAimWorld(AIM) : null;
     if (!a && edge && !fire && input.getLastAimWorld) a = input.getLastAimWorld(AIM);
     if (a) {
-      GrenadeSystem.landing(p.x, p.y, a.x, a.y, pv);
+      // D116: the preview follows the real way (bounces off the walls); the ring where it comes to rest
+      const way = GrenadeSystem.path(this.world, p.x, p.y, a.x, a.y, pv.way);
+      pv.x = way.pts[way.pts.length - 2]; pv.y = way.pts[way.pts.length - 1];
       pv.active = true;
-      this._gTarget.x = pv.x; this._gTarget.y = pv.y;
+      this._gTarget.x = a.x; this._gTarget.y = a.y;
     }
     if (edge) { this._gWaitUp = false; this._gFire = true; }
     if (this._gWaitUp) { if (!fire) this._gWaitUp = false; return; }

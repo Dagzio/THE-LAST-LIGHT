@@ -140,13 +140,14 @@ function propFaces(p, out) {
   const v = viewOf(p);
   if (!v) return;
   const { m, item, A } = v, t = PROP_TYPES[p.type];
+  if (m.custom) return; // D116: built by its own module (the conference table: render3d/confTable.js)
   const rot = (p.rot | 0) & 3;
   const base = _m.compose(_p.set(p.x, p.elev || 0, p.y), _q.setFromAxisAngle(UP, -(rot * Math.PI) / 2), _s);
   const W = p.w || m.drawW || t.w, D = m.drawD || Math.max(1, t.d); // (p.w: a fence piece cut to its wall)
   const front = item.front || item.back;
   // D111: the user's new office atlases (every view fits its bounding face; `surf` — the main surface height)
   const surf = m.surf ?? item.surf;
-  if (surf !== undefined && !m.sprite && !m.flatTop) { lowPolyFaces(p, m, item, A, t, base, W, D, surf, v.outline, out); return; }
+  if (surf !== undefined && !m.sprite && !m.flatTop) { lowPolyFaces(p, m, item, A, t, base, W, D, surf, v.outline, out, v.id); return; }
   if (m.wall) {
     // on the wall: the front picture, its own proportions, standing just off the wall face
     const h = (W * front[3]) / front[2];
@@ -198,7 +199,7 @@ function propFaces(p, out) {
  *    monitor), and what rises above it (monitors, a coffee machine, the plant in a planter) stands in the middle as a
  *    cross of the front and side pictures' upper parts.
  */
-function lowPolyFaces(p, m, item, A, t, base, W, D, surf, outline, out) {
+function lowPolyFaces(p, m, item, A, t, base, W, D, surf, outline, out, id = '') {
   const front = item.front || item.back;
   const faces = [];
   if (m.pack && !m.wall) {
@@ -247,11 +248,32 @@ function lowPolyFaces(p, m, item, A, t, base, W, D, surf, outline, out) {
     } else {
       // D114 (user: the leaves were fine before, only the pot was wrong): the leaves — the front and side pictures above
       // the pot as two planes through its middle, the rosette seen from above in the crown
-      const hu = H - Hp, sideP = item.left || item.right;
-      if (front) { const g = quadBand(front, W, hu, A, ph, 1); g.translate(cx, Hp + hu / 2, cz); faces.push(g); }
-      if (sideP) { const g = quadBand(sideP, D, hu, A, ph, 1); g.rotateY(-Math.PI / 2); g.translate(cx, Hp + hu / 2, cz); faces.push(g); }
-      if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, H * (m.topAt ?? 0.72), 0); faces.push(g); }
+      // D116 (user: the snake plant looked boxy): `per` — one view's own settings: topAt 'pot' (its top picture shows the
+      // pot's rim: it lies on the pot), leaves: 3 (upright sword leaves — three planes, 60° apart)
+      const o = (m.per && m.per[id]) || {}, n = o.leaves || 2, topAt = o.topAt ?? m.topAt ?? 0.72;
+      const hu = H - Hp, pics = [front, item.left || item.right, item.back || front];
+      for (let i = 0; i < n; i++) {
+        const pic = pics[i % pics.length];
+        if (!pic) continue;
+        const g = quadBand(pic, n === 2 && i === 1 ? D : W * (n > 2 ? 0.9 : 1), hu, A, ph, 1);
+        g.rotateY(-(i * Math.PI) / n);
+        g.translate(cx, Hp + hu / 2, cz); faces.push(g);
+      }
+      if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, topAt === 'pot' ? Hp + 0.4 : H * topAt, 0); faces.push(g); }
     }
+    for (const g of faces) out.push(g.applyMatrix4(base));
+    return;
+  }
+  if (m.pedestal && !m.wall) {
+    // D116 (a round pedestal table: its outline walls showed the pictures' base plate as black arcs round it): the top —
+    // its edge band along the top picture's outline and the top picture on it; under it the pedestal — the front / side
+    // pictures below the top as two planes through the middle
+    const H = heightOf(m, item, t, W, D), k = m.pedestal.top ?? 0.1, Ht = H * (1 - k);
+    if (outline) { const inset = Math.min(1, 0.02 * Math.min(W, D)); for (const loop of outline) faces.push(outlineWalls(loop, W, D, H, item, A, H, inset, Ht)); }
+    if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, H, 0); faces.push(g); }
+    const sideP = item.left || item.right;
+    if (front) { const g = quadBand(front, W, Ht, A, 0, 1 - k); g.translate(0, Ht / 2, 0); faces.push(g); }
+    if (sideP) { const g = quadBand(sideP, D, Ht, A, 0, 1 - k); g.rotateY(-Math.PI / 2); g.translate(0, Ht / 2, 0); faces.push(g); }
     for (const g of faces) out.push(g.applyMatrix4(base));
     return;
   }

@@ -93,7 +93,8 @@ export const OFFICE = {
   props: [
     // --- lobby
     { type: 'reception', x: 1200, y: 1360, rot: 0 },
-    { type: 'exec_chair', x: 1200, y: 1322, rot: 0 },
+    // D116 (user: the plants in the corners went into the walls): every plant at least 12 units off the wall faces
+    // D116 (user: a fallen chair is the one taken from its desk): the reception's chair lies by it (no chair at the desk)
     { type: 'armchair', x: 800, y: 1474, rot: 3 }, { type: 'armchair', x: 800, y: 1526, rot: 3 }, { type: 'coffee_table', x: 862, y: 1500 },
     { type: 'armchair', x: 925, y: 1458, rot: 1 }, { type: 'armchair', x: 925, y: 1542, rot: 1 },
     { type: 'armchair', x: 1600, y: 1474, rot: 1 }, { type: 'armchair', x: 1600, y: 1526, rot: 1 }, { type: 'coffee_table', x: 1538, y: 1500 },
@@ -104,21 +105,21 @@ export const OFFICE = {
     // (5 passages of 52, the turnstile 10 wide)
     { type: 'turnstile', x: 1107, y: 1140 }, { type: 'turnstile', x: 1169, y: 1140 },
     { type: 'turnstile', x: 1231, y: 1140 }, { type: 'turnstile', x: 1293, y: 1140 },
-    { type: 'plant', x: 1622, y: 1300 },
+    { type: 'plant', x: 1619, y: 1300 },
     { type: 'rug_large', x: 862, y: 1500 }, { type: 'rug_large', x: 1538, y: 1500 },
-    { type: 'papers', x: 1150, y: 1450, rot: 1 }, { type: 'overturned_chair', x: 1290, y: 1300, rot: 3 },
+    { type: 'papers', x: 1150, y: 1450, rot: 1 }, { type: 'chair_down', x: 1176, y: 1322, rot: 1 },
     // D83 (the level reference): floor lamps by the lounge corners, a desk lamp on the reception, more papers
     { type: 'floor_lamp', x: 862, y: 1430 }, { type: 'floor_lamp', x: 1538, y: 1430 },
     { type: 'floor_lamp', x: 780, y: 1600 }, { type: 'floor_lamp', x: 1620, y: 1600 },
     { type: 'desk_lamp', x: 1255, y: 1352, elev: 34 },
     // D85: more of the user's catalogue (water cooler, bins, a coat stand, a camera)
-    { type: 'water_cooler', x: 775, y: 1250 }, { type: 'coat_stand', x: 1625, y: 1228 },
+    { type: 'water_cooler', x: 775, y: 1250 }, // D116 (user): the coat stand removed from the game
     { type: 'steel_bin', x: 960, y: 1590 }, { type: 'steel_bin', x: 1440, y: 1590 },
     { type: 'security_camera', x: 900, y: 1141.5, rot: 0 }, { type: 'security_camera', x: 1500, y: 1141.5, rot: 0 },
     // --- corridor
     { type: 'elevator', x: 1500, y: 1118.5, rot: 2 }, { type: 'extinguisher', x: 700, y: 1121, rot: 2 },
-    { type: 'plant', x: 272, y: 972 }, { type: 'plant', x: 2128, y: 972 }, { type: 'plant', x: 2128, y: 1108 },
-    { type: 'plant', x: 900, y: 1108 },
+    { type: 'plant', x: 281, y: 981 }, { type: 'plant', x: 2119, y: 981 }, { type: 'plant', x: 2119, y: 1099 },
+    { type: 'plant', x: 900, y: 1099 },
     { type: 'wall_clock', x: 1590, y: 1121, rot: 2 }, { type: 'notice_board', x: 820, y: 1121, rot: 2 },
     { type: 'water_cooler', x: 1400, y: 1112 }, { type: 'fire_hose', x: 700, y: 961.5, rot: 0 }, { type: 'electrical', x: 1750, y: 961.5, rot: 0 },
     { type: 'recycling_bin', x: 2128, y: 1040 },
@@ -129,8 +130,8 @@ export const OFFICE = {
     { type: 'chair_meeting', x: 450, y: 1258, rot: 0 }, { type: 'chair_meeting', x: 450, y: 1322, rot: 2 },
     { type: 'chair_meeting', x: 418, y: 1290, rot: 3 }, { type: 'chair_meeting', x: 482, y: 1290, rot: 1 },
     { type: 'round_table', x: 620, y: 1360 },
-    { type: 'chair_meeting', x: 620, y: 1328, rot: 0 }, { type: 'overturned_chair', x: 660, y: 1400, rot: 1 },
-    { type: 'plant', x: 722, y: 1422 },
+    { type: 'chair_meeting', x: 620, y: 1328, rot: 0 }, { type: 'chair_meeting_down', x: 660, y: 1398, rot: 1 },
+    { type: 'plant', x: 719, y: 1419 },
     { type: 'wall_clock', x: 400, y: 1141.5, rot: 0 },
     { type: 'papers', x: 560, y: 1400, rot: 1 },
     { type: 'coffee_vending', x: 590, y: 1158, rot: 0 }, { type: 'first_aid', x: 625, y: 1141.5, rot: 0 }, { type: 'recycling_bin', x: 700, y: 1230 }, // D114 (user): the first aid was on the door
@@ -153,25 +154,26 @@ export const OFFICE = {
     { type: 'armchair', x: 1912, y: 1652, rot: 2 }, { type: 'armchair', x: 1988, y: 1652, rot: 2 },
     { type: 'bookcase', x: 1735, y: 1467, rot: 0 }, { type: 'bookcase', x: 1790, y: 1467, rot: 0 },
     { type: 'armchair', x: 1674, y: 1555, rot: 3 }, { type: 'armchair', x: 1674, y: 1607, rot: 3 },
-    { type: 'plant', x: 2125, y: 1675 }, { type: 'plant', x: 1680, y: 1478 }, { type: 'plant', x: 2125, y: 1478 },
+    { type: 'plant', x: 2119, y: 1669 }, { type: 'plant', x: 1681, y: 1481 }, { type: 'plant', x: 2119, y: 1481 },
     { type: 'rug_small', x: 1950, y: 1570 }, { type: 'wall_clock', x: 2000, y: 1461.5, rot: 0 },
     { type: 'floor_lamp', x: 2122, y: 1560 }, { type: 'floor_lamp', x: 1700, y: 1500 },
     { type: 'desk_lamp', x: 1982, y: 1594, elev: 24 }, 
     // --- open space: six blocks of four workstations — D85: two rows back to back, each chair at its desk's front
-    ...cluster(450, 400), ...cluster(750, 400), ...cluster(1050, 400),
-    ...cluster(450, 680), ...cluster(750, 680), ...cluster(1050, 680),
+    // D116: the chairs lying on the floor are missing from their desks (750, 400: south-west; 1050, 680: north-east)
+    ...cluster(450, 400), ...cluster(750, 400, [-31, 44]), ...cluster(1050, 400),
+    ...cluster(450, 680), ...cluster(750, 680), ...cluster(1050, 680, [31, -44]),
     { type: 'whiteboard', x: 880, y: 268, rot: 0 }, { type: 'notice_board', x: 600, y: 261.5, rot: 0 },
-    { type: 'printer', x: 1272, y: 860, rot: 1 }, { type: 'plant', x: 1278, y: 780 },
-    { type: 'plant', x: 272, y: 272 }, { type: 'plant', x: 1278, y: 272 }, { type: 'plant', x: 272, y: 928 },
-    { type: 'plant', x: 760, y: 928 }, { type: 'boxes', x: 300, y: 830 }, { type: 'boxes_tall', x: 300, y: 870 },
-    { type: 'overturned_chair', x: 700, y: 545, rot: 2 }, { type: 'papers', x: 790, y: 560 },
+    { type: 'printer', x: 1272, y: 860, rot: 1 }, { type: 'plant', x: 1269, y: 780 },
+    { type: 'plant', x: 281, y: 281 }, { type: 'plant', x: 1269, y: 281 }, { type: 'plant', x: 281, y: 919 },
+    { type: 'plant', x: 760, y: 919 }, { type: 'boxes', x: 300, y: 830 }, { type: 'boxes_tall', x: 300, y: 870 },
+    { type: 'chair_down', x: 706, y: 488, rot: 2 }, { type: 'papers', x: 790, y: 560 },
     { type: 'exit_sign', x: 261.5, y: 400, rot: 3 },
     ...[600, 622, 644, 670, 692, 714].map((y) => ({ type: 'filing_cabinet', x: 272, y, rot: 3 })),
     { type: 'wall_clock', x: 1100, y: 261.5, rot: 0 },
     // D83 (the reference): planters with plants between the desk blocks (low cover), more papers, a second printer
     ...planter(600, 400), ...planter(900, 400), ...planter(600, 680), ...planter(900, 680),
     { type: 'papers', x: 1000, y: 770, rot: 2 }, { type: 'papers', x: 1180, y: 470 },
-    { type: 'overturned_chair', x: 1150, y: 560, rot: 0 },
+    { type: 'chair_down', x: 1104, y: 596, rot: 0 },
     { type: 'printer', x: 1272, y: 330, rot: 1 },
     { type: 'water_cooler', x: 1280, y: 620 }, { type: 'air_conditioner', x: 450, y: 261.5, rot: 0 },
     { type: 'steel_bin', x: 527, y: 455 }, { type: 'steel_bin', x: 827, y: 455 }, { type: 'steel_bin', x: 1127, y: 735 },
@@ -181,13 +183,13 @@ export const OFFICE = {
     { type: 'chair_meeting', x: 1620, y: 385, rot: 0 }, { type: 'chair_meeting', x: 1480, y: 485, rot: 2 },
     { type: 'chair_meeting', x: 1550, y: 485, rot: 2 }, { type: 'chair_meeting', x: 1620, y: 485, rot: 2 },
     { type: 'chair_meeting', x: 1432, y: 435, rot: 3 }, { type: 'chair_meeting', x: 1668, y: 435, rot: 1 },
-    { type: 'tv_wall', x: 1550, y: 261.5, rot: 0 }, { type: 'plant', x: 1322, y: 272 }, { type: 'plant', x: 1778, y: 272 },
+    { type: 'tv_wall', x: 1550, y: 261.5, rot: 0 }, { type: 'plant', x: 1331, y: 281 }, { type: 'plant', x: 1772, y: 277 },
     { type: 'wall_clock', x: 1700, y: 261.5, rot: 0 },
     { type: 'floor_lamp', x: 1330, y: 590 }, { type: 'floor_lamp', x: 1770, y: 590 }, { type: 'papers', x: 1440, y: 545, rot: 1 },
     // --- print room
     { type: 'printer', x: 1323, y: 700, rot: 3 }, { type: 'printer', x: 1323, y: 780, rot: 3 },
     { type: 'archive_shelf', x: 1660, y: 639, rot: 0 }, { type: 'archive_shelf', x: 1740, y: 639, rot: 0 },
-    { type: 'boxes', x: 1650, y: 700 }, { type: 'boxes_tall', x: 1322, y: 920 },
+    { type: 'boxes', x: 1650, y: 700 }, { type: 'boxes_tall', x: 1322, y: 917 },
     { type: 'boxes', x: 1760, y: 920 },
     { type: 'shredder', x: 1380, y: 642, rot: 0 }, { type: 'recycling_bin', x: 1430, y: 642 },
     // --- server room
@@ -282,13 +284,14 @@ export const OFFICE = {
 };
 
 /** D85: four workstations in two rows back to back around (cx, cy); every chair at its desk's front (the screen side). */
-function cluster(cx, cy) {
+function cluster(cx, cy, without = null) {
   const out = [];
   for (const dx of [-31, 31]) {
     out.push({ type: 'workstation', x: cx + dx, y: cy - 16, rot: 2 }, { type: 'chair', x: cx + dx, y: cy - 44, rot: 0 });
     out.push({ type: 'workstation', x: cx + dx, y: cy + 16, rot: 0 }, { type: 'chair', x: cx + dx, y: cy + 44, rot: 2 });
   }
-  return out;
+  // D116: without [dx, dy] — the chair at that spot is the one lying on the floor nearby
+  return without ? out.filter((p) => !(p.type === 'chair' && p.x === cx + without[0] && p.y === cy + without[1])) : out;
 }
 
 /** D83: a planter (north–south, low cover). */
