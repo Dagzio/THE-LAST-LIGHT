@@ -72,7 +72,8 @@ function wireCombatSounds(events, game) {
     const hero = game.renderer3d && game.renderer3d.hero;
     const n = hero ? hero.footfalls : 0;
     const speed = Math.hypot(p.vx, p.vy);
-    const walking = game.sm.is(STATES.RUNNING) && p.alive && !p.dodging && !p.takedown && speed > FOOTSTEPS.minSpeed;
+    // (D122: stepping round on the spot is heard too)
+    const walking = game.sm.is(STATES.RUNNING) && p.alive && !p.dodging && !p.takedown && (speed > FOOTSTEPS.minSpeed || !!(hero && hero.turnStepping));
     if (walking && steps.feet !== undefined && n !== steps.feet) {
       const set = STEP_SETS[stepSetAt(run, p, steps.rugs)];
       const last = steps.last[set.sfx];

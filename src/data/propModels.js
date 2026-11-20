@@ -87,7 +87,7 @@ export const PROP_MODELS = {
   extinguisher: { view: 'extinguisher_cabinet', wall: true, at: 30 },
   fire_hose: { view: 'fire_hose_cabinet', wall: true, at: 34 },
   electrical: { view: 'electrical_cabinet', wall: true, at: 40 },
-  first_aid: { view: 'first_aid', wall: true, at: 40 },
+  first_aid: { view: 'first_aid', wall: true, at: 60 }, // D122: above the coffee machine below it
   air_conditioner: { view: 'air_conditioner', wall: true, at: 68 },
   security_camera: { view: 'security_camera', wall: true, at: 70 },
   // D88: the training ground — the user's sheets in their own atlas (data/trainingViews.js)

@@ -108,29 +108,39 @@ export const OFFICE_BUILDS = {
     cyl(ctx, out, 0, by0 + bh, 0, W * 0.34, H - by0 - bh, ['front', 0.15, 0.0, 0.85, 0.3], ['top', 0.13, 0.13, 0.87, 0.87], 20, W * 0.3);
   },
 
-  /** Coffee counter: the cabinet (its doors), the counter top slab, the espresso machine at the back, two cup stacks. */
+  /**
+   * Coffee counter (D122, user: the old look back, the machine itself worked out, no extra cups): the cabinet and the
+   * counter slab with the whole top picture on it (as before — the paper cups are part of that picture), and the espresso
+   * machine modelled from its own pictures (measured on them: front x 0.07…0.66, the side profile): the body at the back,
+   * the head overhanging the front (its panel and gauge), the group head under it (the portafilters), the cup recess, the
+   * drip tray standing out in front with its grille on top.
+   */
   coffeeCounter(ctx, out, W, D, H) {
-    const cabH = H * 0.52, slab = H * 0.075, y = cabH + slab;
+    const cabH = H * 0.52, slab = H * 0.075;
     box(ctx, out, 0, 0, 0, W * 0.97, cabH, D * 0.94, {
       front: ['front', 0.02, 0.47, 0.98, 0.995], back: ['back', 0.02, 0.47, 0.98, 0.995],
       left: ['left', 0.03, 0.47, 0.97, 0.995], right: ['right', 0.03, 0.47, 0.97, 0.995], top: null,
     });
     box(ctx, out, 0, cabH, 0, W, slab, D, {
-      // the counter's own surface (a clean part of the top picture — its machine and cups are real parts now)
-      top: ['top', 0.7, 0.76, 0.98, 0.97], front: ['front', 0, 0.40, 1, 0.47], back: ['back', 0, 0.40, 1, 0.47],
+      top: ['top', 0, 0, 1, 1], front: ['front', 0, 0.40, 1, 0.47], back: ['back', 0, 0.40, 1, 0.47],
       left: ['left', 0, 0.40, 1, 0.47], right: ['right', 0, 0.40, 1, 0.47],
     });
-    // the machine: front view x 0 … 0.5, height 0 … 0.40; side view (depth) 0.02 … 0.6 (the back half)
-    const mw = W * 0.47, mh = H * 0.34, md = D * 0.58; // (the picture's solid part: above the drip gap)
-    box(ctx, out, -W * 0.25, y, -D * 0.2, mw, mh, md, {
-      front: ['front', 0.03, 0.0, 0.49, 0.34], back: ['back', 0.51, 0.0, 0.97, 0.34],
-      left: ['left', 0.02, 0.0, 0.6, 0.34], right: ['right', 0.4, 0.0, 0.98, 0.34], top: ['top', 0.05, 0.05, 0.65, 0.6],
-    });
-    // the paper cups: two stacks (front view x 0.70 … 0.89)
-    cyl(ctx, out, W * 0.25, y, D * 0.05, W * 0.05, H * 0.32, ['front', 0.70, 0.08, 0.80, 0.40], ['top', 0.73, 0.18, 0.86, 0.36], 12);
-    cyl(ctx, out, W * 0.34, y, -D * 0.12, W * 0.05, H * 0.26, ['front', 0.79, 0.14, 0.89, 0.40], ['top', 0.80, 0.42, 0.93, 0.6], 12);
+    // the machine: x 0.07…0.66 of the width; a part = its depth d0…d1 (from the rear) and its height fy0…fy1 (of the
+    // picture, from its top — the counter top is at fy 0.405); each face the matching piece of that view
+    const fx0 = 0.07, fx1 = 0.66, mx = -W / 2 + ((fx0 + fx1) / 2) * W, mw = (fx1 - fx0) * W;
+    const yOf = (fy) => H * (1 - fy);
+    const part = (d0, d1, fy0, fy1, topReg, front = ['front', fx0, fy0, fx1, fy1], w = mw) => {
+      const z = -D / 2 + ((d0 + d1) / 2) * D, d = (d1 - d0) * D;
+      box(ctx, out, mx, yOf(fy1), z, w, yOf(fy0) - yOf(fy1), d, {
+        front, back: ['back', 1 - fx1, fy0, 1 - fx0, fy1], top: topReg, bottom: ['front', 0.3, 0.12, 0.34, 0.14],
+        left: ['left', d0, fy0, d1, fy1], right: ['right', 1 - d1, fy0, 1 - d0, fy1],
+      });
+    };
+    part(0.12, 0.57, 0.0, 0.405, ['top', 0.04, 0.09, 0.66, 0.57]);                                       // the body
+    part(0.57, 0.68, 0.02, 0.17, ['top', 0.04, 0.57, 0.66, 0.68]);                                      // the head (panel, gauge)
+    part(0.57, 0.64, 0.17, 0.26, null, ['front', fx0 + 0.04, 0.17, fx1 - 0.04, 0.26], mw * 0.86);       // the group head
+    part(0.57, 0.89, 0.31, 0.405, ['top', 0.06, 0.68, 0.64, 0.89], ['front', fx0, 0.31, fx1, 0.405], mw * 0.94); // the drip tray
   },
-
   /** Long planter: a concrete trough, the leaves above it (the front band along, two turned for volume, the crown top). */
   planter(ctx, out, W, D, H) {
     const th = H * 0.58, tw = W * 0.88, td = D * 0.9;

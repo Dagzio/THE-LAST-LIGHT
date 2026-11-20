@@ -645,15 +645,27 @@ export class HumanView {
     for (const a of Object.values(this.turnActs)) if (a) a.setEffectiveWeight(0);
     const crouchTurn = lowOn && !!st.crouch;
     const turnKey = (crouchTurn ? 'c' : '') + (this.turnDir > 0 ? 'R' : 'L'), turnA = this.turnActs[turnKey], TI = this.turnInfo[turnKey];
-    if (tw > 0.001 && turnA && TI) {
-      // (a quick turn plays it at most 2.5× its own pace — no frantic feet)
+    this.turnStepping = tw > 0.3 && !crouchTurn && !!fwdWalk;
+    if (tw > 0.001 && !crouchTurn && fwdWalk) {
+      // D122 (user: the turn clip looked bad — back to stepping, realistic, the feet not spread): standing and turning he
+      // steps in place — the in-place walk's legs at HALF their stride (blended with the stance: short steps, the feet
+      // close together, never the side-steps' wide stance), paced by the turn (1.3 … 2.1 steps a second each foot)
+      const STEP = A.turnSteps.stride;
+      const hz = Math.min(A.turnSteps.maxHz, Math.max(A.turnSteps.minHz, Math.abs(turnNow) * 0.5));
+      for (const a of [L.pIdle, L.fire, L.idle, PR && PR.l]) if (a) a.setEffectiveWeight(a.getEffectiveWeight() * (1 - tw * STEP));
+      fwdWalk.setEffectiveWeight(fwdWalk.getEffectiveWeight() + stand * tw * STEP);
+      const p0 = this.phase, p1 = p0 + Math.max(0, dt) * hz;
+      for (const at of FOOTFALLS) if ((p0 < at && p1 >= at) || (p0 < at + 1 && p1 >= at + 1)) this.footfalls += 1; // (their footsteps)
+      this.phase = p1 % 1;
+      this.gaitHz = Math.max(this.gaitHz, hz);
+      fwdWalk.timeScale = 0;
+      const ph = this.phase + (this.tpl.gait[this.idOf.get(fwdWalk)] || 0);
+      fwdWalk.time = (ph - Math.floor(ph)) * fwdWalk.getClip().duration * 0.999;
+    } else if (tw > 0.001 && turnA && TI && crouchTurn) {
+      // crouched (the stealth crouch): the crouch turn clip's legs (a quick turn: at most 2.5× its own pace)
       const adv = Math.min(((Math.abs(turnNow) * Math.max(0, dt) * 180) / Math.PI / TI.deg) * TI.dur, Math.max(0, dt) * 2.5);
       this.turnT = (this.turnT + adv) % TI.dur;
       turnA.time = this.turnT;
-      if (!crouchTurn) {
-        for (const a of [L.pIdle, L.fire, L.idle, PR && PR.l]) if (a) a.setEffectiveWeight(a.getEffectiveWeight() * (1 - tw));
-        turnA.setEffectiveWeight(stand * tw);
-      }
     }
 
     // ---- upper body

@@ -1,110 +1,92 @@
-// D120 / D121 (user: new textures for the training ground's trees — NEW/tutorial/new sprites/TREE; the first build showed
-// crossing flat pictures and a too dark trunk — "the textures are made as planes to be stretched over a low-poly
-// model's faces"): the tree built as a low-poly model with the atlas projected onto its faces (data/treeAtlas.js):
-//   - the crown: ONE closed, lumpy volume (a deformed sphere filling the crown's measured bounds); each of its faces
-//     takes the projection it faces — the top view for the faces looking up, the front / right / back / left views for
-//     the sides (each mapped exactly as projected: the catalogue's pivots and sizes) — the leaves' alpha cuts its
-//     outline, so the volume reads as foliage from any side, with no crossing planes;
-//   - the trunk: a tapered cylinder with the bark wrapped round it (twice round, along its length), a root flare, three
-//     limbs into the crown; brightened (vertex colour) — the bark tile is dark and the crown shades it.
-// Every tree of a level is ONE mesh (alpha cut, double-sided, casting its leafy shadow); each tree is turned and sized a
-// little differently (seeded by its spot). Presentation only — the collision stays in data/props.js.
+// D120 → D122 (user: the training ground's tree — the new textures in NEW/tutorial/new sprites/TREE; the crown "worked out
+// carefully, real-looking from every side"; the user's crown model TREE.glb is too heavy as it is): the tree as a real
+// low-poly model —
+//   - the crown: the user's crown model, its foliage thinned offline (tools/build-tree-crown.mjs → tree_crown.bin:
+//     ~1 600 of its 11 073 leaves, each as one quad, picked evenly through the crown and grown to keep it as dense), every leaf with the
+//     leaf picture of the user's tree atlas and its own tint; foliage lighting (each leaf lit by where it is in the crown
+//     — no black backs) — real leaves in 3D from every side, no projected pictures;
+//   - the trunk: a tapered cylinder with the atlas bark wrapped round it, a root flare, five limbs up into the crown.
+// All the crowns are ONE instanced mesh (the same model, each tree turned and sized a little differently — seeded by its
+// spot), all the trunks one mesh. Presentation only — the collision stays in data/props.js.
 import * as THREE from '../../lib/three.module.js';
 import { TREE_ATLAS as T } from '../data/treeAtlas.js';
 import { PROP_MODELS } from '../data/propModels.js';
 
-const HEIGHT = 150;       // units: the tree's height (as the old model)
-const BARK_LIGHT = 1.9;   // vertex colour of the trunk / limbs (the bark lit up)
-let material = null;
+const HEIGHT = 150;            // units: the tree's height (as before)
+const CROWN_FILE = 'assets/models/props/tree_crown.bin';
+const CROWN_Y = 1.49;          // m: the crown model's origin above the ground (its leaves start at the trunk's top, 1.79 m)
+const BARK_LIGHT = 1.9;        // vertex colour of the bark (the tile is dark, the crown shades it)
+const LEAF_LIGHT = 1.22;       // …and of the leaves (× their own tint)
+let crownGeo = null, crownLoad = null, barkMat = null, leafMat = null;
 
-function sharedMaterial() {
-  if (!material) {
-    const t = new THREE.TextureLoader().load(T.file);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 4;
-    // (front faces only: the crown has its own inner shell, lit as the outside — a double-sided back face was lit
-    // from behind and showed black through the gaps between the leaves)
-    material = new THREE.MeshLambertMaterial({ map: t, alphaTest: 0.42, side: THREE.FrontSide, vertexColors: true });
+function texture() {
+  const t = new THREE.TextureLoader().load(T.file);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+function materials() {
+  if (!barkMat) {
+    const t = texture();
+    barkMat = new THREE.MeshLambertMaterial({ map: t, vertexColors: true });
+    leafMat = new THREE.MeshLambertMaterial({ map: t, vertexColors: true, alphaTest: 0.45, side: THREE.DoubleSide });
+    // foliage: both sides of a leaf lit alike (the normal is the leaf's place in the crown, never flipped for its back)
+    leafMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n  normal = normalize( vNormal );'); };
   }
-  return material;
+  return { barkMat, leafMat };
 }
 
-// the crown's bounds in the tree's frame (metres; x right, y back, z up) — from the top view's and the side views' pivots
-const TOP = T.tiles.crown_top, FR = T.tiles.crown_front, RI = T.tiles.crown_right;
-const X0 = -TOP.pivot[0] * TOP.size[0], X1 = X0 + TOP.size[0];
-const Y0 = -TOP.pivot[1] * TOP.size[1], Y1 = Y0 + TOP.size[1];
-const Z0 = -FR.pivot[1] * FR.size[1], Z1 = Z0 + FR.size[1];
-
-/** uv in the atlas of a tile at local (s, t) ∈ 0…1 (bottom-left origin). */
-const at = (tile, s, t) => { const [u0, v0, u1, v1] = T.tiles[tile].uv; return [u0 + (u1 - u0) * s, v0 + (v1 - v0) * t]; };
-
-/** The crown's projection of a point (tree frame, metres) seen along `view` → [u, v] in the atlas. */
-function project(view, x, y, z) {
-  const side = (tile, along) => { const c = T.tiles[tile]; return at(tile, c.pivot[0] + along / c.size[0], c.pivot[1] + z / c.size[1]); };
-  switch (view) {
-    case 'top': return at('crown_top', TOP.pivot[0] + x / TOP.size[0], TOP.pivot[1] + y / TOP.size[1]);
-    case 'front': return side('crown_front', x);   // seen from −Y: u → +X
-    case 'back': return side('crown_back', -x);    // seen from +Y: u → −X
-    case 'right': return side('crown_right', y);   // seen from +X: u → +Y
-    default: return side('crown_left', -y);        // seen from −X: u → −Y
+/** Loads the crown (once; a missing file leaves the trees with their trunks only). */
+export function preloadTreeCrown() {
+  if (!crownLoad) {
+    crownLoad = fetch(CROWN_FILE).then((r) => (r.ok ? r.arrayBuffer() : null)).then((b) => { if (b) crownGeo = crownGeometry(b); }).catch(() => null);
   }
+  return crownLoad;
 }
 
-/** A small deterministic noise of a direction (the crown's lumps; the same at the same point — the mesh stays closed). */
-function lump(nx, ny, nz, seed) {
-  const f = (a, b, c) => Math.sin(a * 3.1 + seed) * Math.cos(b * 2.7 - seed * 0.7) + Math.sin(c * 3.7 + a * 1.3 + seed * 1.9);
-  return f(nx, ny, nz) * 0.13 + Math.sin(nx * 7.3 + nz * 5.1 + seed) * 0.06 + Math.sin(ny * 9.1 - nx * 4.3 + seed * 2.3) * 0.04;
+/** tree_crown.bin → a geometry (metres): the leaves on the atlas' leaf tile, tinted, with foliage normals. */
+function crownGeometry(buf) {
+  const dv = new DataView(buf), n = dv.getUint32(0, true);
+  const P = new Float32Array(n * 3), N = new Float32Array(n * 3), UV = new Float32Array(n * 2), CL = new Float32Array(n * 3);
+  const [u0, v0, u1, v1] = T.tiles.leaf_upper.uv;
+  let o = 4;
+  let cx = 0, cy = 0, cz = 0;
+  for (let i = 0; i < n; i++) {
+    for (let d = 0; d < 3; d++) P[i * 3 + d] = dv.getFloat32(o + d * 4, true);
+    for (let d = 0; d < 3; d++) N[i * 3 + d] = dv.getFloat32(o + 12 + d * 4, true);
+    const gu = dv.getFloat32(o + 24, true), gv = dv.getFloat32(o + 28, true);
+    UV[i * 2] = u0 + (u1 - u0) * gu; UV[i * 2 + 1] = v1 - (v1 - v0) * gv; // (glTF uv: v down)
+    for (let d = 0; d < 3; d++) CL[i * 3 + d] = (dv.getUint8(o + 32 + d) / 255) * LEAF_LIGHT;
+    cx += P[i * 3]; cy += P[i * 3 + 1]; cz += P[i * 3 + 2];
+    o += 36;
+  }
+  cx /= n; cy /= n; cz /= n;
+  // light and colour by the leaf's place (the reference: sunlit yellow-green tips, a shaded inside): higher and further
+  // out → lighter and warmer; low and inner → darker
+  let ymin = Infinity, ymax = -Infinity, rmax = 0;
+  for (let i = 0; i < n; i++) { ymin = Math.min(ymin, P[i * 3 + 1]); ymax = Math.max(ymax, P[i * 3 + 1]); rmax = Math.max(rmax, Math.hypot(P[i * 3] - cx, P[i * 3 + 2] - cz)); }
+  for (let i = 0; i < n; i++) {
+    const h = (P[i * 3 + 1] - ymin) / (ymax - ymin || 1), out = Math.min(1, Math.hypot(P[i * 3] - cx, P[i * 3 + 2] - cz) / (rmax || 1));
+    const k = 0.58 + 0.6 * h + 0.3 * out, warm = Math.max(0, h * 0.8 + out * 0.6 - 0.5);
+    CL[i * 3] *= k * (1 + warm * 0.75); CL[i * 3 + 1] *= k * (1 + warm * 0.18); CL[i * 3 + 2] *= k * (1 - warm * 0.3);
+  }
+  // foliage normals: the leaf's own, bent towards where it sits in the crown (out and up) — the crown lit as a volume
+  for (let i = 0; i < n; i++) {
+    const rx = P[i * 3] - cx, ry = (P[i * 3 + 1] - cy) * 0.8, rz = P[i * 3 + 2] - cz, rl = Math.hypot(rx, ry, rz) || 1;
+    const nx = N[i * 3] * 0.25 + (rx / rl) * 0.6, ny = Math.abs(N[i * 3 + 1]) * 0.25 + (ry / rl) * 0.6 + 0.55, nz = N[i * 3 + 2] * 0.25 + (rz / rl) * 0.6;
+    const l = Math.hypot(nx, ny, nz) || 1;
+    N[i * 3] = nx / l; N[i * 3 + 1] = ny / l; N[i * 3 + 2] = nz / l;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
+  g.setAttribute('color', new THREE.BufferAttribute(CL, 3));
+  g.translate(0, CROWN_Y, 0);
+  g.computeBoundingSphere();
+  return g;
 }
 
-/**
- * D121: the crown — leaf clusters: flattened, lumpy caps at different heights (a big one on top, a ring round it lower
- * down) and a shaded underside. Every cap takes the TOP view by its position (one planar projection for all of them:
- * seen from the game camera they line up into the picture of the crown, and still have volume and depth); the caps
- * stop short of vertical (no stretched streaks); their normals tip upwards (lit as foliage); an inner face for each
- * (seen through the gaps between the leaves). Tree frame (metres) → game frame (units of `s`).
- */
-function crownFaces(s, seed, rnd, out) {
-  const cx = (X0 + X1) / 2, cy = (Y0 + Y1) / 2, RX = (X1 - X0) / 2, RY = (Y1 - Y0) / 2;
-  const pos = [], nor = [], uv = [], col = [];
-  const cap = (px, py, pz, rx, ry, rz, light, open = 0.34) => {
-    const g = new THREE.SphereGeometry(1, 13, 5, 0, Math.PI * 2, 0, Math.PI * open).toNonIndexed();
-    const p = g.attributes.position, start = pos.length / 3;
-    for (let i = 0; i < p.count; i++) {
-      const ux = p.getX(i), uz = p.getY(i), uy = -p.getZ(i);
-      const k = 1 + lump(ux, uy, uz, seed + px * 3.1 + py * 1.7);
-      const x = px + ux * rx * k, y = py + uy * ry * k, z = pz + uz * rz * k;
-      pos.push(x * s, z * s, -y * s);
-      const nx = ux / rx, ny = uy / ry, nz = uz / rz + 0.9 / rz, nl = Math.hypot(nx, ny, nz) || 1; // tipped up
-      nor.push(nx / nl, nz / nl, -ny / nl);
-      uv.push(...project('top', x, y, z));
-      const lit = light * (0.86 + 0.14 * uz); // (a little darker towards the cap's rim)
-      col.push(lit, lit, lit);
-    }
-    // the inner face (wound the other way, the same normals / pictures, shaded)
-    const end = pos.length / 3;
-    for (let v = start; v < end; v += 3) for (const k of [0, 2, 1]) {
-      const i = v + k;
-      pos.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]); nor.push(nor[i * 3], nor[i * 3 + 1], nor[i * 3 + 2]);
-      uv.push(uv[i * 2], uv[i * 2 + 1]); col.push(col[i * 3] * 0.72, col[i * 3 + 1] * 0.72, col[i * 3 + 2] * 0.72);
-    }
-    g.dispose();
-  };
-  // the shaded underside (a wide low dome turned over: seen from the side, under the clusters)
-  const z0 = Z0 + (Z1 - Z0) * 0.32;
-  cap(cx, cy, z0, RX * 0.78, RY * 0.78, (Z1 - Z0) * 0.28, 0.62, 0.5);
-  // the ring of clusters round the crown, lower down, then the middle ones, the top one
-  const n = 6;
-  for (let k = 0; k < n; k++) {
-    const a = (k / n) * Math.PI * 2 + seed * 0.37 + rnd() * 0.4, d = 0.5 + rnd() * 0.12;
-    cap(cx + Math.cos(a) * RX * d, cy + Math.sin(a) * RY * d, Z0 + (Z1 - Z0) * (0.42 + rnd() * 0.12), RX * (0.5 + rnd() * 0.1), RY * (0.5 + rnd() * 0.1), (Z1 - Z0) * 0.3, 1.0);
-  }
-  for (let k = 0; k < 3; k++) {
-    const a = (k / 3) * Math.PI * 2 + seed + rnd() * 0.6;
-    cap(cx + Math.cos(a) * RX * 0.22, cy + Math.sin(a) * RY * 0.22, Z0 + (Z1 - Z0) * (0.6 + rnd() * 0.08), RX * 0.55, RY * 0.55, (Z1 - Z0) * 0.3, 1.08);
-  }
-  cap(cx + rnd() * 0.3, cy + rnd() * 0.3, Z0 + (Z1 - Z0) * 0.72, RX * 0.5, RY * 0.5, (Z1 - Z0) * 0.3, 1.15);
-  out.push(geometryOf(pos, nor, uv, col));
-}
 /** A tapered limb from A to B (game units), the bark wrapped round it. */
 function limb(A, B, r0, r1, out, seg = 9) {
   const len = A.distanceTo(B);
@@ -118,30 +100,19 @@ function limb(A, B, r0, r1, out, seg = 9) {
   g.translate(0, len / 2, 0);
   g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize()));
   g.translate(A.x, A.y, A.z);
-  const n = g.attributes.position.count, col = new Float32Array(n * 3).fill(BARK_LIGHT);
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 3).fill(BARK_LIGHT), 3));
   out.push(g);
 }
 
-/** The faces of one tree (its foot at the origin; game frame), `s` units per metre, `rnd` its seeded random. */
-function treeFaces(s, rnd, seed, out) {
-  const V = (x, y, z) => new THREE.Vector3(x * s, z * s, -y * s); // tree frame (metres) → game
-  limb(V(0, 0, -0.05), V(0, 0, 0.5), 0.36 * s, 0.19 * s, out, 10);        // the root flare
-  limb(V(0, 0, 0.45), V(0.05, 0.02, Z0 + 0.9), 0.19 * s, 0.11 * s, out);   // the trunk, into the crown
-  for (let k = 0; k < 3; k++) {                                            // three limbs up into the crown
-    const a = (k / 3) * Math.PI * 2 + rnd() * 0.8;
-    limb(V(0.04, 0.02, Z0 + 0.4 + k * 0.25), V(Math.cos(a) * 1.3, Math.sin(a) * 1.1, Z0 + 1.6 + k * 0.3), 0.08 * s, 0.035 * s, out, 6);
+/** The trunk of one tree (its foot at the origin; game frame, units), `s` units per metre. */
+function trunkFaces(s, rnd, out) {
+  const V = (x, y, z) => new THREE.Vector3(x * s, y * s, z * s); // (glTF / game frame: y up)
+  limb(V(0, -0.05, 0), V(0, 0.5, 0), 0.36 * s, 0.19 * s, out, 10);   // the root flare
+  limb(V(0, 0.45, 0), V(0.05, 2.9, 0.05), 0.19 * s, 0.1 * s, out);    // the trunk, into the crown
+  for (let k = 0; k < 5; k++) {                                      // five limbs spreading up into the crown
+    const a = (k / 5) * Math.PI * 2 + rnd() * 0.7, y0 = 2.0 + k * 0.22;
+    limb(V(0.03, y0, 0.03), V(Math.cos(a) * 1.5, y0 + 1.1 + rnd() * 0.4, Math.sin(a) * 1.4), 0.075 * s, 0.03 * s, out, 6);
   }
-  crownFaces(s, seed, rnd, out);
-}
-
-function geometryOf(pos, nor, uv, col) {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  return g;
 }
 
 /** A small seeded random for one tree (−0.5 … 0.5), the same every load. */
@@ -150,39 +121,47 @@ function treeRandom(p) {
   return () => { h ^= h << 13; h >>>= 0; h ^= h >>> 17; h ^= h << 5; h >>>= 0; return h / 4294967296 - 0.5; };
 }
 
-/** Every tree of a level (data/propModels.js custom: 'tree') → [mesh] ([] when none). */
+/** Every tree of a level (data/propModels.js custom: 'tree') → [trunks mesh, crowns instanced mesh] ([] when none). */
 export function buildTrees(props, shadows) {
-  const parts = [];
-  for (const p of props) {
-    const m = PROP_MODELS[p.type];
-    if (!m || m.custom !== 'tree' || p.drawn === false) continue;
+  const trees = props.filter((p) => { const m = PROP_MODELS[p.type]; return m && m.custom === 'tree' && p.drawn !== false; });
+  if (!trees.length) return [];
+  const { barkMat: bm, leafMat: lm } = materials();
+  const parts = [], places = [];
+  for (const p of trees) {
     const rnd = treeRandom(p), own = [];
     const s = (HEIGHT / T.size[2]) * (p.scale || 1) * (0.92 + 0.16 * (rnd() + 0.5));
-    treeFaces(s, rnd, (rnd() + 0.5) * 10, own);
     const yaw = (rnd() + 0.5) * Math.PI * 2;
+    trunkFaces(s, rnd, own);
     for (const g of own) { g.rotateY(yaw); g.translate(p.x, p.elev || 0, p.y); parts.push(g); }
+    places.push({ p, s, yaw });
   }
-  if (!parts.length) return [];
+  const out = [];
   let n = 0;
   for (const g of parts) n += g.attributes.position.count;
-  const P = new Float32Array(n * 3), N = new Float32Array(n * 3), UV = new Float32Array(n * 2), C = new Float32Array(n * 3);
+  const P = new Float32Array(n * 3), N = new Float32Array(n * 3), UV = new Float32Array(n * 2), CL = new Float32Array(n * 3);
   let o = 0;
   for (const g of parts) {
     const c = g.attributes.position.count;
-    P.set(g.attributes.position.array, o * 3); N.set(g.attributes.normal.array, o * 3); UV.set(g.attributes.uv.array, o * 2);
-    C.set(g.attributes.color.array, o * 3);
-    o += c;
-    g.dispose();
+    P.set(g.attributes.position.array, o * 3); N.set(g.attributes.normal.array, o * 3); UV.set(g.attributes.uv.array, o * 2); CL.set(g.attributes.color.array, o * 3);
+    o += c; g.dispose();
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
   geo.setAttribute('normal', new THREE.BufferAttribute(N, 3));
   geo.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
-  geo.setAttribute('color', new THREE.BufferAttribute(C, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(CL, 3));
   geo.computeBoundingSphere();
-  const mesh = new THREE.Mesh(geo, sharedMaterial());
-  mesh.castShadow = shadows;
-  mesh.receiveShadow = false;
-  mesh.matrixAutoUpdate = false;
-  return [mesh];
+  const trunks = new THREE.Mesh(geo, bm);
+  trunks.castShadow = shadows; trunks.receiveShadow = shadows; trunks.matrixAutoUpdate = false;
+  out.push(trunks);
+  if (crownGeo) {
+    const crowns = new THREE.InstancedMesh(crownGeo, lm, places.length);
+    const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), Pv = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+    places.forEach(({ p, s, yaw }, i) => crowns.setMatrixAt(i, M.compose(Pv.set(p.x, p.elev || 0, p.y), Q.setFromAxisAngle(UP, yaw), S.set(s, s, s))));
+    crowns.castShadow = shadows; crowns.receiveShadow = false;
+    crowns.frustumCulled = false;
+    crowns.userData.sharedGeometry = true; // (the crown model is kept for the next level)
+    out.push(crowns);
+  }
+  return out;
 }

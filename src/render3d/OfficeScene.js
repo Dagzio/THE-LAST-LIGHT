@@ -569,7 +569,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
       if (key !== lockKey) lockKey = placeLocks((id) => { const st = run.doors.find((x) => x.id === id); return !!(st && st.locked); });
     },
     dispose() {
-      for (const m of meshes) { m.geometry.dispose(); if (m.userData.ownMaterial) m.material.dispose(); }
+      for (const m of meshes) { if (!m.userData.sharedGeometry) m.geometry.dispose(); if (m.userData.ownMaterial) m.material.dispose(); } // (D122: the shared crown model stays)
       // D96: their own materials; the merged impostor quads (an instanced model keeps the shared, cached geometry)
       for (const mm of modelMeshes) { mm.material.dispose(); if (!mm.isInstancedMesh) mm.geometry.dispose(); }
       leafGeo.dispose();

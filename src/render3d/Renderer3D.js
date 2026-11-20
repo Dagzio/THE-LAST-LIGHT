@@ -8,6 +8,7 @@ import { createRenderGuard, cpuCanvas } from './render-guard.js';
 import { createMaterials } from './materials.js';
 import { buildOfficeScene, officeMaterials, preloadOfficeTextures, setOfficeAnisotropy } from './OfficeScene.js';
 import { preloadPropModels, bakeImpostors } from './propModels3d.js';
+import { preloadTreeCrown } from './trainingTree.js';
 import { HumanTemplate, bakeGunGeometry } from './humans.js';
 import { parseSkinnedGLB, loadGLB, blobTexture } from './glb.js';
 import { HUMAN_MODELS, HUMAN_ANIM, GUN_MODELS, gunModelOf, enemyModelOf } from '../data/humanModels.js';
@@ -201,6 +202,7 @@ export class Renderer3D {
       loadGLB('assets/models/grenade.min.glb'),
       preloadOfficeTextures(),
       preloadPropModels(), // D96: the user's prop models (trees, plants, the executive chair)
+      preloadTreeCrown(), // D122: the training trees' crown
     ]);
     this.anims = animRes;
     try { bakeImpostors(this.renderer); } catch (e) { console.error('prop impostors failed (the pictures stay)', e); } // D96
@@ -331,13 +333,48 @@ export class Renderer3D {
   // ---------------- scene objects ----------------
   _buildDynamic() {
     const m = this.mats;
-    // muzzle flash: two crossed quads (a star), additive
-    const fl = new THREE.PlaneGeometry(10, 5);
-    const fl2 = fl.clone().rotateX(Math.PI / 2);
-    this.flashGeo = mergeSimple([fl, fl2]);
-    this.flashGeo.translate(4, 0, 0);
+    // muzzle flash. D122 (user: smaller, a realistic colour and shape): a painted flame — seen from the side a short
+    // white-hot core at the muzzle opening into a yellow-orange cone with ragged tongues (two crossed quads along the
+    // barrel), seen from the front a small four-petal star (a quad across the barrel); additive
+    const flashTex = iconTexture((g, W, H) => {
+      const h = H / 2;
+      // side view (left 3/4): the flame cone along +x
+      const fw = W * 0.75;
+      const cone = g.createLinearGradient(0, 0, fw, 0);
+      cone.addColorStop(0, 'rgba(255,255,240,1)'); cone.addColorStop(0.18, 'rgba(255,236,170,0.95)'); cone.addColorStop(0.5, 'rgba(255,170,60,0.7)');
+      cone.addColorStop(0.82, 'rgba(230,90,20,0.25)'); cone.addColorStop(1, 'rgba(200,60,10,0)');
+      g.fillStyle = cone;
+      g.beginPath(); g.moveTo(0, h - H * 0.1);
+      for (const [x, y] of [[0.22, -0.3], [0.4, -0.18], [0.55, -0.34], [0.7, -0.12], [0.9, -0.04], [1, 0], [0.9, 0.05], [0.68, 0.14], [0.52, 0.36], [0.38, 0.17], [0.2, 0.29]]) g.lineTo(fw * x, h + H * y);
+      g.lineTo(0, h + H * 0.1); g.closePath(); g.fill();
+      const core = g.createRadialGradient(fw * 0.08, h, 0, fw * 0.08, h, fw * 0.28);
+      core.addColorStop(0, 'rgba(255,255,255,1)'); core.addColorStop(0.5, 'rgba(255,248,215,0.8)'); core.addColorStop(1, 'rgba(255,230,160,0)');
+      g.fillStyle = core; g.fillRect(0, 0, fw * 0.45, H);
+      // front view (right 1/4): a four-petal star with a white centre
+      const cx = fw + (W - fw) / 2, r = (W - fw) / 2;
+      g.save(); g.translate(cx, h);
+      for (let i = 0; i < 4; i++) {
+        g.rotate(Math.PI / 2);
+        const pg = g.createLinearGradient(0, 0, r, 0);
+        pg.addColorStop(0, 'rgba(255,240,190,0.95)'); pg.addColorStop(1, 'rgba(255,130,30,0)');
+        g.fillStyle = pg; g.beginPath(); g.moveTo(0, -r * 0.18); g.lineTo(r, 0); g.lineTo(0, r * 0.18); g.closePath(); g.fill();
+      }
+      const sc = g.createRadialGradient(0, 0, 0, 0, 0, r * 0.45);
+      sc.addColorStop(0, 'rgba(255,255,255,1)'); sc.addColorStop(1, 'rgba(255,220,140,0)');
+      g.fillStyle = sc; g.fillRect(-r, -r, 2 * r, 2 * r);
+      g.restore();
+    }, 256, 64);
+    const part = (w, h, u0, u1) => {
+      const q = new THREE.PlaneGeometry(w, h);
+      const uv = q.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) > 0.5 ? u1 : u0);
+      return q;
+    };
+    const side1 = part(6.5, 3, 0.002, 0.748).translate(3.25, 0, 0), side2 = side1.clone().rotateX(Math.PI / 2);
+    const front = part(3.2, 3.2, 0.752, 0.998).rotateY(Math.PI / 2).translate(0.4, 0, 0);
+    this.flashGeo = mergeSimple([side1, side2, front]);
     this.flashMat = new THREE.MeshBasicMaterial({
-      color: 0xffd68a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+      map: flashTex, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     });
     // tracers
     this.bullets = new THREE.InstancedMesh(new THREE.BoxGeometry(16, 1.1, 1.1), new THREE.MeshBasicMaterial({ color: 0xffffff }), MAX_BULLETS);

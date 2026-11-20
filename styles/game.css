@@ -680,7 +680,9 @@ body.map-over .intro-card { display: none; }
 /* ===================== D116 (user): the result on a whole dark screen, alive; the defeat — "FAILED" ===================== */
 .result-panel { background: #040405; }
 body.victory .result-panel { background: radial-gradient(ellipse at 50% 40%, #0b1a1a, #030506 70%); }
-.result-panel.failed { background: radial-gradient(ellipse at 50% 45%, #140506, #020203 72%); }
+.result-panel.failed { background: radial-gradient(ellipse at 50% 45%, #0f0405, #020203 72%); } /* D122: the red centre −25 % */
+.result-panel.failed .rs-glow { background: radial-gradient(ellipse 55% 45% at 50% 46%, rgba(var(--rs), 0.165), transparent 70%); } /* D122: −25 % */
+.result-panel.failed .rs-flash { background: radial-gradient(ellipse at 50% 45%, rgba(var(--rs), 0.41), rgba(var(--rs), 0.09) 45%, transparent 75%); }
 /* the living background: film noise, scratches, dust, a vignette — all CSS, no frame work for the game */
 .rs-fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .rs-fx i { position: absolute; inset: 0; display: block; }
@@ -1822,16 +1824,16 @@ body.touch-firing .touch-fire-zone.tut-focus { background: rgba(255, 90, 60, 0.3
 .hud-slots .slot.tut-slot { border-color: #ffcf3a; color: #ffcf3a; animation: tutFocus 1s ease-in-out infinite; outline: 2px solid #ffcf3a; outline-offset: 2px; } /* D93 */
 
 /* ===== D120 (user): the defeat — red in the darkened corners and realistic blood instead of the rays: splatters
-   (tools/build-blood.py, painted procedurally) land in the corners as the title slams in, a few runs keep dripping ===== */
+   (tools/build-blood.py) — D122 (user): the blood removed again; only the red corners stay ===== */
 .result-panel.failed .rs-rays { display: none; }
 .rs-corners, .rs-blood, .rs-drip { display: none; }
 .result-panel.failed .rs-corners, .result-panel.failed .rs-blood, .result-panel.failed .rs-drip { display: block; }
 .rs-corners {
   background:
-    radial-gradient(ellipse 55% 60% at 0% 0%, rgba(150, 0, 8, 0.55), rgba(90, 0, 4, 0.25) 45%, transparent 75%),
-    radial-gradient(ellipse 55% 60% at 100% 0%, rgba(150, 0, 8, 0.5), rgba(90, 0, 4, 0.22) 45%, transparent 75%),
-    radial-gradient(ellipse 60% 55% at 0% 100%, rgba(150, 0, 8, 0.6), rgba(90, 0, 4, 0.28) 45%, transparent 75%),
-    radial-gradient(ellipse 60% 55% at 100% 100%, rgba(150, 0, 8, 0.55), rgba(90, 0, 4, 0.25) 45%, transparent 75%);
+    radial-gradient(ellipse 55% 60% at 0% 0%, rgba(150, 0, 8, 0.495), rgba(90, 0, 4, 0.225) 45%, transparent 75%),
+    radial-gradient(ellipse 55% 60% at 100% 0%, rgba(150, 0, 8, 0.45), rgba(90, 0, 4, 0.198) 45%, transparent 75%),
+    radial-gradient(ellipse 60% 55% at 0% 100%, rgba(150, 0, 8, 0.54), rgba(90, 0, 4, 0.252) 45%, transparent 75%),
+    radial-gradient(ellipse 60% 55% at 100% 100%, rgba(150, 0, 8, 0.495), rgba(90, 0, 4, 0.225) 45%, transparent 75%); /* D122 (user): −10 % */
   animation: rsCornerBeat 1.6s ease-in-out infinite;
 }
 @keyframes rsCornerBeat { 0%, 100% { opacity: 0.75; } 12% { opacity: 1; } 24% { opacity: 0.85; } 36% { opacity: 0.98; } }
