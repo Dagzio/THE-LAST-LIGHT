@@ -243,7 +243,9 @@ export const OFFICE = {
     { type: 'thug', x: 330, y: 1580, angle: 0, patrol: [[330, 1580], [690, 1580]] },
     { type: 'heavy', x: 1990, y: 1300, angle: Math.PI, carries: null },
     { type: 'gunman', x: 1750, y: 1250, angle: Math.PI / 2, patrol: [[1750, 1250], [1750, 1400]] },
-    { type: 'thug', x: 1850, y: 1610, angle: -Math.PI / 2, busy: true }, // D83: going through the manager's files
+    // D118 (user: he searches the cabinet by the door — the hero can sneak up behind him): his back to the room, facing
+    // the bookcase, going through it (usy); unaware he can be taken down silently (F)
+    { type: 'thug', x: 1730, y: 1500, angle: -Math.PI / 2, busy: true },
     { type: 'thug', x: 300, y: 540, angle: 0, patrol: [[300, 540], [1200, 540]] },
     { type: 'gunman', x: 1150, y: 840, angle: Math.PI },
     { type: 'thug', x: 350, y: 300, angle: 0, busy: true }, // D83: going through the files

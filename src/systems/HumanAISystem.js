@@ -70,7 +70,10 @@ export class HumanAISystem {
     if (d2 > V.range * V.range) return false;
     const d = Math.sqrt(d2);
     const tracking = e.ai.mode === 'combat';
-    if (!tracking && d > V.near && Math.abs(angDiff(Math.atan2(dy, dx), e.faceAngle)) > (V.fov * Math.PI) / 360) return false;
+    // D118: a guard busy at the files (his back to the room) does not feel the hero close behind him — he can be crept
+    // up on and taken down (the mission's takedown); only what is in front of him is seen
+    const near = e.busy && e.ai.mode === 'idle' ? 0 : V.near;
+    if (!tracking && d > near && Math.abs(angDiff(Math.atan2(dy, dx), e.faceAngle)) > (V.fov * Math.PI) / 360) return false;
     // D82: a hero crouched behind low cover is hidden by the low objects too (D85: or crouching)
     return this.world.clear(e.x, e.y, p.x, p.y, null, p.lowProfile ? BLOCK.SIGHT | BLOCK.LOW : BLOCK.SIGHT);
   }

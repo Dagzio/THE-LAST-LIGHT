@@ -52,7 +52,8 @@ export class ResultsView {
     if (failed) {
       el.failTitle.textContent = T('fail.title');
       el.failTitle.dataset.text = el.failTitle.textContent;
-      el.failReason.textContent = T(s.checkpoint ? 'fail.tutDetected' : s.reason === 'detected' ? 'result.detectedText' : 'result.lostText');
+      // D118 (user): no line under a plain defeat ("the floor is still theirs" removed)
+      el.failReason.textContent = s.checkpoint ? T('fail.tutDetected') : s.reason === 'detected' ? T('result.detectedText') : '';
       el.failRetry.textContent = T(s.checkpoint ? 'fail.retryTask' : 'defeat.retry');
       if (animate) {
         el.panel.classList.remove('fail-in'); void el.panel.offsetWidth; el.panel.classList.add('fail-in');
@@ -85,7 +86,7 @@ export class ResultsView {
       // D85 stealth: medals (Ghost / No kills / Fast), intel, takedowns
       const md = s.medals || {}, n = (md.ghost ? 1 : 0) + (md.noKills ? 1 : 0) + (md.fast ? 1 : 0);
       el.title.textContent = s.won ? T('victory.title') : T(s.reason === 'detected' ? 'defeat.detected' : 'defeat.player');
-      el.sub.textContent = s.won ? T('result.stealthWon') : T(s.reason === 'detected' ? 'result.detectedText' : 'result.lostText');
+      el.sub.textContent = s.won ? T('result.stealthWon') : (s.reason === 'detected' ? T('result.detectedText') : '');
       el.stamp.textContent = T(s.won ? (n === 3 ? 'result.rankGhost' : 'result.victory') : 'result.defeat');
       rows = [
         ['result.time', Math.round(s.time), clock],
@@ -97,7 +98,7 @@ export class ResultsView {
       if (s.won && s.best > 0) rows.push(['result.best', Math.round(s.best), clock]);
     } else {
       el.title.textContent = s.won ? T('victory.title') : T('defeat.player');
-      el.sub.textContent = s.won ? T(congrats ? 'congrats.text' : 'result.wonText') : T('result.lostText');
+      el.sub.textContent = s.won ? T(congrats ? 'congrats.text' : 'result.wonText') : '';
       el.stamp.textContent = T(s.won ? 'result.victory' : 'result.defeat');
       // lines: [labelKey, target, format] — KILL LIST (D78): time, kills, accuracy, damage taken (+ best time on a win)
       rows = [

@@ -17,6 +17,7 @@ import { WEAPONS, getWeapon, HERO_WEAPONS, AMMO_DROPS } from '../data/weapons.js
 import { StealthDirector } from '../systems/StealthDirector.js';
 import { SurvivalDirector } from '../systems/SurvivalDirector.js';
 import { TutorialDirector } from '../systems/TutorialDirector.js';
+import { MissionTakedown } from '../systems/MissionTakedown.js';
 import { HUMAN_TYPES } from '../data/humans.js';
 import { CAPS } from '../data/balance.js';
 import { FACING, INTERACT, COVER, muzzleOf, barrelOffsetAngle } from '../data/player.js';
@@ -102,7 +103,8 @@ export class MissionRun {
     for (const [t, n] of Object.entries(L.grenades || {})) this.grenades.add(t, n);
     // D85: the mode's director (stealth / survival rules); the mission has none
     this.mode = this.modeId === 'stealth' ? new StealthDirector(this) : this.modeId === 'survival' ? new SurvivalDirector(this)
-      : this.modeId === 'tutorial' ? new TutorialDirector(this) : null; // D88: the training ground's lessons
+      : this.modeId === 'tutorial' ? new TutorialDirector(this) // D88: the training ground's lessons
+      : new MissionTakedown(this); // D118: the story mission — only the silent takedown of an unaware guard
 
     this._unsub = [
       events.on('shot', (x, y, angle, weaponId) => {

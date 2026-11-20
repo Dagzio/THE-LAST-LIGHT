@@ -419,7 +419,7 @@ export class HUD {
       }
     }
     // D85 stealth: the alert scale, the visibility eye, the context label (takedown / copy), the crouch button
-    if ((run.modeId === 'stealth' || run.modeId === 'tutorial') && run.mode) this._stealthHud(run, running);
+    if ((run.modeId === 'stealth' || run.modeId === 'tutorial' || run.modeId === 'mission') && run.mode) this._stealthHud(run, running); // D118: the mission's takedown label
     // objective + level name
     const o = run.objective;
     const objKey = o ? o.textKey : '';

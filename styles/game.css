@@ -720,6 +720,71 @@ body.victory .result-panel { background: radial-gradient(ellipse at 50% 40%, #0b
 .rs-vig { background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.85)); animation: rsFlicker 3.7s steps(1) infinite; }
 @keyframes rsFlicker { 0%, 100% { opacity: 1; } 7% { opacity: 0.75; } 8% { opacity: 1; } 43% { opacity: 0.85; } 44% { opacity: 1; } 71% { opacity: 0.7; } 72% { opacity: 1; } }
 
+/* D118 (user: more effects on both screens): a coloured glow beating behind (defeat: a heartbeat, red; victory: a slow
+   breath, teal), soft light rays turning, embers (defeat: ash drifting down; victory: sparks rising), a glitch band
+   sweeping the screen now and then, a flash as the title / tablet lands, a shine crossing the tablet. CSS only. */
+.result-panel { --rs: 255, 46, 56; }
+body.victory .result-panel { --rs: 63, 240, 200; }
+.rs-glow { background: radial-gradient(ellipse 55% 45% at 50% 46%, rgba(var(--rs), 0.22), transparent 70%); animation: rsBeat 1.6s ease-in-out infinite; }
+body.victory .rs-glow { animation: rsBreath 4s ease-in-out infinite; }
+@keyframes rsBeat { 0%, 100% { opacity: 0.55; transform: scale(1); } 12% { opacity: 1; transform: scale(1.06); } 24% { opacity: 0.7; transform: scale(1.01); } 36% { opacity: 0.95; transform: scale(1.04); } 60% { opacity: 0.55; } }
+@keyframes rsBreath { 50% { opacity: 0.6; transform: scale(1.08); } }
+.rs-rays {
+  inset: -60% !important;
+  background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(var(--rs), 0.05) 0deg 5deg, transparent 5deg 24deg);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0 18%, transparent 55%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 0 18%, transparent 55%);
+  animation: rsTurn 40s linear infinite;
+}
+@keyframes rsTurn { to { transform: rotate(360deg); } }
+.rs-sparks {
+  /* a layer twice the screen's height, dotted with glowing specks (background dots: robust everywhere), sliding */
+  top: auto !important; bottom: -200% !important; height: 200%; left: 0 !important; right: 0 !important;
+  background-image:
+    radial-gradient(circle, rgba(var(--rs), 0.95) 0 1.6px, rgba(var(--rs), 0.35) 2.4px, transparent 4px),
+    radial-gradient(circle, rgba(var(--rs), 0.8) 0 1.2px, rgba(var(--rs), 0.25) 2px, transparent 3.5px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.7) 0 1px, transparent 2.5px);
+  background-size: 23vw 31vh, 17vw 23vh, 29vw 37vh;
+  background-position: 3vw 5vh, 11vw 14vh, 7vw 2vh;
+  animation: rsRise 14s linear infinite;
+}
+.rs-sparks.rs-b { background-size: 31vw 27vh, 19vw 41vh, 37vw 33vh; background-position: 13vw 9vh, 2vw 21vh, 21vw 3vh; animation-duration: 21s; opacity: 0.6; }
+@keyframes rsRise { from { transform: translateY(0); } to { transform: translateY(-300%); } }
+/* defeat: ash and embers falling, swaying */
+.result-panel.failed .rs-sparks { bottom: auto !important; top: -200% !important; animation-name: rsFall; animation-duration: 17s; }
+.result-panel.failed .rs-sparks.rs-b { animation-duration: 25s; }
+@keyframes rsFall { 0% { transform: translate(0, 0); } 50% { transform: translate(2vw, 150%); } 100% { transform: translate(-1vw, 300%); } }/* a glitch band: a bright slice of the screen shifted sideways, now and then */
+.rs-band {
+  top: 0 !important; bottom: auto !important; height: 7vh;
+  background: linear-gradient(180deg, transparent, rgba(var(--rs), 0.16) 30%, rgba(255, 255, 255, 0.08) 50%, rgba(var(--rs), 0.16) 70%, transparent);
+  mix-blend-mode: screen;
+  animation: rsBand 5.3s steps(1) infinite;
+}
+@keyframes rsBand {
+  0%, 62%, 100% { opacity: 0; transform: translate(0, 10vh); }
+  63% { opacity: 1; transform: translate(-2vw, 34vh); } 64% { transform: translate(3vw, 36vh); } 65% { transform: translate(-1vw, 58vh); }
+  66% { opacity: 0.6; transform: translate(2vw, 61vh); } 67% { opacity: 0; }
+  88% { opacity: 0.8; transform: translate(-3vw, 18vh); } 89% { opacity: 0; }
+}
+/* the flash as the screen lands (defeat: when the title slams in; victory: as the tablet boots) */
+.rs-flash { background: radial-gradient(ellipse at 50% 45%, rgba(var(--rs), 0.55), rgba(var(--rs), 0.12) 45%, transparent 75%); opacity: 0; }
+.result-panel.fail-in .rs-flash { animation: rsFlash 0.9s ease-out 2.5s both; }
+body.victory .result-panel .rs-flash { animation: rsFlash 1s ease-out 0.15s both; }
+@keyframes rsFlash { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+/* victory: a shine crossing the tablet (after it boots, then every few seconds) */
+.journal::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 4;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.09) 46%, rgba(160, 255, 230, 0.16) 50%, rgba(255, 255, 255, 0.09) 54%, transparent 62%) no-repeat;
+  background-size: 250% 100%;
+  animation: tabShine 6s ease-in-out 1.2s infinite;
+}
+@keyframes tabShine { 0% { background-position: 130% 0; } 30%, 100% { background-position: -30% 0; } }
+.journal:not(.won)::after { display: none; }
+/* the status stamp glows on a victory */
+.journal.won.stamped .journal-stamp { box-shadow: 0 0 18px color-mix(in srgb, var(--acc) 40%, transparent), inset 0 0 12px color-mix(in srgb, var(--acc) 25%, transparent); animation: statusIn 0.45s steps(1) forwards, stampGlow 2.2s ease-in-out 0.6s infinite; }
+@keyframes stampGlow { 50% { box-shadow: 0 0 34px color-mix(in srgb, var(--acc) 70%, transparent), inset 0 0 18px color-mix(in srgb, var(--acc) 40%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .rs-glow, .rs-rays, .rs-sparks, .rs-band, .rs-flash, .journal::after { animation: none !important; } .rs-sparks, .rs-band { display: none; } }
+
 /* the defeat: the title slams in, the rule draws out, the reason fades in; then it keeps breathing and tearing */
 .fail-screen { display: none; position: relative; z-index: 1; flex-direction: column; align-items: center; text-align: center; width: min(calc(1100px * var(--fs)), 94vw); }
 .result-panel.failed .fail-screen { display: flex; }
@@ -743,6 +808,7 @@ body.victory .result-panel { background: radial-gradient(ellipse at 50% 40%, #0b
 @keyframes failBreath { 50% { color: #a80f14; text-shadow: 0 0 34px rgba(220, 20, 28, 0.8), 3px 0 rgba(255, 60, 60, 0.35), -3px 0 rgba(120, 0, 0, 0.6); } }
 @keyframes failJitter { 0%, 100% { transform: none; } 31% { transform: translate(-2px, 1px) skewX(-2deg); } 32% { transform: none; } 67% { transform: translate(3px, -1px); } 68% { transform: none; } 90% { transform: translate(-1px, 2px) skewX(3deg); } 91% { transform: none; } }
 .fail-rule { display: block; width: 72%; height: 2px; margin: calc(16px * var(--fs)) 0 calc(14px * var(--fs)); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55) 15%, rgba(255, 255, 255, 0.55) 85%, transparent); }
+.fail-reason:empty { display: none; } /* D118: a plain defeat has no line under the title */
 .fail-reason { max-width: min(calc(760px * var(--fs)), 92vw); font: 400 calc(22px * var(--fs)) / 1.35 'Segoe UI', Roboto, system-ui, sans-serif; color: #d8d8d8; text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); }
 .fail-btns { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: calc(18px * var(--fs)); margin-top: calc(34px * var(--fs)); }
 /* D117 (user): the screen waits 1.6 s more (the moment of the failure stays on screen), then fades in slowly */
@@ -1718,10 +1784,10 @@ body.touch .hud-slots .slot { min-width: 36px; height: 32px; line-height: 30px; 
 .mode-tab { font-size: max(12px, calc(17px * var(--fs))); }
 /* D91: the dialogue covers the scene's arrow (no arrow over it); its buttons stay clear of the portraits; thumb size */
 body.dlg-open .obj-arrow { display: none; }
-.dlg-btns { left: 6%; right: 6%; }
+.dlg-btns { left: 6%; right: 6%; bottom: 13.5%; } /* D118 (user): above the frame's bottom line (at 9 % of its height) */
 .dlg-btn { min-height: 40px; }
-@media (max-height: 500px) { .dlg-btn { min-height: 40px; } .dlg-text { bottom: calc(9% + 44px); } }
-@media (max-height: 500px) { .dlg-text { bottom: calc(9% + 42px); line-height: 1.2; } }
+@media (max-height: 500px) { .dlg-btn { min-height: 40px; } .dlg-text { bottom: calc(13.5% + 44px); } }
+@media (max-height: 500px) { .dlg-text { bottom: calc(13.5% + 42px); line-height: 1.2; } }
 /* D92: the second pointer (a supply the level shows: the office's SMG crate) — smaller, blue */
 .obj-arrow.alt { width: 34px; height: 34px; box-shadow: 0 0 0 2px #7fd6ff, 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 12px rgba(127, 214, 255, 0.5); }
 .obj-arrow.alt svg { stroke: #9fe2ff; }
