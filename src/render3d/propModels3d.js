@@ -56,9 +56,9 @@ export function preloadPropModels() {
  * D116 (user: the fallen chairs — our office chair lying down): the model (height 1, base at y 0) laid on its side —
  * turned `lie` rad about its depth axis, its lowest point back on the floor; the size kept (height 1 = the chair's).
  */
-function lyingGeometry(g, lie) {
+function lyingGeometry(g, lie, axis = 'z') {
   const out = g.clone();
-  out.rotateZ(lie);
+  if (axis === 'x') out.rotateX(lie); else out.rotateZ(lie); // D117: 'x' — fallen on its back
   out.computeBoundingBox();
   const b = out.boundingBox;
   out.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
@@ -92,7 +92,9 @@ export function modelOf(p) {
  * from the game camera's angle side by side → { px (RGBA, rows bottom-up), W (one cell), H, frame }.
  */
 export function renderImpostor(renderer, geometry, texture, cfg) {
-  const L = cfg.look || {}, turns = cfg.turns ? 4 : 1, H = cfg.bakeH || BAKE_H;
+  // D117: turns — a number: that many turns round (chairs set off the quarter turns, yaw); true = 4
+  const L = cfg.look || {}, turns = typeof cfg.turns === 'number' ? cfg.turns : cfg.turns ? 4 : 1, step = (Math.PI * 2) / turns;
+  let H = cfg.bakeH || BAKE_H;
   // D100 (user: the trees looked like huge bushes): a picture may be taken from lower than the game camera (bakeTilt,
   // degrees from the vertical) — a tree then shows its trunk and height (the usual top-down game cheat)
   const tilt = cfg.bakeTilt != null ? (cfg.bakeTilt * Math.PI) / 180 : TILT;
@@ -120,6 +122,7 @@ export function renderImpostor(renderer, geometry, texture, cfg) {
     mesh.rotation.y = turn;
     mesh.scale.set(k, k, k);
     mesh.position.y = (1 - k) * (cfg.fillAt ?? 0.62); // shrunk about the crown, not the base
+    mesh.updateMatrix(); // (D117: the game turns matrix auto-update off — set by hand)
     group.add(mesh);
   }
   scene.add(group);
@@ -127,7 +130,7 @@ export function renderImpostor(renderer, geometry, texture, cfg) {
   const pos = geometry.attributes.position, v = new THREE.Vector3();
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   for (let r = 0; r < turns; r++) {
-    const a = -r * (Math.PI / 2) + (cfg.turn || 0), c = Math.cos(a), s = Math.sin(a);
+    const a = -r * step + (cfg.turn || 0), c = Math.cos(a), s = Math.sin(a);
     for (let i = 0; i < pos.count; i += 2) {
       v.fromBufferAttribute(pos, i);
       const x = v.x * c + v.z * s, z = -v.x * s + v.z * c, u = v.y * up.y + z * up.z;
@@ -136,32 +139,37 @@ export function renderImpostor(renderer, geometry, texture, cfg) {
   }
   const pad = 0.02;
   x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
-  const W = Math.max(16, Math.round((H * (x1 - x0)) / (y1 - y0)));
+  let W = Math.max(16, Math.round((H * (x1 - x0)) / (y1 - y0)));
+  if (W * turns > 4096) { W = Math.floor(4096 / turns); H = Math.max(16, Math.round((W * (y1 - y0)) / (x1 - x0))); } // (a texture ≤ 4096 wide)
   const cam = new THREE.OrthographicCamera(x0, x1, y1, y0, 0.01, 20);
   cam.position.set(0, Math.cos(tilt) * 8, Math.sin(tilt) * 8);
   cam.up.copy(up);
   cam.lookAt(0, 0, 0);
-  const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4 });
-  rt.texture.colorSpace = THREE.SRGBColorSpace; // (written as sRGB — read back as sRGB: no double darkening)
+  // D117: a render target per turn (one reused multisampled target read back the first turn's picture every time on
+  // some GPUs / software GL — every cell the same)
+  const newTarget = () => { const r = new THREE.WebGLRenderTarget(W, H, { samples: 4 }); r.texture.colorSpace = THREE.SRGBColorSpace; return r; }; // (written as sRGB — read back as sRGB)
   const prevTarget = renderer.getRenderTarget(), prevClear = renderer.getClearColor(new THREE.Color()), prevAlpha = renderer.getClearAlpha();
   const out = new Uint8Array(W * turns * H * 4), cell = new Uint8Array(W * H * 4);
   const prevShadow = renderer.shadowMap.enabled, prevType = renderer.shadowMap.type;
   if (selfShadow) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.needsUpdate = true; }
-  renderer.setRenderTarget(rt);
   renderer.setClearColor(0x000000, 0);
   for (let r = 0; r < turns; r++) {
-    group.rotation.y = -r * (Math.PI / 2) + (cfg.turn || 0);
+    const rt = newTarget();
+    renderer.setRenderTarget(rt);
+    group.rotation.y = -r * step + (cfg.turn || 0);
+    group.updateMatrix(); group.updateMatrixWorld(true); // D117: the turn really applied (the cells were all the same picture)
     renderer.clear();
     if (selfShadow) renderer.shadowMap.needsUpdate = true;
     renderer.render(scene, cam);
     renderer.readRenderTargetPixels(rt, 0, 0, W, H, cell);
     if (cfg.look) grade(cell, W, H, cfg.look);
     for (let y = 0; y < H; y++) out.set(cell.subarray(y * W * 4, (y + 1) * W * 4), (y * W * turns + r * W) * 4);
+    renderer.setRenderTarget(prevTarget);
+    rt.dispose();
   }
   renderer.setRenderTarget(prevTarget);
   if (selfShadow) { renderer.shadowMap.enabled = prevShadow; renderer.shadowMap.type = prevType; renderer.shadowMap.needsUpdate = true; sun.shadow.map && sun.shadow.map.dispose(); }
   renderer.setClearColor(prevClear, prevAlpha);
-  rt.dispose();
   mat.dispose();
   return { px: out, W, H, turns, frame: [x0, x1, y0, y1] };
 }
@@ -174,7 +182,7 @@ export function bakeImpostors(renderer) {
   for (const { f, cfg, key } of entries()) {
     if (!cfg.impostor || cfg.baked || baked.has(key) || !raw.has(f)) continue;
     const { geometry: g0, texture } = raw.get(f);
-    const geometry = cfg.lie ? lyingGeometry(g0, cfg.lie) : g0;
+    const geometry = cfg.lie ? lyingGeometry(g0, cfg.lie, cfg.lieAxis) : g0;
     const r = renderImpostor(renderer, geometry, texture, cfg);
     if (geometry !== g0) geometry.dispose();
     const tex = new THREE.DataTexture(r.px, r.W * r.turns, r.H, THREE.RGBAFormat);
@@ -208,7 +216,8 @@ export function buildPropModels(props, shadows) {
         const s = m.height * (p.scale || 1) * (m.vary === false ? 1 : 0.92 + 0.16 * hash01(p)); // a little variety
         const g = new THREE.PlaneGeometry((fx1 - fx0) * s, (fy1 - fy0) * s);
         if (b.cells > 1) { // D99: the quarter turn's cell of the picture
-          const c = ((p.rot | 0) & 3) % b.cells, uv = g.attributes.uv;
+          // D117: the cell nearest its turn (quarter turns + yaw; cells evenly round)
+          const k = Math.round(((((p.rot | 0) & 3) * Math.PI) / 2 + (p.yaw || 0)) / ((Math.PI * 2) / b.cells)), c = ((k % b.cells) + b.cells) % b.cells, uv = g.attributes.uv;
           for (let i = 0; i < uv.count; i++) uv.setX(i, (c + uv.getX(i)) / b.cells);
         }
         g.translate(((fx0 + fx1) / 2) * s, ((fy0 + fy1) / 2) * s, 0);   // the model's base point at the origin
@@ -236,7 +245,7 @@ export function buildPropModels(props, shadows) {
       const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
       list.forEach((p, i) => {
         const s = m.height * (p.scale || 1);
-        Q.setFromAxisAngle(Y, -(((p.rot | 0) & 3) * Math.PI) / 2 + (m.turn || 0));
+        Q.setFromAxisAngle(Y, -(((p.rot | 0) & 3) * Math.PI) / 2 - (p.yaw || 0) + (m.turn || 0));
         M.compose(P.set(p.x, p.elev || 0, p.y), Q, S.set(s, s, s));
         im.setMatrixAt(i, M);
       });

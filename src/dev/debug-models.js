@@ -12,6 +12,7 @@ import { officeMaterials } from '../render3d/OfficeScene.js';
 import { buildPropViews, propViewTexture } from '../render3d/propViews.js';
 import { buildPropModels, hasModel } from '../render3d/propModels3d.js';
 import { buildCustomProps } from '../render3d/confTable.js';
+import { buildWorkstations } from '../render3d/workstation.js';
 import { PROP_TYPES, propBlocks } from '../data/props.js';
 import { PROP_MODELS } from '../data/propModels.js';
 import { HUMAN_ANIM } from '../data/humanModels.js';
@@ -155,7 +156,7 @@ async function open() {
         tris += ((geo.index ? geo.index.count : geo.attributes.position.count) / 3) * (mesh.isInstancedMesh ? mesh.count : 1);
       };
       const p = { type: e.type, x: 0, y: 0, rot: 0 };
-      if (how === 'custom') for (const m of buildCustomProps([p], false)) add(m, true);
+      if (how === 'custom') for (const m of [...buildCustomProps([p], false), ...buildWorkstations([p], false)]) add(m, !!m.userData.ownMaterial);
       if (how === 'model') {
         if (hasModel(p)) for (const m of buildPropModels([p], false)) add(m, true);
         else how = 'view'; // (not loaded: the game draws its atlas view)

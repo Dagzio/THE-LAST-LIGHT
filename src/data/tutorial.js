@@ -35,10 +35,10 @@ export const TUTORIAL = {
     // D116 (user): both guards (they patrol in opposite directions); fully spotted — the lesson fails (its checkpoint)
     { id: 'takedown', touchKey: 'tut.tobj.stealth', textKey: 'tut.obj.stealth', keys: ['F'], dialogue: 'tut.stealth', target: [1250, 540], opens: 'gD', need: 2,
       hl: [{ tag: 'stealth' }], ui: { takedown: 'F' } }, // D107: no crouch button (he sneaks by himself here)
-    { id: 'grenades', touchKey: 'tut.tobj.grenadeTake', textKey: 'tut.obj.grenadeTake', keys: ['E'], dialogue: 'tut.grenade', target: [1800, 490], hl: [{ pickup: 'grenade_chest' }], ui: { interact: 'E' } },
-    { id: 'kill', tag: 'grenade', touchKey: 'tut.tobj.grenadeThrow', textKey: 'tut.obj.grenadeThrow', keys: ['G', 'key.lmb'], target: [2120, 300], opens: 'gE', hl: [{ tag: 'grenade' }], ui: { grenade: 'G' } },
+    { id: 'grenades', touchKey: 'tut.tobj.grenadeTake', textKey: 'tut.obj.grenadeTake', keys: ['E'], dialogue: 'tut.grenade', target: [1970, 430], hl: [{ pickup: 'grenade_chest' }], ui: { interact: 'E' } },
+    { id: 'kill', tag: 'grenade', touchKey: 'tut.tobj.grenadeThrow', textKey: 'tut.obj.grenadeThrow', keys: ['G', 'key.lmb'], target: [1970, 240], opens: 'gE', hl: [{ tag: 'grenade' }], ui: { grenade: 'G' } },
     // D116 (user): the way to roll runs ALONG the mats (west → east), not across them
-    { id: 'roll', touchKey: 'tut.tobj.roll', textKey: 'tut.obj.roll', keys: ['key.space'], dialogue: 'tut.roll', target: [1990, 890], opens: 'gF', hl: [{ rect: [1930, 872, 2050, 908] }, { arrow: [1880, 890, 2100, 890] }], ui: { dash: 'key.space' } },
+    { id: 'roll', touchKey: 'tut.tobj.roll', textKey: 'tut.obj.roll', keys: ['key.space'], dialogue: 'tut.roll', target: [1990, 890], opens: 'gF', hl: [{ rect: [1930, 872, 2050, 908] }, { arrow: [1928, 890, 2052, 890] }], ui: { dash: 'key.space' } },
     { id: 'kill', tag: 'ambush', touchKey: 'tut.tobj.ambush', textKey: 'tut.obj.ambush', dialogue: 'tut.ambush', target: [1990, 1420], opens: 'gG', ambush: true, hl: [{ tag: 'ambush' }] },
     { id: 'medkit', touchKey: 'tut.tobj.medkit', textKey: 'tut.obj.medkit', keys: ['E'], dialogue: 'tut.medkit', target: [1150, 1330], opens: 'gH', hl: [{ pickup: 'medkit_case' }], ui: { interact: 'E' } },
     { id: 'exit', textKey: 'tut.obj.exit', dialogue: 'tut.end', target: [1200, 1745], hl: [{ rect: 'exit' }] },

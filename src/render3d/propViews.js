@@ -142,7 +142,7 @@ function propFaces(p, out) {
   const { m, item, A } = v, t = PROP_TYPES[p.type];
   if (m.custom) return; // D116: built by its own module (the conference table: render3d/confTable.js)
   const rot = (p.rot | 0) & 3;
-  const base = _m.compose(_p.set(p.x, p.elev || 0, p.y), _q.setFromAxisAngle(UP, -(rot * Math.PI) / 2), _s);
+  const base = _m.compose(_p.set(p.x, p.elev || 0, p.y), _q.setFromAxisAngle(UP, -(rot * Math.PI) / 2 - (p.yaw || 0)), _s); // D117: yaw — a turn off the quarter turns
   const W = p.w || m.drawW || t.w, D = m.drawD || Math.max(1, t.d); // (p.w: a fence piece cut to its wall)
   const front = item.front || item.back;
   // D111: the user's new office atlases (every view fits its bounding face; `surf` — the main surface height)

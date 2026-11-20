@@ -35,6 +35,7 @@ export class ResultsView {
   }
 
   hide() {
+    clearTimeout(this.sfxT);
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     this.summary = null;
@@ -53,7 +54,12 @@ export class ResultsView {
       el.failTitle.dataset.text = el.failTitle.textContent;
       el.failReason.textContent = T(s.checkpoint ? 'fail.tutDetected' : s.reason === 'detected' ? 'result.detectedText' : 'result.lostText');
       el.failRetry.textContent = T(s.checkpoint ? 'fail.retryTask' : 'defeat.retry');
-      if (animate) { el.panel.classList.remove('fail-in'); void el.panel.offsetWidth; el.panel.classList.add('fail-in'); Sfx.play('stamp'); }
+      if (animate) {
+        el.panel.classList.remove('fail-in'); void el.panel.offsetWidth; el.panel.classList.add('fail-in');
+        // D117: the stamp sounds as the title lands (the screen comes in 2.15 s after the failure, the title 0.3 s later)
+        clearTimeout(this.sfxT);
+        this.sfxT = setTimeout(() => { if (this.summary) Sfx.play('stamp'); }, 2650);
+      }
     }
     el.journal.classList.toggle('won', s.won);
     el.journal.classList.toggle('congrats', congrats);

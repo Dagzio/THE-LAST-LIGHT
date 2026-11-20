@@ -79,12 +79,54 @@ const colorCache = new Map();
 const rgbOf = (hex) => { let c = colorCache.get(hex); if (!c) { c = new THREE.Color(hex); colorCache.set(hex, c); } return c; };
 
 /** A canvas-painted icon texture ('!' / '?' / chevron). */
-function iconTexture(draw) {
-  const { canvas, g } = cpuCanvas(64, 64);
-  draw(g);
+function iconTexture(draw, w = 64, h = 64) {
+  const { canvas, g } = cpuCanvas(w, h);
+  draw(g, w, h);
   const t = new THREE.CanvasTexture(canvas);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
+}
+
+/**
+ * D117 (user: nicer rings round the targets and the grenade's blast area): ring pictures (white — the material gives
+ * the colour; drawn on a 2 × 2 quad = radius 1): 'mark' — a glowing band, a crisp line, a faint inner line and four ticks
+ * (highlights, the objective, the crate in reach); 'zone' — the grenade's area: a soft filled disc, a crisp rim, a dashed
+ * inner ring and a small centre cross; 'wave' — the blast's shock ring (a bright edge fading inwards).
+ */
+function ringTexture(kind) {
+  return iconTexture((g, S) => {
+    const c = S / 2, R = S / 2 - 2;
+    const band = (r0, r1, stops) => { const gr = g.createRadialGradient(c, c, r0, c, c, r1); for (const [k, a] of stops) gr.addColorStop(k, `rgba(255,255,255,${a})`); g.fillStyle = gr; g.beginPath(); g.arc(c, c, r1, 0, Math.PI * 2); g.fill(); };
+    const line = (r, w, a, dash = null) => { g.strokeStyle = `rgba(255,255,255,${a})`; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); };
+    if (kind === 'mark') {
+      band(R * 0.7, R, [[0, 0], [0.62, 0.35], [0.72, 0.6], [0.85, 0.2], [1, 0]]);
+      line(R * 0.9, S * 0.018, 1);
+      line(R * 0.74, S * 0.008, 0.45);
+      g.fillStyle = '#fff';
+      for (let i = 0; i < 4; i++) { g.save(); g.translate(c, c); g.rotate((i * Math.PI) / 2 + Math.PI / 4); g.fillRect(R * 0.93, -S * 0.012, R * 0.07, S * 0.024); g.restore(); }
+    } else if (kind === 'zone') {
+      band(0, R, [[0, 0.04], [0.75, 0.12], [0.95, 0.32], [1, 0]]);
+      line(R * 0.965, S * 0.016, 1);
+      line(R * 0.84, S * 0.008, 0.6, [S * 0.03, S * 0.025]);
+      g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = S * 0.008;
+      g.beginPath(); g.moveTo(c - R * 0.08, c); g.lineTo(c + R * 0.08, c); g.moveTo(c, c - R * 0.08); g.lineTo(c, c + R * 0.08); g.stroke();
+    } else { // 'wave'
+      band(R * 0.45, R, [[0, 0], [0.55, 0.15], [0.85, 0.85], [0.93, 1], [1, 0]]);
+    }
+  }, 256, 256);
+}
+
+/** D117 (user: the roll arrow — small, a thin dashed line): white dashes + a small head along +x (the quad is 1 × 1). */
+function dashedArrowTexture() {
+  return iconTexture((g, W, H) => {
+    const y = H / 2, head = W * 0.1;
+    g.strokeStyle = '#fff'; g.lineWidth = H * 0.16; g.lineCap = 'round';
+    g.setLineDash([W * 0.045, W * 0.035]);
+    g.beginPath(); g.moveTo(W * 0.02, y); g.lineTo(W - head - W * 0.02, y); g.stroke();
+    g.setLineDash([]);
+    g.lineWidth = H * 0.14; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(W - head * 1.6, y - H * 0.38); g.lineTo(W - W * 0.015, y); g.lineTo(W - head * 1.6, y + H * 0.38); g.stroke();
+  }, 512, 64);
 }
 
 export class Renderer3D {
@@ -319,17 +361,20 @@ export class Renderer3D {
     this.aimDots = new THREE.InstancedMesh(new THREE.SphereGeometry(2, 8, 6), m.grenadeAim, GRENADE_RULES.previewDots);
     this.aimDots.frustumCulled = false;
     this.aimDots.visible = false;
-    const aimRing = new THREE.RingGeometry(0.9, 1, 40);
-    aimRing.rotateX(-Math.PI / 2);
-    this.aimRing = new THREE.Mesh(aimRing, m.grenadeAimRing);
+    // D117: the rings are pictures on a flat 2 × 2 quad (radius 1) — see ringTexture
+    const ringQuad = new THREE.PlaneGeometry(2, 2);
+    ringQuad.rotateX(-Math.PI / 2);
+    const ringMat = (kind, color, opacity) => new THREE.MeshBasicMaterial({ map: ringTexture(kind), color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending });
+    this.aimRing = new THREE.Mesh(ringQuad, ringMat('zone', 0xff9a4a, 0.9));
     this.aimRing.visible = false;
     this.aimRing.renderOrder = 6;
     // grenades in flight (replaced by the user's model when it loads) + blast rings
     this.grenadeMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(4, 10, 8), new THREE.MeshLambertMaterial({ color: 0x4b5348 }), 8);
     this.grenadeMesh.frustumCulled = false;
     this.grenadeMesh.count = 0;
+    const waveMat = ringMat('wave', 0xffb070, 0.95);
     this.blastRings = [0, 1, 2].map(() => {
-      const r = new THREE.Mesh(aimRing, m.blast.clone());
+      const r = new THREE.Mesh(ringQuad, waveMat.clone());
       r.visible = false;
       r.renderOrder = 5;
       return r;
@@ -356,9 +401,7 @@ export class Renderer3D {
     }));
     this.objMarker.renderOrder = 15;
     this.objMarker.visible = false;
-    const objRing = new THREE.RingGeometry(0.82, 1, 40);
-    objRing.rotateX(-Math.PI / 2);
-    this.objRing = new THREE.Mesh(objRing, new THREE.MeshBasicMaterial({ color: 0xffcf3a, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.objRing = new THREE.Mesh(ringQuad, ringMat('mark', 0xffcf3a, 0.6));
     this.objRing.renderOrder = 3;
     this.objRing.visible = false;
     // D90 (user: light up the objects themselves): the training ground's highlights — a glowing frame round a prop
@@ -366,20 +409,19 @@ export class Renderer3D {
     const flat = new THREE.PlaneGeometry(1, 1); flat.rotateX(-Math.PI / 2);
     const hlMat = new THREE.MeshBasicMaterial({ color: 0xffcf3a, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending });
     this.hlBars = new THREE.InstancedMesh(flat, hlMat, MAX_HL * 4);
-    this.hlRings = new THREE.InstancedMesh(new THREE.RingGeometry(0.8, 1, 40).rotateX(-Math.PI / 2), hlMat, MAX_HL);
+    this.hlRings = new THREE.InstancedMesh(ringQuad, ringMat('mark', 0xffcf3a, 0.95), MAX_HL);
     this.hlArrows = new THREE.InstancedMesh(new THREE.PlaneGeometry(13, 13), this.objMarker.material, MAX_HL);
     for (const im of [this.hlBars, this.hlRings, this.hlArrows]) { im.frustumCulled = false; im.count = 0; im.renderOrder = im === this.hlArrows ? 15 : 3; }
-    // D92: a direction arrow painted on the ground (the roll lesson: across the mats); unit length along +x
+    // D92: a direction arrow painted on the ground (the roll lesson); unit length along +x
+    // D117 (user: small, a thin dashed line in the roll's direction — the old wide arrow also looked doubled)
     const arrowGeo = new THREE.PlaneGeometry(1, 1); arrowGeo.rotateX(-Math.PI / 2);
-    this.hlGroundArrow = new THREE.Mesh(arrowGeo, new THREE.MeshBasicMaterial({ map: iconTexture((g) => {
-      g.fillStyle = '#ffcf3a'; g.strokeStyle = 'rgba(40, 28, 0, 0.9)'; g.lineWidth = 3;
-      g.beginPath(); g.moveTo(4, 24); g.lineTo(38, 24); g.lineTo(38, 12); g.lineTo(60, 32); g.lineTo(38, 52); g.lineTo(38, 40); g.lineTo(4, 40); g.closePath(); g.fill(); g.stroke();
-    }), transparent: true, depthWrite: false }));
+    this.hlGroundArrow = new THREE.Mesh(arrowGeo, new THREE.MeshBasicMaterial({ map: dashedArrowTexture(), color: 0xffd34d, transparent: true, depthWrite: false }));
+    this.hlGroundArrow.castShadow = this.hlGroundArrow.receiveShadow = false;
     this.hlGroundArrow.renderOrder = 6; // (over the mats)
     this.hlGroundArrow.visible = false;
     this.scene.add(this.hlGroundArrow);
     // crate "in reach" ring
-    this.reachRing = new THREE.Mesh(objRing, new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.reachRing = new THREE.Mesh(ringQuad, ringMat('mark', 0x9fe8ff, 0.75));
     this.reachRing.renderOrder = 3;
     this.reachRing.visible = false;
     // blood pools under the dead (dosed: small, dark)
@@ -540,8 +582,8 @@ export class Renderer3D {
           g.visible = true;
           g.position.set((x0 + x1) / 2, 4, (y0 + y1) / 2);
           g.rotation.set(0, -a, 0);
-          g.scale.set(len, 1, len * 0.42);
-          g.material.opacity = 0.55 + 0.4 * k;
+          g.scale.set(len, 1, 9);
+          g.material.opacity = 0.6 + 0.35 * k;
           groundArrow = true;
           continue;
         }
@@ -549,7 +591,7 @@ export class Renderer3D {
         if (h.r) {
           const ex = h.e ? this._lx(h.e) : h.x, ey = h.e ? this._ly(h.e) : h.y;
           const r = h.r + pulse * 3;
-          P.set(ex, 1.7, ey); S.set(r, 1, r); M.compose(P, Q.identity(), S); this.hlRings.setMatrixAt(rings++, M);
+          P.set(ex, 1.7, ey); S.set(r, 1, r); M.compose(P, Q.setFromAxisAngle(UP, time * 0.7), S); this.hlRings.setMatrixAt(rings++, M); // D117: its ticks turn slowly
           top = h.e && h.e.alive ? 80 : 30;
           P.set(ex, top + Math.sin(time * 3.2) * 3, ey);
         } else {
@@ -907,6 +949,7 @@ export class Renderer3D {
         hitAge: time - e.lastHitAt,
         deadAge: e.alive ? -1 : time - e.deathAt,
         busy: !!e.busy && e.alive && ai.mode === 'idle' && sp < 2, // D83: going through the files until alerted
+        crouch: e.alive && e.crouch && sp < 2, // D117: crouched in place (the grenade yard's dummies)
       });
       // D92 (user: the dead must not fall through walls / furniture / the floor): the fall goes where there is room (a
       // turn of up to 90° eased in while he staggers); with no room he fades out right after the fall. Bodies no

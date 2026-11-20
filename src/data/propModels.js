@@ -18,18 +18,22 @@
 //   model  — D96: drawn from the user's 3D model (render3d/propModels3d.js): the office chairs (impostors) and the
 //            training tree (a baked picture); D112: the plants' and the armchair's models removed (atlas).
 export const PROP_MODELS = {
-  workstation: { view: 'workstation' },
-  terminal: { view: 'workstation' },
+  // D117 (user: the new PC textures; remodel the workstation): built in code — the desk + the new monitor, keyboard,
+  // mouse, phone and PC tower (render3d/workstation.js); the view is the fallback
+  workstation: { view: 'workstation', custom: 'workstation' },
+  terminal: { view: 'workstation', custom: 'workstation' },
   exec_desk: { view: 'executive_desk' },
+  // D117 (user: the chairs stood too neatly): pictures for 16 turns round (turns: 16) — the level sets them a little off
+  // (yaw, data/levels/office.js scatter)
   // D112 (user): the chairs back on the user's 3D models (D99: 4-turn impostors baked from them, brighter); the view is
   // the fallback while they load
-  chair: { view: 'mesh_chair', model: { file: 'exec_chair.glb', height: 32, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
-  exec_chair: { view: 'executive_chair', model: { file: 'exec_chair.glb', height: 34, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
-  chair_meeting: { view: 'cantilever_chair', model: { file: 'meeting_chair.glb', height: 29, impostor: true, turns: true, bakeH: 256, vary: false, look: { gain: 1.1 } } },
+  chair: { view: 'mesh_chair', model: { file: 'exec_chair.glb', height: 32, impostor: true, turns: 16, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
+  exec_chair: { view: 'executive_chair', model: { file: 'exec_chair.glb', height: 34, impostor: true, turns: 16, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
+  chair_meeting: { view: 'cantilever_chair', model: { file: 'meeting_chair.glb', height: 29, impostor: true, turns: 16, bakeH: 256, vary: false, look: { gain: 1.1 } } },
   // D116 (user: the fallen chairs — our office chair, lying): the same models laid on their side (`lie`: the turn about
   // their depth axis), their own pictures (`key`); the view is the fallback while they load
-  chair_down: { view: 'mesh_chair', model: { file: 'exec_chair.glb', key: 'exec_chair_down', lie: Math.PI / 2, height: 32, impostor: true, turns: true, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
-  chair_meeting_down: { view: 'cantilever_chair', model: { file: 'meeting_chair.glb', key: 'meeting_chair_down', lie: -Math.PI / 2, height: 29, impostor: true, turns: true, bakeH: 256, vary: false, look: { gain: 1.1 } } },
+  chair_down: { view: 'mesh_chair', model: { file: 'exec_chair.glb', key: 'exec_chair_down', lie: -Math.PI / 2, lieAxis: 'x', height: 32, impostor: true, turns: 16, bakeH: 256, vary: false, look: { hemi: 2.8, gain: 1.65 } } },
+  chair_meeting_down: { view: 'cantilever_chair', model: { file: 'meeting_chair.glb', key: 'meeting_chair_down', lie: -Math.PI / 2, height: 29, impostor: true, turns: 16, bakeH: 256, vary: false, look: { gain: 1.1 } } },
   // D114 (user: odd panels on its sides / ends): a solid base box under a thin top slab; D116 (user: poor quality, square
   // corners — remodel it): built in code (render3d/confTable.js) — a stadium-shaped top with a crisp walnut texture and
   // its three cable hatches, two steel panel legs and a rail; the view is only the minimap / fallback

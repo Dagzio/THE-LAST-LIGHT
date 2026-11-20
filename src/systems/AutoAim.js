@@ -3,6 +3,9 @@
 // Pure simulation (no DOM): MapRun calls it on touch devices. D75: only enemies already on the screen (inView), and
 // the mobile version has no manual fire at all.
 import { AUTO_AIM } from '../data/player.js';
+import { BLOCK } from './Collision.js';
+
+const isGlass = (s) => (s.kind === 'wall' || s.kind === 'door') && !(s.blocks & BLOCK.SIGHT);
 
 export class AutoAim {
   constructor(cfg = AUTO_AIM) {
@@ -24,7 +27,8 @@ export class AutoAim {
     // D75: never at an enemy still off the screen (D108: a new lock — the whole body well inside; the locked one is kept
     // while it is still on the screen)
     if (this.inView && !this.inView(e.x, e.y, e === this.target)) return false;
-    return !this.cfg.lineOfSight || !this.world || this.world.clear(o.x, o.y, e.x, e.y);
+    // D117: …and no glass between (seen through, it stops the rounds)
+    return !this.cfg.lineOfSight || !this.world || (this.world.clear(o.x, o.y, e.x, e.y) && this.world.segmentHit(o.x, o.y, e.x, e.y, 0, isGlass) === Infinity);
   }
 
   /**

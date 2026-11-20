@@ -136,8 +136,11 @@ export const TRAINING = {
     { type: 'fabric_screen', x: 1010, y: 500, rot: 1 }, { type: 'fabric_screen', x: 1320, y: 300 }, { type: 'tent', x: 1440, y: 480 },
     { type: 'crate_wood', x: 1460, y: 240 }, { type: 'barrel', x: 960, y: 160 }, { type: 'signal_amber', x: 1505, y: 405 },
     // --- E grenade yard: three dummies behind sandbags, the open grenade chest
-    { type: 'sandbags', x: 2110, y: 340 }, { type: 'sandbags', x: 2020, y: 340 },
-    { type: 'supply_chest_open', x: 1800, y: 490, rot: 0 }, { type: 'barrel', x: 1730, y: 160 }, { type: 'crate_wood', x: 2200, y: 520 },
+    // D117 (user's sketch): a sandbag U opening north — the bottom wall, two slanted wings (yaw), three crouched dummies
+    // inside it; the grenade chest south of it, lengthwise
+    { type: 'sandbags', x: 1925, y: 292 }, { type: 'sandbags', x: 2015, y: 292 },
+    { type: 'sandbags', x: 1855, y: 240, yaw: Math.atan2(104, 50) }, { type: 'sandbags', x: 2085, y: 240, yaw: Math.atan2(104, -50) },
+    { type: 'supply_chest_open', x: 1970, y: 430, rot: 0 }, { type: 'barrel', x: 1730, y: 160 }, { type: 'crate_wood', x: 2200, y: 520 },
     { type: 'signal_amber', x: 2050, y: 545 },
     // --- F roll yard: jersey barriers, hurdles, the blue mats (roll across them)
     { type: 'blue_mat', x: 1960, y: 890 }, { type: 'blue_mat', x: 2020, y: 890 },
@@ -174,9 +177,10 @@ export const TRAINING = {
     // hero is not caught just stepping in (fully spotted now fails the lesson)
     { type: 'thug', x: 1250, y: 170, angle: Math.PI / 2, harmless: true, bulletProof: true, tag: 'stealth', patrol: [[1250, 170, 3.5, 0], [1250, 550, 3.5, 0]] },
     { type: 'thug', x: 1380, y: 560, angle: -Math.PI / 2, harmless: true, bulletProof: true, tag: 'stealth', patrol: [[1380, 560, 3.5, 0], [1380, 170, 3.5, 0]] },
-    { type: 'thug', x: 2080, y: 290, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'grenade' },
-    { type: 'thug', x: 2120, y: 310, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'grenade' },
-    { type: 'thug', x: 2160, y: 285, angle: Math.PI / 2, dummy: true, bulletProof: true, tag: 'grenade' },
+    // D117: crouched inside the sandbag U (two by its upper ends, one in the middle by its bottom wall)
+    { type: 'thug', x: 1882, y: 212, angle: Math.PI / 2, dummy: true, bulletProof: true, crouch: true, tag: 'grenade' },
+    { type: 'thug', x: 2058, y: 212, angle: Math.PI / 2, dummy: true, bulletProof: true, crouch: true, tag: 'grenade' },
+    { type: 'thug', x: 1970, y: 252, angle: Math.PI / 2, dummy: true, bulletProof: true, crouch: true, tag: 'grenade' },
     // D89: behind the two crates, on the screen as the hero walks in (were by the south wall, off the screen)
     { type: 'thug', x: 1880, y: 1435, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush' },
     { type: 'thug', x: 2110, y: 1430, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush' },
@@ -189,7 +193,7 @@ export const TRAINING = {
     { id: 'chest_smg', kind: 'crate', item: 'smg', x: 290, y: 1320, hidden: true, refill: 1.5, label: 'hud.take.smg' },
     { id: 'chest_rifle', kind: 'crate', item: 'rifle', x: 500, y: 1320, hidden: true, refill: 1.5, label: 'hud.take.rifle' },
     { id: 'ammo_table', kind: 'crate', item: 'ammo', count: 1, x: 560, y: 990, hidden: true, refill: 1, label: 'hud.take.ammo' },
-    { id: 'grenade_chest', kind: 'crate', item: 'grenades', count: 2, x: 1800, y: 490, hidden: true, refill: 1.5, label: 'hud.take.grenades' },
+    { id: 'grenade_chest', kind: 'crate', item: 'grenades', count: 2, x: 1970, y: 430, hidden: true, refill: 1.5, label: 'hud.take.grenades' },
     { id: 'medkit_case', kind: 'crate', item: 'medkit', x: 1150, y: 1330, hidden: true, label: 'hud.take.medkit' },
   ],
 

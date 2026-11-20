@@ -12,6 +12,8 @@ import { BLOCK } from './Collision.js';
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const NEXT = { x: 0, y: 0 };
+/** D117: a glass wall / door — seen through, stops rounds. */
+const isGlass = (s) => (s.kind === 'wall' || s.kind === 'door') && !(s.blocks & BLOCK.SIGHT);
 
 export class HumanAISystem {
   /**
@@ -401,6 +403,8 @@ export class HumanAISystem {
     const c = Math.cos(e.faceAngle), sn = Math.sin(e.faceAngle);
     const mx = e.x + c * mz.f - sn * mz.s, my = e.y + sn * mz.f + c * mz.s;
     if (this.world.segmentHit(e.x, e.y, mx, my, 0) !== Infinity) { g.nextShotAt = time + 0.3; return; } // D82: barrel past a wall: no shot
+    // D117: glass (seen through, stops rounds) between him and the hero — he does not empty his gun into it
+    if (this.world.segmentHit(mx, my, p.x, p.y, 0, isGlass) !== Infinity) { g.nextShotAt = time + 0.3; return; }
     let spread = (s.spreadAngle * Math.PI) / 180;
     if (p.dodging) spread *= 2.5;
     else if (Math.hypot(p.vx, p.vy) > 20) spread *= T.movingTargetSpread;

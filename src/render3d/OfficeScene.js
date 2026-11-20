@@ -13,6 +13,7 @@ import { buildPropCards, hasSprite, propAtlasTexture, preloadPropAtlas } from '.
 import { levelLights, LIGHT_KINDS } from './officeLights.js';
 import { buildPropViews, hasView, propViewTexture, preloadPropViews, VIEW_ATLASES } from './propViews.js';
 import { buildCustomProps } from './confTable.js';
+import { buildWorkstations } from './workstation.js';
 import { buildPropModels } from './propModels3d.js';
 
 const POOL_GAIN = 0.9;    // D83: floor pool brightness per unit of light power
@@ -455,7 +456,8 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     meshes.push(vm);
   }
   // D116: props built in code (the conference table)
-  for (const cm of buildCustomProps(allProps, shadows)) { group.add(cm); meshes.push(cm); }
+  // D117: the workstations (the new PC equipment) too
+  for (const cm of [...buildCustomProps(allProps, shadows), ...buildWorkstations(allProps, shadows, lights)]) { group.add(cm); meshes.push(cm); }
   // D96: the props drawn from the user's 3D models (impostor pictures / instanced meshes)
   const modelMeshes = buildPropModels(level.props, shadows);
   for (const mm of modelMeshes) group.add(mm);

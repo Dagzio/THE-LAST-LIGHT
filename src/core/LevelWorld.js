@@ -14,8 +14,9 @@ export const DOOR = {
 };
 
 // D88: the training ground's mesh fences / gates stop walkers only (seen and shot through)
-const WALL_BLOCKS = { glass: BLOCK.MOVE, fence: BLOCK.MOVE };
-const DOOR_BLOCKS = { glass: BLOCK.MOVE, gate: BLOCK.MOVE };
+// D117 (user: rounds flew through the office glass): glass walls / doors stop walkers AND rounds (seen through)
+const WALL_BLOCKS = { glass: BLOCK.MOVE | BLOCK.BULLET, fence: BLOCK.MOVE };
+const DOOR_BLOCKS = { glass: BLOCK.MOVE | BLOCK.BULLET, gate: BLOCK.MOVE };
 
 export class LevelWorld {
   /** @param {object} level data/levels/*.js */

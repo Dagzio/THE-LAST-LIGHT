@@ -90,7 +90,8 @@ export const OFFICE = {
     { x: 1200, y: 1130, zones: ['corridor', 'lobby'] },
   ],
 
-  props: [
+  // D117 (user: the chairs stood too neatly): chairs and small things a little off (scatter, below)
+  props: scatter([
     // --- lobby
     { type: 'reception', x: 1200, y: 1360, rot: 0 },
     // D116 (user: the plants in the corners went into the walls): every plant at least 12 units off the wall faces
@@ -202,7 +203,7 @@ export const OFFICE = {
     { type: 'electrical', x: 1980, y: 261.5, rot: 0 },
     // --- stairwell
     { type: 'stairs', x: 175, y: 400, rot: 1 },
-  ],
+  ]),
 
   // D83 (the level reference): signs of the attack and wear on the floors — t: atlas decal (render3d/OfficeScene.js
   // DECAL_TILES), w × d units, r — turn (rad). Presentation only.
@@ -305,4 +306,29 @@ function rackRow(x0, x1, y) {
   let i = 0;
   for (let x = x0; x <= x1; x += 26, i++) out.push({ type: i % 3 === 1 ? 'server_rack_open' : 'server_rack', x, y, rot: 0 });
   return out;
+}
+
+/**
+ * D117 (user: "a bit more chaos — nothing lined up with a ruler, the chairs especially; desks and big furniture stay"):
+ * chairs and small things are set a little off their spots and turns — seeded by their position (the same every run).
+ * [move ± units, turn: chairs — steps of 22.5° (their 16-turn pictures), others — ± rad]
+ */
+function scatterTable() { // (a function: the level data above is built before a const here would exist)
+  return {
+  chair: [6, 'step'], exec_chair: [4, 'step'], chair_meeting: [5, 'step'],
+  steel_bin: [3, 0.4], recycling_bin: [3, 0.35], open_box: [3, 0.45], boxes: [2, 0.12], boxes_tall: [1.5, 0.08],
+  plant: [0, Math.PI], water_cooler: [0, 0.5],
+  };
+}
+function scatter(list) {
+  const SCATTER = scatterTable();
+  return list.map((p) => {
+    const s = SCATTER[p.type];
+    if (!s) return p;
+    let h = (Math.imul(Math.round(p.x * 13) ^ Math.imul(Math.round(p.y * 7), 0x9e3779b1), 0x85ebca6b) >>> 0) || 1;
+    const rnd = () => { h ^= h << 13; h >>>= 0; h ^= h >>> 17; h ^= h << 5; h >>>= 0; return h / 4294967296; }; // 0 … 1
+    const [move, turn] = s;
+    const yaw = turn === 'step' ? [-1, 1, -2, 1, -1, 2, 0, 1][Math.floor(rnd() * 8)] * (Math.PI / 8) : (rnd() * 2 - 1) * turn;
+    return { ...p, x: Math.round((p.x + (rnd() * 2 - 1) * move) * 10) / 10, y: Math.round((p.y + (rnd() * 2 - 1) * move) * 10) / 10, yaw };
+  });
 }

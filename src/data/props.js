@@ -138,6 +138,7 @@ export function propBlocks(t) {
  */
 export function propParts(p) {
   const T = PROP_TYPES[p.type];
+  if (T && !T.parts && p.yaw && T.w > T.d * 1.5) return yawParts(p, T);
   if (!T || !T.parts) return null;
   const a = -((p.rot | 0) & 3) * (Math.PI / 2), c = Math.round(Math.cos(a)), s = Math.round(Math.sin(a));
   return T.parts.map(([x0, z0, x1, z1]) => {
@@ -145,6 +146,23 @@ export function propParts(p) {
     const xs = pts.map((q) => q[0]), zs = pts.map((q) => q[1]);
     return [p.x + Math.min(...xs), p.y + Math.min(...zs), p.x + Math.max(...xs), p.y + Math.max(...zs)];
   });
+}
+
+/**
+ * D117: a long prop turned off the quarter turns (`yaw`, rad — a slanted sandbag wall) collides as a row of small boxes
+ * along its length (each the box round one piece of the turned footprint) — not one big box round the whole slant.
+ * The turn matches the renderer's: θ = −(rot·π/2 + yaw) about the vertical.
+ */
+function yawParts(p, T) {
+  const n = Math.max(2, Math.ceil(T.w / T.d)), th = -(((p.rot | 0) & 3) * (Math.PI / 2) + p.yaw), c = Math.cos(th), s = Math.sin(th);
+  const hl = T.w / (2 * n), hd = (T.d / 2) * 0.9, out = [];
+  for (let i = 0; i < n; i++) {
+    const mx = -T.w / 2 + (i + 0.5) * (T.w / n);
+    const pts = [[mx - hl, -hd], [mx + hl, -hd], [mx - hl, hd], [mx + hl, hd]].map(([x, z]) => [x * c + z * s, -x * s + z * c]);
+    const xs = pts.map((q) => q[0]), zs = pts.map((q) => q[1]);
+    out.push([p.x + Math.min(...xs), p.y + Math.min(...zs), p.x + Math.max(...xs), p.y + Math.max(...zs)]);
+  }
+  return out;
 }
 
 /** Footprint box of a placed prop (rot = quarter turns) → [minX, minY, maxX, maxY]. */

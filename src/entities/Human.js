@@ -39,6 +39,8 @@ export class Human {
     this.tag = spawn.tag || null;
     // D89 training ground: rounds do not fell him (the lesson wants a takedown / a grenade) — ProjectileSystem
     this.bulletProof = !!spawn.bulletProof;
+    // D117 presentation: he crouches where he stands (the grenade yard's dummies behind their sandbags)
+    this.crouch = !!spawn.crouch;
     this.gun = {
       stats: weapon,
       ammo: weapon.magazineSize,
