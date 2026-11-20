@@ -94,12 +94,9 @@ export const PROP_MODELS = {
   // D90: foliage — one picture turned to the camera (render3d/propViews.js `sprite`), not a box of views
   // D99 (user): the user's second, detailed tree (60 MB, 2 M triangles) — its picture baked OFFLINE from the model
   // (tools/bake-impostor.html: 785 × 768 webp, 79 KB) — the game never loads the model
-  tree: { view: 'deciduous_tree', atlas: 'training', drawW: 120, drawD: 120, sprite: { lean: 1 },
-    // D103 (user: back on the ground, much less tilt — mostly from above, a bit of trunk, volume as the first one): baked
-    // from 48° (the D99 volume look + the olive foliage), standing on its base (no lift), its own cast shadow
-    // D104 (user: shadows in the foliage): rebaked with a real shadow map (upper clusters shade the lower) + the clusters'
-    // local contrast (tools/bake-impostor.html look: selfShadow, hemi 0.9, sun 2.8, depth 0.9, sphere 0.2, olive tint 0.6)
-    model: { file: 'tree_big', height: 150, baked: { file: 'tree_big.webp', frame: [-0.4816, 0.4816, -0.0666, 0.8943] } } },
+  // D120 (user: the new tree textures, NEW/tutorial/new sprites/TREE): the tree built in code — trunk, branch cards, a
+  // layered crown (render3d/trainingTree.js); the old baked picture (D99–D104) retired
+  tree: { view: 'deciduous_tree', atlas: 'training', custom: 'tree', drawW: 120, drawD: 120 },
   boulder: { view: 'boulder', atlas: 'training' },
   bush: { view: 'leafy_bush', atlas: 'training', sprite: { lean: 1 } },
   grass_tuft: { view: 'grass_tuft', atlas: 'training', sprite: { lean: 1 } },

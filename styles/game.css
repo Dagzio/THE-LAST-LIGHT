@@ -768,7 +768,7 @@ body.victory .rs-glow { animation: rsBreath 4s ease-in-out infinite; }
 }
 /* the flash as the screen lands (defeat: when the title slams in; victory: as the tablet boots) */
 .rs-flash { background: radial-gradient(ellipse at 50% 45%, rgba(var(--rs), 0.55), rgba(var(--rs), 0.12) 45%, transparent 75%); opacity: 0; }
-.result-panel.fail-in .rs-flash { animation: rsFlash 0.9s ease-out 2.5s both; }
+.result-panel.fail-in .rs-flash { animation: rsFlash 0.9s ease-out 0.85s both; }
 body.victory .result-panel .rs-flash { animation: rsFlash 1s ease-out 0.15s both; }
 @keyframes rsFlash { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
 /* victory: a shine crossing the tablet (after it boots, then every few seconds) */
@@ -812,12 +812,13 @@ body.victory .result-panel .rs-flash { animation: rsFlash 1s ease-out 0.15s both
 .fail-reason { max-width: min(calc(760px * var(--fs)), 92vw); font: 400 calc(22px * var(--fs)) / 1.35 'Segoe UI', Roboto, system-ui, sans-serif; color: #d8d8d8; text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); }
 .fail-btns { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: calc(18px * var(--fs)); margin-top: calc(34px * var(--fs)); }
 /* D117 (user): the screen waits 1.6 s more (the moment of the failure stays on screen), then fades in slowly */
-body.defeat .result-panel.failed { animation: failPanelIn 1.1s ease-in-out 2.15s both; }
+/* D120 (user: the delay looked like a frozen game): no wait — the screen fades in slowly from the moment of the failure */
+body.defeat .result-panel.failed { animation: failPanelIn 1.9s ease-in-out 0.05s both; }
 @keyframes failPanelIn { from { opacity: 0; visibility: hidden; } 1% { visibility: visible; } to { opacity: 1; visibility: visible; } }
-.result-panel.fail-in .fail-title { animation: failSlam 0.85s cubic-bezier(0.2, 0.8, 0.25, 1) 2.45s both, failBreath 2.4s ease-in-out 3.3s infinite, failJitter 4.1s steps(1) 3.3s infinite; }
-.result-panel.fail-in .fail-rule { animation: failRule 0.7s ease-out 3.0s both; }
-.result-panel.fail-in .fail-reason { animation: failFade 0.8s ease-out 3.3s both; }
-.result-panel.fail-in .fail-btns { animation: failFade 0.7s ease-out 3.7s both; }
+.result-panel.fail-in .fail-title { animation: failSlam 1s cubic-bezier(0.2, 0.8, 0.25, 1) 0.75s both, failBreath 2.4s ease-in-out 1.8s infinite, failJitter 4.1s steps(1) 1.8s infinite; }
+.result-panel.fail-in .fail-rule { animation: failRule 0.8s ease-out 1.4s both; }
+.result-panel.fail-in .fail-reason { animation: failFade 0.9s ease-out 1.7s both; }
+.result-panel.fail-in .fail-btns { animation: failFade 0.8s ease-out 2.1s both; }
 @keyframes failSlam {
   0% { opacity: 0; transform: scale(1.9); filter: blur(10px); }
   55% { opacity: 1; transform: scale(0.96); filter: blur(0); }
@@ -1686,8 +1687,9 @@ body.map-over .cover-prompt { display: none; }
 /* D90 (user): the bottom of the screen darkened under the panel, fading out softly up by the portrait's head */
 .dlg::before {
   content: ''; position: absolute; z-index: -1; pointer-events: none; left: 0; right: 0; bottom: calc(-1 * (var(--safe-b) + 8px));
-  height: calc(min(46vh, 380px) + var(--safe-b) + 30px);
-  background: linear-gradient(to top, rgba(3, 5, 9, 0.88) 0%, rgba(3, 5, 9, 0.72) 30%, rgba(3, 5, 9, 0.38) 62%, rgba(3, 5, 9, 0.12) 84%, rgba(3, 5, 9, 0) 100%);
+  /* D120 (user): stronger and taller */
+  height: calc(min(62vh, 520px) + var(--safe-b) + 30px);
+  background: linear-gradient(to top, rgba(2, 3, 6, 0.97) 0%, rgba(2, 3, 6, 0.9) 26%, rgba(2, 3, 6, 0.7) 50%, rgba(2, 3, 6, 0.38) 72%, rgba(2, 3, 6, 0.12) 88%, rgba(2, 3, 6, 0) 100%);
 }
 @keyframes dlgIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .dlg.right { flex-direction: row-reverse; }
@@ -1730,7 +1732,7 @@ body.map-over .cover-prompt { display: none; }
 @media (max-height: 500px) {
   .dlg-box { width: min(78vw, 720px); }
   .dlg-portrait { height: min(52vh, 210px); }
-  .dlg::before { height: calc(min(52vh, 210px) + var(--safe-b) + 24px); }
+  .dlg::before { height: calc(min(72vh, 300px) + var(--safe-b) + 24px); } /* D120: taller */
   .dlg-text { font-size: 13px; line-height: 1.25; top: 48%; }
   .dlg-name { font-size: 12px; }
   .dlg-btn { font-size: 11px; min-height: 30px; padding: 0 10px; }
@@ -1818,3 +1820,41 @@ body.level-loading #screen-game .corner, body.level-loading #screen-game .kiosk-
 .touch-fire-zone.tut-focus { display: grid; left: auto; right: calc(var(--safe-r, 0px) + 33%); top: 66%; /* D107: lower, clear of the view */ translate: 50% -50%; background: rgba(10, 12, 16, 0.35); outline-offset: 6px; border-radius: 50%; }
 body.touch-firing .touch-fire-zone.tut-focus { background: rgba(255, 90, 60, 0.35); }
 .hud-slots .slot.tut-slot { border-color: #ffcf3a; color: #ffcf3a; animation: tutFocus 1s ease-in-out infinite; outline: 2px solid #ffcf3a; outline-offset: 2px; } /* D93 */
+
+/* ===== D120 (user): the defeat — red in the darkened corners and realistic blood instead of the rays: splatters
+   (tools/build-blood.py, painted procedurally) land in the corners as the title slams in, a few runs keep dripping ===== */
+.result-panel.failed .rs-rays { display: none; }
+.rs-corners, .rs-blood, .rs-drip { display: none; }
+.result-panel.failed .rs-corners, .result-panel.failed .rs-blood, .result-panel.failed .rs-drip { display: block; }
+.rs-corners {
+  background:
+    radial-gradient(ellipse 55% 60% at 0% 0%, rgba(150, 0, 8, 0.55), rgba(90, 0, 4, 0.25) 45%, transparent 75%),
+    radial-gradient(ellipse 55% 60% at 100% 0%, rgba(150, 0, 8, 0.5), rgba(90, 0, 4, 0.22) 45%, transparent 75%),
+    radial-gradient(ellipse 60% 55% at 0% 100%, rgba(150, 0, 8, 0.6), rgba(90, 0, 4, 0.28) 45%, transparent 75%),
+    radial-gradient(ellipse 60% 55% at 100% 100%, rgba(150, 0, 8, 0.55), rgba(90, 0, 4, 0.25) 45%, transparent 75%);
+  animation: rsCornerBeat 1.6s ease-in-out infinite;
+}
+@keyframes rsCornerBeat { 0%, 100% { opacity: 0.75; } 12% { opacity: 1; } 24% { opacity: 0.85; } 36% { opacity: 0.98; } }
+.rs-blood { inset: auto !important; background: center / contain no-repeat; opacity: 0; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); }
+.rs-blood.b1 { left: -6vmin !important; top: -7vmin !important; width: 46vmin; height: 46vmin; background-image: url("../assets/ui/fx/blood_1.webp"); transform: rotate(160deg); }
+.rs-blood.b2 { right: -5vmin !important; top: -4vmin !important; width: 34vmin; height: 34vmin; background-image: url("../assets/ui/fx/blood_2.webp"); transform: rotate(-120deg); }
+.rs-blood.b3 { left: -4vmin !important; bottom: -8vmin !important; width: 40vmin; height: 40vmin; background-image: url("../assets/ui/fx/blood_3.webp"); transform: rotate(30deg); }
+.rs-blood.b4 { right: 2vmin !important; bottom: -6vmin !important; width: 30vmin; height: 30vmin; background-image: url("../assets/ui/fx/blood_4.webp"); transform: rotate(-35deg); }
+/* they hit as the title lands (one after another), a quick squash then rest */
+.result-panel.fail-in .rs-blood { animation: bloodHit 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+.result-panel.fail-in .rs-blood.b1 { animation-delay: 0.82s; }
+.result-panel.fail-in .rs-blood.b2 { animation-delay: 0.9s; }
+.result-panel.fail-in .rs-blood.b3 { animation-delay: 0.97s; }
+.result-panel.fail-in .rs-blood.b4 { animation-delay: 1.05s; }
+@keyframes bloodHit { from { opacity: 0; scale: 0.55; } 60% { opacity: 1; scale: 1.06; } to { opacity: 1; scale: 1; } }
+/* the runs: a streak revealed downwards slowly, then held */
+.rs-drip { inset: auto !important; width: 1.1vmin; height: 34vmin; background: url("../assets/ui/fx/blood_drip.webp") top / 100% 100% no-repeat; clip-path: inset(0 0 100% 0); }
+.rs-drip.d1 { left: 15vmin; top: 22vmin; }
+.rs-drip.d2 { left: 26vmin; top: 17vmin; height: 24vmin; width: 0.8vmin; }
+.rs-drip.d3 { right: 13vmin; top: 18vmin; height: 30vmin; }
+.result-panel.fail-in .rs-drip { animation: bloodRun 6s cubic-bezier(0.4, 0.1, 0.6, 1) both; }
+.result-panel.fail-in .rs-drip.d1 { animation-delay: 1.3s; }
+.result-panel.fail-in .rs-drip.d2 { animation-delay: 2.1s; animation-duration: 7.5s; }
+.result-panel.fail-in .rs-drip.d3 { animation-delay: 1.7s; }
+@keyframes bloodRun { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .result-panel.fail-in .rs-blood, .result-panel.fail-in .rs-drip, .rs-corners { animation: none !important; opacity: 1; clip-path: none; } }

@@ -57,9 +57,9 @@ export class ResultsView {
       el.failRetry.textContent = T(s.checkpoint ? 'fail.retryTask' : 'defeat.retry');
       if (animate) {
         el.panel.classList.remove('fail-in'); void el.panel.offsetWidth; el.panel.classList.add('fail-in');
-        // D117: the stamp sounds as the title lands (the screen comes in 2.15 s after the failure, the title 0.3 s later)
+        // D117 / D120: the stamp sounds as the title lands (the screen fades in from the failure, the title at ~0.95 s)
         clearTimeout(this.sfxT);
-        this.sfxT = setTimeout(() => { if (this.summary) Sfx.play('stamp'); }, 2650);
+        this.sfxT = setTimeout(() => { if (this.summary) Sfx.play('stamp'); }, 950); // D120: as the title lands
       }
     }
     el.journal.classList.toggle('won', s.won);
