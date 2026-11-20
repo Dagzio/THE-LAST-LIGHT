@@ -53,24 +53,33 @@ export class DialogueView {
     if (!run) return;
     const set = (LEVEL_DIALOGUES[run.mapId] || {})[run.modeId];
     if (!set || !set[kind]) return;
-    // D110: a list plays in order (the waiting ones queue); the story ones only until the level is cleared
+    // D110: a list plays in order; the story ones only until the level is cleared. D120 (user: the office's story call and
+    // its briefing felt like two dialogues — SKIP skipped only the first): a list is ONE conversation (its lines joined)
     const cleared = this.game.isMapCleared && this.game.isMapCleared(run.mapId);
-    for (const id of [].concat(set[kind])) if (!(cleared && id.startsWith('story.'))) this.open(id);
+    this.openMany([].concat(set[kind]).filter((id) => !(cleared && id.startsWith('story.'))));
   }
 
   /** Opens a dialogue by id (once per run); another one open → it waits. */
-  open(id) {
-    if (!DIALOGUES[id] || this.played.has(id)) return false;
-    this.played.add(id);
-    if (this.game.touchMode && DIALOGUES[`${id}.touch`]) id = `${id}.touch`; // D93: the phone's own variant
-    this.played.add(id);
-    if (this.lines) { this.queue.push(id); return true; }
-    this._start(id);
+  open(id) { return this.openMany([id]); }
+
+  /** D120: several dialogues as one conversation (their lines in order; SKIP closes all of it). */
+  openMany(ids) {
+    const lines = [];
+    for (let id of ids) {
+      if (!DIALOGUES[id] || this.played.has(id)) continue;
+      this.played.add(id);
+      if (this.game.touchMode && DIALOGUES[`${id}.touch`]) id = `${id}.touch`; // D93: the phone's own variant
+      this.played.add(id);
+      lines.push(...DIALOGUES[id]);
+    }
+    if (!lines.length) return false;
+    if (this.lines) { this.queue.push(lines); return true; }
+    this._start(lines);
     return true;
   }
 
-  _start(id) {
-    this.lines = DIALOGUES[id];
+  _start(lines) {
+    this.lines = lines;
     this.index = 0;
     this.game.dialogueOpen = true;
     this.game.input.releaseAll(); // nothing held / queued goes on while the game waits
@@ -145,8 +154,8 @@ export class DialogueView {
   close() {
     if (!this.lines) return;
     this._hide();
-    const id = this.queue.shift();
-    if (id) this._start(id);
+    const next = this.queue.shift();
+    if (next) this._start(next);
   }
 
   _hide() {

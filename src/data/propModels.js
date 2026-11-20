@@ -55,7 +55,9 @@ export const PROP_MODELS = {
   shredder: { view: 'shredder' },
   server_rack: { view: 'server_rack' },
   server_rack_open: { view: 'network_rack' },
-  console: { view: 'security_console', build: 'console' }, // D119: remodelled
+  // D121 (user: the new console textures, NEW/Office/office new sprites/CONSOLE): built from its catalogue's assembly
+  // (render3d/securityConsole.js) — six monitors, two pedestals, the PC, the curved desk top
+  console: { view: 'security_console', custom: 'securityConsole' },
   turnstile: { view: 'turnstile' },
   coffee_counter: { view: 'coffee_station', drawH: 46, build: 'coffeeCounter' }, // D111: its own height; D119: remodelled
   coffee_vending: { view: 'coffee_vending' },

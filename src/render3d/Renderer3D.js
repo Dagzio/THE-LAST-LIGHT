@@ -945,6 +945,7 @@ export class Renderer3D {
         throwAge: Infinity,
         aim: e.alive && ai.mode === 'combat',
         armsReady: true, // D119: the pistol held two-handed while walking (the hero's arms)
+        leftGrip: true,  // D120: the left hand put on the pistol by IK (their arms differ from the clips' rig)
         reload: g.reloading ? Math.min(1, (time - g.reloadStartedAt) / Math.max(0.01, g.reloadEndsAt - g.reloadStartedAt)) : -1,
         reloadClip: pistolReloadOf(g.reloadStartedAt + e.id),
         hitAge: time - e.lastHitAt,

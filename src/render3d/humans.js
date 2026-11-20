@@ -423,7 +423,8 @@ export class HumanView {
     this.aimYaw = 0;
     this.phase = Math.random(); // D86: the shared gait phase (cycles) of the locomotion clips (presentation only)
     // D86: the bones turned after the mixer (torso fix, recoil) and their last mixer-given rotation
-    this.touched = ['Spine', 'RightHand', 'RightForeArm'].filter((n) => bones.get(n)).map((n) => [bones.get(n), bones.get(n).quaternion.clone()]);
+    // (D120: + the left arm — the pistol's two-handed grip is set by IK after the mixer)
+    this.touched = ['Spine', 'RightHand', 'RightForeArm', 'LeftArm', 'LeftForeArm', 'LeftHand'].filter((n) => bones.get(n)).map((n) => [bones.get(n), bones.get(n).quaternion.clone()]);
     this.torsoTwist = 0;        // D86: the last torso fix (rad, dev / checks)
     this.gaitHz = 0;            // D87: the legs' cadence (gait cycles/s) this frame — the footsteps follow it
     this.footfalls = 0;         // D90: feet put down so far (the footstep one-shots follow it)
@@ -792,6 +793,14 @@ export class HumanView {
     const left = thr > 0.5 && tossT >= A.throwHandOff && tossT < A.throwHandBack;
     if (left !== this.inLeft) this._mountGun(left);
 
+    // D120 (user: the enemies' left hand stuck out forward, not on the pistol — their arms are proportioned unlike the
+    // rig the clips were made on): `leftGrip` — the left hand is brought onto the pistol grip (two-bone IK), whatever the
+    // pistol clip (stance, walk, run, strafes, kneeling), except while reloading / throwing / rolling / taking down
+    if (st.leftGrip && pistol && !dead && !this.inLeft) {
+      const k = normal * (1 - rl) * (1 - thr) * (1 - (w.dodge || 0)) * (1 - (w.td || 0));
+      if (k > 0.02) this._leftGrip(k);
+    }
+
     // D82: where the barrel points in THIS pose (relative to the body's facing) — the renderer turns the body by it,
     // so the gun itself points at the aim whatever the legs do (walking / strafing hips sway the torso)
     const aimW = Math.max(am * normal, lowAim * lowW * live * (1 - Math.min(1, sp / 10)), highW * live * smooth(0.3, 1, peekK)); // D86: kneeling aim only (the sneaks are no aim pose); D87: the peek
@@ -820,6 +829,40 @@ export class HumanView {
     _q.premultiply(_q3.setFromAxisAngle(axisW, angle));
     bone.quaternion.copy(_q2.invert().multiply(_q));
     bone.updateMatrixWorld(true);
+  }
+
+  /**
+   * D120: the left hand on the pistol — the left wrist goes to the right wrist's left side (the support hand cupping
+   * the grip): two-bone IK on LeftArm → LeftForeArm → LeftHand (the elbow bends in its own plane), blended by k; the
+   * left hand then takes the right hand's turn (palms together round the grip).
+   */
+  _leftGrip(k) {
+    const UA = this.bones.get('LeftArm'), FA = this.bones.get('LeftForeArm'), H = this.leftHand, R = this.hand;
+    if (!UA || !FA || !H || !R) return;
+    this.group.updateMatrixWorld(true);
+    const gq = this.group.getWorldQuaternion(_q2);
+    // the target: the right wrist, moved to the character's left (−Z of its frame) and a little down / back
+    const s = this.tpl.height / 56;
+    const T = R.getWorldPosition(new THREE.Vector3()).add(_v.set(-0.6 * s, -1.0 * s, -2.4 * s).applyQuaternion(gq));
+    const A = UA.getWorldPosition(new THREE.Vector3()), B = FA.getWorldPosition(new THREE.Vector3()), C = H.getWorldPosition(new THREE.Vector3());
+    T.lerp(C, 1 - k);
+    const a = A.distanceTo(B), b = B.distanceTo(C), d = Math.min(a + b - 1e-3, Math.max(Math.abs(a - b) + 1e-3, A.distanceTo(T)));
+    // 1) the elbow: its angle for that reach
+    const BA = A.clone().sub(B), BC = C.clone().sub(B);
+    const cur = BA.angleTo(BC), want = Math.acos(Math.min(1, Math.max(-1, (a * a + b * b - d * d) / (2 * a * b))));
+    const n = new THREE.Vector3().crossVectors(BA, BC);
+    if (n.lengthSq() < 1e-8) n.set(0, 1, 0).applyQuaternion(gq);
+    this._rotateWorld(FA, n.normalize(), want - cur);
+    // 2) the upper arm: the wrist onto the target
+    const C2 = H.getWorldPosition(new THREE.Vector3()), AC = C2.sub(A), AT = T.clone().sub(A);
+    const ax = new THREE.Vector3().crossVectors(AC, AT);
+    if (ax.lengthSq() > 1e-10) this._rotateWorld(UA, ax.normalize(), AC.angleTo(AT));
+    // 3) the hand: turned as the right one (blended)
+    const rq = R.getWorldQuaternion(new THREE.Quaternion()), hq = H.getWorldQuaternion(new THREE.Quaternion());
+    hq.slerp(rq, 0.6 * k);
+    H.parent.updateMatrixWorld(true);
+    H.quaternion.copy(H.parent.getWorldQuaternion(_q3).invert().multiply(hq));
+    H.updateMatrixWorld(true);
   }
 
   /** The procedural kick of a shot (after the clips). D84: the pistol reload is the user's clip now (no IK). */
