@@ -71,6 +71,7 @@ export class MissionRun {
     this.controller = new PlayerController(events, { w: level.width, h: level.height });
     this.controller.world = this.world;
     this.controller.rng = this.rng; // D83: which roll clip
+    this.controller.gunOf = () => this.weapon && this.weapon.stats.gun; // D126: the pistol rolls over the shoulder only
     this.weapons = new WeaponSystem(this.projectiles, this.rng, events);
     this.weapons.world = this.world;
     this.projectileSystem = new ProjectileSystem(this.projectiles, this.rng, events, (id) => this._statsFor(id));

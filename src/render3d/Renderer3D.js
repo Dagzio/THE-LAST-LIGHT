@@ -574,7 +574,9 @@ export class Renderer3D {
     if (t) {
       this.objMarker.position.set(t.x, 70 + Math.sin(time * 3.2) * 4, t.y);
       this.objMarker.quaternion.copy(FACE_CAM);
-      this._flat(this.objRing, t.x, t.y, 26 + (time * 18) % 14, 1.0, 0.65 - ((time * 18) % 14) / 30);
+      // D126 (user: the office's last ring flickered in the stairs): at 2.6 — over flat floor props (the stairs' steps
+      // rise 1 → 2 units; at 1.0 it fought the first step and hid under the others)
+      this._flat(this.objRing, t.x, t.y, 26 + (time * 18) % 14, 2.6, 0.65 - ((time * 18) % 14) / 30);
     }
   }
 
@@ -979,6 +981,7 @@ export class Renderer3D {
         deadAge: e.alive ? -1 : time - e.deathAt,
         busy: !!e.busy && e.alive && ai.mode === 'idle' && sp < 2, // D83: going through the files until alerted
         crouch: e.alive && e.crouch && sp < 2, // D117: crouched in place (the grenade yard's dummies)
+        kneelAim: !!e.crouch, // D126: …kneeling, the pistol aimed in both hands
       });
       // D92 (user: the dead must not fall through walls / furniture / the floor): the fall goes where there is room (a
       // turn of up to 90° eased in while he staggers); with no room he fades out right after the fall. Bodies no

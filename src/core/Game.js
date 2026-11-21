@@ -193,13 +193,30 @@ export class Game {
     return this._startRun(level, this.selectedModeId);
   }
 
-  /** CONTINUE after a victory (not the last level): back to level select with the next level selected. */
+  /**
+   * CONTINUE after a victory (not the last level). D126 (user): the next level starts at once (its selected / only
+   * mode); were it not open, level select with it selected.
+   */
   continueCampaign() {
     if (!this.sm.is(STATES.MAP_VICTORY) || !this.run) return false;
     const next = nextLevelId(this.run.mapId);
     this.exitToMenu();
-    this.selectedMapId = next && this.isMapUnlocked(next) ? next : defaultLevelSelection(this.progress.profile);
-    return this.sm.set(STATES.MAP_SELECT);
+    const open = !!next && this.isMapUnlocked(next);
+    this.selectedMapId = open ? next : defaultLevelSelection(this.progress.profile);
+    if (!this.sm.set(STATES.MAP_SELECT)) return false;
+    return open ? this.beginMap() || true : true;
+  }
+
+  /**
+   * D126 (user): the results' MAIN MENU button leads to level select (not the main menu) — after a victory the next
+   * level selected, after a defeat the same one.
+   */
+  resultToMapSelect() {
+    if (!this.sm.mapOver || !this.run) return false;
+    const next = this.run.victory ? nextLevelId(this.run.mapId) : null;
+    if (!this.exitToMapSelect()) return false;
+    if (next && this.isMapUnlocked(next)) this.selectedMapId = next;
+    return true;
   }
 
   /** Read-only summary of the finished level for the results screen (recording happened once already). */

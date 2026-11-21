@@ -136,6 +136,10 @@ export class TutorialDirector {
   get heroVisibility() { return this.stealth.heroVisibility; }
 
   _next(i) {
+    // D126 (user: a yard's briefing as the hero walks OUT of the yard before, not into the next one): the yard of the
+    // lesson just done — its next lesson's briefing plays once he leaves it (or is in the new lesson's own yard)
+    const prev = this.steps[this.index];
+    this.prevYard = prev && prev.target ? this.run.levelWorld.zoneAt(prev.target[0], prev.target[1]) : null;
     this.index = i;
     this.count = 0;
     this.hitTargets = new Set(); // D92: the targets hit in this lesson
@@ -226,6 +230,23 @@ export class TutorialDirector {
     return !yard || W.zoneAt(p.x, p.y) === yard;
   }
 
+  /** D126: has the hero walked out of the yard of the lesson before (into a path / another yard)? */
+  _leftPrevYard(p) {
+    if (!this.prevYard) return false;
+    const z = this.run.levelWorld.zoneAt(p.x, p.y);
+    return !!z && z !== this.prevYard;
+  }
+
+  /** D126: every enemy of the step's afterDeaths tags dead for TUTORIAL.fallTime s (their fall played out). */
+  _fallsOver(s, time) {
+    if (!s || !s.afterDeaths) return true;
+    for (const e of this.run.enemies) {
+      if (!s.afterDeaths.includes(e.tag)) continue;
+      if (e.alive || !(time - (e.deathAt ?? -Infinity) >= TUTORIAL.fallTime)) return false;
+    }
+    return true;
+  }
+
   _onMat(p) {
     const m = this.run.level.rollMat;
     return !!m && p.x >= m[0] && p.x <= m[2] && p.y >= m[1] && p.y <= m[3];
@@ -264,7 +285,11 @@ export class TutorialDirector {
     // D108: a lesson's dialogue waits for the takedown in progress to end (it froze the takedown clip mid-blow).
     // D110 (user: the roll briefing started in the grenade yard): a lesson held in another yard is briefed once the hero
     // walks in through its gate — the yard's own lessons follow one another at once
-    if (this.pendingDialogue && !p.takedown && this._inLessonYard(s, p)) { const id = this.pendingDialogue; this.pendingDialogue = null; run.events.emit('dialogue', id); }
+    // D126 (user): …or once he has walked out of the yard of the lesson before (its gate behind him); a briefing that
+    // follows a fall (afterDeaths) waits until the death clip has played out
+    if (this.pendingDialogue && !p.takedown && (this._inLessonYard(s, p) || this._leftPrevYard(p)) && this._fallsOver(s, time)) {
+      const id = this.pendingDialogue; this.pendingDialogue = null; run.events.emit('dialogue', id);
+    }
     // the roll lesson: a roll that started or is passing over the mats
     if (s && s.id === 'roll' && p.dodging && this._onMat(p)) this._done();
     // D89: the grenade lesson never runs dry — out of grenades with dummies standing, the instructor hands one more

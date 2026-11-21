@@ -106,7 +106,8 @@ export class HumanAISystem {
         const periph = a > S.peripheral.from * half ? S.peripheral.mult : 1;
         const stanceK = p.lowProfile ? S.stance.crouch : S.stance.stand;
         const motionK = sp < S.motion.stillBelow ? S.motion.still : sp > S.motion.runAbove ? S.motion.run : S.motion.walk;
-        rate = S.rate * distK * (0.3 + 0.7 * lightK) * stanceK * motionK * periph * (0.6 / e.type.reaction)
+        const part = p.cover ? this.bodySeen(e, p, mask) : 1; // D126: in cover — by the part of him seen
+        rate = S.rate * distK * (0.3 + 0.7 * lightK) * stanceK * motionK * periph * part * (0.6 / e.type.reaction)
           * (ai.investigate ? S.investigate.fillMult : 1) * (search ? S.search.fillMult : 1);
       }
       // felt at any angle: an upright, moving hero very close
@@ -196,10 +197,34 @@ export class HumanAISystem {
     }
   }
 
+  /**
+   * D126: how much of a hero in cover this enemy sees (0…1): his middle and four points round him (his shoulders as
+   * seen from the enemy, the side towards / away from the cover) — each a line of sight. Out of cover: 1.
+   */
+  bodySeen(e, p, mask = BLOCK.SIGHT) {
+    if (!p.cover) return 1;
+    const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1, r = (p.radius || 15) * 0.9;
+    const sx = (-dy / d) * r, sy = (dx / d) * r, nx = (p.cover.nx || 0) * r, ny = (p.cover.ny || 0) * r;
+    let n = 0;
+    for (const [ox, oy] of [[0, 0], [sx, sy], [-sx, -sy], [nx, ny], [-nx, -ny]]) if (this.world.clear(e.x, e.y, p.x + ox, p.y + oy, null, mask)) n += 1;
+    return n / 5;
+  }
+
   _perceive(e, p, enemies, time) {
     const ai = e.ai;
-    const sees = this._sees(e, p);
+    let sees = this._sees(e, p);
+    // D126: a hero in cover, only partly showing, is not spotted at once — the glimpse builds by the part seen
+    const C = T.coverSpot, gdt = Number.isFinite(ai.glimpseAt) ? Math.min(0.5, time - ai.glimpseAt) : 0;
+    ai.glimpseAt = time;
+    if (sees && ai.mode !== 'combat' && p.cover) {
+      const part = this.bodySeen(e, p, p.lowProfile ? BLOCK.SIGHT | BLOCK.LOW : BLOCK.SIGHT);
+      if (part < C.full) {
+        ai.glimpse = Math.min(1, (ai.glimpse || 0) + gdt * C.rate * part);
+        if (ai.glimpse < 1) sees = false;
+      }
+    } else if (!sees) ai.glimpse = Math.max(0, (ai.glimpse || 0) - gdt * C.fade);
     if (sees) {
+      ai.glimpse = 0;
       if (ai.mode !== 'combat') {
         ai.reactAt = Math.max(ai.reactAt > time ? ai.reactAt : 0, time + e.type.reaction * (ai.aware ? 0.6 : 1));
         if (!ai.aware) this.events.emit('spotted', e);

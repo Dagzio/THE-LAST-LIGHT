@@ -16,22 +16,24 @@ export const TUTORIAL = {
   hitsNear: 18,          // units: a round stopped this close to a target is a hit on it
   minHp: 1,              // D89: the hero's HP never drops below this here (the ambush hurts, never kills)
   hintEvery: 2.5,        // s between two "rounds won't do" hints
+  fallTime: 2.7,         // D126: s a death clip plays (the longest, 2.63) — a briefing waiting for a fall waits this long
   steps: [
     { id: 'arm', touchKey: 'tut.tobj.arm', textKey: 'tut.obj.arm', keys: ['E'], dialogue: 'tut.start', target: [395, 1330], need: 2, opens: 'gA',
       hl: [{ pickup: 'chest_smg', unless: 'smg' }, { pickup: 'chest_rifle', unless: 'rifle' }], ui: { interact: 'E' } },
     { id: 'hits', weapon: 'pistol', touchKey: 'tut.tobj.pistol', textKey: 'tut.obj.pistol', keys: ['1', 'key.lmb'], dialogue: 'tut.range', target: [325, 760], need: 3,
       hl: [{ targets: true }], ui: { weapon: '1', fire: 'key.lmb' } }, // D108: the TAP-to-fire hint only here (its first lesson)
-    { id: 'hits', weapon: 'smg', touchKey: 'tut.tobj.smg', textKey: 'tut.obj.smg', keys: ['2'], dialogue: 'tut.switch', target: [475, 770], need: 5,
+    { id: 'hits', weapon: 'smg', touchKey: 'tut.tobj.smg', textKey: 'tut.obj.smg', keys: ['2'], dialogue: 'tut.switch', target: [475, 770], need: 6, // D126 (user): 6 shots for the SMG / rifle
       hl: [{ targets: true }], ui: { weapon: '2' } },
-    { id: 'hits', weapon: 'rifle', touchKey: 'tut.tobj.rifle', textKey: 'tut.obj.rifle', keys: ['3'], target: [535, 760], need: 5,
+    { id: 'hits', weapon: 'rifle', touchKey: 'tut.tobj.rifle', textKey: 'tut.obj.rifle', keys: ['3'], target: [535, 760], need: 6,
       hl: [{ targets: true }], ui: { weapon: '3' } },
     { id: 'reload', touchKey: 'tut.tobj.reload', textKey: 'tut.obj.reload', keys: ['R'], dialogue: 'tut.reload', ui: { reload: 'R' } },
     { id: 'ammo', touchKey: 'tut.tobj.ammo', textKey: 'tut.obj.ammo', keys: ['E'], target: [560, 990], opens: 'gB', hl: [{ pickup: 'ammo_table' }], ui: { interact: 'E' } },
     { id: 'coverLow', touchKey: 'tut.tobj.coverLow', textKey: 'tut.obj.coverLow', keys: ['Q'], dialogue: 'tut.cover', target: [280, 460], hl: [{ prop: [280, 440] }], ui: { cover: 'Q' } },
     { id: 'kill', tag: 'cover1', touchKey: 'tut.tobj.coverShoot', textKey: 'tut.obj.coverShoot', keys: ['key.lmb'], target: [290, 325], hl: [{ tag: 'cover1' }] },
-    { id: 'kill', tag: 'cover2', touchKey: 'tut.tobj.peek', textKey: 'tut.obj.peek', keys: ['Q', 'key.lmb'], dialogue: 'tut.peek', target: [610, 450],
+    { id: 'kill', tag: 'cover2', touchKey: 'tut.tobj.peek', textKey: 'tut.obj.peek', keys: ['Q', 'key.lmb'], target: [610, 450], // D126 (user): no briefing here — the wall's corner is in tut.cover
       hl: [{ rect: [540, 422, 680, 438] }, { tag: 'cover2' }], ui: { cover: 'Q' } },
-    { id: 'loot', textKey: 'tut.obj.loot', dialogue: 'tut.loot', target: [460, 310], opens: 'gC', hl: [{ bodies: ['cover1', 'cover2'] }] },
+    // D126 (user): the rounds briefing once the second dummy's fall has played out (afterDeaths: its tag, TUTORIAL.fallTime)
+    { id: 'loot', textKey: 'tut.obj.loot', dialogue: 'tut.loot', afterDeaths: ['cover2'], target: [460, 310], opens: 'gC', hl: [{ bodies: ['cover1', 'cover2'] }] },
     // D116 (user): both guards (they patrol in opposite directions); fully spotted — the lesson fails (its checkpoint)
     { id: 'takedown', touchKey: 'tut.tobj.stealth', textKey: 'tut.obj.stealth', keys: ['F'], dialogue: 'tut.stealth', target: [1250, 540], opens: 'gD', need: 2,
       hl: [{ tag: 'stealth' }], ui: { takedown: 'F' } }, // D107: no crouch button (he sneaks by himself here)
@@ -41,7 +43,7 @@ export const TUTORIAL = {
     { id: 'roll', touchKey: 'tut.tobj.roll', textKey: 'tut.obj.roll', keys: ['key.space'], dialogue: 'tut.roll', target: [1990, 890], opens: 'gF', hl: [{ rect: [1930, 872, 2050, 908] }, { arrow: [1928, 890, 2052, 890] }], ui: { dash: 'key.space' } },
     { id: 'kill', tag: 'ambush', touchKey: 'tut.tobj.ambush', textKey: 'tut.obj.ambush', dialogue: 'tut.ambush', target: [1990, 1420], opens: 'gG', ambush: true, hl: [{ tag: 'ambush' }] },
     { id: 'medkit', touchKey: 'tut.tobj.medkit', textKey: 'tut.obj.medkit', keys: ['E'], dialogue: 'tut.medkit', target: [1150, 1330], opens: 'gH', hl: [{ pickup: 'medkit_case' }], ui: { interact: 'E' } },
-    { id: 'exit', textKey: 'tut.obj.exit', dialogue: 'tut.end', target: [1200, 1745], hl: [{ rect: 'exit' }] },
+    { id: 'exit', textKey: 'tut.obj.exit', target: [1200, 1745], hl: [{ rect: 'exit' }] },
   ],
   // D116 (user): where a failed lesson starts again (systems/TutorialDirector.js applyCheckpoint): its step, the hero's
   // spot [x, y, facing], the guns he carries by then, the enemies of the yards behind him (gone), pickups already taken

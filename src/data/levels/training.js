@@ -156,12 +156,13 @@ export const TRAINING = {
     { type: 'workbench', x: 1150, y: 1330, rot: 0 }, { type: 'medical_case', x: 1135, y: 1330, elev: 24 }, { type: 'small_medkit', x: 1170, y: 1335, elev: 24 },
     { type: 'tent', x: 1030, y: 1270 }, ...canopy(1330, 1290), { type: 'equipment_case', x: 1390, y: 1600 },
     { type: 'signal_amber', x: 1260, y: 1625 },
-    // --- the field round the yards (outside the walls): trees, bushes, rocks, grass
+    // --- the field round the yards (outside the walls): trees, bushes, grass
     // D116 (user): half the trees (20 → 10), each crown clear of the yard walls
     ...[[1100, 820], [1400, 760], [1250, 1050], [880, 1080], [1560, 1120], [60, 900], [2340, 300], [2340, 1500], [500, 1740], [2100, 1740]]
       .map(([x, y]) => ({ type: 'tree', x, y })),
-    ...[[960, 700], [1180, 940], [1500, 980], [820, 1200], [1620, 1300], [880, 1650], [2300, 600], [100, 650], [1480, 640]]
-      .map(([x, y], i) => ({ type: i % 3 === 2 ? 'boulder' : 'bush', x, y })),
+    // D126 (user): no rocks in the game — the boulders (every third spot) are gone, the bushes stay
+    ...[[960, 700], [1180, 940], [820, 1200], [1620, 1300], [2300, 600], [100, 650]]
+      .map(([x, y]) => ({ type: 'bush', x, y })),
     ...[[1000, 900], [1320, 920], [1700, 1000], [780, 1300], [900, 1400], [1600, 660], [1300, 700], [1040, 1100]]
       .map(([x, y], i) => ({ type: i % 2 ? 'flowers' : 'grass_tuft', x, y })),
   ],

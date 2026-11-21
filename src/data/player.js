@@ -30,6 +30,8 @@ export const PLAYER = {
         invulnerableTo: 0.73,
       },
     ],
+    // D126 (user): with the pistol only the roll over the shoulder ("Dodge"; "Dodge 2" is the long dive on both hands)
+    pistolVariants: [0],
   },
   hitInvulnerability: 0.08, // s after a hit (bullets: no long i-frames)
 };

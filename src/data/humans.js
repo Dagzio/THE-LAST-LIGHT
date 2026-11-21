@@ -37,6 +37,10 @@ export const HUMAN_TYPES = {
 /** How enemies think (systems/HumanAISystem.js). */
 export const AI_TUNING = {
   thinkInterval: 0.1,        // s between perception checks (not every step: weak phones)
+  // D126 (user: a hero in cover, barely showing, was spotted at once): in cover his body is checked at 5 points (the
+  // middle, the shoulders, front / back) — partly hidden (`full` of them or fewer seen), an enemy needs
+  // 1 / (rate × the part seen) s of sight to spot him (half seen ≈ 1.4 s); out of sight the glimpse fades (`fade` /s)
+  coverSpot: { rate: 1.4, full: 0.99, fade: 0.8 },
   hearShot: 520,             // units: an unsuppressed shot is heard this far (half through walls)
   alertShare: 340,           // units: an enemy that spots the player alerts the others this close
   searchTime: 6,             // s an enemy searches the last known spot before going back

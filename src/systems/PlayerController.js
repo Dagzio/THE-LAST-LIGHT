@@ -308,8 +308,11 @@ export class PlayerController {
     let dx = Math.cos(player.bodyAngle), dy = Math.sin(player.bodyAngle);
     if (moving) { const l = Math.hypot(move.x, move.y) || 1; dx = move.x / l; dy = move.y / l; }
     // D83: one of the two roll clips at random (seeded)
-    const n = PLAYER.dodge.variants.length;
-    player.dodgeVariant = this.rng ? Math.min(n - 1, Math.floor(this.rng.next() * n)) : 0;
+    // D126: the pistol in his hands — only its own roll(s) (PLAYER.dodge.pistolVariants)
+    const pool = this.gunOf && this.gunOf() === 'pistol' && PLAYER.dodge.pistolVariants ? PLAYER.dodge.pistolVariants : null;
+    const n = pool ? pool.length : PLAYER.dodge.variants.length;
+    const i = this.rng ? Math.min(n - 1, Math.floor(this.rng.next() * n)) : 0;
+    player.dodgeVariant = pool ? pool[i] : i;
     player.dodging = true;
     player.dodgeDirX = dx;
     player.dodgeDirY = dy;

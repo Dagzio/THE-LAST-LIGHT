@@ -189,7 +189,7 @@ export class UIManager {
       case 'mapNext': this._turnMap(1); break;
       case 'retryMap': this.game.retryMap(); break;
       case 'continueCampaign': this.game.continueCampaign(); break;
-      case 'resultMenu': this.game.exitToMenu(); break; // the level is already over: nothing to lose, no confirmation
+      case 'resultMenu': this.game.resultToMapSelect(); break; // the level is already over: no confirmation. D126: → level select
       case 'interact': if (!this.game.interact()) Sfx.play('deny'); break;
       case 'toggleCover': if (!this.game.toggleCover()) Sfx.play('deny'); break;
       case 'armGrenade': Sfx.play(this.game.armGrenade('frag') ? 'click' : 'deny'); break;

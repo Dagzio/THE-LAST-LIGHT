@@ -784,7 +784,10 @@ export class HumanView {
     for (const a of this.coverLower.values()) a.setEffectiveWeight(0);
     const lw = lowW * live * (1 - tr), hw = highW * live * (1 - tr);
     const inLow = st.cover === 'low' && !!cv.coverIdle;
-    fw(inLow ? cv.coverIdle : cv.lowIdle, lw * (1 - cm) * (1 - lowAim)); // D90: back to low cover — Male Crouch Pose
+    // D126 (user): the grenade yard's crouched dummies with a pistol (st.kneelAim) kneel aiming it in both hands —
+    // "Pistol Kneeling Idle" — not the rifle's crouch idle
+    const kneelAim = !inLow && !!st.kneelAim && pistol && !!cv.pKneel;
+    fw(inLow ? cv.coverIdle : kneelAim ? cv.pKneel : cv.lowIdle, lw * (1 - cm) * (1 - lowAim)); // D90: back to low cover — Male Crouch Pose
     if (crouchTurn && tw > 0.001 && turnA && !inLow && cv.lowIdle) {
       // D114: crouched and turning (the stealth crouch) — the crouch turn's legs, the crouch idle's arms
       const wa = cv.lowIdle.getEffectiveWeight();
@@ -860,7 +863,8 @@ export class HumanView {
     // rig the clips were made on): `leftGrip` — the left hand is brought onto the pistol grip (two-bone IK), whatever the
     // pistol clip (stance, walk, run, strafes, kneeling), except while reloading / throwing / rolling / taking down
     if (st.leftGrip && pistol && !dead && !this.inLeft) {
-      const k = normal * (1 - rl) * (1 - thr) * (1 - (w.dodge || 0)) * (1 - (w.td || 0));
+      // (D126: + kneeling with the pistol aimed — the grenade yard's dummies)
+      const k = Math.min(1, normal + (st.kneelAim ? lowW * live : 0)) * (1 - rl) * (1 - thr) * (1 - (w.dodge || 0)) * (1 - (w.td || 0));
       if (k > 0.02) this._leftGrip(k);
     }
 
