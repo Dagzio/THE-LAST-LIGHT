@@ -25,6 +25,7 @@ export const HUMAN_ANIM = {
   srcHipsCm: 55.0,
   // presentation tuning (D79)
   blendRate: 10,        // 1/s — how fast the layer weights follow the state
+  reloadLegs: 0,        // D125: the pistol reload clip's own legs under a standing reload (0 = the stance's planted legs)
   walkRateMax: 2.3,     // walk / strafe / back clips are played up to this fast (beyond, the feet would slide)
   runRateMax: 1.6,      // run clips
   strideK: 1.12,        // D86: "In Place" clips — ground speed = planted-foot speed × this (calibrated on the clips with travel)

@@ -665,15 +665,24 @@ export class HumanView {
     // standing: the pistol stance always; with a long gun the aim stance while aiming (aim weight from last frame)
     const stand = (1 - move) * normal;
     // D84: which pistol reload clip this reload plays (picked per reload by the renderer), its legs while standing
-    if (st.reloadClip && this.pRel[st.reloadClip] && st.reload >= 0) this.pRelId = st.reloadClip;
+    // D95 (user: running, reloading and stopping slid the feet): the reload clip's own legs only for a reload begun
+    // standing still; begun on the move he keeps the pistol stance's planted legs
+    // D125 (user: reloading on the spot SOMETIMES stepped in place): "Pistol Reload" is a reload on the walk (its feet
+    // step all through) — the renderer's random pick gave it to a standing reload half the time, its legs walking on the
+    // spot. Begun standing still, a reload now always plays the in-place "Pistol Reloading Idle"; on the move either (the
+    // walk's legs under it) — kept for the whole reload. Its legs stand still in the clip but apart from the stance's:
+    // blending them in / out slid the feet — the stance's planted legs stay (HUMAN_ANIM.reloadLegs = 0; the torso fix
+    // keeps the reload's arms on the stance's hips)
+    if (st.reload >= 0 && !this.wasReloading) {
+      this.relStill = sp < 2;
+      const pickId = this.relStill && this.pRel.pReload2 ? 'pReload2' : st.reloadClip;
+      if (pickId && this.pRel[pickId]) this.pRelId = pickId;
+    }
+    this.wasReloading = st.reload >= 0;
     const PR = this.pRel[this.pRelId];
     for (const r0 of Object.values(this.pRel)) { r0.u.setEffectiveWeight(0); r0.l.setEffectiveWeight(0); }
     const wr = PR ? w.reload : 0; // the reload weight of the last frame (like w.aim below)
-    // D95 (user: running, reloading and stopping slid the feet): the reload clip's own legs (it takes a step) only for a
-    // reload begun standing still; begun on the move he keeps the pistol stance's planted legs
-    if (st.reload >= 0 && !this.wasReloading) this.relStill = sp < 2;
-    this.wasReloading = st.reload >= 0;
-    const relLegs = PR && this.relStill ? wr : 0;
+    const relLegs = PR && this.relStill ? wr * A.reloadLegs : 0;
     if (pistol) { L.pIdle.setEffectiveWeight(stand * (1 - relLegs)); if (PR) PR.l.setEffectiveWeight(stand * relLegs); }
     else { L.fire.setEffectiveWeight(stand * w.aim); L.idle.setEffectiveWeight(stand * (1 - w.aim)); }
     fwdWalk.setEffectiveWeight(move * f * (1 - run) * normal);
