@@ -98,7 +98,8 @@ export class ResultsView {
       if (s.won && s.best > 0) rows.push(['result.best', Math.round(s.best), clock]);
     } else {
       el.title.textContent = s.won ? T('victory.title') : T('defeat.player');
-      el.sub.textContent = s.won ? T(congrats ? 'congrats.text' : 'result.wonText') : '';
+      // (D131: the training base's own line — result.wonText is the office's "the drive is ours")
+      el.sub.textContent = s.won ? T(congrats ? 'congrats.text' : s.mapId === 'training' ? 'result.trainingWon' : 'result.wonText') : '';
       el.stamp.textContent = T(s.won ? 'result.victory' : 'result.defeat');
       // lines: [labelKey, target, format] — KILL LIST (D78): time, kills, accuracy, damage taken (+ best time on a win)
       rows = [

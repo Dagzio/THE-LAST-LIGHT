@@ -49,6 +49,8 @@ export class UIManager {
     // so turning the carousel shows the finished picture at once
     game.sm.onChange((state) => { if (state === STATES.MAIN_MENU) this._prerenderThumbs(); });
     onLanguageChange(() => this._refreshDynamicText());
+    // D131: a turned / resized screen fits the level card's tabs and facts again (they shrink, never cut)
+    window.addEventListener('resize', () => { if (game.sm.is(STATES.MAP_SELECT)) requestAnimationFrame(() => this._showMapCard()); });
     this._buildMapCards();
     applyTranslations();
     this._syncScreen(game.sm.state);
@@ -416,6 +418,29 @@ export class UIManager {
       : !mb ? T('map.noRecord') : modeId === 'stealth' ? T('map.bestStealth', { t: clock(mb.time), m: mb.medals }) : T('map.bestSurvival', { t: clock(mb.time), k: mb.kills });
     bestFact.hidden = !bestFact.textContent;
     document.querySelector('[data-action="beginMap"]').disabled = locked;
+    this._fitMapInfo();
+  }
+
+  /**
+   * D131 (user: no text cut anywhere, in any language): the level's info panel keeps every fact chip — when its texts
+   * do not fit (long languages on a phone), the description's font shrinks first (down to 11 px), then the chips', and
+   * only then the description gives up lines (never a fact chip).
+   */
+  _fitMapInfo() {
+    const info = document.querySelector('#screen-mapSelect .map-info'), desc = document.getElementById('mapDesc');
+    if (!info || !desc || !info.offsetParent) return;
+    const facts = [...info.querySelectorAll('.map-info-facts li')];
+    desc.style.fontSize = ''; desc.style.display = ''; desc.style.webkitLineClamp = ''; desc.style.webkitBoxOrient = ''; desc.style.overflow = '';
+    for (const li of facts) li.style.fontSize = '';
+    const over = () => info.scrollHeight > info.clientHeight + 1;
+    if (!over()) return;
+    let fs = parseFloat(getComputedStyle(desc).fontSize);
+    while (fs - 0.5 >= 11 && over()) { fs -= 0.5; desc.style.fontSize = `${fs}px`; }
+    let ff = facts.length ? parseFloat(getComputedStyle(facts[0]).fontSize) : 0;
+    while (ff - 0.5 >= 11 && over()) { ff -= 0.5; for (const li of facts) li.style.fontSize = `${ff}px`; }
+    if (!over()) return;
+    desc.style.display = '-webkit-box'; desc.style.webkitBoxOrient = 'vertical'; desc.style.overflow = 'hidden';
+    for (const n of [4, 3, 2, 1]) { desc.style.webkitLineClamp = String(n); if (!over()) return; }
   }
 
   _refreshMapSelect() { this._showMapCard(); }
