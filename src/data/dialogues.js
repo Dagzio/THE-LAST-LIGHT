@@ -18,7 +18,7 @@ export const DIALOGUES = {
   'story.recruit': [H('dlg.sr.1'), K('dlg.sr.2'), H('dlg.sr.3'), K('dlg.sr.4'), H('dlg.sr.5'), K('dlg.sr.6'), H('dlg.sr.7'), K('dlg.sr.8'), H('dlg.sr.9')],
   'story.office': [H('dlg.so.1'), K('dlg.so.2'), H('dlg.so.3'), K('dlg.so.4'), H('dlg.so.5'), K('dlg.so.6'), H('dlg.so.7')],
   // ---- office · mission
-  'office.start': [H('dlg.os.1'), K('dlg.os.2'), H('dlg.os.3'), K('dlg.os.4'), H('dlg.os.5'), K('dlg.os.6')], // D92: + the SMG / medkits
+  'office.start': [H('dlg.os.1'), K('dlg.os.2'), H('dlg.os.3'), K('dlg.os.4'), H('dlg.os.5'), K('dlg.os.6')], // D92: + the SMG; D128: + the wounds heal in cover (no medkits)
   'office.keycard': [K('dlg.ok.1'), H('dlg.ok.2')],
   'office.drive': [H('dlg.od.1'), K('dlg.od.2'), H('dlg.od.3')],
   // ---- office · stealth
@@ -38,8 +38,8 @@ export const DIALOGUES = {
   'tut.spotted': [H('dlg.t.spotted.1')],
   'tut.grenade': [H('dlg.t.grenade.1')],
   'tut.roll': [H('dlg.t.roll.1'), K('dlg.t.roll.2'), H('dlg.t.roll.3')],
-  'tut.ambush': [H('dlg.t.ambush.1'), K('dlg.t.ambush.2'), H('dlg.t.ambush.3')],
-  'tut.medkit': [H('dlg.t.medkit.1')],
+  // D128: + how the wounds heal (no medkits — the medic yard is gone)
+  'tut.ambush': [H('dlg.t.ambush.1'), K('dlg.t.ambush.2'), H('dlg.t.ambush.3'), H('dlg.t.ambush.4')],
   // D93: the phone's variants ('<id>.touch', DialogueView picks it on touch): the controls explained in Lira's words
   'tut.start.touch': [H('dlg.t.start.1'), K('dlg.t.start.2'), H('dlg.t.start.3'), H('dlg.tt.move')],
   'tut.range.touch': [H('dlg.t.range.1'), K('dlg.t.range.2'), H('dlg.t.range.3'), H('dlg.tt.aim')],

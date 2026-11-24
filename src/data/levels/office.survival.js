@@ -1,6 +1,6 @@
 // D85 SURVIVAL on the office (MODES_DESIGN_D85.md §4): hold out in the office as long as you can. Enemies come in a
 // couple at a time through the stairwell, the elevator, the main door and three far rooms (never in view); supplies
-// (crates: the SMG / grenades; medkits) appear at random spots and are refreshed over time.
+// (crates: the SMG / rounds / grenades; D128: no medkits — the wounds heal by themselves) appear at random spots and are refreshed over time.
 
 export const OFFICE_SURVIVAL = {
   playerSpawn: { x: 1200, y: 1480, angle: -Math.PI / 2 },
@@ -19,6 +19,5 @@ export const OFFICE_SURVIVAL = {
   pickupSpots: {
     crate: [[950, 1640], [1450, 1640], [450, 1400], [690, 1585], [850, 540], [600, 300], [1550, 560], [1950, 880],
       [1800, 1300], [1700, 1662], [1500, 800], [350, 1040]],
-    medkit: [[300, 1410], [1000, 545], [1600, 1250], [2100, 1220], [1350, 900], [1760, 300], [850, 1200], [2050, 1520]],
   },
 };

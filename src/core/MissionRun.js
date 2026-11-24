@@ -212,6 +212,11 @@ export class MissionRun {
     return take;
   }
 
+  /** D128: could a round of this class be taken now (a carried gun for it, not full)? */
+  canTakeAmmo(type) {
+    return this.inventory.some((id) => { const w = this.weaponStates[id]; return w && w.stats.ammo === type && w.reserve < (w.stats.reserveMax ?? Infinity); });
+  }
+
   get equippedWeaponId() { return this.weapon.weaponId; }
 
   // ---------------- grenades: G / the button arms one; the next fire press aims it, the release throws ----------------
@@ -313,11 +318,9 @@ export class MissionRun {
 
   // ---------------- pickups, crates, objectives ----------------
   _pickup(pk, time) {
-    const d = pk.def, p = this.player;
-    if (d.kind === 'medkit') {
-      if (p.hp >= p.maxHp) return false; // stays for later
-      p.hp = Math.min(p.maxHp, p.hp + INTERACT.medkitHeal);
-    } else if (d.kind === 'keycard') this.has.keycard = true;
+    const d = pk.def;
+    if (d.kind === 'medkit') return false; // D128: no medkits (the wounds heal by themselves) — never on a level now
+    if (d.kind === 'keycard') this.has.keycard = true;
     else if (d.kind === 'drive') this.has.drive = true;
     else if (d.kind === 'intel') this.intel += 1; // D85 stealth: hidden intel (optional)
     pk.taken = true;
@@ -341,10 +344,6 @@ export class MissionRun {
     } else if (item === 'ammo') {
       // D88: a box of rounds — a magazine's worth for every carried gun (count = magazines)
       for (const id of this.inventory) { const w = this.weaponStates[id]; this.giveAmmo(w.stats.ammo, w.stats.magazineSize * count); }
-    } else if (item === 'medkit') {
-      // D88 training ground: a medkit kept in a case (taken with E like a crate) heals even at full health
-      this.player.hp = Math.min(this.player.maxHp, this.player.hp + INTERACT.medkitHeal);
-      this.events.emit('pickup', 'medkit', d.id);
     }
     this.events.emit('crateOpened', item, count, d.id);
     // D112 (user): a crate picked up is gone at once (not on the training ground: its chests stay and refill)
@@ -521,6 +520,7 @@ export class MissionRun {
     for (let i = 0; i < this.enemies.length; i++) { const e = this.enemies[i]; e.prevX = e.x; e.prevY = e.y; }
     if (this.mode && this.mode.preUpdate) this.mode.preUpdate(input, dt, time); // D85: stance, takedown, copy (stealth)
     this.controller.update(p, input, dt, time);
+    p.regenerate(dt, time); // D128: the wounds heal once he takes no damage for a while (no medkits)
 
     if (input.consumePressed('switchWeapon')) this.switchWeapon();
     if (input.consumePressed('switchWeaponPrev')) this.switchWeapon(null, -1);

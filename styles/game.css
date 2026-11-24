@@ -1358,6 +1358,22 @@ body:not(.touch) .hud-player::before {
 @keyframes hurtPulse { from { transform: scale(1); } to { transform: scale(1.12); } }
 body.paused #screen-game.keeper-hurt::before, body.paused #screen-game.keeper-hurt .hud-hp { animation-play-state: paused; }
 body.map-over #screen-game::before { opacity: 0; animation: none; }
+/* D128 (user: health as in Call of Duty — a blood frame at low health, fading as the wounds heal): the frame painted by
+   tools/build-blood-frame.py, stretched over the screen; HUD.js sets its opacity from the health (0 … 1, eased by the
+   transition); while on it beats slowly (a heartbeat). Under the HUD, over the game. */
+.blood-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url('../assets/ui/fx/blood_frame.webp') center / 100% 100% no-repeat;
+  opacity: 0;
+  transition: opacity 0.35s linear;
+}
+.blood-frame.on { animation: bloodBeat 1.05s ease-in-out infinite; }
+@keyframes bloodBeat { 0%, 100% { filter: brightness(1); transform: scale(1.015); } 14% { filter: brightness(1.18); transform: scale(1); } 30% { filter: brightness(1.05); transform: scale(1.008); } 44% { filter: brightness(1.15); transform: scale(1); } }
+body.paused .blood-frame.on { animation-play-state: paused; }
+body.map-over .blood-frame { opacity: 0 !important; animation: none; }
+@media (prefers-reduced-motion: reduce) { .blood-frame.on { animation: none; } }
 /* Low ammo (≤ 25 % of the magazine): the round counter turns orange */
 .hud-weapon.low-ammo .hud-ammo b { color: #ff9a4a; }
 

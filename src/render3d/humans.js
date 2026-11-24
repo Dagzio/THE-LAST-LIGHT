@@ -1041,7 +1041,7 @@ export class HumanView {
     }
     if (seq.shown < seq.stopAt - 1e-3) {
       seq.hold = 0;
-      const pace = left > 60 ? TS.clipPaceMax : TS.clipPace;
+      const pace = left > 35 ? TS.clipPaceMax : TS.clipPace; // (D128: the twist stops at 50° now)
       const tEnd = turnTime(TI, seq.stopAt, fps);
       const t1 = Math.min(tEnd, seq.time + dt * pace);
       const a1 = t1 >= tEnd ? seq.stopAt : Math.min(seq.stopAt, yawAt(TI, t1, fps));

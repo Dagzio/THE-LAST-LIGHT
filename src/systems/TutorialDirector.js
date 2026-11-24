@@ -1,7 +1,7 @@
 // D88 (user request): the TUTORIAL director — the lessons of the training ground (data/tutorial.js) one by one: which
 // lesson is on, its progress, its gate. The stealth yard borrows the stealth rules (StealthDirector: the sneak, the
 // takedown); D116: a guard who fully spots the hero fails the lesson — the retry starts at its checkpoint (the yard's
-// gate). Dummies stand and never shoot; only the ambush yard shoots back (and then the medkit makes sense). Pure
+// gate). Dummies stand and never shoot; only the ambush yard shoots back (D128: then he catches his breath — the wounds heal by themselves). Pure
 // simulation, game clock only.
 import { TUTORIAL } from '../data/tutorial.js';
 import { STEALTH } from '../data/stealth.js';
@@ -35,6 +35,7 @@ export class TutorialDirector {
     this.ambushOn = false;
     this.spottedSaid = false;
     this.targets = run.level.props.filter((p) => p.target);
+    this.targetHits = new Map(); // D128: "x,y" of a range target → the game time it was last hit
     this.takedownTarget = null;
     this.copying = false;
     this._unsub = [
@@ -185,7 +186,9 @@ export class TutorialDirector {
       if (group.length && group.every((e) => !e.alive)) this._done();
     } else if (s.id === 'loot') {
       // nothing left to take (every body emptied, or no gun for those rounds) — the lesson is over anyway
-      if (!run.enemies.some((e) => !e.alive && e.ammoDrop > 0 && (e.tag === 'cover1' || e.tag === 'cover2'))) this._done();
+      // D128 (user: killed with the rifle and the pistol full — nothing could be taken, the gate stayed shut): rounds no
+      // carried gun has room for do not count
+      if (!run.enemies.some((e) => !e.alive && e.ammoDrop > 0 && (e.tag === 'cover1' || e.tag === 'cover2') && run.canTakeAmmo(e.ammoType))) this._done();
     } else if (s.id === 'takedown') {
       // D116 (user): both guards of the yard taken down — then the gate opens
       const group = run.enemies.filter((e) => e.tag === 'stealth');
@@ -193,6 +196,9 @@ export class TutorialDirector {
       if (group.length && this.count >= group.length) this._done();
     } else if (s.id === 'grenades') {
       if ((run.grenades.stock.frag | 0) > 0) this._done();
+    } else if (s.id === 'recover') {
+      // D128: the wounds healed by themselves (health back to full)
+      if (run.player.hp >= run.player.maxHp) this._done();
     }
   }
 
@@ -204,6 +210,9 @@ export class TutorialDirector {
     // D92 (user): each gun hits different targets — a target already hit in this lesson no longer counts (nor glows)
     if (i < 0 || this.hitTargets.has(i)) return;
     this.hitTargets.add(i);
+    // D128 (user: the targets fall back when hit, then a motor stands them up — no HIT banner): when each was hit
+    // (presentation reads it: render3d drops / raises the target)
+    this.targetHits.set(`${this.targets[i].x},${this.targets[i].y}`, this.run.lastTime);
     this._aim = null;
     this.count += 1;
     this.run.events.emit('targetHit', x, y);
@@ -213,7 +222,7 @@ export class TutorialDirector {
   _onCrate(item) {
     const s = this.step;
     if (!s) return;
-    if ((s.id === 'ammo' && item === 'ammo') || (s.id === 'medkit' && item === 'medkit')) this._done();
+    if (s.id === 'ammo' && item === 'ammo') this._done();
   }
 
   /** D89: a round stopped on a lesson's bullet-proof target — the hint says what this lesson wants (throttled). */

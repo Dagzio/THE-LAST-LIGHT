@@ -271,8 +271,7 @@ export const OFFICE = {
   pickups: [
     { id: 'crate_smg', kind: 'crate', item: 'smg', x: 690, y: 1585 },
     { id: 'crate_grenades', kind: 'crate', item: 'grenades', count: 2, x: 1700, y: 1662 },
-    { id: 'medkit_break', kind: 'medkit', x: 300, y: 1410 },
-    { id: 'medkit_open', kind: 'medkit', x: 1000, y: 545 },
+    // (D128: no medkits — the wounds heal by themselves)
     { id: 'keycard', kind: 'keycard', x: 2080, y: 1290 },
     { id: 'drive', kind: 'drive', x: 2097, y: 860 },
   ],

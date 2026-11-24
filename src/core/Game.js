@@ -166,6 +166,10 @@ export class Game {
 
   isMapCleared(id) { return this.progress.profile.completedLevels.includes(id); }
 
+  /** D128: dialogues read or skipped once never play again (the profile keeps them). */
+  isDialogueSeen(id) { return this.progress.isDialogueSeen(id); }
+  markDialoguesSeen(ids) { return this.progress.markDialoguesSeen(ids); }
+
   /** Test cheat (CHEATS): main menu logo tap → every level opens. @returns {boolean} something changed */
   cheatUnlockAllMaps() { return CHEATS && this.progress.cheatUnlockAll() > 0; }
 

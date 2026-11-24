@@ -43,7 +43,9 @@ export const HUMAN_ANIM = {
   // hero standing: from his stance, the two steps in `ikDur` s (60°; scaled by the turn), up to `ikMax`° at once, the
   // stepping foot lifted `lift` × his height. `release` 1/s: walking off, the legs swing back under the body;
   // `blendIn` / `blendOut`: the clip's weight in / out (× blendRate)
-  turnSteps: { below: 8, start: 32, square: 12, settle: 0.25, still: 0.12, max: 95, clipPace: 1.15, clipPaceMax: 1.8, ikDur: 0.5, ikMax: 90, lift: 0.045, release: 10, blendIn: 3, blendOut: 1.4 },
+  // D128 (user: the body wrung round over still feet): the steps start at 24° of twist and the twist never passes 50°
+  // (a faster turn drags the legs round with the body — no unnatural twist)
+  turnSteps: { below: 8, start: 24, square: 10, settle: 0.25, still: 0.12, max: 50, clipPace: 1.15, clipPaceMax: 1.8, ikDur: 0.44, ikMax: 90, lift: 0.045, release: 10, blendIn: 3, blendOut: 1.4 },
   // D110: standing up from low cover — the parts of "Crouch To Standing With Rifle" / "Stand To Crouch" (s) from the
   // kneel to the upright stance (measured on the Hips height: 21 → 53 / 52 → 22)
   rise: { upFrom: 0.1, upTo: 0.72, downFrom: 0.08, downTo: 0.65 },

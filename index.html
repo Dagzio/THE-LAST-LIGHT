@@ -99,6 +99,8 @@
 
   <!-- ===== Level HUD (KILL LIST D78) ===== -->
   <section class="screen" id="screen-game">
+    <!-- D128: health as in Call of Duty — the blood frame round the screen (its opacity follows the wounds) -->
+    <div class="blood-frame" id="bloodFrame" aria-hidden="true"></div>
     <!-- D46: no EXIT button on the level — leaving is in the pause menu (EXIT tab) -->
     <div class="corner corner-tl corner-col">
       <button class="ring-btn" data-action="fullscreen" data-fs data-i18n-aria="aria.fullscreen">
@@ -232,11 +234,6 @@
       </button>
       <div class="hud-plate">
         <span class="hud-name"><span class="hud-lv" id="hudLevelName"></span></span>
-        <span class="hud-hp">
-          <svg class="hud-heart" viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11.2A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8 2.8C20 15.8 12 21 12 21z"/></svg>
-          <b id="hudHp">100</b>
-        </span>
-        <i class="hud-hpbar"><i id="hudHpFill"></i></i>
         <span class="hud-items" id="hudItems"></span>
       </div>
     </div>

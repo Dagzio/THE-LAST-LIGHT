@@ -41,9 +41,11 @@ export const TUTORIAL = {
     { id: 'kill', tag: 'grenade', touchKey: 'tut.tobj.grenadeThrow', textKey: 'tut.obj.grenadeThrow', keys: ['G', 'key.lmb'], target: [1970, 240], opens: 'gE', hl: [{ tag: 'grenade' }], ui: { grenade: 'G' } },
     // D116 (user): the way to roll runs ALONG the mats (west → east), not across them
     { id: 'roll', touchKey: 'tut.tobj.roll', textKey: 'tut.obj.roll', keys: ['key.space'], dialogue: 'tut.roll', target: [1990, 890], opens: 'gF', hl: [{ rect: [1930, 872, 2050, 908] }, { arrow: [1928, 890, 2052, 890] }], ui: { dash: 'key.space' } },
-    { id: 'kill', tag: 'ambush', touchKey: 'tut.tobj.ambush', textKey: 'tut.obj.ambush', dialogue: 'tut.ambush', target: [1990, 1420], opens: 'gG', ambush: true, hl: [{ tag: 'ambush' }] },
-    { id: 'medkit', touchKey: 'tut.tobj.medkit', textKey: 'tut.obj.medkit', keys: ['E'], dialogue: 'tut.medkit', target: [1150, 1330], opens: 'gH', hl: [{ pickup: 'medkit_case' }], ui: { interact: 'E' } },
-    { id: 'exit', textKey: 'tut.obj.exit', target: [1200, 1745], hl: [{ rect: 'exit' }] },
+    { id: 'kill', tag: 'ambush', touchKey: 'tut.tobj.ambush', textKey: 'tut.obj.ambush', dialogue: 'tut.ambush', target: [1990, 1420], ambush: true, hl: [{ tag: 'ambush' }] },
+    // D128 (user: health as in Call of Duty, no medkits; the medic yard gone): after the ambush — wounded, he catches his
+    // breath until the wounds have healed (unhurt: done at once); then the yard's south gate opens — the way out
+    { id: 'recover', touchKey: 'tut.tobj.recover', textKey: 'tut.obj.recover', target: [1990, 1420], opens: 'gG', hl: [{ prop: [1880, 1395] }, { prop: [2110, 1390] }] }, // (the yard's crates: cover)
+    { id: 'exit', textKey: 'tut.obj.exit', target: [1990, 1745], hl: [{ rect: 'exit' }] },
   ],
   // D116 (user): where a failed lesson starts again (systems/TutorialDirector.js applyCheckpoint): its step, the hero's
   // spot [x, y, facing], the guns he carries by then, the enemies of the yards behind him (gone), pickups already taken

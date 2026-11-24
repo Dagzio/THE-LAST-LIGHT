@@ -30,7 +30,6 @@ export function resolveLevel(level, modeId) {
   if (ov.pickupSpots) {
     out.pickups = [
       ...ov.pickupSpots.crate.map(([x, y], i) => ({ id: `crate${i}`, kind: 'crate', item: null, x, y, dormant: true })),
-      ...ov.pickupSpots.medkit.map(([x, y], i) => ({ id: `med${i}`, kind: 'medkit', x, y, dormant: true })),
     ];
   }
   return out;

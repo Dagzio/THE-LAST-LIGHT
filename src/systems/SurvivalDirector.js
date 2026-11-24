@@ -1,7 +1,7 @@
 // D85 SURVIVAL director (MODES_DESIGN_D85.md §4): enemies come in a couple at a time from entry points the hero
 // cannot see (never on the screen, never close, never in his line of sight nearby), with a very smooth ramp of the
 // interval, the group size, the number alive, the mix of types and their strength; supplies (crates with the SMG /
-// grenades, medkits) appear at random spots and are refreshed over time. Its own seeded RNG stream; game clock only.
+// grenades; D128: no medkits) appear at random spots and are refreshed over time. Its own seeded RNG stream; game clock only.
 import { SURVIVAL as S } from '../data/survival.js';
 import { HUMAN_TYPES } from '../data/humans.js';
 import { WEAPONS } from '../data/weapons.js';
@@ -30,7 +30,6 @@ export class SurvivalDirector {
     this.retargetAt = S.retarget;
     this.lastPoint = null;
     this.crateAt = S.crate.first;
-    this.medkitAt = S.medkit.first;
     this.firstCrate = true;
     this.lastSpot = null;
     this.threat = 1;
@@ -125,11 +124,10 @@ export class SurvivalDirector {
   // ---------------- supplies ----------------
   _supplies(t, time) {
     const run = this.run;
-    // opened crates go away after a moment; medkits nobody took expire (only while off the screen)
+    // opened crates go away after a moment (D128: no medkits — the wounds heal by themselves)
     for (const pk of run.pickups) {
       if (pk.taken) continue;
       if (pk.def.kind === 'crate' && pk.openedAt >= 0 && time - pk.openedAt > S.crate.openedFor) pk.taken = true;
-      else if (pk.def.kind === 'medkit' && time > pk.until && !(this.inView && this.inView(pk.def.x, pk.def.y))) pk.taken = true;
     }
     const active = (kind) => run.pickups.filter((pk) => !pk.taken && pk.def.kind === kind && !(kind === 'crate' && pk.openedAt >= 0)).length;
     if (t >= this.crateAt) {
@@ -147,13 +145,6 @@ export class SurvivalDirector {
         }
       }
     }
-    if (t >= this.medkitAt) {
-      this.medkitAt = t + S.medkit.every;
-      if (active('medkit') < S.medkit.max) {
-        const pk = this._spot('medkit', Infinity);
-        if (pk) { pk.taken = false; pk.until = time + S.medkit.expire; run.events.emit('pickupSpawned', pk); }
-      }
-    }
   }
 
   /** A free spot of a kind: not too close, preferably off the screen, not the one freed last. */
@@ -169,10 +160,10 @@ export class SurvivalDirector {
     return pk;
   }
 
-  /** The HUD arrow: a medkit when hurt, else the nearest unopened crate. */
+  /** The HUD arrow: the nearest unopened crate (D128: no medkits). */
   objectiveTarget(out = {}) {
     const run = this.run, p = run.player;
-    const want = p.hp < p.maxHp * 0.5 ? 'medkit' : 'crate';
+    const want = 'crate';
     let best = null, bd = Infinity;
     for (const pk of run.pickups) {
       if (pk.taken || pk.def.kind !== want || pk.openedAt >= 0) continue;

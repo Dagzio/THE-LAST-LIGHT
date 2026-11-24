@@ -34,6 +34,10 @@ export const PLAYER = {
     pistolVariants: [0],
   },
   hitInvulnerability: 0.08, // s after a hit (bullets: no long i-frames)
+  // D128 (user: health as in Call of Duty — no medkits): the wounds heal by themselves once he takes no damage for
+  // `delay` s, `rate` HP/s back to full (100 HP: ~3.3 s); the blood frame (HUD) shows below `frameFrom` of his health,
+  // full at `frameFull`
+  regen: { delay: 4, rate: 30, frameFrom: 0.6, frameFull: 0.2 },
 };
 
 /** The roll variant (data) of a player's current / last roll. */
@@ -133,6 +137,5 @@ export const AUTO_AIM = {
 /** Interaction (crates, pickups) and the hero's own noise. */
 export const INTERACT = {
   radius: 46,               // units from the hero's centre to a crate's centre (E / the touch button)
-  pickupRadius: 30,         // medkits, key card, drive: picked up by walking over them
-  medkitHeal: 50,
+  pickupRadius: 30,         // key card, drive, intel: picked up by walking over them (D128: no medkits)
 };

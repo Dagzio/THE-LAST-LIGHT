@@ -26,6 +26,5 @@ export const SURVIVAL = {
   // supplies
   // D88: ammoMags — a box of rounds gives this many magazines to every carried gun
   crate: { first: 12, every: 35, max: 2, maxLate: 3, lateAt: 300, firstNear: 700, openedFor: 6, grenades: 2, ammoMags: 2 },
-  medkit: { first: 25, every: 30, max: 2, expire: 90 },
   pickupMinDist: 300,
 };

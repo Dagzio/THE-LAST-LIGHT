@@ -367,11 +367,35 @@ function cellFaces(m, item, A, W, D, H, surf, outline, faces) {
 export function buildPropViews(props, lights = null, atlas = 'office') {
   const parts = [];
   for (const p of props) {
-    if (p.drawn === false || hasModel(p)) continue; // D96: drawn from its 3D model
+    if (p.drawn === false || hasModel(p) || p.target) continue; // D96: drawn from its 3D model; D128: range targets apart
     const m = PROP_MODELS[p.type];
     if (!m || (m.atlas || 'office') !== atlas) continue;
     propFaces(p, parts);
   }
+  return bakeViews(parts, lights);
+}
+
+/**
+ * D128 (user: the range targets fall back when hit and a motor stands them up again): every range target (`target`
+ * prop) of the atlas as its own geometry, built round its foot (origin at its base; lit where it stands) — the scene
+ * turns each one about its foot. → [{ prop, geo }]
+ */
+export function buildTargetViews(props, lights = null, atlas = 'office') {
+  const out = [];
+  for (const p of props) {
+    if (!p.target || p.drawn === false || hasModel(p)) continue;
+    const m = PROP_MODELS[p.type];
+    if (!m || (m.atlas || 'office') !== atlas) continue;
+    const parts = [];
+    propFaces({ ...p, x: 0, y: 0, elev: 0 }, parts);
+    const geo = bakeViews(parts, lights, p.x, p.y);
+    if (geo) out.push({ prop: p, geo });
+  }
+  return out;
+}
+
+/** The faces → one geometry with the baked light colours (the lights read at the faces' world spot: + ox, oz). */
+function bakeViews(parts, lights, ox = 0, oz = 0) {
   if (!parts.length) return null;
   let n = 0;
   for (const g of parts) n += g.attributes.position.count;
@@ -384,7 +408,7 @@ export function buildPropViews(props, lights = null, atlas = 'office') {
     uv.set(g.attributes.uv.array, o * 2);
     for (let i = 0; i < c; i++) {
       let r = VIEW_AMBIENT, gg = VIEW_AMBIENT, b = VIEW_AMBIENT;
-      if (lights) { lightAt(lights, P[i * 3], P[i * 3 + 2], LT); r += LT[0] * VIEW_GAIN; gg += LT[1] * VIEW_GAIN; b += LT[2] * VIEW_GAIN; }
+      if (lights) { lightAt(lights, P[i * 3] + ox, P[i * 3 + 2] + oz, LT); r += LT[0] * VIEW_GAIN; gg += LT[1] * VIEW_GAIN; b += LT[2] * VIEW_GAIN; }
       col[(o + i) * 3] = Math.min(VIEW_MAX, r); col[(o + i) * 3 + 1] = Math.min(VIEW_MAX, gg); col[(o + i) * 3 + 2] = Math.min(VIEW_MAX, b);
     }
     o += c;

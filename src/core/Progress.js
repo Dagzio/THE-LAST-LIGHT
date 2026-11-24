@@ -51,6 +51,18 @@ export class Progress {
     return true;
   }
 
+  /** D128: has this dialogue been read or skipped once (any run)? */
+  isDialogueSeen(id) { return this.profile.seenDialogues.includes(id); }
+
+  /** D128: dialogues read to the end or skipped — never played again. @returns {boolean} something new was saved */
+  markDialoguesSeen(ids) {
+    const seen = this.profile.seenDialogues;
+    let n = 0;
+    for (const id of ids || []) if (typeof id === 'string' && !seen.includes(id)) { seen.push(id); n++; }
+    if (n) this._commit();
+    return n > 0;
+  }
+
   /** Test cheat (CHEATS): every level opens. @returns {number} levels newly unlocked */
   cheatUnlockAll() {
     let n = 0;

@@ -580,6 +580,30 @@ export class Renderer3D {
     }
   }
 
+  /**
+   * D128 (user: the range targets — not a HIT banner, they really fall, then stand up again as on a shooting range: a
+   * hinge lets a target fall back, a motor raises it): each hit target (the lesson's hit times) tips back about its foot
+   * like a falling plate (gravity: faster as it goes), knocks on the stop with a little rebound, lies a moment, then the
+   * motor stands it up smoothly. Game time (a pause holds it).
+   */
+  _syncTargets(run, time) {
+    const tg = this.office && this.office.targets;
+    if (!tg || !tg.length) return;
+    const hits = run.mode && run.mode.targetHits;
+    const FALL = 0.24, KNOCK = 0.2, DOWN = 1.3, RISE = 0.75, ANGLE = 1.45; // s, s, s, s, rad (≈ 83°: lying back)
+    for (const t of tg) {
+      const at = hits ? hits.get(`${t.prop.x},${t.prop.y}`) : undefined;
+      const age = at === undefined ? Infinity : time - at;
+      let k = 0;
+      if (age >= 0 && age < FALL) k = (age / FALL) ** 2;
+      else if (age >= FALL && age < FALL + KNOCK) k = 1 - 0.07 * Math.sin((Math.PI * (age - FALL)) / KNOCK);
+      else if (age >= FALL + KNOCK && age < FALL + KNOCK + DOWN) k = 1;
+      else if (age >= FALL + KNOCK + DOWN && age < FALL + KNOCK + DOWN + RISE) { const u = (age - FALL - KNOCK - DOWN) / RISE; k = 1 - u * u * (3 - 2 * u); }
+      const a = -k * ANGLE; // (back: away from the shooters south of the line — its top towards −z)
+      if (t.pivot.rotation.x !== a) t.pivot.rotation.x = a;
+    }
+  }
+
   /** D92: where a dead enemy falls — the first turn whose floor ahead is free (walls, doors, furniture), else a fade. */
   _planDeath(v, e, run) {
     v.deathOff = 0; v.deathFade = false;
@@ -1028,6 +1052,7 @@ export class Renderer3D {
 
     // ---- level: doors, pickups, objective
     this.office.update(run);
+    this._syncTargets(run, time);
     this._syncPickups(run, time);
     if (this.stealthOverlay) {
       // D87: the cones follow the drawn (interpolated) enemy, not the last simulation step

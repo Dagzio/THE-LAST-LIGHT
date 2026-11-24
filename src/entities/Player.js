@@ -60,6 +60,13 @@ export class Player {
 
   isInvulnerable(time) { return time < this.invulnerableUntil; }
 
+  /** D128 (Call of Duty style): no damage for PLAYER.regen.delay s → the wounds heal at its rate, up to full. */
+  regenerate(dt, time) {
+    const R = PLAYER.regen;
+    if (!this.alive || this.hp >= this.maxHp || !(dt > 0) || time - this.lastHitAt < R.delay) return;
+    this.hp = Math.min(this.maxHp, this.hp + R.rate * dt);
+  }
+
   /** D85: low to the ground — kneeling behind cover or crouching (low objects then hide him from the eyes). */
   get lowProfile() { return this.crouched || this.stance === 'crouch'; }
 
@@ -71,7 +78,7 @@ export class Player {
     if (!this.alive || !(amount > 0) || !Number.isFinite(amount)) return 0;
     if (!ignoreInvulnerability && this.isInvulnerable(time)) return 0; // D62: poison ticks go through it
     const reduced = amount * (this.damageTakenMult > 0 ? this.damageTakenMult : 1);
-    // D89: the training ground never kills him (minHp — the ambush only hurts; the medkit lesson follows)
+    // D89: the training ground never kills him (minHp — the ambush only hurts; D128: then the wounds heal by themselves)
     const applied = Math.max(0, Math.min(this.hp - (this.minHp > 0 ? this.minHp : 0), reduced));
     this.hp -= applied;
     this.lastHitAt = time;

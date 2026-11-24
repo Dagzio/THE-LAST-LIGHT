@@ -7,6 +7,7 @@ import { T, onLanguageChange } from '../i18n/i18n.js';
 import { STATES } from '../core/GameStateMachine.js';
 import { gunIcon } from '../data/icons.js';
 import { HERO_WEAPONS } from '../data/weapons.js';
+import { PLAYER } from '../data/player.js';
 import { coversHud, invalidateHudBlockers } from './hudBlockers.js';
 
 const BANNER_CLASS = 'show';
@@ -37,7 +38,7 @@ export class HUD {
     this.game = game;
     const $ = (id) => document.getElementById(id);
     this.el = {
-      hp: $('hudHp'), hpFill: $('hudHpFill'), ammo: $('hudAmmo'), mag: $('hudMag'), weaponName: $('hudWeaponName'),
+      blood: $('bloodFrame'), ammo: $('hudAmmo'), mag: $('hudMag'), weaponName: $('hudWeaponName'),
       gun: $('hudGun'), weapon: $('hudWeapon'), reloadFill: $('hudReloadFill'), slots: $('hudSlots'),
       objKicker: $('hudObjKicker'), objText: $('hudObjText'), objective: $('hudObjective'), levelName: $('hudLevelName'),
       items: $('hudItems'),
@@ -72,7 +73,7 @@ export class HUD {
     ev.on('radioCheck', () => this._showBanner('banner.radioCheck'));     // D87
     ev.on('witness', () => this._showBanner('banner.witness'));
     ev.on('copyDone', () => this._showBanner('banner.copyDone'));
-    ev.on('targetHit', () => this._showBanner('banner.hit')); // D88 the training ground
+    // (D128 (user): no HIT banner — the range targets fall back and rise again by themselves, render3d/rangeTargets.js)
     ev.on('ambush', () => this._showBanner('banner.contact'));
     ev.on('tutorialHint', (key) => this._showBanner(key)); // D89: "rounds won't do — sneak up" / "use a grenade"
     ev.on('threatLevel', (n) => { if (n > 1) this._showBanner('banner.threat', { n }); });
@@ -81,7 +82,6 @@ export class HUD {
     ev.on('pickup', (kind) => {
       if (kind === 'keycard') this._showBanner('banner.keycard');
       else if (kind === 'drive') this._showBanner('banner.drive');
-      else if (kind === 'medkit') this._showBanner('banner.medkit');
       else if (kind === 'intel' && game.run) this._showBanner('banner.intel', { n: game.run.intel, total: game.run.level.pickups.filter((p) => p.kind === 'intel').length });
     });
     ev.on('crateOpened', (item, count) => {
@@ -365,12 +365,12 @@ export class HUD {
     const time = this.game.clock.time;
     const running = this.game.sm.is(STATES.RUNNING);
 
-    const hp = Math.ceil(p.hp);
-    if (hp !== c.hp || p.maxHp !== c.maxHp) {
-      c.hp = hp; c.maxHp = p.maxHp;
-      el.hp.textContent = String(hp);
-      el.hpFill.style.width = `${Math.max(0, Math.min(100, (p.hp / p.maxHp) * 100))}%`;
-    }
+    // D128 (user: health as in Call of Duty — no HP bar): the blood frame shows the wounds — none above
+    // PLAYER.regen.frameFrom of his health, full at frameFull; it fades as the wounds heal (only on a change of 1 %)
+    const R = PLAYER.regen, frac = p.alive ? p.hp / p.maxHp : 0;
+    const k = Math.min(1, Math.max(0, (R.frameFrom - frac) / (R.frameFrom - R.frameFull)));
+    const blood = Math.round(k * k * (3 - 2 * k) * 100);
+    if (blood !== c.hp) { c.hp = blood; if (el.blood) { el.blood.style.opacity = String(blood / 100); el.blood.classList.toggle('on', blood > 0); } }
     if (w.weaponId !== c.weaponId) {
       c.weaponId = w.weaponId;
       el.weaponName.textContent = T(w.stats.nameKey);
@@ -394,8 +394,7 @@ export class HUD {
       }));
       el.weapon.classList.toggle('multi', run.inventory.length > 1);
     }
-    const hurt = p.alive && p.hp / p.maxHp <= 0.3;
-    if (hurt !== c.hurt) { c.hurt = hurt; el.screen.classList.toggle('keeper-hurt', hurt); }
+    // (D128: the low-health edge pulse is the blood frame now)
     const hitFlash = p.alive && time - p.lastHitAt < 0.5;
     if (hitFlash && p.lastHitAt !== c.lastHitAt) { el.screen.classList.remove('keeper-hit'); void el.screen.offsetWidth; el.screen.classList.add('keeper-hit'); c.hitFlash = true; }
     else if (hitFlash !== c.hitFlash) { c.hitFlash = hitFlash; el.screen.classList.toggle('keeper-hit', hitFlash); }

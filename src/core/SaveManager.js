@@ -8,7 +8,9 @@ import { Storage } from '../platform/StorageService.js';
 import { LEVELS } from '../data/levels/index.js';
 
 // D85 — schema 4: + modeBests (the best stealth / survival results per level); a schema 3 profile is migrated.
-export const SCHEMA_VERSION = 4;
+// D128 — schema 5: + seenDialogues (the dialogues read or skipped once never play again); schemas 3–4 are migrated.
+export const SCHEMA_VERSION = 5;
+const MAX_SEEN = 400;
 const MODE_KEYS = ['stealth', 'survival'];
 export const PROFILE_KEY = 'profile';
 export const BACKUP_KEY = 'profile.backup';
@@ -24,6 +26,7 @@ export function createDefaultProfile() {
     completedLevels: [],
     bestTimes: {},            // level id → seconds of the fastest win (mission)
     modeBests: {},            // D85: level id → { stealth: { time, medals, intel }, survival: { time, kills } }
+    seenDialogues: [],        // D128: dialogue ids read or skipped once (data/dialogues.js)
     statistics: { totalKills: 0, levelsWon: 0, levelsFailed: 0 },
   };
 }
@@ -31,7 +34,8 @@ export function createDefaultProfile() {
 /** Brings older schemas up to the current one. Unknown versions are rejected (null). */
 export function migrateProfile(data) {
   if (!data || typeof data !== 'object') return null;
-  if (data.schemaVersion === 3) return { ...data, schemaVersion: SCHEMA_VERSION, modeBests: {} }; // D85
+  if (data.schemaVersion === 3) return { ...data, schemaVersion: SCHEMA_VERSION, modeBests: {}, seenDialogues: [] }; // D85
+  if (data.schemaVersion === 4) return { ...data, schemaVersion: SCHEMA_VERSION, seenDialogues: [] }; // D128
   return data.schemaVersion === SCHEMA_VERSION ? data : null;
 }
 
@@ -69,6 +73,10 @@ export function validateProfile(data) {
       (p.modeBests[id] = p.modeBests[id] || {})[m] = out;
     }
   }
+  // D128: the dialogues seen — short id strings only, no repeats, a sane count
+  const seen = Array.isArray(data.seenDialogues) ? data.seenDialogues : [];
+  p.seenDialogues = [...new Set(seen.filter((s) => typeof s === 'string' && /^[a-z0-9_.]{1,64}$/i.test(s)))].slice(0, MAX_SEEN);
+  if (p.seenDialogues.length !== seen.length) repaired = true;
   const st = data.statistics && typeof data.statistics === 'object' ? data.statistics : {};
   for (const k of Object.keys(p.statistics)) {
     const v = int(st[k], 0, MAX_N);

@@ -41,7 +41,6 @@ export const OFFICE_STEALTH = {
   pickups: [
     { id: 'keycard', kind: 'keycard', x: 2080, y: 1290 },     // the spare card
     { id: 'terminal', kind: 'terminal', x: 2097, y: 868, hold: 6 },
-    { id: 'medkit_break', kind: 'medkit', x: 300, y: 1410 },
     { id: 'intel_conf', kind: 'intel', x: 1720, y: 470 },
     { id: 'intel_mgr', kind: 'intel', x: 2030, y: 1600 },
   ],

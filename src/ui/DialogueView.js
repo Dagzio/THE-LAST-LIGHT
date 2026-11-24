@@ -53,10 +53,10 @@ export class DialogueView {
     if (!run) return;
     const set = (LEVEL_DIALOGUES[run.mapId] || {})[run.modeId];
     if (!set || !set[kind]) return;
-    // D110: a list plays in order; the story ones only until the level is cleared. D120 (user: the office's story call and
-    // its briefing felt like two dialogues — SKIP skipped only the first): a list is ONE conversation (its lines joined)
-    const cleared = this.game.isMapCleared && this.game.isMapCleared(run.mapId);
-    this.openMany([].concat(set[kind]).filter((id) => !(cleared && id.startsWith('story.'))));
+    // D110: a list plays in order. D120 (user: the office's story call and its briefing felt like two dialogues — SKIP
+    // skipped only the first): a list is ONE conversation (its lines joined). D128: every dialogue plays once ever
+    // (read or skipped — the profile keeps it), the story ones too
+    this.openMany([].concat(set[kind]));
   }
 
   /** Opens a dialogue by id (once per run); another one open → it waits. */
@@ -64,15 +64,19 @@ export class DialogueView {
 
   /** D120: several dialogues as one conversation (their lines in order; SKIP closes all of it). */
   openMany(ids) {
-    const lines = [];
+    const lines = [], took = [];
     for (let id of ids) {
       if (!DIALOGUES[id] || this.played.has(id)) continue;
+      // D128 (user): a dialogue read or skipped once (any run before) never plays again
+      if (this.game.isDialogueSeen && this.game.isDialogueSeen(id)) continue;
       this.played.add(id);
+      took.push(id);
       if (this.game.touchMode && DIALOGUES[`${id}.touch`]) id = `${id}.touch`; // D93: the phone's own variant
       this.played.add(id);
       lines.push(...DIALOGUES[id]);
     }
     if (!lines.length) return false;
+    lines.ids = took; // (marked seen once this conversation is closed — read to the end or skipped)
     if (this.lines) { this.queue.push(lines); return true; }
     this._start(lines);
     return true;
@@ -153,6 +157,7 @@ export class DialogueView {
   /** SKIP (or the last line read): the dialogue closes; a waiting one opens. */
   close() {
     if (!this.lines) return;
+    if (this.lines.ids && this.game.markDialoguesSeen) this.game.markDialoguesSeen(this.lines.ids); // D128
     this._hide();
     const next = this.queue.shift();
     if (next) this._start(next);

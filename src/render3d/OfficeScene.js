@@ -11,7 +11,7 @@ import { PROP_TYPES, propBox } from '../data/props.js';
 import { TILE, tileUV } from './officeAtlas.js';
 import { buildPropCards, hasSprite, propAtlasTexture, preloadPropAtlas } from './propSprites.js';
 import { levelLights, LIGHT_KINDS } from './officeLights.js';
-import { buildPropViews, hasView, propViewTexture, preloadPropViews, VIEW_ATLASES } from './propViews.js';
+import { buildPropViews, buildTargetViews, hasView, propViewTexture, preloadPropViews, VIEW_ATLASES } from './propViews.js';
 import { buildCustomProps } from './confTable.js';
 import { buildWorkstations } from './workstation.js';
 import { buildTrees } from './trainingTree.js';
@@ -457,6 +457,20 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     group.add(vm);
     meshes.push(vm);
   }
+  // D128: the range targets — each its own mesh on a pivot at its foot (they fall back when hit, then stand up again)
+  const targets = [];
+  for (const [atlas, mat] of [['office', mats.propViews], ['training', mats.propViewsTraining]]) {
+    for (const { prop, geo } of buildTargetViews(allProps, lights, atlas)) {
+      const pivot = new THREE.Group();
+      pivot.position.set(prop.x, prop.elev || 0, prop.y);
+      const tm = new THREE.Mesh(geo, mat);
+      tm.castShadow = shadows; tm.receiveShadow = shadows;
+      pivot.add(tm);
+      group.add(pivot);
+      meshes.push(tm);
+      targets.push({ prop, pivot, hitAt: -Infinity });
+    }
+  }
   // D116: props built in code (the conference table)
   // D117: the workstations (the new PC equipment) too
   for (const cm of [...buildCustomProps(allProps, shadows), ...buildWorkstations(allProps, shadows, lights), ...buildTrees(allProps, shadows), ...buildConsoles(allProps, shadows, lights)]) { group.add(cm); meshes.push(cm); } // D120: + the trees
@@ -555,6 +569,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   return {
     group,
     meshes,
+    targets, // D128: [{ prop, pivot, hitAt }] the range targets (Renderer3D drops / raises them)
     /** Door leaves follow the run's door state (only changed doors are written). */
     update(run) {
       if (!run || !run.doors) return;
