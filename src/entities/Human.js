@@ -41,6 +41,10 @@ export class Human {
     this.bulletProof = !!spawn.bulletProof;
     // D117 presentation: he crouches where he stands (the grenade yard's dummies behind their sandbags)
     this.crouch = !!spawn.crouch;
+    // D130 training ground: the area he keeps to ([x0, y0, x1, y1]; TutorialDirector holds him in it — the ambush stays
+    // off the hero's cover), and his rounds × damageMult (the ambush hurts enough to show the wounds healing)
+    this.leash = Array.isArray(spawn.leash) ? spawn.leash : null;
+    if (spawn.damageMult > 0) weapon = { ...weapon, damage: weapon.damage * spawn.damageMult };
     this.gun = {
       stats: weapon,
       ammo: weapon.magazineSize,

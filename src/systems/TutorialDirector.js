@@ -25,7 +25,8 @@ export class TutorialDirector {
     this.homes = new Map();
     for (const e of run.enemies) {
       const zid = run.levelWorld.zoneAt(e.x, e.y), z = zid && run.level.zones.find((q) => q.id === zid);
-      if (z) this.homes.set(e, z.rect);
+      if (e.leash) this.homes.set(e, e.leash); // D130: his own area inside the yard
+      else if (z) this.homes.set(e, z.rect);
     }
     this.steps = TUTORIAL.steps;
     this.hintAt = -Infinity;
@@ -144,6 +145,8 @@ export class TutorialDirector {
     this.index = i;
     this.count = 0;
     this.hitTargets = new Set(); // D92: the targets hit in this lesson
+    // D130 (user: the next gun's lesson lit the targets while they still lay down): a new lesson stands them up at once
+    this.targetsResetAt = this.run.lastTime || 0;
     this._aim = null;
     const s = this.step;
     if (!s) return;
@@ -196,6 +199,10 @@ export class TutorialDirector {
       if (group.length && this.count >= group.length) this._done();
     } else if (s.id === 'grenades') {
       if ((run.grenades.stock.frag | 0) > 0) this._done();
+    } else if (s.id === 'wounded') {
+      // D130: badly hurt in the ambush (or the ambush already down) — on to healing
+      const group = run.enemies.filter((e) => e.tag === s.tag);
+      if (run.player.hp <= run.player.maxHp * s.woundAt || (group.length && group.every((e) => !e.alive))) this._done();
     } else if (s.id === 'recover') {
       // D128: the wounds healed by themselves (health back to full)
       if (run.player.hp >= run.player.maxHp) this._done();

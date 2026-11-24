@@ -590,15 +590,19 @@ export class Renderer3D {
     const tg = this.office && this.office.targets;
     if (!tg || !tg.length) return;
     const hits = run.mode && run.mode.targetHits;
+    const reset = run.mode && Number.isFinite(run.mode.targetsResetAt) ? run.mode.targetsResetAt : -Infinity;
     const FALL = 0.24, KNOCK = 0.2, DOWN = 1.3, RISE = 0.75, ANGLE = 1.45; // s, s, s, s, rad (≈ 83°: lying back)
     for (const t of tg) {
       const at = hits ? hits.get(`${t.prop.x},${t.prop.y}`) : undefined;
       const age = at === undefined ? Infinity : time - at;
+      // D130: a new lesson (the next gun) stands a fallen target up at once — right after its fall, if still falling
+      let down = DOWN;
+      if (at !== undefined && reset >= at) down = Math.min(DOWN, Math.max(0, reset - at - FALL - KNOCK));
       let k = 0;
       if (age >= 0 && age < FALL) k = (age / FALL) ** 2;
       else if (age >= FALL && age < FALL + KNOCK) k = 1 - 0.07 * Math.sin((Math.PI * (age - FALL)) / KNOCK);
-      else if (age >= FALL + KNOCK && age < FALL + KNOCK + DOWN) k = 1;
-      else if (age >= FALL + KNOCK + DOWN && age < FALL + KNOCK + DOWN + RISE) { const u = (age - FALL - KNOCK - DOWN) / RISE; k = 1 - u * u * (3 - 2 * u); }
+      else if (age >= FALL + KNOCK && age < FALL + KNOCK + down) k = 1;
+      else if (age >= FALL + KNOCK + down && age < FALL + KNOCK + down + RISE) { const u = (age - FALL - KNOCK - down) / RISE; k = 1 - u * u * (3 - 2 * u); }
       const a = -k * ANGLE; // (back: away from the shooters south of the line — its top towards −z)
       if (t.pivot.rotation.x !== a) t.pivot.rotation.x = a;
     }

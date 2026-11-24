@@ -41,10 +41,13 @@ export const TUTORIAL = {
     { id: 'kill', tag: 'grenade', touchKey: 'tut.tobj.grenadeThrow', textKey: 'tut.obj.grenadeThrow', keys: ['G', 'key.lmb'], target: [1970, 240], opens: 'gE', hl: [{ tag: 'grenade' }], ui: { grenade: 'G' } },
     // D116 (user): the way to roll runs ALONG the mats (west → east), not across them
     { id: 'roll', touchKey: 'tut.tobj.roll', textKey: 'tut.obj.roll', keys: ['key.space'], dialogue: 'tut.roll', target: [1990, 890], opens: 'gF', hl: [{ rect: [1930, 872, 2050, 908] }, { arrow: [1928, 890, 2052, 890] }], ui: { dash: 'key.space' } },
-    { id: 'kill', tag: 'ambush', touchKey: 'tut.tobj.ambush', textKey: 'tut.obj.ambush', dialogue: 'tut.ambush', target: [1990, 1420], ambush: true, hl: [{ tag: 'ambush' }] },
-    // D128 (user: health as in Call of Duty, no medkits; the medic yard gone): after the ambush — wounded, he catches his
-    // breath until the wounds have healed (unhurt: done at once); then the yard's south gate opens — the way out
-    { id: 'recover', touchKey: 'tut.tobj.recover', textKey: 'tut.obj.recover', target: [1990, 1420], opens: 'gG', hl: [{ prop: [1880, 1395] }, { prop: [2110, 1390] }] }, // (the yard's crates: cover)
+    // D130 (user: the ambush wounds him first — then he heals in the first cover; no separate "behind the crates" step):
+    // 'wounded' — the fight until his health drops to woundAt (or they are all down); 'recover' — "you're badly hurt,
+    // get into cover" (the jersey barrier by the gate lit, the cover control), done once the wounds have healed; then the
+    // fight goes on; all down — the yard's south gate opens
+    { id: 'wounded', tag: 'ambush', woundAt: 0.35, touchKey: 'tut.tobj.ambush', textKey: 'tut.obj.ambush', dialogue: 'tut.ambush', target: [1990, 1420], ambush: true, hl: [{ tag: 'ambush' }] },
+    { id: 'recover', touchKey: 'tut.tobj.recover', textKey: 'tut.obj.recover', keys: ['Q'], dialogue: 'tut.wounded', target: [1990, 1320], hl: [{ prop: [1990, 1320] }], ui: { cover: 'Q' } },
+    { id: 'kill', tag: 'ambush', touchKey: 'tut.tobj.ambush', textKey: 'tut.obj.ambush', target: [1990, 1420], opens: 'gG', hl: [{ tag: 'ambush' }] },
     { id: 'exit', textKey: 'tut.obj.exit', target: [1990, 1745], hl: [{ rect: 'exit' }] },
   ],
   // D116 (user): where a failed lesson starts again (systems/TutorialDirector.js applyCheckpoint): its step, the hero's

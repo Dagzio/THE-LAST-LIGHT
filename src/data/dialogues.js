@@ -40,6 +40,7 @@ export const DIALOGUES = {
   'tut.grenade': [H('dlg.t.grenade.1')],
   'tut.roll': [H('dlg.t.roll.1'), K('dlg.t.roll.2'), H('dlg.t.roll.3')],
   'tut.ambush': [H('dlg.t.ambush.1'), K('dlg.t.ambush.2'), H('dlg.t.ambush.3')], // (D128: .3 — the wounds heal in cover)
+  'tut.wounded': [H('dlg.t.wounded.1')], // D130: badly hurt in the ambush — into cover to heal
   // D93: the phone's variants ('<id>.touch', DialogueView picks it on touch): the lesson's lines + the controls in Lira's
   // words (D129: the phone hears the same lesson lines, then its own)
   'tut.start.touch': [H('dlg.t.start.1'), K('dlg.t.start.2'), H('dlg.t.start.3'), H('dlg.tt.move')],

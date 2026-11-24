@@ -15,6 +15,10 @@ import { TUTORIAL } from '../tutorial.js';
 const W = (x0, y0, x1, y1, style, gaps = []) => ({ x0, y0, x1, y1, style, gaps });
 const G = (id, x, y, axis, zones) => ({ id, x, y, axis, width: 90, kind: 'gate', lock: 'step', zones });
 const Y = 'yard', F = 'fence';
+// D130: where each of the ambush keeps to — just south of the yard's crates, on the screen with the hero at the jersey
+// barrier (1990, 1320; a phone sees ±150 units, the frame shifted south here), never closer than ~110 units: from anywhere
+// in them the line to a hero crouched behind the barrier crosses it (stopped), to one standing it is open
+const AMBUSH_AREA = { left: [1870, 1405, 1935, 1460], right: [2045, 1405, 2110, 1460], mid: [1950, 1430, 2030, 1460] };
 // D116 (user: the canopy's legs had no collision): a canopy and its four legs (stop walkers; not drawn — the canopy is)
 const canopy = (x, y) => [{ type: 'canopy', x, y }, ...[[-58, -43], [58, -43], [-58, 43], [58, 43]].map(([dx, dy]) => ({ type: 'canopy_pole', x: x + dx, y: y + dy, drawn: false }))];
 
@@ -30,7 +34,7 @@ export const TRAINING = {
   outside: 'grass',
   enemyModel: 'enemyTraining', // D89: the user's training enemy model (data/humanModels.js), the office one elsewhere
   // D107 (user): on a phone the cover yard is framed higher (part of the view; − = north) — the top hint covered the dummies
-  touchFrame: { cover: -0.2, range: -0.18 },
+  touchFrame: { cover: -0.2, range: -0.18, ambush: 0.22 }, // (D130: + the ambush yard framed lower — its shooters on screen)
   manualCrates: true,          // D110: the lessons teach E / the button — the crates here are not opened by walking up
   noXray: true,               // D90 (user): no X-ray silhouette of the hero through the walls here
   footsteps: 'outdoor',        // D89 / D93: the user's steps1 on every floor here (data/sounds.js STEP_SETS)
@@ -173,8 +177,12 @@ export const TRAINING = {
     { type: 'thug', x: 2058, y: 212, angle: Math.PI / 2, dummy: true, bulletProof: true, crouch: true, tag: 'grenade' },
     { type: 'thug', x: 1970, y: 252, angle: Math.PI / 2, dummy: true, bulletProof: true, crouch: true, tag: 'grenade' },
     // D89: behind the two crates, on the screen as the hero walks in (were by the south wall, off the screen)
-    { type: 'thug', x: 1880, y: 1435, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush' },
-    { type: 'thug', x: 2110, y: 1430, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush' },
+    // D130 (user: the ambush must wound him — to see the healing; one more of them, harder hits; they never come close or
+    // round the first cover, the jersey barrier by the gate): three, rounds × 3, each kept to the yard's south part
+    // (leash: each his own part; from there the barrier shields a hero crouched behind it)
+    { type: 'thug', x: 1900, y: 1440, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush', damageMult: 3, leash: AMBUSH_AREA.left },
+    { type: 'thug', x: 2080, y: 1440, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush', damageMult: 3, leash: AMBUSH_AREA.right },
+    { type: 'thug', x: 1990, y: 1450, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush', damageMult: 3, leash: AMBUSH_AREA.mid },
   ],
   reinforcements: null,
 
