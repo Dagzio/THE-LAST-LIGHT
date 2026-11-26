@@ -55,11 +55,15 @@ export class ResultsView {
       // D118 (user): no line under a plain defeat ("the floor is still theirs" removed)
       el.failReason.textContent = s.checkpoint ? T('fail.tutDetected') : s.reason === 'detected' ? T('result.detectedText') : '';
       el.failRetry.textContent = T(s.checkpoint ? 'fail.retryTask' : 'defeat.retry');
+      // D132 (user): the training's stealth lesson failed — the whole screen comes 1 s later (`fail-late`: every delay
+      // of its animations + --fail-delay), the world still moving under it meanwhile (run.liveUntil)
+      const late = !!s.checkpoint;
+      el.panel.classList.toggle('fail-late', late);
       if (animate) {
         el.panel.classList.remove('fail-in'); void el.panel.offsetWidth; el.panel.classList.add('fail-in');
         // D117 / D120: the stamp sounds as the title lands (the screen fades in from the failure, the title at ~0.95 s)
         clearTimeout(this.sfxT);
-        this.sfxT = setTimeout(() => { if (this.summary) Sfx.play('stamp'); }, 950); // D120: as the title lands
+        this.sfxT = setTimeout(() => { if (this.summary) Sfx.play('stamp'); }, 950 + (late ? 1000 : 0)); // D120: as the title lands
       }
     }
     el.journal.classList.toggle('won', s.won);

@@ -35,6 +35,7 @@ export class TutorialDirector {
     this.inStealth = false;
     this.ambushOn = false;
     this.spottedSaid = false;
+    this.aside = null;            // D132: a lesson's follow-up word waiting for its moment ({ dialogue, afterDeaths })
     this.targets = run.level.props.filter((p) => p.target);
     this.targetHits = new Map(); // D128: "x,y" of a range target → the game time it was last hit
     this.takedownTarget = null;
@@ -172,6 +173,9 @@ export class TutorialDirector {
       if (d && d.locked) { d.locked = false; this.run.events.emit('doorUnlocked', d.id); }
     }
     this.run.events.emit('tutorialDone', this.index, s);
+    // D132: a word that follows a lesson, not a lesson of its own (only after real deaths: a lesson skipped with its
+    // dummies standing has none — it would hold the next briefings back for good)
+    if (s.aside && !(s.aside.afterDeaths || []).some((tag) => this.run.enemies.some((e) => e.tag === tag && e.alive))) this.aside = s.aside;
     this._next(this.index + 1);
   }
 
@@ -295,6 +299,14 @@ export class TutorialDirector {
       const m = e.radius + 2;
       e.x = Math.min(r[2] - m, Math.max(r[0] + m, e.x));
       e.y = Math.min(r[3] - m, Math.max(r[1] + m, e.y));
+      // D132 (user): the ambush roams its whole yard but keeps off the hero's first cover; while he heals behind it, none
+      // goes round it to his side
+      const a = e.avoid;
+      if (a) {
+        if (this.step && this.step.id === 'recover' && e.y < a.south) e.y = a.south;
+        const dx = e.x - a.x, dy = e.y - a.y, d = Math.hypot(dx, dy);
+        if (d < a.r) { const k = d > 1e-3 ? a.r / d : 0; e.x = d > 1e-3 ? a.x + dx * k : a.x; e.y = d > 1e-3 ? a.y + dy * k : a.y + a.r; }
+      }
     }
     this._check();
     const s = this.step;
@@ -303,7 +315,11 @@ export class TutorialDirector {
     // walks in through its gate — the yard's own lessons follow one another at once
     // D126 (user): …or once he has walked out of the yard of the lesson before (its gate behind him); a briefing that
     // follows a fall (afterDeaths) waits until the death clip has played out
-    if (this.pendingDialogue && !p.takedown && (this._inLessonYard(s, p) || this._leftPrevYard(p)) && this._fallsOver(s, time)) {
+    // D132: an aside (the rounds on the bodies) once its falls have played out — before the next lesson's briefing
+    if (this.aside && !p.takedown && this._fallsOver(this.aside, time)) {
+      const id = this.aside.dialogue; this.aside = null; run.events.emit('dialogue', id);
+    }
+    if (this.pendingDialogue && !this.aside && !p.takedown && (this._inLessonYard(s, p) || this._leftPrevYard(p)) && this._fallsOver(s, time)) {
       const id = this.pendingDialogue; this.pendingDialogue = null; run.events.emit('dialogue', id);
     }
     // the roll lesson: a roll that started or is passing over the mats
@@ -328,11 +344,15 @@ export class TutorialDirector {
     }
     // D116 (user): the stealth yard — a guard who fully spots the hero fails the lesson (a defeat screen); the retry
     // starts this lesson again from its gate (applyCheckpoint). (D88–D115: he only said so and calmed down.)
-    if (s && s.id === 'takedown') {
+    if (s && s.id === 'takedown' && !run.over) { // (D132: once — the run steps on after it, liveUntil set a single time)
       for (const e of run.enemies) {
         if (!e.alive || e.tag !== 'stealth' || e.ai.mode !== 'combat') continue;
         run.events.emit('tutorialSpotted', e);
         run.checkpoint = 'stealth';
+        // D132 (user): the failure screen fades in TUTORIAL.failScreen.delay s later, the world going on under it until
+        // the fade is `stopAt` done (then the game stops)
+        const F = TUTORIAL.failScreen;
+        run.liveUntil = time + F.delay + F.fadeIn * F.stopAt;
         run._setDefeat('detected');
         break;
       }

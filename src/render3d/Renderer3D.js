@@ -783,6 +783,11 @@ export class Renderer3D {
   // ---------------- sizing & camera ----------------
   _resize(force) {
     if (!this.sizeDirty && !force && this.sizeObserved) return;
+    // D132 (user: a brown screen after CONTINUE): a level loaded while its screen is still hidden read a 0×0 canvas, kept
+    // 1×1 — and the observer never fired (the size was the same before and after the task). Hidden: stay dirty, keep the
+    // last size, measure again on the next frame
+    const hidden = !(this.canvas.clientWidth > 0 && this.canvas.clientHeight > 0);
+    if (hidden) { this.sizeDirty = true; this.pausedDrawn = false; if (this.cssW > 1) return; }
     const w = Math.max(1, this.canvas.clientWidth), h = Math.max(1, this.canvas.clientHeight);
     if (!this.sizeDirty && !force && w === this.cssW && h === this.cssH) return;
     this.cssW = w;
@@ -790,7 +795,8 @@ export class Renderer3D {
     const r = this.canvas.getBoundingClientRect();
     this.viewLeft = r.left;
     this.viewTop = r.top;
-    this.sizeDirty = false;
+    this.sizeDirty = hidden;
+    this.pausedDrawn = false; // (a new size: a paused frame is drawn again)
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;

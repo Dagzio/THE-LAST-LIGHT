@@ -1,7 +1,7 @@
 // Game start (imported by boot.js after the preload): wires platform services, the runtime and the UI.
 // No globals are created (except window.__game while the dev viewer or the test cheats are on — never in a release).
 import { DEBUG_ENABLED, DEBUG_MODELS, CHEATS } from './config/constants.js';
-import { MUSIC_FILES, SFX_FILES, AUDIO_DIR, ENEMY_KILL_SFX, FOOTSTEPS, STEP_SETS, CARPET_FLOORS, CARPET_PROPS, FOOTSTEP_GAIN, PLAYER_HURT_SFX } from './data/sounds.js';
+import { MUSIC_FILES, SFX_FILES, AUDIO_DIR, ENEMY_KILL_SFX, FOOTSTEPS, STEP_SETS, CARPET_FLOORS, CARPET_PROPS, FOOTSTEP_GAIN, PLAYER_HURT_SFX, HEARTBEAT } from './data/sounds.js';
 import { propBox } from './data/props.js';
 import { STATES } from './core/GameStateMachine.js';
 import { WeaponAudio } from './platform/WeaponAudio.js';
@@ -44,8 +44,20 @@ function wireCombatSounds(events, game) {
   });
   // D87 (user request): no synthesized sounds (Sfx plays only files + data/sounds.js SYNTH_KEEP); the roll, the alarm
   // horn, the takedown thud and the re-pitched UI cues (spotted, suspicion, body found, weapon switch, door) are gone
-  events.on('mapDefeat', () => Sfx.play('defeat'));
+  // (D132: the stealth lesson's failure screen comes 1 s later — its sound with it)
+  events.on('mapDefeat', () => { if (game.run && game.run.checkpoint) setTimeout(() => { if (game.sm.is('MAP_DEFEAT')) Sfx.play('defeat'); }, 1000); else Sfx.play('defeat'); });
   events.on('mapVictory', () => Sfx.play('victory'));
+  // D132 (user file): the heartbeat while his health is critical (the blood frame strong); it fades out as he heals,
+  // and stops when the level is not running (pause, a dialogue, the end) or he is dead
+  let beat = null;
+  game.onFrame(() => {
+    const run = game.run, p = run && run.player;
+    const live = !!p && p.alive && game.sm.is(STATES.RUNNING) && !game.dialogueOpen && !game.loading;
+    const frac = p ? p.hp / p.maxHp : 1;
+    if (beat && beat.done) beat = null;
+    if (!beat && live && frac <= HEARTBEAT.from) beat = Sfx.loop(HEARTBEAT.sfx);
+    else if (beat && (!live || frac >= HEARTBEAT.to)) { beat.stop(HEARTBEAT.fade); beat = null; }
+  });
   events.on('grenadeThrow', () => Sfx.play('throw'));
   events.on('grenadeBlast', () => Sfx.play('boom'));
   events.on('crateOpened', () => Sfx.play('crateOpen'));

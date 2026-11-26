@@ -325,6 +325,7 @@
   background: linear-gradient(90deg, rgba(75, 84, 173, 0.55), rgba(46, 52, 112, 0.25));
 }
 .brush-cta { flex: none; font-size: calc(54px * var(--fs)); }
+.map-side .brush-cta { align-self: center; } /* D132 (user): START centred under the level's info panel */
 
 /* ===================== Popups (H5 §4) ===================== */
 .popup {

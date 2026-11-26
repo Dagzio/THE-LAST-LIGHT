@@ -12,7 +12,7 @@ export const DEBUG_MODELS = false; // D110: the viewer in the main menu; D127 (u
  */
 export const CHEATS = true;
 
-export const BUILD_VERSION = '0.25.3-killlist-story';
+export const BUILD_VERSION = '0.25.4-killlist-story';
 
 /** Prefix for every localStorage key of the game (H5 §9). KILL LIST (D78): its own prefix, a new profile schema. */
 export const STORAGE_PREFIX = 'kl.';

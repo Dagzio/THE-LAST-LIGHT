@@ -106,7 +106,8 @@ export class Game {
   // ---------------- simulation ----------------
   update(dt) {
     if (this.loading) return; // D93: the level is still loading (its loading screen is up) — nothing moves yet
-    if (!this.sm.simulating || this.dialogueOpen) return; // D88: a dialogue on screen — the game waits
+    // D132: a failed run may go on a moment after its end (run.liveUntil — the failure screen fading in over it)
+    if (!(this.sm.simulating || this._afterLive()) || this.dialogueOpen) return; // D88: a dialogue on screen — the game waits
     if (this.renderer3d && this.renderer3d.busy()) return; // shaders compiling / context lost: the game waits
     this.clock.advance(dt);
     if (this.run) {
@@ -123,7 +124,7 @@ export class Game {
   render(alpha, frameDt) {
     this.presentationTime += frameDt;
     if (this.sm.inMap && this.run && this.renderer3d) {
-      this.renderer3d.render(this.run, frameDt, this.clock.time, !this.loading && (!this.sm.is(STATES.RUNNING) || !!this.dialogueOpen), alpha);
+      this.renderer3d.render(this.run, frameDt, this.clock.time, !this.loading && ((!this.sm.is(STATES.RUNNING) && !this._afterLive()) || !!this.dialogueOpen), alpha);
       if (this.loading) this._pollLoading();
     } else {
       this.viewport.ensure(); // menus: the still picture is CSS (#menuBg); only the input surface follows the size
@@ -132,6 +133,9 @@ export class Game {
   }
 
   onFrame(fn) { this.frameListeners.add(fn); return () => this.frameListeners.delete(fn); }
+
+  /** D132: the level is over (a defeat) but its run still steps a moment (run.liveUntil, game time). */
+  _afterLive() { return this.sm.is(STATES.MAP_DEFEAT) && !!this.run && this.clock.time < this.run.liveUntil; }
 
   // ---------------- quality ----------------
   _resolveQuality() { return this.qualitySetting === 'auto' ? resolveAutoQuality() : this.qualitySetting; }

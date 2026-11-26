@@ -824,6 +824,14 @@ body.defeat .result-panel.failed { animation: failPanelIn 1.9s ease-in-out 0.05s
 .result-panel.fail-in .fail-rule { animation: failRule 0.8s ease-out 1.4s both; }
 .result-panel.fail-in .fail-reason { animation: failFade 0.9s ease-out 1.7s both; }
 .result-panel.fail-in .fail-btns { animation: failFade 0.8s ease-out 2.1s both; }
+/* D132 (user: the stealth lesson's failure — the screen 1 s later, the world still moving under it): every step of the
+   screen's entrance 1 s later */
+body.defeat .result-panel.failed.fail-late { animation-delay: 1.05s; }
+.result-panel.fail-in.fail-late .rs-flash { animation-delay: 1.85s; }
+.result-panel.fail-in.fail-late .fail-title { animation-delay: 1.75s, 2.8s, 2.8s; }
+.result-panel.fail-in.fail-late .fail-rule { animation-delay: 2.4s; }
+.result-panel.fail-in.fail-late .fail-reason { animation-delay: 2.7s; }
+.result-panel.fail-in.fail-late .fail-btns { animation-delay: 3.1s; }
 @keyframes failSlam {
   0% { opacity: 0; transform: scale(1.9); filter: blur(10px); }
   55% { opacity: 1; transform: scale(0.96); filter: blur(0); }
@@ -1608,7 +1616,10 @@ body.paused .act-grenade.armed, body.paused .grenade-neon.armed { animation-play
   background: linear-gradient(180deg, rgba(9, 11, 15, 0.82), rgba(9, 11, 15, 0.55));
   border: 1px solid rgba(255, 207, 58, 0.35);
   border-top: 0;
+  /* D132 (user: the soft shade round the header showed above the plate): the plate's own shadow, below it only */
+  box-shadow: 0 7px 14px -6px rgba(0, 0, 0, 0.65), 0 2px 4px rgba(0, 0, 0, 0.25);
 }
+.hud-top::before { display: none; } /* (D132: the D51 soft plate behind the header — the objective plate has its own) */
 .hud-obj-kicker { font-size: calc(12px * var(--fs)); letter-spacing: 0.18em; color: #ffcf3a; }
 .hud-obj-text { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: calc(19px * var(--fs)); letter-spacing: 0.05em; color: #fff; }
 .hud-objective.pop { animation: objPop 0.6s ease-out; }

@@ -44,6 +44,7 @@ export class Human {
     // D130 training ground: the area he keeps to ([x0, y0, x1, y1]; TutorialDirector holds him in it — the ambush stays
     // off the hero's cover), and his rounds × damageMult (the ambush hurts enough to show the wounds healing)
     this.leash = Array.isArray(spawn.leash) ? spawn.leash : null;
+    this.avoid = spawn.avoid || null; // D132: { x, y, r, south } — a spot he keeps away from (the hero's first cover)
     if (spawn.damageMult > 0) weapon = { ...weapon, damage: weapon.damage * spawn.damageMult };
     this.gun = {
       stats: weapon,

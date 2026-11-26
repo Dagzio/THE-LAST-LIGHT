@@ -16,6 +16,9 @@ export const TUTORIAL = {
   hitsNear: 18,          // units: a round stopped this close to a target is a hit on it
   minHp: 1,              // D89: the hero's HP never drops below this here (the ambush hurts, never kills)
   hintEvery: 2.5,        // s between two "rounds won't do" hints
+  // D132 (user: the stealth lesson's failure): the failure screen starts fading in `delay` s after he is spotted (its
+  // fade: `fadeIn` s — styles/game.css failPanelIn + .fail-late); the world goes on until the fade is `stopAt` done
+  failScreen: { delay: 1.0, fadeIn: 1.95, stopAt: 0.8 },
   fallTime: 2.7,         // D126: s a death clip plays (the longest, 2.63) — a briefing waiting for a fall waits this long
   steps: [
     { id: 'arm', touchKey: 'tut.tobj.arm', textKey: 'tut.obj.arm', keys: ['E'], dialogue: 'tut.start', target: [395, 1330], need: 2, opens: 'gA',
@@ -31,9 +34,10 @@ export const TUTORIAL = {
     { id: 'coverLow', touchKey: 'tut.tobj.coverLow', textKey: 'tut.obj.coverLow', keys: ['Q'], dialogue: 'tut.cover', target: [280, 460], hl: [{ prop: [280, 440] }], ui: { cover: 'Q' } },
     { id: 'kill', tag: 'cover1', touchKey: 'tut.tobj.coverShoot', textKey: 'tut.obj.coverShoot', keys: ['key.lmb'], target: [290, 325], hl: [{ tag: 'cover1' }] },
     { id: 'kill', tag: 'cover2', touchKey: 'tut.tobj.peek', textKey: 'tut.obj.peek', keys: ['Q', 'key.lmb'], target: [610, 450], // D126 (user): no briefing here — the wall's corner is in tut.cover
-      hl: [{ rect: [540, 422, 680, 438] }, { tag: 'cover2' }], ui: { cover: 'Q' } },
-    // D126 (user): the rounds briefing once the second dummy's fall has played out (afterDeaths: its tag, TUTORIAL.fallTime)
-    { id: 'loot', textKey: 'tut.obj.loot', dialogue: 'tut.loot', afterDeaths: ['cover2'], target: [460, 310], opens: 'gC', hl: [{ bodies: ['cover1', 'cover2'] }] },
+      hl: [{ rect: [540, 422, 680, 438] }, { tag: 'cover2' }], ui: { cover: 'Q' }, opens: 'gC',
+      // D132 (user: collecting the rounds is no lesson any more — the gate opens with the second dummy down): an aside —
+      // "well done, take their rounds if you need them" — once his fall has played out (afterDeaths, TUTORIAL.fallTime)
+      aside: { dialogue: 'tut.loot', afterDeaths: ['cover2'] } },
     // D116 (user): both guards (they patrol in opposite directions); fully spotted — the lesson fails (its checkpoint)
     { id: 'takedown', touchKey: 'tut.tobj.stealth', textKey: 'tut.obj.stealth', keys: ['F'], dialogue: 'tut.stealth', target: [1250, 540], opens: 'gD', need: 2,
       hl: [{ tag: 'stealth' }], ui: { takedown: 'F' } }, // D107: no crouch button (he sneaks by himself here)

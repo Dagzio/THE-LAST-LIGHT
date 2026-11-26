@@ -15,10 +15,11 @@ import { TUTORIAL } from '../tutorial.js';
 const W = (x0, y0, x1, y1, style, gaps = []) => ({ x0, y0, x1, y1, style, gaps });
 const G = (id, x, y, axis, zones) => ({ id, x, y, axis, width: 90, kind: 'gate', lock: 'step', zones });
 const Y = 'yard', F = 'fence';
-// D130: where each of the ambush keeps to — just south of the yard's crates, on the screen with the hero at the jersey
-// barrier (1990, 1320; a phone sees ±150 units, the frame shifted south here), never closer than ~110 units: from anywhere
-// in them the line to a hero crouched behind the barrier crosses it (stopped), to one standing it is open
-const AMBUSH_AREA = { left: [1870, 1405, 1935, 1460], right: [2045, 1405, 2110, 1460], mid: [1950, 1430, 2030, 1460] };
+// D130 / D132 (user: let them move over the whole yard, never up to the hero's first cover): the ambush keeps to the
+// yard (AMBUSH_AREA) but never comes within r of the jersey barrier by the gate (AMBUSH_AVOID); while he heals
+// behind it (the recover lesson) none goes north of y = south (round the barrier to his side) - TutorialDirector
+const AMBUSH_AREA = [1760, 1215, 2220, 1620];
+const AMBUSH_AVOID = { x: 1990, y: 1320, r: 170, south: 1360 };
 // D116 (user: the canopy's legs had no collision): a canopy and its four legs (stop walkers; not drawn — the canopy is)
 const canopy = (x, y) => [{ type: 'canopy', x, y }, ...[[-58, -43], [58, -43], [-58, 43], [58, 43]].map(([dx, dy]) => ({ type: 'canopy_pole', x: x + dx, y: y + dy, drawn: false }))];
 
@@ -179,10 +180,10 @@ export const TRAINING = {
     // D89: behind the two crates, on the screen as the hero walks in (were by the south wall, off the screen)
     // D130 (user: the ambush must wound him — to see the healing; one more of them, harder hits; they never come close or
     // round the first cover, the jersey barrier by the gate): three, rounds × 3, each kept to the yard's south part
-    // (leash: each his own part; from there the barrier shields a hero crouched behind it)
-    { type: 'thug', x: 1900, y: 1440, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush', damageMult: 3, leash: AMBUSH_AREA.left },
-    { type: 'thug', x: 2080, y: 1440, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush', damageMult: 3, leash: AMBUSH_AREA.right },
-    { type: 'thug', x: 1990, y: 1450, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush', damageMult: 3, leash: AMBUSH_AREA.mid },
+    // (D132: the whole yard, kept off the first cover — AMBUSH_AVOID)
+    { type: 'thug', x: 1900, y: 1440, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush', damageMult: 3, leash: AMBUSH_AREA, avoid: AMBUSH_AVOID },
+    { type: 'thug', x: 2080, y: 1440, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush', damageMult: 3, leash: AMBUSH_AREA, avoid: AMBUSH_AVOID },
+    { type: 'thug', x: 1990, y: 1450, angle: -Math.PI / 2, dummy: true, bulletProof: true, noCone: true, tag: 'ambush', damageMult: 3, leash: AMBUSH_AREA, avoid: AMBUSH_AVOID },
   ],
   reinforcements: null,
 

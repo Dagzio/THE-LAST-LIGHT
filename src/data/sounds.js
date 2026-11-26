@@ -49,6 +49,10 @@ export const SFX_FILES = {
   legPunch: { file: 'player/leg-punch.mp3', trim: 0.12, gain: 1 },
   flip: { file: 'player/flip.mp3', trim: 0.04, gain: 1 },             // D98 (user file): the roll (≈ 1 s, the roll's own length)
   handPunch: { file: 'player/hand-punch.mp3', trim: 0.11, gain: 1 },
+  // D132 (user files): the grenade toss (replaces the synth recipe of the same name); the heartbeat — looped while the
+  // hero's health is critical (main.js, HEARTBEAT below)
+  throw: { file: 'player/throw.mp3', gain: 1 },
+  heartbeat: { file: 'player/heartbeat.mp3', gain: 1 },
   playerHurt1: { file: 'player/player-hitted1.mp3', gain: 1 },
   playerHurt2: { file: 'player/player-hitted2.mp3', trim: 0.025, gain: 1 },
   // D53 replacements of synthesized sounds: CC0 packs (sfx/CREDITS.txt), mixed / levelled into the file (gain 1)
@@ -100,6 +104,11 @@ export const CARPET_FLOORS = new Set(['carpet']);
 export const CARPET_PROPS = new Set(['rug_large', 'rug_small']);
 /** D93 (user): crouched (or in cover) — quiet; walking upright in stealth — softer; running / the normal pace — full. */
 export const FOOTSTEP_GAIN = { crouch: 0.42, walk: 0.72, run: 1 };
+/**
+ * D132 (user): the heartbeat starts when his health falls to `from` of the maximum (the blood frame strong) and fades
+ * out (`fade` s) once it is back above `to` — or the level is not running.
+ */
+export const HEARTBEAT = { sfx: 'heartbeat', from: 0.35, to: 0.5, fade: 0.6 };
 /** The keeper is hurt (D53): one of the user's two takes at random (synth 'playerHurt' while they load). */
 export const PLAYER_HURT_SFX = ['playerHurt1', 'playerHurt2'];
 

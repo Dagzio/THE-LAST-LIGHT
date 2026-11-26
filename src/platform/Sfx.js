@@ -116,11 +116,12 @@ export const Sfx = (() => {
         const h = {
           done: false,
           rate(r) { if (!h.done) s.playbackRate.setTargetAtTime(r, a.currentTime, 0.05); },
-          stop() {
+          stop(fade = 0) { // (D132: fade — seconds of a soft fade-out, the heartbeat)
             if (h.done) return;
             h.done = true;
             loops.delete(h);
-            try { g.gain.setTargetAtTime(0, a.currentTime, 0.015); s.stop(a.currentTime + 0.08); } catch (e) { /* ended */ }
+            const tc = fade > 0 ? fade / 4 : 0.015;
+            try { g.gain.setTargetAtTime(0, a.currentTime, tc); s.stop(a.currentTime + Math.max(0.08, fade * 1.2)); } catch (e) { /* ended */ }
           },
         };
         loops.add(h);

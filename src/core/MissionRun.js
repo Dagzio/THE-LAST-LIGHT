@@ -24,6 +24,11 @@ import { FACING, INTERACT, COVER, muzzleOf, barrelOffsetAngle } from '../data/pl
 
 const AIM = { x: 0, y: 0 };
 const BODY_FADE = 30; // s a dead body stays (presentation; bodies never block anything)
+/** D132: no controls (the hero stands; the world goes on) — the moments after a failure that keep the run stepping. */
+const IDLE_INPUT = {
+  getMove(o) { o.x = 0; o.y = 0; return o; }, isDown() { return false; }, consumePressed() { return false; }, peekPressed() { return false; },
+  getAimWorld() { return null; }, getLastAimWorld() { return null; }, analogActive() { return false; },
+};
 /** D88: slot of a hero gun (0 pistols, 1 SMG, 2 M4A1). */
 const slotOf = (id) => (WEAPONS[id] && WEAPONS[id].gun === 'pistol' ? 0 : Math.max(0, HERO_WEAPONS.indexOf(id)));
 
@@ -43,6 +48,7 @@ export class MissionRun {
     this.stats = { kills: 0, shotsFired: 0, hits: 0, damageTaken: 0, time: 0, spotted: false };
     this.defeat = null;
     this.victory = false;
+    this.liveUntil = -Infinity; // D132: game time until which a finished run still steps (no controls)
     this.lastTime = 0;
 
     this.levelWorld = new LevelWorld(level);
@@ -512,7 +518,12 @@ export class MissionRun {
   // ---------------- step ----------------
   /** @param {import('../platform/InputManager.js').InputManager} input */
   update(input, dt, time) {
-    if (this.over) return;
+    // D132 (user: the stealth lesson's failure — the world goes on a moment while the failure screen fades in): over,
+    // the run still steps until liveUntil, without the hero's controls (Game keeps it stepping meanwhile)
+    if (this.over) {
+      if (!(time < this.liveUntil)) return;
+      input = IDLE_INPUT;
+    }
     this.lastTime = time;
     this.stats.time += dt;
     const p = this.player;

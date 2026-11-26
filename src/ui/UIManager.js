@@ -343,10 +343,7 @@ export class UIManager {
     const name = document.createElement('span');
     name.className = 'map-card-name';
     name.textContent = T(map.nameKey);
-    const num = document.createElement('span');
-    num.className = 'map-card-num';
-    num.textContent = String(this.viewIndex + 1);
-    card.append(this._thumb(map), num, name);
+    card.append(this._thumb(map), name); // (D132 (user): no level number on the card any more)
     if (locked) {
       const lock = document.createElement('span');
       lock.className = 'map-card-lock';
