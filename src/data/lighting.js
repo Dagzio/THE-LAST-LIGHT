@@ -43,6 +43,10 @@ const PROP_LIGHTS = {
   wall_light: [['wall', 14, 0, 1.6, 0.8]],
   alarm_light: [['red', 10, 0, 1, 1]],
   tv_wall: [['screen', 18, 0, 2.2, 0.8]],
+  // D145: the parking (Marseille, level 1): cold strip lights on its walls, the booth's monitors, the street lantern
+  strip_light: [['cool', 26, 0, 1.7, 0.9]],
+  booth_desk: [['screen', 10, 0, 2.0, 1.0]],
+  street_lantern: [['lamp', 0, 0, 1.5, 1.5]],
 };
 
 /**

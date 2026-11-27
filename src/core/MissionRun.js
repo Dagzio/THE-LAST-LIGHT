@@ -506,7 +506,7 @@ export class MissionRun {
       return;
     }
     const key = o.done || o.target;
-    const done = key === 'keycard' ? this.has.keycard : key === 'drive' ? this.has.drive : key === 'copy' ? this.has.copy : false;
+    const done = this.has[key] === true; // (keycard / drive / copy; D145: a sub-task's own fact — 'entered')
     if (done) {
       this.objectiveIndex += 1;
       this.events.emit('objective', this.objectiveIndex, this.objective);

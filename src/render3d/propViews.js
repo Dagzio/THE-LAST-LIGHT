@@ -9,6 +9,7 @@
 import * as THREE from '../../lib/three.module.js';
 import { PROP_VIEW_ATLAS } from '../data/propViews.js';
 import { TRAINING_VIEW_ATLAS } from '../data/trainingViews.js';
+import { MARSEILLE_L01_VIEW_ATLAS } from '../data/views/marseille_l01.js';
 import { PROP_MODELS } from '../data/propModels.js';
 import { PROP_TYPES } from '../data/props.js';
 import { lightAt } from './officeLights.js';
@@ -25,8 +26,13 @@ const VIEW_GAIN = 0.9;     // …plus the baked lights around (lamps, screens)
 const VIEW_MAX = 1.9;
 const LT = [0, 0, 0];
 
-export const VIEW_ATLASES = { office: PROP_VIEW_ATLAS, training: TRAINING_VIEW_ATLAS };
+export const VIEW_ATLASES = { office: PROP_VIEW_ATLAS, training: TRAINING_VIEW_ATLAS, marseille_l01: MARSEILLE_L01_VIEW_ATLAS };
+/** D145: the atlases loaded at start; a story location's level atlas loads with its level (weight: never before). */
+const GLOBAL_ATLASES = ['office', 'training'];
 const textures = {};
+
+/** D145: the view atlases created so far (anisotropy updates). */
+export const loadedViewAtlases = () => Object.keys(textures);
 
 /** The view atlas texture (loaded once per atlas). */
 export function propViewTexture(aniso = 4, atlas = 'office') {
@@ -41,7 +47,7 @@ export function propViewTexture(aniso = 4, atlas = 'office') {
 
 /** Resolves when the atlases have loaded (or failed — a missing file must not block the game). */
 export function preloadPropViews() {
-  return Promise.all(Object.keys(VIEW_ATLASES).map((k) => new Promise((res) => {
+  return Promise.all(GLOBAL_ATLASES.map((k) => new Promise((res) => {
     const t = textures[k] = new THREE.TextureLoader().load(VIEW_ATLASES[k].file, () => res(), undefined, () => res());
     t.colorSpace = THREE.SRGBColorSpace;
   })));

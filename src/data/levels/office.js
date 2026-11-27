@@ -11,6 +11,7 @@
 // sprite (it still collides).
 import { OFFICE_STEALTH } from './office.stealth.js';
 import { OFFICE_SURVIVAL } from './office.survival.js';
+import { PARKING } from './office.parking.js';
 
 const W = (x0, y0, x1, y1, style, gaps = []) => ({ x0, y0, x1, y1, style, gaps });
 
@@ -21,11 +22,13 @@ export const OFFICE = {
   location: 'office',
   requires: 'training', // D90 (user): closed until the training ground is completed
   preview: 'assets/ui/previews/office.webp', // D90: the user's card art (NEW/previewOffice.png)
-  width: 2250,
-  height: 1800,
+  // D145 (level 1): the underground parking and the street south of the floor (data/levels/office.parking.js)
+  width: 2400,
+  height: 2880,
   wallHeight: 78,
   wallThickness: 20,
-  playerSpawn: { x: 1200, y: 1630, angle: -Math.PI / 2 },
+  buildingRect: [250, 250, 2150, 1700], // (the office floor itself — its façade gets the night windows)
+  playerSpawn: { x: 2250, y: 1750, angle: Math.PI / 2 }, // D145: on the street, by the parking ramp
   // D85: the modes of this demo level (data/modes.js resolveLevel): mission = this file as it is
   modes: { mission: {}, stealth: OFFICE_STEALTH, survival: OFFICE_SURVIVAL },
   menuModes: ['mission'], // D141 (user): one story level — the stealth / survival rules live on as its sub-tasks
@@ -45,6 +48,7 @@ export const OFFICE = {
     { id: 'print', rect: [1300, 620, 1800, 950], floor: 'tile_light', light: 'dim' },
     { id: 'server', rect: [1800, 250, 2150, 950], floor: 'access', light: 'dark' },
     { id: 'stairs', rect: [100, 300, 250, 500], floor: 'concrete', light: 'dim', wallLights: false },
+    ...PARKING.zones, // D145
   ],
 
   // walls: axis-aligned lines (centre line, thickness above) with gaps [from, to] along the line for doors / openings
@@ -57,7 +61,7 @@ export const OFFICE = {
     W(250, 1130, 2150, 1130, 'int', [[460, 540], [1050, 1350], [1860, 1940]]),
     W(250, 1450, 750, 1450, 'int', [[460, 540]]),
     W(1650, 1450, 2150, 1450, 'int', [[1860, 1940]]),
-    W(250, 1700, 2150, 1700, 'ext', [[1140, 1260]]),
+    W(250, 1700, 2150, 1700, 'ext', [[370, 450], [1140, 1260]]), // D145: the archive's back door to the service stairs
     W(100, 300, 250, 300, 'ext'),
     W(100, 500, 250, 500, 'ext'),
     W(250, 250, 250, 1700, 'ext', [[360, 440]]),
@@ -68,6 +72,7 @@ export const OFFICE = {
     W(1800, 250, 1800, 950, 'steel'),
     W(750, 1130, 750, 1700, 'warm'),
     W(1650, 1130, 1650, 1700, 'warm'),
+    ...PARKING.walls, // D145
   ],
 
   // doors in the wall gaps: axis 'x' = the door spans along x (a horizontal wall). lock: null (opens for anyone
@@ -83,12 +88,14 @@ export const OFFICE = {
     { id: 'confopen', x: 1300, y: 430, axis: 'y', width: 80, kind: 'wood', zones: ['open', 'conference'] },
     { id: 'exit', x: 250, y: 400, axis: 'y', width: 80, kind: 'secure', lock: 'drive', zones: ['open', 'stairs'] },
     { id: 'entrance', x: 1200, y: 1700, axis: 'x', width: 120, kind: 'glass', lock: 'never', zones: [] },
+    ...PARKING.doors, // D145
   ],
   // gaps without a door (routing only)
   openings: [
     { x: 500, y: 950, zones: ['open', 'corridor'] },
     { x: 1000, y: 950, zones: ['open', 'corridor'] },
     { x: 1200, y: 1130, zones: ['corridor', 'lobby'] },
+    ...PARKING.openings, // D145
   ],
 
   // D117 (user: the chairs stood too neatly): chairs and small things a little off (scatter, below)
@@ -204,7 +211,7 @@ export const OFFICE = {
     { type: 'electrical', x: 1980, y: 261.5, rot: 0 },
     // --- stairwell
     { type: 'stairs', x: 175, y: 400, rot: 1 },
-  ]),
+  ]).concat(PARKING.props), // D145: the parking (laid out by hand along the reference — no scatter)
 
   // D83 (the level reference): signs of the attack and wear on the floors — t: atlas decal (render3d/OfficeScene.js
   // DECAL_TILES), w × d units, r — turn (rad). Presentation only.
@@ -228,11 +235,13 @@ export const OFFICE = {
     // security, manager, server room
     { t: 'blood', x: 2020, y: 1240, w: 60, r: 1.4 }, { t: 'scuff', x: 1800, y: 1300, w: 100 }, { t: 'coffee', x: 2050, y: 1660, w: 30 },
     { t: 'hazard', x: 1975, y: 930, w: 90, d: 30 }, { t: 'dirt', x: 1960, y: 600, w: 200, d: 80 },
+    ...PARKING.decals, // D145
   ],
   // D83: extra lights (render3d/officeLights.js kinds); the rooms' ceiling lights and the props' own glow come by themselves
   lights: [
     { x: 1850, y: 300, kind: 'red' }, { x: 2110, y: 300, kind: 'red' }, { x: 1960, y: 1180, kind: 'red' },
     { x: 1975, y: 920, kind: 'red', sx: 0.8, sz: 0.6 },
+    ...PARKING.lights, // D145
   ],
 
   // enemies: type (data/humans.js), post, facing (rad: 0 east, π/2 south, π west, −π/2 north), optional patrol loop
@@ -256,6 +265,7 @@ export const OFFICE = {
     { type: 'gunman', x: 1400, y: 800, angle: 0, patrol: [[1400, 800], [1700, 800]] },
     { type: 'gunman', x: 1840, y: 450, angle: Math.PI / 2, patrol: [[1840, 440], [1840, 800]] },
     { type: 'gunman', x: 2000, y: 770, angle: Math.PI / 2 },
+    ...PARKING.enemies, // D145: the parking's night shift
   ],
   // after the drive is taken (the "turn" of the level): they come in already hunting the player
   reinforcements: {
@@ -290,6 +300,8 @@ export const OFFICE = {
   // the hero is in `zone`, its `waves` come in at fractions of it (hunting him) from `spawnPoints`; `gives` — the fact
   // set when it is done (the drive: the level's turn — the exit opens, the reinforcements come)
   objectives: [
+    // D145: in through the underground parking — done on the service stairs (type 'reach': the hero in `room`)
+    { id: 'enter', type: 'reach', textKey: 'obj.enter', target: [440, 2230], room: 'service_stairs', done: 'entered' },
     // D143 (user): outside the security room the marker leads to its door; inside — no marker, Lyra's hint once
     { id: 'keycard', type: 'search', textKey: 'obj.searchKeycard', target: [1900, 1150], room: 'security', dialogue: 'office.search', done: 'keycard', gives: 'keycard' },
     {
@@ -297,8 +309,9 @@ export const OFFICE = {
       // come in 1–2 at a time (trickle: first after `first` s, then every `every` s) until it is done
       id: 'drive', type: 'hold', textKey: 'obj.download', activate: 'server_pc', activateKey: 'obj.activate', dialogue: 'office.download',
       done: 'drive', gives: 'drive', zone: [1800, 250, 2150, 950], duration: 60,
-      spawnPoints: { elevator: { x: 1500, y: 1080 }, archive: { x: 330, y: 1590 }, conference: { x: 1760, y: 300 } },
-      trickle: { first: 5, every: [8, 13], group: [1, 2], types: ['thug', 'gunman', 'gunman'], from: ['elevator', 'archive', 'conference'], maxAlive: 5 },
+      // D145: Lyra sees them coming "from the service entrance" — the service stairs from the parking, the lift, the far side
+      spawnPoints: { elevator: { x: 1500, y: 1080 }, service: { x: 410, y: 1790 }, conference: { x: 1760, y: 300 } },
+      trickle: { first: 5, every: [8, 13], group: [1, 2], types: ['thug', 'gunman', 'gunman'], from: ['service', 'service', 'elevator', 'conference'], maxAlive: 5 },
     },
     { id: 'exit', textKey: 'obj.exit', target: 'exit' },
   ],

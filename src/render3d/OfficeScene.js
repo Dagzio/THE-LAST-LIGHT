@@ -11,7 +11,8 @@ import { PROP_TYPES, propBox } from '../data/props.js';
 import { TILE, tileUV } from './officeAtlas.js';
 import { buildPropCards, hasSprite, propAtlasTexture, preloadPropAtlas } from './propSprites.js';
 import { levelLights, LIGHT_KINDS } from './officeLights.js';
-import { buildPropViews, buildTargetViews, hasView, propViewTexture, preloadPropViews, VIEW_ATLASES } from './propViews.js';
+import { buildPropViews, buildTargetViews, hasView, propViewTexture, preloadPropViews, VIEW_ATLASES, loadedViewAtlases } from './propViews.js';
+import { PROP_MODELS } from '../data/propModels.js';
 import { buildCustomProps } from './confTable.js';
 import { buildWorkstations } from './workstation.js';
 import { buildTrees } from './trainingTree.js';
@@ -34,12 +35,22 @@ const FLOORS = {
   gravel: ['training/fine_gravel.webp', 120], yard_concrete: ['training/worn_concrete.webp', 160],
   pavers: ['training/concrete_pavers.webp', 130], rubber: ['training/rubber_tiles.webp', 110],
   asphalt: ['training/dark_asphalt.webp', 160], stony: ['training/stony_ground.webp', 150],
+  // D145: Marseille (the user's seamless textures, tools/build-location-assets.py) — tile = the material's real size
+  // (1 m = 30 units); created and loaded only when a level uses them (locationMat)
+  parking: ['marseille/parking_concrete.webp', 120], ramp: ['marseille/grooved_ramp_concrete.webp', 60],
+  road: ['marseille/road_asphalt.webp', 120], sidewalk: ['marseille/sidewalk_flagstones.webp', 72],
+  deck_plate: ['marseille/steel_deck_plate.webp', 60],
 };
 const WALLS = {
   ext: ['concrete_blue', 130], int: ['plaster_cool', 110], warm: ['plaster_warm', 110], acoustic: ['acoustic', 80],
   steel: ['steel_panels', 90], walnut: ['walnut_panels', 100],
   yard: ['training/smooth_concrete.webp', 110], // D88: the training yards' low concrete walls
+  // D145: Marseille — the parking's cladding and its cast concrete
+  cladding: ['marseille/charcoal_cladding.webp', 72], formwork: ['marseille/formwork_concrete.webp', 90],
+  painted_steel: ['marseille/painted_industrial_steel.webp', 60],
 };
+/** D145: a texture of a story location — made on demand (its level only), not with the start-up set. */
+const isLocationTex = (file) => file.startsWith('marseille/');
 /** D88: wall styles drawn as a row of the user's sprites instead of a box (collision: data in core/LevelWorld.js). */
 const SPRITE_WALLS = { fence: 'mesh_fence' };
 // plain colours with a sheen (merged into the vcShiny mesh); the rest of COLORS are dull (vc mesh)
@@ -55,7 +66,7 @@ const texCache = new Map();
 /** Loads (once) a repeating sRGB texture of the office set. */
 // D88: 'training/x.webp' — a training-ground texture (assets/textures/training), repeated mirrored (atlas README)
 const texUrl = (name) => (name.includes('/') ? `assets/textures/${name}` : `${TEX_DIR}${name}.png`);
-const texWrap = (name) => (name.includes('/') ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping);
+const texWrap = (name) => (name.startsWith('training/') ? THREE.MirroredRepeatWrapping : THREE.RepeatWrapping); // (D145: Marseille's are seamless)
 
 function officeTexture(name, aniso) {
   let t = texCache.get(name);
@@ -71,7 +82,7 @@ function officeTexture(name, aniso) {
 
 /** Resolves when every office texture has loaded (or failed — a missing file must not block the game). */
 export function preloadOfficeTextures() {
-  const names = new Set([...Object.values(FLOORS), ...Object.values(WALLS)].map((e) => e[0]));
+  const names = new Set([...Object.values(FLOORS), ...Object.values(WALLS)].map((e) => e[0]).filter((n) => !isLocationTex(n)));
   return Promise.all([preloadPropAtlas(), preloadPropViews(), ...[...names].map((n) => new Promise((res) => {
     const t = new THREE.TextureLoader().load(texUrl(n), () => res(), undefined, () => res());
     t.colorSpace = THREE.SRGBColorSpace;
@@ -118,8 +129,8 @@ export function officeMaterials(aniso = 4) {
   const aoEdge = soft((g) => { const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, '#e6e6e6'); gr.addColorStop(0.35, '#595959'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); });
   m.aoBox = new THREE.MeshBasicMaterial({ alphaMap: aoBox, color: 0x000000, transparent: true, opacity: 0.62, depthWrite: false });
   m.aoEdge = new THREE.MeshBasicMaterial({ alphaMap: aoEdge, color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
-  for (const [k, [file]] of Object.entries(FLOORS)) m[`floor_${k}`] = new THREE.MeshLambertMaterial({ map: officeTexture(file, aniso) });
-  for (const [k, [file]] of Object.entries(WALLS)) m[`wall_${k}`] = new THREE.MeshLambertMaterial({ map: officeTexture(file, aniso) });
+  for (const [k, [file]] of Object.entries(FLOORS)) if (!isLocationTex(file)) m[`floor_${k}`] = new THREE.MeshLambertMaterial({ map: officeTexture(file, aniso) });
+  for (const [k, [file]] of Object.entries(WALLS)) if (!isLocationTex(file)) m[`wall_${k}`] = new THREE.MeshLambertMaterial({ map: officeTexture(file, aniso) });
   m.outside = new THREE.MeshLambertMaterial({ color: 0x0c0f14 });
   // soft light pools (ceiling lights seen on the floor), additive
   const { canvas, g } = cpuCanvas(128, 128);
@@ -150,12 +161,28 @@ export function officeMaterials(aniso = 4) {
   return m;
 }
 
+/** D145: the view-box material of an atlas (a story location's level atlas: made — and loaded — on first use). */
+function viewMaterial(mats, atlas, aniso) {
+  if (atlas === 'office') return mats.propViews;
+  if (atlas === 'training') return mats.propViewsTraining;
+  const key = `propViews_${atlas}`;
+  if (!mats[key]) mats[key] = new THREE.MeshLambertMaterial({ map: propViewTexture(aniso, atlas), vertexColors: true, alphaTest: 0.5, shadowSide: THREE.DoubleSide, side: THREE.DoubleSide });
+  return mats[key];
+}
+
+/** D145: a floor / wall material of a story location — made (and its texture loaded) the first time a level uses it. */
+function locationMat(mats, key, aniso) {
+  if (mats[key]) return;
+  const [kind, name] = key.startsWith('floor_') ? [FLOORS, key.slice(6)] : key.startsWith('wall_') ? [WALLS, key.slice(5)] : [null, null];
+  const e = kind && kind[name];
+  if (e) mats[key] = new THREE.MeshLambertMaterial({ map: officeTexture(e[0], aniso) });
+}
+
 /** Sets the anisotropy of every office texture (graphics preset, applied live). */
 export function setOfficeAnisotropy(aniso) {
   for (const t of texCache.values()) if (t.anisotropy !== aniso) { t.anisotropy = aniso; if (t.image) t.needsUpdate = true; }
   propAtlasTexture(aniso);
-  propViewTexture(aniso);
-  propViewTexture(aniso, 'training');
+  for (const a of loadedViewAtlases()) propViewTexture(aniso, a); // (D145: the location atlases made so far too)
 }
 
 function roundRect(g, x, y, w, h, r) {
@@ -428,6 +455,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   // one mesh per material
   const meshes = [];
   for (const [k, list] of buckets) {
+    locationMat(mats, k, aniso); // D145: a story location's floor / wall — made now (its level only)
     const mat = mats[k];
     if (!mat) { console.warn('office material missing', k); continue; }
     const mesh = new THREE.Mesh(merge(list), mat);
@@ -447,7 +475,9 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
 
   // D81: the sprite cards (one mesh) + the invisible shadow casters of those props
   // D85: the view boxes (one mesh) — every prop with the user's 5-view art
-  for (const [atlas, mat] of [['office', mats.propViews], ['training', mats.propViewsTraining]]) { // D88: one mesh per atlas
+  // D145: the atlases this level's props use (a story location's level atlas joins only where it is used)
+  const atlasList = [...new Set(['office', 'training', ...allProps.map((p) => (PROP_MODELS[p.type] || {}).atlas).filter(Boolean)])];
+  for (const [atlas, mat] of atlasList.map((a) => [a, viewMaterial(mats, a, aniso)])) { // D88: one mesh per atlas
     const viewGeo = buildPropViews(allProps, lights, atlas);
     if (!viewGeo) continue;
     const vm = new THREE.Mesh(viewGeo, mat);
@@ -637,6 +667,7 @@ function wallLights(level) {
 
 /** The building's outer rectangle: the walls that bound most rooms (the stairwell sticks out of it). */
 function buildingRect(level) {
+  if (level.buildingRect) return level.buildingRect; // D145: the office floor itself (its parking / street are not the façade)
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const z of level.zones) {
     if (z.id === 'stairs') continue;

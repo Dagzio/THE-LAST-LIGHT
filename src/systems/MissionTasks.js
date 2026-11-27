@@ -119,6 +119,8 @@ export class MissionTasks {
     if (run.objectiveIndex !== this.lastIndex) { this.lastIndex = run.objectiveIndex; this._onObjective(); }
     const o = this.objective;
     if (!o || run.over || !p.alive) return;
+    // D145: 'reach' — done once the hero is in its room (the parking crossed: on the service stairs)
+    if (o.type === 'reach' && o.room && run.levelWorld.zoneAt(p.x, p.y) === o.room) { run.has[o.done] = true; return; }
     if (o.type === 'search' && !this.saidRoom && o.room && run.levelWorld.zoneAt(p.x, p.y) === o.room) {
       this.saidRoom = true;
       if (o.dialogue) run.events.emit('dialogue', o.dialogue);

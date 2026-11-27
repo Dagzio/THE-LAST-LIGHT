@@ -19,7 +19,7 @@ export const DIALOGUES = {
   'story.recruit': [H('dlg.sr.1'), K('dlg.sr.2'), H('dlg.sr.3'), K('dlg.sr.4'), H('dlg.sr.5'), K('dlg.sr.6'), H('dlg.sr.7'), K('dlg.sr.8')],
   'story.office': [H('dlg.so.1'), K('dlg.so.2'), H('dlg.so.3')],
   // ---- office · mission (story.office + office.start play as one conversation)
-  'office.start': [K('dlg.os.1'), H('dlg.os.2'), H('dlg.os.3'), H('dlg.os.4')],
+  'office.start': [K('dlg.os.1'), H('dlg.os.2'), H('dlg.os.park'), H('dlg.os.3'), H('dlg.os.4')], // D145: + the way in
   'office.keycard': [K('dlg.ok.1'), H('dlg.ok.2')],
   'office.drive': [H('dlg.od.1'), K('dlg.od.2')],
   'office.search': [H('dlg.osr.1')],                            // D143 (user): in the security room — where to look
