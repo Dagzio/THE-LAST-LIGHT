@@ -73,10 +73,16 @@ export class MissionTasks {
     this.nextAlarmAt = time + A.every[0] + this.rng.next() * (A.every[1] - A.every[0]);
     this.alarmSpawned = this.alarmSpawned.filter((e) => e.alive);
     if (this.alarmSpawned.length >= A.maxAlive) return;
-    // the entry point farthest from the hero (they come in, not appear beside him)
-    const p = run.player;
-    let pt = null, best = -1;
-    for (const q of Object.values(A.from)) { const d = Math.hypot(q.x - p.x, q.y - p.y); if (d > best) { best = d; pt = q; } }
+    // the nearest entry point that is not close to the hero (they come in, not appear beside him — nor a minute away);
+    // none far enough: the farthest
+    const p = run.player, minD = A.minDist || 700;
+    let pt = null, near = Infinity, far = null, farD = -1;
+    for (const q of Object.values(A.from)) {
+      const d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d >= minD && d < near) { near = d; pt = q; }
+      if (d > farD) { farD = d; far = q; }
+    }
+    if (!pt) pt = far;
     const n = Math.min(A.maxAlive - this.alarmSpawned.length, A.group[0] + Math.floor(this.rng.next() * (A.group[1] - A.group[0] + 1)));
     for (let i = 0; i < n; i++) {
       const type = A.types[Math.floor(this.rng.next() * A.types.length) % A.types.length];
