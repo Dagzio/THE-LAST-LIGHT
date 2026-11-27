@@ -41,6 +41,73 @@ export class MissionTasks {
     this.nextTrickleAt = Infinity;
     this.lastIndex = -1;
     this.snapshot = null;
+    // D146 (STORY_DESIGN_D133.md §3.2 — stealth by choice): level.alarm — a guard who has seen the hero calls it in after
+    // `radio` s (downed before that: no alarm); the alarm brings enemies in, 1–2 at a time, until it is cut at one of
+    // its panels (E). Only during the objectives it lists (the download / the escape have their own enemies).
+    this.alarm = null;           // null — quiet, 'on', 'off' (cut: for good)
+    this.nextAlarmAt = Infinity;
+    this.alarmSpawned = [];
+  }
+
+  get alarmOn() { return this.alarm === 'on'; }
+
+  /** The alarm's rules apply now (the level has one, the objective is one it covers). */
+  _alarmWatch() {
+    const A = this.run.level.alarm, o = this.objective;
+    return !!A && !!o && A.during.includes(o.id);
+  }
+
+  _alarmUpdate(time) {
+    const run = this.run, A = run.level.alarm;
+    if (!A) return;
+    if (this.alarm === null && this._alarmWatch()) {
+      // his call starts the moment he first sees the hero (combat); it goes through if he still stands when it ends —
+      // whether or not he still sees him (lost sight, he searches — the call is already on the air)
+      for (const e of run.enemies) {
+        if (!e.alive) continue;
+        if (!(e.alarmAt > 0)) { if (e.ai.mode === 'combat' || e.ai.aware) e.alarmAt = time + A.radio; continue; } // (aware: saw him / heard the shots)
+        if (time >= e.alarmAt) { this._raiseAlarm(time); break; }
+      }
+    }
+    if (this.alarm !== 'on' || !this._alarmWatch() || time < this.nextAlarmAt) return;
+    this.nextAlarmAt = time + A.every[0] + this.rng.next() * (A.every[1] - A.every[0]);
+    this.alarmSpawned = this.alarmSpawned.filter((e) => e.alive);
+    if (this.alarmSpawned.length >= A.maxAlive) return;
+    // the entry point farthest from the hero (they come in, not appear beside him)
+    const p = run.player;
+    let pt = null, best = -1;
+    for (const q of Object.values(A.from)) { const d = Math.hypot(q.x - p.x, q.y - p.y); if (d > best) { best = d; pt = q; } }
+    const n = Math.min(A.maxAlive - this.alarmSpawned.length, A.group[0] + Math.floor(this.rng.next() * (A.group[1] - A.group[0] + 1)));
+    for (let i = 0; i < n; i++) {
+      const type = A.types[Math.floor(this.rng.next() * A.types.length) % A.types.length];
+      const e = run._spawnEnemy({ type, x: pt.x + (i ? 24 : 0), y: pt.y, angle: Math.atan2(p.y - pt.y, p.x - pt.x) }, true);
+      if (e) this.alarmSpawned.push(e);
+    }
+    run.events.emit('alarmWave', n);
+  }
+
+  _raiseAlarm(time) {
+    const run = this.run, A = run.level.alarm;
+    this.alarm = 'on';
+    run.stats.alarm = true;
+    this.nextAlarmAt = time + A.first;
+    run.events.emit('alarm');
+    if (A.dialogue) run.events.emit('dialogue', A.dialogue);
+  }
+
+  _cutAlarm(pk) {
+    const run = this.run, A = run.level.alarm;
+    this.alarm = 'off';
+    for (const q of run.pickups) if (q.def.task === 'alarm') q.taken = true;
+    run.events.emit('alarmOff');
+    if (A.offDialogue) run.events.emit('dialogue', A.offDialogue);
+    this._save(); // a key moment: the alarm is down
+  }
+
+  /** The alarm panels to point at while it rings (the run's pointers: a frame + the second arrow). */
+  alarmPanels() {
+    if (this.alarm !== 'on') return null;
+    return this.run.pickups.filter((q) => q.def.task === 'alarm' && !q.taken);
   }
 
   dispose() { if (this._unsub) { this._unsub(); this._unsub = null; } }
@@ -76,6 +143,7 @@ export class MissionTasks {
     if (!p.alive || p.takedown || !pk || run.over) { this.searching = null; return; }
     if (pk.def.kind === 'activate') {
       this.searching = null;
+      if (pk.def.task === 'alarm') { if (this.alarm === 'on' && input.consumePressed('interact')) this._cutAlarm(pk); return; } // D146
       if (o && o.type === 'hold' && o.activate === pk.def.id && !this.activated && input.consumePressed('interact')) this._activate(pk, time);
       return;
     }
@@ -119,6 +187,7 @@ export class MissionTasks {
     if (run.objectiveIndex !== this.lastIndex) { this.lastIndex = run.objectiveIndex; this._onObjective(); }
     const o = this.objective;
     if (!o || run.over || !p.alive) return;
+    this._alarmUpdate(time); // D146
     // D145: 'reach' — done once the hero is in its room (the parking crossed: on the service stairs)
     if (o.type === 'reach' && o.room && run.levelWorld.zoneAt(p.x, p.y) === o.room) { run.has[o.done] = true; return; }
     if (o.type === 'search' && !this.saidRoom && o.room && run.levelWorld.zoneAt(p.x, p.y) === o.room) {
@@ -187,6 +256,7 @@ export class MissionTasks {
       hidden: { ...this.hidden },
       activated: this.activated,
       saidRoom: this.saidRoom,
+      alarm: this.alarm, // D146: ringing / cut at that moment
     };
   }
 
@@ -218,6 +288,10 @@ export class MissionTasks {
     this.snapshot = cp;
     run.restartPoint = cp;
     this.saidRoom = !!cp.saidRoom;
+    // D146: the alarm as it was (ringing again from the restart — its next group a moment later; cut — its panels gone)
+    this.alarm = cp.alarm || null;
+    if (this.alarm === 'on') { this.nextAlarmAt = (run.level.alarm || {}).first || 5; run.stats.alarm = true; }
+    if (this.alarm === 'off') for (const q of run.pickups) if (q.def.task === 'alarm') q.taken = true;
     if (cp.activated) {
       const o = this.objective, pc = o && run.pickups.find((k) => k.def.id === o.activate);
       if (pc) { this.activated = true; this.holdProgress = 0; this.nextTrickleAt = o.trickle ? o.trickle.first : Infinity; }

@@ -25,6 +25,8 @@ export class MissionTakedown {
   /** D143: the sub-task's marker (undefined — the run's own rules). */
   taskTarget(out) { return this.tasks ? this.tasks.objectiveTarget(out) : undefined; }
   applyCheckpoint(cp) { if (this.tasks) this.tasks.applyCheckpoint(cp); }
+  get alarmOn() { return !!this.tasks && this.tasks.alarmOn; }        // D146
+  alarmPanels() { return this.tasks ? this.tasks.alarmPanels() : null; }
   dispose() { if (this.tasks) this.tasks.dispose(); }
 
   /** Before the hero moves: a takedown in progress goes on; F / E (touch) starts one on an unaware guard from behind. */

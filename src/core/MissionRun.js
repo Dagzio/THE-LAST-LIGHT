@@ -390,6 +390,7 @@ export class MissionRun {
         // D141: a search spot is held the same way, a computer to start is pressed (MissionTasks). D143 (user: searched
         // through a wall): those only from their own room
         if (pk.def.kind !== 'terminal' && this.levelWorld.zoneAt(p.x, p.y) !== this.levelWorld.zoneAt(pk.def.x, pk.def.y)) continue;
+        if (pk.def.task === 'alarm' && !(this.mode && this.mode.alarmOn)) continue; // D146: a panel matters only while it rings
         if ((pk.def.kind !== 'terminal' || !this.has.copy) && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
       } else if (d <= INTERACT.pickupRadius + p.radius) this._pickup(pk, time);
     }
@@ -461,8 +462,11 @@ export class MissionRun {
   pointers() {
     const out = this._ptrs || (this._ptrs = []);
     out.length = 0;
-    if (this.modeId !== 'mission' || !this.level.pointers) return out;
-    for (const ptr of this.level.pointers) {
+    if (this.modeId !== 'mission') return out;
+    // D146: while the alarm rings — its panels (lit, the second arrow to the nearest)
+    const panels = this.mode && this.mode.alarmPanels ? this.mode.alarmPanels() : null;
+    if (panels) for (const pk of panels) out.push({ x: pk.def.x, y: pk.def.y, w: 34, d: 20 });
+    for (const ptr of this.level.pointers || []) {
       const pk = this.pickups.find((x) => x.def.id === ptr.pickup);
       if (pk && !pk.taken && pk.openedAt < 0) out.push({ x: pk.def.x, y: pk.def.y, w: ptr.w || 46, d: ptr.d || 26 });
     }

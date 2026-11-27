@@ -70,6 +70,7 @@ export class HUD {
     // D88: the handler's calls are dialogues now (ui/DialogueView.js); the call card stays unused
     // D85: the modes' events
     ev.on('alarm', () => this._showBanner('banner.alarm'));
+    ev.on('alarmOff', () => this._showBanner('banner.alarmOff')); // D146: the alarm cut at a panel
     ev.on('bodyFound', () => this._showBanner('banner.bodyFound'));
     ev.on('radioCheck', () => this._showBanner('banner.radioCheck'));     // D87
     ev.on('witness', () => this._showBanner('banner.witness'));
@@ -220,7 +221,7 @@ export class HUD {
       el.ctx.classList.toggle('found', key === 'note:found');
       if (key === 'takedown') { el.ctxKey.textContent = 'F'; el.ctxText.textContent = T('hud.takedown'); }
       else if (key === 'search') { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.search'); }
-      else if (key === 'activate') { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.activate'); }
+      else if (key === 'activate') { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T((it && it.def.label) || 'hud.activate'); } // (D146: the alarm panel's own words)
       else if (key.startsWith('searching:')) { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.searching', { p: key.slice(10) }); }
       else if (key.startsWith('note:')) { el.ctxKey.textContent = ''; el.ctxText.textContent = T(key === 'note:found' ? 'hud.searchFound' : 'hud.searchEmpty'); }
       else if (key) { el.ctxKey.textContent = 'E'; el.ctxText.textContent = m.copying ? T('hud.copying', { p: Math.floor(run.copyProgress * 100) }) : T('hud.copy'); }

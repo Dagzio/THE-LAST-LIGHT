@@ -158,6 +158,8 @@ export const OFFICE = {
     { type: 'filing_cabinet', x: 1802, y: 1428, rot: 2 },
     { type: 'alarm_light', x: 1960, y: 1141.5, rot: 0 }, { type: 'papers', x: 1900, y: 1330, rot: 2 },
     { type: 'security_camera', x: 1690, y: 1141.5, rot: 0 },
+    // D146: the building's alarm panel (cut here or in the parking) — on the north wall, facing the camera
+    { type: 'alarm_panel', x: 2125, y: 1143, rot: 0 },
     // --- manager
     // D124 (user): the two armchairs in front of the desk removed, the chair moved round to the desk's drawers side
     { type: 'exec_desk', x: 1950, y: 1600, rot: 0 }, { type: 'exec_chair', x: 1950, y: 1634, rot: 2 },
@@ -293,7 +295,19 @@ export const OFFICE = {
     { id: 'search_desk', kind: 'search', task: 'keycard', x: 2050, y: 1182, h: 46 }, // D143 (user): "in the desk or the cabinets"
     // D143 (user): the download starts at the server room's computer (E) — the old drive spot
     { id: 'server_pc', kind: 'activate', x: 2097, y: 836 },
+    // D146: the alarm panels (E while the alarm rings): the parking's electrical room, the security room's east wall
+    { id: 'alarm_cut_parking', kind: 'activate', task: 'alarm', label: 'hud.alarmCut', x: 1790, y: 2656 },
+    { id: 'alarm_cut_security', kind: 'activate', task: 'alarm', label: 'hud.alarmCut', x: 2125, y: 1172 },
   ],
+  // D146 (STORY_DESIGN_D133.md §3.2 — stealth by choice): a guard who has seen the hero calls it in after `radio` s (downed
+  // before that: no alarm); then enemies come in (`group` every `every` s, at most `maxAlive` of them) from the entry
+  // point farthest from the hero until the alarm is cut at a panel. Only while sneaking in (`during`): the download and
+  // the escape bring their own enemies.
+  alarm: {
+    radio: 3, first: 6, every: [12, 18], group: [1, 2], maxAlive: 4, types: ['thug', 'gunman'],
+    from: { ramp: { x: 2050, y: 2100 }, service: { x: 410, y: 1790 }, elevator: { x: 1500, y: 1080 } },
+    during: ['enter', 'keycard'], dialogue: 'office.alarm', offDialogue: 'office.alarmOff',
+  },
 
   // objectives in order; `done` — the run fact that completes it. D141 (level 1): `type` — a sub-task
   // (systems/MissionTasks.js): search — the item is in one of the task's search spots; hold — the progress runs while

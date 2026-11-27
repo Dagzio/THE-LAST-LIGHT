@@ -22,7 +22,9 @@ export const DIALOGUES = {
   'office.start': [K('dlg.os.1'), H('dlg.os.2'), H('dlg.os.park'), H('dlg.os.3'), H('dlg.os.4')], // D145: + the way in
   'office.keycard': [K('dlg.ok.1'), H('dlg.ok.2')],
   'office.drive': [H('dlg.od.1'), K('dlg.od.2')],
-  'office.search': [H('dlg.osr.1')],                            // D143 (user): in the security room — where to look
+  'office.search': [H('dlg.osr.1')],
+  'office.alarm': [H('dlg.oal.1')],    // D146: spotted, the alarm rings — where to cut it
+  'office.alarmOff': [H('dlg.oal.2')], // D146: cut                            // D143 (user): in the security room — where to look
   'office.download': [K('dlg.odl.1'), H('dlg.odl.2'), K('dlg.odl.3')], // D143 (user): the download started
   // ---- office · stealth
   'stealth.start': [H('dlg.ss.1'), K('dlg.ss.2'), H('dlg.ss.3'), H('dlg.ss.4'), K('dlg.ss.5')],
