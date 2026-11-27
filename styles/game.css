@@ -1694,6 +1694,9 @@ body[data-mode="stealth"] #screen-game .stealth-hud { display: inline-flex; }
 /* D141: the search's result over the spot — no key chip; "found" in the objective's gold */
 .ctx-prompt.note .kiosk-key { display: none; }
 .ctx-prompt.note.found { color: #ffd35a; }
+/* D143: the download's per cent over the computer — gold; dim while the hero is out of the room (it waits) */
+.dl-prompt { color: #ffd35a; }
+.dl-prompt.paused { opacity: 0.55; color: #e8e2d6; }
 body.map-over .ctx-prompt { display: none; }
 /* D83 touch: the cover button — next to an object one can hide behind; lit (tap leaves) while in cover */
 .cover-neon { display: none; }

@@ -20,6 +20,7 @@ export const TUTORIAL = {
   // fade: `fadeIn` s — styles/game.css failPanelIn + .fail-late); the world goes on until the fade is `stopAt` done
   failScreen: { delay: 1.0, fadeIn: 1.95, stopAt: 0.8 },
   fallTime: 2.7,         // D126: s a death clip plays (the longest, 2.63) — a briefing waiting for a fall waits this long
+  targetsDown: 1.0,      // D143: s after the last target of a range lesson is hit (its fall + a moment lying) — then the briefing
   steps: [
     { id: 'arm', touchKey: 'tut.tobj.arm', textKey: 'tut.obj.arm', keys: ['E'], dialogue: 'tut.start', target: [395, 1330], need: 2, opens: 'gA',
       hl: [{ pickup: 'chest_smg', unless: 'smg' }, { pickup: 'chest_rifle', unless: 'rifle' }], ui: { interact: 'E' } },
@@ -27,7 +28,7 @@ export const TUTORIAL = {
       hl: [{ targets: true }], ui: { weapon: '1', fire: 'key.lmb' } }, // D108: the TAP-to-fire hint only here (its first lesson)
     { id: 'hits', weapon: 'smg', touchKey: 'tut.tobj.smg', textKey: 'tut.obj.smg', keys: ['2'], dialogue: 'tut.switch', target: [475, 770], need: 6, // D126 (user): 6 shots for the SMG / rifle
       hl: [{ targets: true }], ui: { weapon: '2' } },
-    { id: 'hits', weapon: 'rifle', touchKey: 'tut.tobj.rifle', textKey: 'tut.obj.rifle', keys: ['3'], target: [535, 760], need: 6,
+    { id: 'hits', weapon: 'rifle', touchKey: 'tut.tobj.rifle', textKey: 'tut.obj.rifle', keys: ['3'], dialogue: 'tut.rifle', target: [535, 760], need: 6, // D143 (user)
       hl: [{ targets: true }], ui: { weapon: '3' } },
     { id: 'reload', touchKey: 'tut.tobj.reload', textKey: 'tut.obj.reload', keys: ['R'], dialogue: 'tut.reload', ui: { reload: 'R' } },
     { id: 'ammo', touchKey: 'tut.tobj.ammo', textKey: 'tut.obj.ammo', keys: ['E'], target: [560, 990], opens: 'gB', hl: [{ pickup: 'ammo_table' }], ui: { interact: 'E' } },

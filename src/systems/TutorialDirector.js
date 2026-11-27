@@ -227,7 +227,13 @@ export class TutorialDirector {
     this._aim = null;
     this.count += 1;
     this.run.events.emit('targetHit', x, y);
-    if (this.count >= s.need) this._done();
+    if (this.count >= s.need) {
+      // D143 (user: the next briefing only once the targets are down): the next lesson's words wait for the last fall, and
+      // the targets stand up together after it
+      this.dialogueAfter = this.run.lastTime + TUTORIAL.targetsDown;
+      this._done();
+      this.targetsResetAt = this.dialogueAfter;
+    }
   }
 
   _onCrate(item) {
@@ -319,7 +325,7 @@ export class TutorialDirector {
     if (this.aside && !p.takedown && this._fallsOver(this.aside, time)) {
       const id = this.aside.dialogue; this.aside = null; run.events.emit('dialogue', id);
     }
-    if (this.pendingDialogue && !this.aside && !p.takedown && (this._inLessonYard(s, p) || this._leftPrevYard(p)) && this._fallsOver(s, time)) {
+    if (this.pendingDialogue && !this.aside && !p.takedown && !(time < this.dialogueAfter) && (this._inLessonYard(s, p) || this._leftPrevYard(p)) && this._fallsOver(s, time)) {
       const id = this.pendingDialogue; this.pendingDialogue = null; run.events.emit('dialogue', id);
     }
     // the roll lesson: a roll that started or is passing over the mats

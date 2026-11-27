@@ -22,6 +22,8 @@ export const DIALOGUES = {
   'office.start': [K('dlg.os.1'), H('dlg.os.2'), H('dlg.os.3'), H('dlg.os.4')],
   'office.keycard': [K('dlg.ok.1'), H('dlg.ok.2')],
   'office.drive': [H('dlg.od.1'), K('dlg.od.2')],
+  'office.search': [H('dlg.osr.1')],                            // D143 (user): in the security room — where to look
+  'office.download': [K('dlg.odl.1'), H('dlg.odl.2'), K('dlg.odl.3')], // D143 (user): the download started
   // ---- office · stealth
   'stealth.start': [H('dlg.ss.1'), K('dlg.ss.2'), H('dlg.ss.3'), H('dlg.ss.4'), K('dlg.ss.5')],
   'stealth.keycard': [K('dlg.sk.1'), H('dlg.sk.2')],
@@ -32,6 +34,7 @@ export const DIALOGUES = {
   'tut.start': [H('dlg.t.start.1'), K('dlg.t.start.2'), H('dlg.t.start.3')],
   'tut.range': [H('dlg.t.range.1')],
   'tut.switch': [H('dlg.t.switch.1')],
+  'tut.rifle': [H('dlg.t.rifle.1')], // D143 (user): after the SMG's six — the M4A1's turn
   'tut.reload': [H('dlg.t.reload.1')],
   'tut.cover': [H('dlg.t.cover.1')],
   'tut.loot': [H('dlg.t.loot.1')],

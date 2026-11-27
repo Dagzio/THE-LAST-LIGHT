@@ -385,10 +385,12 @@ export class MissionRun {
       const d = Math.hypot(p.x - pk.def.x, p.y - pk.def.y);
       if (pk.def.kind === 'crate') {
         if (pk.openedAt < 0 && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
-      } else if (pk.def.kind === 'terminal' || pk.def.kind === 'search') {
+      } else if (pk.def.kind === 'terminal' || pk.def.kind === 'search' || pk.def.kind === 'activate') {
         // D85 stealth: the copy is held at the terminal (the stealth director advances it) — not a walk-over pickup;
-        // D141: a search spot is held the same way (MissionTasks)
-        if ((pk.def.kind === 'search' || !this.has.copy) && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
+        // D141: a search spot is held the same way, a computer to start is pressed (MissionTasks). D143 (user: searched
+        // through a wall): those only from their own room
+        if (pk.def.kind !== 'terminal' && this.levelWorld.zoneAt(p.x, p.y) !== this.levelWorld.zoneAt(pk.def.x, pk.def.y)) continue;
+        if ((pk.def.kind !== 'terminal' || !this.has.copy) && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
       } else if (d <= INTERACT.pickupRadius + p.radius) this._pickup(pk, time);
     }
     this.interactTarget = best;
@@ -481,6 +483,7 @@ export class MissionRun {
     if (this.mode && this.mode.objectiveTarget) return this.mode.objectiveTarget(out); // D85: survival — supplies
     const o = this.objective;
     if (!o) return null;
+    if (this.mode && this.mode.taskTarget) { const t = this.mode.taskTarget(out); if (t !== undefined) return t; } // D143: sub-tasks
     if (o.target === 'exit') { out.x = this.level.exit.x; out.y = this.level.exit.y; return out; }
     if (Array.isArray(o.target)) { out.x = o.target[0]; out.y = o.target[1]; return out; } // D141: a point (a room, a terminal)
     // D85: a key card still carried by a living enemy — the marker follows him

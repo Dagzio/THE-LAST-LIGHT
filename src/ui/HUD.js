@@ -49,6 +49,7 @@ export class HUD {
       // D85 stealth
       stealth: $('stealthHud'), alertLabel: $('alertLabel'), vis: $('visLabel'), visText: $('visText'),
       ctx: $('ctxPrompt'), ctxKey: $('ctxKey'), ctxText: $('ctxText'),
+      dl: $('dlPrompt'), dlText: $('dlText'), // D143: the download's per cent over its computer
       gBtns: [[$('grenadeBtn'), $('grenadeBtnCount')], [$('hudGrenade'), $('hudGrenadeCount')]].filter((b) => b[0]),
     };
     this.labelSize = new Map();
@@ -203,6 +204,7 @@ export class HUD {
     const it = run.interactTarget;
     if (running && m.takedownTarget && !this.game.touchMode) { key = 'takedown'; x = r3._lx(m.takedownTarget); y = r3._ly(m.takedownTarget); }
     else if (running && it && it.def.kind === 'terminal') { key = m.copying ? `copy:${Math.floor(run.copyProgress * 100)}` : 'copy'; x = it.def.x; y = it.def.y; h = 40; }
+    else if (running && it && it.def.kind === 'activate') { key = 'activate'; x = it.def.x; y = it.def.y; h = 44; } // D143: "E · START"
     else if (running && it && it.def.kind === 'search') { // D141: "E · SEARCH" / "SEARCHING 60%" over the spot
       const s = m.searching;
       key = s && s.pk === it ? `searching:${Math.floor(s.progress * 100)}` : 'search'; x = it.def.x; y = it.def.y; h = (it.def.h || 48) + 10;
@@ -218,6 +220,7 @@ export class HUD {
       el.ctx.classList.toggle('found', key === 'note:found');
       if (key === 'takedown') { el.ctxKey.textContent = 'F'; el.ctxText.textContent = T('hud.takedown'); }
       else if (key === 'search') { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.search'); }
+      else if (key === 'activate') { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.activate'); }
       else if (key.startsWith('searching:')) { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.searching', { p: key.slice(10) }); }
       else if (key.startsWith('note:')) { el.ctxKey.textContent = ''; el.ctxText.textContent = T(key === 'note:found' ? 'hud.searchFound' : 'hud.searchEmpty'); }
       else if (key) { el.ctxKey.textContent = 'E'; el.ctxText.textContent = m.copying ? T('hud.copying', { p: Math.floor(run.copyProgress * 100) }) : T('hud.copy'); }
@@ -226,6 +229,19 @@ export class HUD {
       r3.projectToScreen(x, y, h, PT);
       const rx = Math.round(PT.x), ry = Math.round(PT.y);
       if (rx !== c.cxx || ry !== c.cxy) { c.cxx = rx; c.cxy = ry; el.ctx.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -100%)`; }
+    }
+    // D143 (user): the download's per cent over its computer (dim while the hero is out of the room)
+    const dl = running && m.holdLabel ? m.holdLabel() : null, dk = dl ? `${dl.p}|${dl.paused}` : '';
+    if (el.dl && dk !== c.dlKey) {
+      c.dlKey = dk;
+      el.dl.classList.toggle('on', !!dl);
+      el.dl.classList.toggle('paused', !!dl && dl.paused);
+      if (dl) el.dlText.textContent = T('hud.download', { p: dl.p });
+    }
+    if (dl && r3 && el.dl) {
+      r3.projectToScreen(dl.x, dl.y, 46, PT);
+      const rx = Math.round(PT.x), ry = Math.round(PT.y);
+      if (rx !== c.dlx || ry !== c.dly) { c.dlx = rx; c.dly = ry; el.dl.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -100%)`; }
     }
   }
 
@@ -452,12 +468,13 @@ export class HUD {
     } else if (run.modeId !== 'survival') {
       // D141: a hold shows its per cent in the text ("… (45%)") — rewritten only when it changes
       const pr = run.mode && run.mode.objectiveProgress ? run.mode.objectiveProgress() : null;
-      const fullKey = `${objKey}|${pr}`;
+      const tk = (run.mode && run.mode.objectiveTextKey && run.mode.objectiveTextKey()) || objKey; // D143: "start the download" first
+      const fullKey = `${tk}|${pr}`;
       if (fullKey !== c.objKey || run.objectiveIndex !== c.objIdx) {
-        const fresh = run.objectiveIndex !== c.objIdx || !c.objKey.startsWith(`${objKey}|`);
+        const fresh = run.objectiveIndex !== c.objIdx || !c.objKey.startsWith(`${tk}|`);
         c.objKey = fullKey; c.objIdx = run.objectiveIndex;
         el.objKicker.textContent = T('hud.objective', { n: Math.min(run.objectiveIndex + 1, run.level.objectives.length), total: run.level.objectives.length });
-        el.objText.textContent = o ? T(o.textKey, { p: pr ?? 0 }) : '';
+        el.objText.textContent = o ? T(tk, { p: pr ?? 0 }) : '';
         this._fitObjective();
         if (fresh) { el.objective.classList.remove('pop'); void el.objective.offsetWidth; el.objective.classList.add('pop'); invalidateHudBlockers(); }
       }

@@ -280,6 +280,9 @@ export const OFFICE = {
     { id: 'search_cab3', kind: 'search', task: 'keycard', x: 1758, y: 1428, h: 52 },
     { id: 'search_cab4', kind: 'search', task: 'keycard', x: 1780, y: 1428, h: 52 },
     { id: 'search_cab5', kind: 'search', task: 'keycard', x: 1802, y: 1428, h: 52 },
+    { id: 'search_desk', kind: 'search', task: 'keycard', x: 2050, y: 1182, h: 46 }, // D143 (user): "in the desk or the cabinets"
+    // D143 (user): the download starts at the server room's computer (E) — the old drive spot
+    { id: 'server_pc', kind: 'activate', x: 2097, y: 836 },
   ],
 
   // objectives in order; `done` — the run fact that completes it. D141 (level 1): `type` — a sub-task
@@ -287,16 +290,15 @@ export const OFFICE = {
   // the hero is in `zone`, its `waves` come in at fractions of it (hunting him) from `spawnPoints`; `gives` — the fact
   // set when it is done (the drive: the level's turn — the exit opens, the reinforcements come)
   objectives: [
-    { id: 'keycard', type: 'search', textKey: 'obj.searchKeycard', target: [1740, 1330], done: 'keycard', gives: 'keycard' },
+    // D143 (user): outside the security room the marker leads to its door; inside — no marker, Lyra's hint once
+    { id: 'keycard', type: 'search', textKey: 'obj.searchKeycard', target: [1900, 1150], room: 'security', dialogue: 'office.search', done: 'keycard', gives: 'keycard' },
     {
-      id: 'drive', type: 'hold', textKey: 'obj.download', target: [2097, 840], done: 'drive', gives: 'drive',
-      zone: [1800, 250, 2150, 950], duration: 60,
+      // D143 (user): start the computer (E) → the marker goes, the per cent over the desk, Kane and Lyra talk; enemies
+      // come in 1–2 at a time (trickle: first after `first` s, then every `every` s) until it is done
+      id: 'drive', type: 'hold', textKey: 'obj.download', activate: 'server_pc', activateKey: 'obj.activate', dialogue: 'office.download',
+      done: 'drive', gives: 'drive', zone: [1800, 250, 2150, 950], duration: 60,
       spawnPoints: { elevator: { x: 1500, y: 1080 }, archive: { x: 330, y: 1590 }, conference: { x: 1760, y: 300 } },
-      waves: [
-        { at: 0.1, from: 'elevator', enemies: ['thug', 'thug'] },
-        { at: 0.45, from: 'archive', enemies: ['gunman', 'gunman', 'thug'] },
-        { at: 0.8, from: 'conference', enemies: ['heavy', 'gunman'] },
-      ],
+      trickle: { first: 5, every: [8, 13], group: [1, 2], types: ['thug', 'gunman', 'gunman'], from: ['elevator', 'archive', 'conference'], maxAlive: 5 },
     },
     { id: 'exit', textKey: 'obj.exit', target: 'exit' },
   ],
