@@ -3,6 +3,7 @@
 // clip's timeline, the kill) without the stealth rules (no stance, no light, no alarm, no witnesses). Only a guard who
 // knows nothing of the hero (not fighting, not alerted, not searching) can be taken. Pure simulation, game clock only.
 import { StealthDirector } from './StealthDirector.js';
+import { MissionTasks } from './MissionTasks.js';
 
 export class MissionTakedown {
   /** @param {import('../core/MissionRun.js').MissionRun} run */
@@ -12,11 +13,19 @@ export class MissionTakedown {
     this.alarmRaised = true; // (StealthDirector's witness check: off — no alarm in the mission)
     this.witnessAt = Infinity;
     run.stats.takedowns = 0;
+    // D141: a story level's sub-tasks (search, hold) and its restart points — when its objectives have types
+    this.tasks = run.level.objectives.some((o) => o.type) ? new MissionTasks(run) : null;
   }
+
+  get searching() { return this.tasks ? this.tasks.searching : null; }
+  get searchNote() { return this.tasks ? this.tasks.searchNote : null; }
+  objectiveProgress() { return this.tasks ? this.tasks.objectiveProgress() : null; }
+  applyCheckpoint(cp) { if (this.tasks) this.tasks.applyCheckpoint(cp); }
 
   /** Before the hero moves: a takedown in progress goes on; F / E (touch) starts one on an unaware guard from behind. */
   preUpdate(input, dt, time) {
     const run = this.run, p = run.player;
+    if (this.tasks) this.tasks.preUpdate(input, dt, time);
     if (!p.alive) { this.takedownTarget = null; return; }
     if (p.takedown) {
       this._takedownStep(time);
@@ -31,7 +40,7 @@ export class MissionTakedown {
     } else input.consumePressed('takedown');
   }
 
-  update() {}
+  update(dt, time) { if (this.tasks) this.tasks.update(dt, time); }
 }
 
 // the takedown itself — the stealth run's (one rule set, one clip timeline)

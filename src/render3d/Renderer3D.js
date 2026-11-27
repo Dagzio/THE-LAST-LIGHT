@@ -13,6 +13,7 @@ import { HumanTemplate, bakeGunGeometry } from './humans.js';
 import { parseSkinnedGLB, loadGLB, blobTexture } from './glb.js';
 import { HUMAN_MODELS, HUMAN_ANIM, GUN_MODELS, gunModelOf, enemyModelOf } from '../data/humanModels.js';
 import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
+import { TASKS } from '../data/tasks.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
 import { dodgeOf, AIM_HEIGHT } from '../data/player.js';
 import { STEALTH } from '../data/stealth.js';
@@ -511,7 +512,15 @@ export class Renderer3D {
       const root = new THREE.Group();
       root.position.set(def.x, 0, def.y);
       let lid = null, spin = null;
-      if (def.hidden) { /* D88: the training ground's chests — the prop is drawn already */ } else if (def.kind === 'crate') {
+      let dot = null;
+      if (def.hidden) { /* D88: the training ground's chests — the prop is drawn already */ } else if (def.kind === 'search') {
+        // D141: a place to search — the white dot over it (the furniture is the level's prop)
+        dot = new THREE.Group();
+        dot.add(new THREE.Mesh(this._dotGeo || (this._dotGeo = new THREE.SphereGeometry(3.2, 12, 8)), this._dotMat || (this._dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff }))));
+        dot.add(new THREE.Mesh(this._haloGeo || (this._haloGeo = new THREE.SphereGeometry(6, 12, 8)), this._haloMat || (this._haloMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, depthWrite: false }))));
+        dot.position.y = def.h || 48;
+        root.add(dot);
+      } else if (def.kind === 'crate') {
         const body = new THREE.Mesh(new THREE.BoxGeometry(40, 12, 20).translate(0, 6, 0), olive);
         const band = new THREE.Mesh(new THREE.BoxGeometry(41, 2, 21).translate(0, 8, 0), stripe);
         lid = new THREE.Group();
@@ -544,7 +553,7 @@ export class Renderer3D {
       }
       root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
       g.add(root);
-      return { def, root, lid, spin };
+      return { def, root, lid, spin, dot };
     });
     this.pickupGroup = g;
     this.scene.add(g);
@@ -554,6 +563,11 @@ export class Renderer3D {
     for (let i = 0; i < this.pickupViews.length; i++) {
       const v = this.pickupViews[i], st = run.pickups[i];
       v.root.visible = !st.taken;
+      if (v.dot) { // D141: shown near the hero only, pulsing
+        const p = run.player, d = Math.hypot(p.x - v.def.x, p.y - v.def.y);
+        v.root.visible = !st.taken && !run.over && d <= TASKS.search.dotRange;
+        if (v.root.visible) { const k = 1 + 0.18 * Math.sin(time * 4 + i) + (d < 70 ? 0.25 : 0); v.dot.scale.setScalar(k); v.dot.position.y = (v.def.h || 48) + Math.sin(time * 2.4 + i) * 1.5; }
+      }
       if (v.lid) {
         const k = st.openedAt >= 0 ? Math.min(1, (time - st.openedAt) / 0.35) : 0;
         v.lid.rotation.x = -k * 1.9;

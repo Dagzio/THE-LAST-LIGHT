@@ -14,6 +14,9 @@ export const MODES = {
 /** The modes a level offers, in the order of MODE_IDS (a level without `modes` has the mission only). */
 export function levelModes(level) {
   if (!level || !level.modes) return ['mission'];
+  // D141 (user: the office's STEALTH / SURVIVAL tabs were for the presentation — the level is one story mission now): a
+  // level may keep its mode data (the directors, their tests) but offer the player only `menuModes`
+  if (Array.isArray(level.menuModes)) return MODE_IDS.filter((id) => level.menuModes.includes(id));
   return MODE_IDS.filter((id) => id === 'mission' || level.modes[id]);
 }
 

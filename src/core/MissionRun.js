@@ -49,6 +49,7 @@ export class MissionRun {
     this.defeat = null;
     this.victory = false;
     this.liveUntil = -Infinity; // D132: game time until which a finished run still steps (no controls)
+    this.restartPoint = null;   // D141: a story level's restart point (MissionTasks: the current objective's start)
     this.lastTime = 0;
 
     this.levelWorld = new LevelWorld(level);
@@ -384,9 +385,10 @@ export class MissionRun {
       const d = Math.hypot(p.x - pk.def.x, p.y - pk.def.y);
       if (pk.def.kind === 'crate') {
         if (pk.openedAt < 0 && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
-      } else if (pk.def.kind === 'terminal') {
-        // D85 stealth: the copy is held at the terminal (the stealth director advances it) — not a walk-over pickup
-        if (!this.has.copy && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
+      } else if (pk.def.kind === 'terminal' || pk.def.kind === 'search') {
+        // D85 stealth: the copy is held at the terminal (the stealth director advances it) — not a walk-over pickup;
+        // D141: a search spot is held the same way (MissionTasks)
+        if ((pk.def.kind === 'search' || !this.has.copy) && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
       } else if (d <= INTERACT.pickupRadius + p.radius) this._pickup(pk, time);
     }
     this.interactTarget = best;
@@ -413,6 +415,18 @@ export class MissionRun {
         }
       }
     }
+  }
+
+  /**
+   * D141: a story fact reached by a sub-task (the key card found in a search, the drive filled by the download) — as if
+   * picked up: the HUD item, the dialogue, the level's turn. Once.
+   */
+  give(fact, time = this.lastTime) {
+    if (!(fact in this.has) || this.has[fact]) return false;
+    this.has[fact] = true;
+    this.events.emit('pickup', fact, `task_${fact}`);
+    if (fact === 'drive') this._onDrive(time);
+    return true;
   }
 
   /** The level's turn: the drive is taken — the exit opens and the reinforcements come in hunting the hero. */
@@ -468,6 +482,7 @@ export class MissionRun {
     const o = this.objective;
     if (!o) return null;
     if (o.target === 'exit') { out.x = this.level.exit.x; out.y = this.level.exit.y; return out; }
+    if (Array.isArray(o.target)) { out.x = o.target[0]; out.y = o.target[1]; return out; } // D141: a point (a room, a terminal)
     // D85: a key card still carried by a living enemy — the marker follows him
     if (o.target === 'keycard') {
       const c = this.enemies.find((e) => e.alive && e.carries === 'keycard');

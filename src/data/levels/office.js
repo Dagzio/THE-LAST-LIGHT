@@ -28,6 +28,7 @@ export const OFFICE = {
   playerSpawn: { x: 1200, y: 1630, angle: -Math.PI / 2 },
   // D85: the modes of this demo level (data/modes.js resolveLevel): mission = this file as it is
   modes: { mission: {}, stealth: OFFICE_STEALTH, survival: OFFICE_SURVIVAL },
+  menuModes: ['mission'], // D141 (user): one story level — the stealth / survival rules live on as its sub-tasks
   briefing: { start: 'call.office.brief', turn: 'call.office.turn' },
 
   // rooms: floor material + the routing graph of the AI (zone → zone through doors / openings). D83: light — the
@@ -272,14 +273,31 @@ export const OFFICE = {
     { id: 'crate_smg', kind: 'crate', item: 'smg', x: 690, y: 1585 },
     { id: 'crate_grenades', kind: 'crate', item: 'grenades', count: 2, x: 1700, y: 1662 },
     // (D128: no medkits — the wounds heal by themselves)
-    { id: 'keycard', kind: 'keycard', x: 2080, y: 1290 },
-    { id: 'drive', kind: 'drive', x: 2097, y: 860 },
+    // D141 (level 1, STORY_DESIGN_D133.md): the key card is in one of the security room's cabinets (a white dot over
+    // each; which one — the run's seed); `h` — the dot's height
+    { id: 'search_cab1', kind: 'search', task: 'keycard', x: 1672, y: 1380, h: 52 },
+    { id: 'search_cab2', kind: 'search', task: 'keycard', x: 1672, y: 1404, h: 52 },
+    { id: 'search_cab3', kind: 'search', task: 'keycard', x: 1758, y: 1428, h: 52 },
+    { id: 'search_cab4', kind: 'search', task: 'keycard', x: 1780, y: 1428, h: 52 },
+    { id: 'search_cab5', kind: 'search', task: 'keycard', x: 1802, y: 1428, h: 52 },
   ],
 
-  // objectives in order; `done` — the run fact that completes it
+  // objectives in order; `done` — the run fact that completes it. D141 (level 1): `type` — a sub-task
+  // (systems/MissionTasks.js): search — the item is in one of the task's search spots; hold — the progress runs while
+  // the hero is in `zone`, its `waves` come in at fractions of it (hunting him) from `spawnPoints`; `gives` — the fact
+  // set when it is done (the drive: the level's turn — the exit opens, the reinforcements come)
   objectives: [
-    { id: 'keycard', textKey: 'obj.keycard', target: 'keycard' },
-    { id: 'drive', textKey: 'obj.drive', target: 'drive' },
+    { id: 'keycard', type: 'search', textKey: 'obj.searchKeycard', target: [1740, 1330], done: 'keycard', gives: 'keycard' },
+    {
+      id: 'drive', type: 'hold', textKey: 'obj.download', target: [2097, 840], done: 'drive', gives: 'drive',
+      zone: [1800, 250, 2150, 950], duration: 60,
+      spawnPoints: { elevator: { x: 1500, y: 1080 }, archive: { x: 330, y: 1590 }, conference: { x: 1760, y: 300 } },
+      waves: [
+        { at: 0.1, from: 'elevator', enemies: ['thug', 'thug'] },
+        { at: 0.45, from: 'archive', enemies: ['gunman', 'gunman', 'thug'] },
+        { at: 0.8, from: 'conference', enemies: ['heavy', 'gunman'] },
+      ],
+    },
     { id: 'exit', textKey: 'obj.exit', target: 'exit' },
   ],
   exit: { rect: [110, 310, 240, 490], x: 175, y: 400 },

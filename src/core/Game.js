@@ -254,7 +254,8 @@ export class Game {
   retryMap() {
     const level = getLevel(this.mapId);
     if (!this.sm.mapOver || !level) return false;
-    const cp = this.run && this.run.defeat ? this.run.checkpoint || null : null;
+    // (D141: a story level's death — from its current objective's start, MissionTasks)
+    const cp = this.run && this.run.defeat ? this.run.checkpoint || this.run.restartPoint || null : null;
     return this._startRun(level, this.modeId || 'mission', cp);
   }
 

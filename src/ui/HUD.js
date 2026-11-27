@@ -172,7 +172,7 @@ export class HUD {
   /** "E · OPEN" above the crate in reach (a button: tap opens it). */
   _crateLabel(run, running) {
     const c = this.cache, el = this.el.crate, r3 = this.game.renderer3d, it = run.interactTarget;
-    let on = running && !!it && !!r3;
+    let on = running && !!it && !!r3 && it.def.kind !== 'search'; // (D141: a search spot has its own label — _stealthHud)
     if (on) {
       r3.projectToScreen(it.def.x, it.def.y, 40, PT);
       on = !this._underHud(el, PT.x, PT.y, -1);
@@ -203,12 +203,23 @@ export class HUD {
     const it = run.interactTarget;
     if (running && m.takedownTarget && !this.game.touchMode) { key = 'takedown'; x = r3._lx(m.takedownTarget); y = r3._ly(m.takedownTarget); }
     else if (running && it && it.def.kind === 'terminal') { key = m.copying ? `copy:${Math.floor(run.copyProgress * 100)}` : 'copy'; x = it.def.x; y = it.def.y; h = 40; }
+    else if (running && it && it.def.kind === 'search') { // D141: "E · SEARCH" / "SEARCHING 60%" over the spot
+      const s = m.searching;
+      key = s && s.pk === it ? `searching:${Math.floor(s.progress * 100)}` : 'search'; x = it.def.x; y = it.def.y; h = (it.def.h || 48) + 10;
+    } else if (running && m.searchNote && run.lastTime < m.searchNote.until) { // …and what it gave: empty / found
+      key = m.searchNote.found ? 'note:found' : 'note:empty'; x = m.searchNote.x; y = m.searchNote.y; h = 58;
+    }
     if (key !== c.ctxKey) {
       c.ctxKey = key;
       el.ctx.classList.toggle('on', !!key);
       el.ctx.classList.toggle('near', !!key);
       el.ctx.classList.toggle('takedown', key === 'takedown');
+      el.ctx.classList.toggle('note', key.startsWith('note:'));
+      el.ctx.classList.toggle('found', key === 'note:found');
       if (key === 'takedown') { el.ctxKey.textContent = 'F'; el.ctxText.textContent = T('hud.takedown'); }
+      else if (key === 'search') { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.search'); }
+      else if (key.startsWith('searching:')) { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.searching', { p: key.slice(10) }); }
+      else if (key.startsWith('note:')) { el.ctxKey.textContent = ''; el.ctxText.textContent = T(key === 'note:found' ? 'hud.searchFound' : 'hud.searchEmpty'); }
       else if (key) { el.ctxKey.textContent = 'E'; el.ctxText.textContent = m.copying ? T('hud.copying', { p: Math.floor(run.copyProgress * 100) }) : T('hud.copy'); }
     }
     if (key && r3) {
@@ -438,13 +449,18 @@ export class HUD {
       this._tutFocus(m.uiFocus);
       const now = performance.now();
       if (this._tutEls.length && now >= (this._tagAt || 0)) { this._tagAt = now + 300; this._placeTags(); } // D91
-    } else if (run.modeId !== 'survival' && (objKey !== c.objKey || run.objectiveIndex !== c.objIdx)) {
-      c.objKey = objKey; c.objIdx = run.objectiveIndex;
-      el.objKicker.textContent = T('hud.objective', { n: Math.min(run.objectiveIndex + 1, run.level.objectives.length), total: run.level.objectives.length });
-      el.objText.textContent = o ? T(o.textKey) : '';
-      this._fitObjective();
-      el.objective.classList.remove('pop'); void el.objective.offsetWidth; el.objective.classList.add('pop');
-      invalidateHudBlockers();
+    } else if (run.modeId !== 'survival') {
+      // D141: a hold shows its per cent in the text ("… (45%)") — rewritten only when it changes
+      const pr = run.mode && run.mode.objectiveProgress ? run.mode.objectiveProgress() : null;
+      const fullKey = `${objKey}|${pr}`;
+      if (fullKey !== c.objKey || run.objectiveIndex !== c.objIdx) {
+        const fresh = run.objectiveIndex !== c.objIdx || !c.objKey.startsWith(`${objKey}|`);
+        c.objKey = fullKey; c.objIdx = run.objectiveIndex;
+        el.objKicker.textContent = T('hud.objective', { n: Math.min(run.objectiveIndex + 1, run.level.objectives.length), total: run.level.objectives.length });
+        el.objText.textContent = o ? T(o.textKey, { p: pr ?? 0 }) : '';
+        this._fitObjective();
+        if (fresh) { el.objective.classList.remove('pop'); void el.objective.offsetWidth; el.objective.classList.add('pop'); invalidateHudBlockers(); }
+      }
     }
     if (innerWidth !== c.objW) this._fitObjective(); // D91: a resize / turn refits the objective
     const levelKey = run.level.nameKey;
