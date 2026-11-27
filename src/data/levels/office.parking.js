@@ -67,7 +67,9 @@ export const PARKING = {
   props: [
     // --- the street: a lantern, a tree in its pit, bollards along the kerb
     { type: 'street_lantern', x: 2318, y: 1736 },
-    { type: 'tree_pit', x: 2040, y: 1748 }, { type: 'street_tree', x: 2040, y: 1748 },
+    // (the tree's picture leans back over what is north of it: at the east end, beyond it only the dark behind the fence —
+    // at the office's wall its crown lay over the manager's room)
+    { type: 'tree_pit', x: 2238, y: 1752 }, { type: 'street_tree', x: 2238, y: 1752 },
     ...[2150, 2210, 2270, 2330].map((x) => ({ type: 'street_bollard', x, y: 1786 })),
     // --- the ramp: cones at its foot
     { type: 'traffic_cone', x: 1990, y: 2400 }, { type: 'traffic_cone', x: 2110, y: 2400 },

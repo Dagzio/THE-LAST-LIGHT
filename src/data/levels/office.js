@@ -28,7 +28,7 @@ export const OFFICE = {
   wallHeight: 78,
   wallThickness: 20,
   buildingRect: [250, 250, 2150, 1700], // (the office floor itself — its façade gets the night windows)
-  playerSpawn: { x: 2250, y: 1750, angle: Math.PI / 2 }, // D145: on the street, by the parking ramp
+  playerSpawn: { x: 2100, y: 1756, angle: Math.PI / 2 }, // D145: on the street, by the parking ramp
   // D85: the modes of this demo level (data/modes.js resolveLevel): mission = this file as it is
   modes: { mission: {}, stealth: OFFICE_STEALTH, survival: OFFICE_SURVIVAL },
   menuModes: ['mission'], // D141 (user): one story level — the stealth / survival rules live on as its sub-tasks
