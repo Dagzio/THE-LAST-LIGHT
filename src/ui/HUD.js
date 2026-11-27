@@ -203,12 +203,12 @@ export class HUD {
     // the context label over the target
     let key = '', x = 0, y = 0, h = 66;
     const it = run.interactTarget;
-    if (running && m.takedownTarget && !this.game.touchMode) { key = 'takedown'; x = r3._lx(m.takedownTarget); y = r3._ly(m.takedownTarget); }
+    if (running && m.takedownTarget && !this.game.touchMode) { key = m.takedownTarget.capture ? 'capture' : 'takedown'; x = r3._lx(m.takedownTarget); y = r3._ly(m.takedownTarget); } // (D148: the dispatcher — taken alive)
     else if (running && it && it.def.kind === 'terminal') { key = m.copying ? `copy:${Math.floor(run.copyProgress * 100)}` : 'copy'; x = it.def.x; y = it.def.y; h = 40; }
     else if (running && it && it.def.kind === 'activate') { key = 'activate'; x = it.def.x; y = it.def.y; h = 44; } // D143: "E · START"
-    else if (running && it && it.def.kind === 'search') { // D141: "E · SEARCH" / "SEARCHING 60%" over the spot
-      const s = m.searching;
-      key = s && s.pk === it ? `searching:${Math.floor(s.progress * 100)}` : 'search'; x = it.def.x; y = it.def.y; h = (it.def.h || 48) + 10;
+    else if (running && it && (it.def.kind === 'search' || it.def.kind === 'inspect')) { // D141: "E · SEARCH" / "SEARCHING 60%" over the spot (D148: "E · EXAMINE")
+      const s = m.searching, ins = it.def.kind === 'inspect';
+      key = s && s.pk === it ? `${ins ? 'inspecting' : 'searching'}:${Math.floor(s.progress * 100)}` : ins ? 'inspect' : 'search'; x = it.def.x; y = it.def.y; h = (it.def.h || 48) + 10;
     } else if (running && m.searchNote && run.lastTime < m.searchNote.until) { // …and what it gave: empty / found
       key = m.searchNote.found ? 'note:found' : 'note:empty'; x = m.searchNote.x; y = m.searchNote.y; h = 58;
     }
@@ -216,10 +216,13 @@ export class HUD {
       c.ctxKey = key;
       el.ctx.classList.toggle('on', !!key);
       el.ctx.classList.toggle('near', !!key);
-      el.ctx.classList.toggle('takedown', key === 'takedown');
+      el.ctx.classList.toggle('takedown', key === 'takedown' || key === 'capture');
       el.ctx.classList.toggle('note', key.startsWith('note:'));
       el.ctx.classList.toggle('found', key === 'note:found');
       if (key === 'takedown') { el.ctxKey.textContent = 'F'; el.ctxText.textContent = T('hud.takedown'); }
+      else if (key === 'capture') { el.ctxKey.textContent = 'F'; el.ctxText.textContent = T('hud.capture'); } // D148
+      else if (key === 'inspect') { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.inspect'); }
+      else if (key.startsWith('inspecting:')) { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.inspecting', { p: key.slice(11) }); }
       else if (key === 'search') { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.search'); }
       else if (key === 'activate') { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T((it && it.def.label) || 'hud.activate'); } // (D146: the alarm panel's own words)
       else if (key.startsWith('searching:')) { el.ctxKey.textContent = 'E'; el.ctxText.textContent = T('hud.searching', { p: key.slice(10) }); }
@@ -409,13 +412,15 @@ export class HUD {
     const mag = Number.isFinite(w.reserve) ? w.reserve : w.stats.magazineSize;
     if (mag !== c.mag) { c.mag = mag; el.mag.textContent = String(mag); }
     // D85: the first slot is the mode's pistol; D88: three slots (pistol, SMG, M4A1) — the M4A1 slot only once seen
-    const slotIds = [run.slotWeapon(0) || HERO_WEAPONS[0], HERO_WEAPONS[1], HERO_WEAPONS[2]].filter((id, i) => i < 2 || run.inventory.includes(id));
-    const slots = slotIds.map((id, i) => (run.inventory.includes(id) ? (id === w.weaponId ? `[${i + 1}]` : String(i + 1)) : '')).join(' ') + `|${this._tutSlot || 0}`;
+    // D148: a fourth slot — the sniper rifle, once carried
+    const slotIds = [run.slotWeapon(0) || HERO_WEAPONS[0], HERO_WEAPONS[1], HERO_WEAPONS[2], HERO_WEAPONS[3]].filter((id, i) => i < 2 || run.inventory.includes(id));
+    const slotN = (id) => Math.max(0, HERO_WEAPONS.indexOf(id)) + 1; // (the key of its slot: 1 the pistols … 4 the sniper rifle)
+    const slots = slotIds.map((id) => (run.inventory.includes(id) ? (id === w.weaponId ? `[${slotN(id)}]` : String(slotN(id))) : '')).join(' ') + `|${this._tutSlot || 0}`;
     if (slots !== c.slots) {
       c.slots = slots;
       el.slots.replaceChildren(...slotIds.map((id, i) => {
         const s = document.createElement('i');
-        s.textContent = String(i + 1);
+        s.textContent = String(slotN(id));
         s.dataset.weapon = id; // D91: a tap on a slot takes that weapon (UIManager)
         s.className = `slot${run.inventory.includes(id) ? '' : ' none'}${id === w.weaponId ? ' on' : ''}${this._tutSlot === i + 1 && id !== w.weaponId ? ' tut-slot' : ''}`; // D93
         return s;

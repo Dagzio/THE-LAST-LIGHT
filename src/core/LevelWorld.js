@@ -15,7 +15,9 @@ export const DOOR = {
 
 // D88: the training ground's mesh fences / gates stop walkers only (seen and shot through)
 // D117 (user: rounds flew through the office glass): glass walls / doors stop walkers AND rounds (seen through)
-const WALL_BLOCKS = { glass: BLOCK.MOVE | BLOCK.BULLET, fence: BLOCK.MOVE };
+// D148: a parapet / the ship's bulwark — low: stops walkers, hides a crouching hero (low cover); a railing and an edge
+// (a roof's drop, the water — never drawn) stop walkers only
+const WALL_BLOCKS = { glass: BLOCK.MOVE | BLOCK.BULLET, fence: BLOCK.MOVE, rail: BLOCK.MOVE, edge: BLOCK.MOVE, parapet: BLOCK.MOVE | BLOCK.LOW, bulwark: BLOCK.MOVE | BLOCK.LOW };
 const DOOR_BLOCKS = { glass: BLOCK.MOVE | BLOCK.BULLET, gate: BLOCK.MOVE };
 
 export class LevelWorld {
@@ -30,6 +32,7 @@ export class LevelWorld {
       for (const [a, b] of wallPieces(w, h)) {
         const s = w.y0 === w.y1 ? this.world.addBox(a, w.y0 - h, b, w.y0 + h, 'wall', blocks) : this.world.addBox(w.x0 - h, a, w.x0 + h, b, 'wall', blocks);
         if (blocks === BLOCK.ALL) s.cover = 'high'; // D82: solid walls are high cover (glass is not)
+        else if (blocks & BLOCK.LOW) s.cover = 'low'; // D148: a parapet — crouch behind it
       }
     }
     // furniture: every standing object collides; bullets / sight by its height (data/props.js propBlocks); D82: cover

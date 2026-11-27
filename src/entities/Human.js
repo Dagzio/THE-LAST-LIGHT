@@ -45,6 +45,16 @@ export class Human {
     // off the hero's cover), and his rounds × damageMult (the ambush hurts enough to show the wounds healing)
     this.leash = Array.isArray(spawn.leash) ? spawn.leash : null;
     this.avoid = spawn.avoid || null; // D132: { x, y, r, south } — a spot he keeps away from (the hero's first cover)
+    // D148 (Marseille): the man to be taken alive (MissionTasks 'capture') and where he runs when alarmed; a sniper woken
+    // by an objective (`wakeOn`: idle and blind until it starts); a body lying there from the start (Moro) that never fades
+    this.capture = !!spawn.capture;
+    this.captured = false;
+    this.fleeTo = spawn.flee || null;
+    this.wakeOn = spawn.wakeOn || null;
+    this.active = !spawn.wakeOn;
+    this.noFade = !!spawn.noFade || !!spawn.dead;
+    this.elev = spawn.elev || 0; // D148 presentation: drawn this high (the sniper on the crane's walkway)
+    if (spawn.carries) this.carries = spawn.carries;
     if (spawn.damageMult > 0) weapon = { ...weapon, damage: weapon.damage * spawn.damageMult };
     this.gun = {
       stats: weapon,
@@ -86,7 +96,11 @@ export class Human {
       sideUntil: 0,
       sideX: 0,
       sideY: 0,
+      aim: 0,                // D148: a sniper's aim (0…1 along his laser)
+      goalX: NaN,            // D148: where an attacker heads (mode 'assault') / a fleeing man runs (mode 'flee')
+      goalY: NaN,
     };
+    if (spawn.dead) { this.state = HUMAN_STATES.DEAD; this.hp = 0; this.deathAt = -1000; this.reported = true; } // D148: Moro
   }
 
   get alive() { return this.state !== HUMAN_STATES.DEAD; }

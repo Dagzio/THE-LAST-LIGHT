@@ -137,6 +137,8 @@ export class MissionRun {
         this.particles.burst(x, y, 7, 150, 0.28, 2.4, '#b3261e');
       }),
       events.on('bulletBlocked', (x, y) => this.particles.burst(x, y, 4, 120, 0.16, 1.8, '#d7d2c8')),
+      // D148: a round stopped by a shield — sparks off the steel, and the trooper knows where it came from
+      events.on('shieldHit', (x, y, e) => { this.particles.burst(x, y, 7, 170, 0.14, 2, '#ffe2a0'); if (e && e.ai) this.ai.onHit(e, this.player, this.lastTime); }),
       events.on('grenadeBlast', (type, x, y, r) => {
         this.particles.burst(x, y, 26, r * 2.4, 0.5, 3, '#ffb070');
         if (this.ai.stealth) this.noise(x, y, 700, 'loud');
@@ -343,7 +345,7 @@ export class MissionRun {
     pk.openedAt = time;
     const d = pk.def, count = pk.count || 1; // D85: the survival director fills its crates
     let item = pk.item;
-    if (item === 'smg' || item === 'rifle') {
+    if (WEAPONS[item] && !WEAPONS[item].hostile) { // (D148: any gun of the hero — the stash's silenced pistol, the sniper rifle)
       if (this.inventory.includes(item)) item = 'ammo-' + item; // D88: carried already → its reserve is topped up
       this.giveWeapon(pk.item);
     } else if (item === 'grenades') {
@@ -353,6 +355,7 @@ export class MissionRun {
       for (const id of this.inventory) { const w = this.weaponStates[id]; this.giveAmmo(w.stats.ammo, w.stats.magazineSize * count); }
     }
     this.events.emit('crateOpened', item, count, d.id);
+    if (d.gives) this.give(d.gives, time); // D148: a story stash (the flat's bath — the objective's fact)
     // D112 (user): a crate picked up is gone at once (not on the training ground: its chests stay and refill)
     if (!this.level.manualCrates) pk.taken = true;
     this.interactTarget = null;
@@ -385,7 +388,7 @@ export class MissionRun {
       const d = Math.hypot(p.x - pk.def.x, p.y - pk.def.y);
       if (pk.def.kind === 'crate') {
         if (pk.openedAt < 0 && d <= INTERACT.radius + p.radius && d < bestD) { best = pk; bestD = d; }
-      } else if (pk.def.kind === 'terminal' || pk.def.kind === 'search' || pk.def.kind === 'activate') {
+      } else if (pk.def.kind === 'terminal' || pk.def.kind === 'search' || pk.def.kind === 'activate' || pk.def.kind === 'inspect') { // (D148: a scene's spot)
         // D85 stealth: the copy is held at the terminal (the stealth director advances it) — not a walk-over pickup;
         // D141: a search spot is held the same way, a computer to start is pressed (MissionTasks). D143 (user: searched
         // through a wall): those only from their own room
@@ -405,6 +408,7 @@ export class MissionRun {
       if (e.ammoDrop > 0) e.ammoDrop -= this.giveAmmo(e.ammoType, e.ammoDrop); // what does not fit stays on him
       if (!e.carries) continue;
       if (e.carries === 'keycard') this.has.keycard = true;
+      else if (e.carries in this.has) this.has[e.carries] = true; // D148: a story item (the liquidation order)
       this.events.emit('pickup', e.carries, `loot_${e.id}`);
       e.carries = null;
     }
@@ -427,6 +431,8 @@ export class MissionRun {
   give(fact, time = this.lastTime) {
     if (!(fact in this.has) || this.has[fact]) return false;
     this.has[fact] = true;
+    // D148: a door locked on a story fact opens with it (level 3: the pier gate after the talk, the gangway lowered)
+    for (const dr of this.doors) if (dr.def.lock === fact && dr.locked) { dr.locked = false; this.events.emit('doorUnlocked', dr.id); }
     this.events.emit('pickup', fact, `task_${fact}`);
     if (fact === 'drive') this._onDrive(time);
     return true;
@@ -490,9 +496,9 @@ export class MissionRun {
     if (this.mode && this.mode.taskTarget) { const t = this.mode.taskTarget(out); if (t !== undefined) return t; } // D143: sub-tasks
     if (o.target === 'exit') { out.x = this.level.exit.x; out.y = this.level.exit.y; return out; }
     if (Array.isArray(o.target)) { out.x = o.target[0]; out.y = o.target[1]; return out; } // D141: a point (a room, a terminal)
-    // D85: a key card still carried by a living enemy — the marker follows him
-    if (o.target === 'keycard') {
-      const c = this.enemies.find((e) => e.alive && e.carries === 'keycard');
+    // D85: a key card still carried by a living enemy — the marker follows him (D148: any carried item; on his body too)
+    if (typeof o.target === 'string') {
+      const c = this.enemies.find((e) => e.alive && e.carries === o.target) || this.enemies.find((e) => e.carries === o.target);
       if (c) { out.x = c.x; out.y = c.y; return out; }
     }
     const pk = this.pickups.find((k) => k.def.id === o.target);
@@ -558,7 +564,7 @@ export class MissionRun {
     if (input.consumePressed('switchWeapon')) this.switchWeapon();
     if (input.consumePressed('switchWeaponPrev')) this.switchWeapon(null, -1);
     // D88: 1 / 2 / 3 — the pistol / SMG / M4A1 slots (a slot not carried does nothing)
-    for (let n = 0; n < 3; n++) if (input.consumePressed(`weapon${n + 1}`)) { const id = this.slotWeapon(n); if (id) this.switchWeapon(id); }
+    for (let n = 0; n < 4; n++) if (input.consumePressed(`weapon${n + 1}`)) { const id = this.slotWeapon(n); if (id) this.switchWeapon(id); }
     if (input.consumePressed('interact')) this.interact(time);
 
     // D93 (user): the mobile version no longer fires by itself — the aim locks onto the nearest target in reach (aim
@@ -595,7 +601,7 @@ export class MissionRun {
 
     for (let i = this.enemies.length - 1; i >= 0; i--) { // bodies vanish after a long while (never during a fight)
       const e = this.enemies[i];
-      if (!e.alive && time - e.deathAt > this.bodyFade) this.enemies.splice(i, 1);
+      if (!e.alive && !e.noFade && time - e.deathAt > this.bodyFade) this.enemies.splice(i, 1); // (D148: Moro stays)
     }
     this.particles.update(dt);
   }

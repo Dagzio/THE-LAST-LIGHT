@@ -20,7 +20,7 @@ export class DialogueView {
     this.full = '';
     this.run = null;
     if (!this.el.root) return;
-    for (const s of Object.values(SPEAKERS)) new Image().src = s.portrait; // warm the cache
+    for (const s of Object.values(SPEAKERS)) if (s.portrait) new Image().src = s.portrait; // warm the cache
     this.el.next.addEventListener('click', (e) => { e.stopPropagation(); Sfx.play('click'); this.next(); });
     this.el.skip.addEventListener('click', (e) => { e.stopPropagation(); Sfx.play('click'); this.close(); });
     // the frame itself: a tap anywhere on it works like NEXT
@@ -98,7 +98,9 @@ export class DialogueView {
     const sp = SPEAKERS[who] || SPEAKERS.handler;
     const right = sp.side === 'right';
     this.el.root.classList.toggle('right', right);
-    if (this.el.portrait.getAttribute('src') !== sp.portrait) {
+    // D148: a speaker without a portrait (the dispatcher) — its place kept empty, only the name on the plate
+    this.el.portrait.classList.toggle('none', !sp.portrait);
+    if (sp.portrait && this.el.portrait.getAttribute('src') !== sp.portrait) {
       this.el.portrait.src = sp.portrait;
       this.el.portrait.style.animation = 'none'; void this.el.portrait.offsetWidth; this.el.portrait.style.animation = '';
     }

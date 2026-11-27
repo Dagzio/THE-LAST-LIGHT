@@ -3,6 +3,9 @@
 // (half the distance through walls), and an enemy who spots the hero alerts the others near him.
 // Modes: idle (post) / patrol → alert (go to the last known spot through the rooms) → combat (face, keep a distance,
 // strafe, shoot bursts after a reaction time) → search (look around) → return (back to the post / patrol).
+// D148 (Marseille): flee (an unarmed man alarmed runs for his way out — reached: 'escaped'), assault (an attacker
+// heads for a spot through the rooms, shooting at the hero on the way, never stopping to fight), and the sniper (never
+// moves; once woken his laser holds on the hero in sight for `aim` s, then the shot — lost sight, the aim falls back).
 // Movement slides along walls and furniture; the room route comes from LevelWorld (rule 14: no A* / navmesh).
 // Everything runs on the game clock; randomness comes from the run's seeded RNG.
 import { AI_TUNING as T } from '../data/humans.js';
@@ -51,6 +54,7 @@ export class HumanAISystem {
       const g = e.gun, ai = e.ai;
       if (ai.mode === 'grabbed' || e.dummy) { e.vx = 0; e.vy = 0; continue; } // D85: held in a takedown; D88: a dummy
       if (g.reloading && time >= g.reloadEndsAt) { g.reloading = false; g.ammo = g.stats.magazineSize; g.burstLeft = g.stats.burst || 1; }
+      if (e.type.sniper) { this._sniper(e, player, dt, time); continue; } // D148
       if (time >= ai.thinkAt) {
         ai.thinkAt = time + T.thinkInterval * (0.85 + 0.3 * this.rng.next());
         if (this.stealth && ai.mode !== 'combat') this._perceiveStealth(e, player, time);
@@ -212,7 +216,16 @@ export class HumanAISystem {
 
   _perceive(e, p, enemies, time) {
     const ai = e.ai;
+    if (ai.mode === 'flee') { ai.sees = false; return; } // D148: running, he looks only where he runs
     let sees = this._sees(e, p);
+    // D148: an attacker keeps heading for his spot — he only notes the hero to shoot at him on the way
+    if (ai.mode === 'assault') {
+      if (sees && !ai.sees) ai.reactAt = Math.max(ai.reactAt, time + e.type.reaction);
+      if (sees) { ai.lastSeenX = p.x; ai.lastSeenY = p.y; ai.lastSeenAt = time; ai.aware = true; }
+      ai.sees = sees;
+      return;
+    }
+    if (sees && e.type.unarmed) { this.flee(e, time); ai.sees = false; return; } // D148: the dispatcher runs
     // D126: a hero in cover, only partly showing, is not spotted at once — the glimpse builds by the part seen
     const C = T.coverSpot, gdt = Number.isFinite(ai.glimpseAt) ? Math.min(0.5, time - ai.glimpseAt) : 0;
     ai.glimpseAt = time;
@@ -253,12 +266,65 @@ export class HumanAISystem {
   /** Something suspicious at (x, y): go and look (never interrupts a fight). */
   alert(e, x, y, time) {
     const ai = e.ai;
-    if (!e.alive || ai.mode === 'combat') return;
+    if (!e.alive || ai.mode === 'combat' || ai.mode === 'flee' || ai.mode === 'assault' || ai.mode === 'grabbed') return;
+    if (e.type.unarmed && e.fleeTo) { this.flee(e, time); return; } // D148
     ai.mode = 'alert';
     ai.aware = true;
     ai.lastSeenX = x; ai.lastSeenY = y;
     ai.reactAt = time + e.type.reaction * 0.6;
     ai.routeGoalX = NaN; // new route
+  }
+
+  /** D148: an unarmed man alarmed runs for his way out (`fleeTo`); with none he stays put. */
+  flee(e, time) {
+    const ai = e.ai;
+    if (!e.alive || !e.fleeTo || e.captured || ai.mode === 'flee' || ai.mode === 'grabbed') return;
+    ai.mode = 'flee'; ai.aware = true; ai.goalX = e.fleeTo[0]; ai.goalY = e.fleeTo[1]; ai.routeGoalX = NaN;
+    ai.progressAt = time; ai.progressX = e.x; ai.progressY = e.y;
+    this.events.emit('flees', e);
+  }
+
+  /** D148: an attacker heads for (gx, gy) — shooting at the hero on the way, never turning to hunt him. */
+  assault(e, gx, gy, time) {
+    const ai = e.ai;
+    if (!e.alive) return;
+    ai.mode = 'assault'; ai.aware = true; ai.goalX = gx; ai.goalY = gy; ai.routeGoalX = NaN;
+    ai.reactAt = time + e.type.reaction;
+    ai.progressAt = time; ai.progressX = e.x; ai.progressY = e.y;
+  }
+
+  /**
+   * D148: the sniper — he stands; woken (`active`), the hero in sight within his range: his laser holds on him and
+   * `ai.aim` fills over `aim` s (lost sight: it falls back); full — the shot (not bound to the screen: the laser is the
+   * warning), then a pause of `after` s.
+   */
+  _sniper(e, p, dt, time) {
+    const S = e.type.sniper, ai = e.ai, g = e.gun;
+    e.vx = 0; e.vy = 0;
+    const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy);
+    const sees = e.active && p.alive && d <= e.type.view.range
+      && this.world.clear(e.x, e.y, p.x, p.y, null, p.lowProfile ? BLOCK.SIGHT | BLOCK.LOW : BLOCK.SIGHT);
+    ai.sees = sees;
+    if (sees) {
+      if (!ai.aware) this.events.emit('spotted', e);
+      ai.mode = 'combat'; ai.aware = true; ai.lastSeenX = p.x; ai.lastSeenY = p.y; ai.lastSeenAt = time;
+      const da = angDiff(Math.atan2(dy, dx), e.faceAngle), mt = 3 * dt;
+      e.faceAngle += Math.abs(da) <= mt ? da : Math.sign(da) * mt;
+    }
+    if (time < g.nextShotAt || g.reloading) { ai.aim = 0; return; }
+    ai.aim = sees ? Math.min(1, ai.aim + dt / S.aim) : Math.max(0, ai.aim - dt * S.lose);
+    if (ai.aim < 1) return;
+    ai.aim = 0;
+    g.nextShotAt = time + S.after;
+    const s = g.stats, a = Math.atan2(dy, dx) + (this.rng.next() - 0.5) * (s.spreadAngle * Math.PI) / 180 * (p.dodging ? 6 : 1);
+    const b = this.pool.spawn();
+    if (!b) return;
+    b.x = b.prevX = e.x + Math.cos(a) * 20; b.y = b.prevY = e.y + Math.sin(a) * 20;
+    b.vx = Math.cos(a) * s.projectileSpeed; b.vy = Math.sin(a) * s.projectileSpeed;
+    b.angle = a; b.maxDistance = s.range * 1.1; b.hitsLeft = 1; b.weaponId = s.id; b.stats = s; b.hostile = true; b.spawnedAt = time;
+    g.ammo -= 1; g.lastShotAt = time;
+    if (g.ammo <= 0) this._reload(e, time);
+    this.events.emit('enemyShot', b.x, b.y, a, s.id, e);
   }
 
   /** A shot / blast heard at (x, y) with this loudness (units). */
@@ -360,6 +426,27 @@ export class HumanAISystem {
         }
         break;
       }
+      case 'flee': { // D148: for his way out at a run; reached — gone
+        if (!this._next(e, ai.goalX, ai.goalY, NEXT)) {
+          if (Math.hypot(e.x - ai.goalX, e.y - ai.goalY) < 60) { if (!e.escaped) { e.escaped = true; this.events.emit('escaped', e); } }
+          else ai.routeGoalX = NaN; // (knocked off his way — a new one next step)
+          break;
+        }
+        const dx = NEXT.x - e.x, dy = NEXT.y - e.y, d = Math.hypot(dx, dy) || 1;
+        mx = dx / d; my = dy / d; speed = S.combat; face = Math.atan2(dy, dx); turn = 8;
+        break;
+      }
+      case 'assault': { // D148: to his spot, the gun on the hero while he sees him
+        turn = 7;
+        const there = !this._next(e, ai.goalX, ai.goalY, NEXT);
+        if (there && Math.hypot(e.x - ai.goalX, e.y - ai.goalY) > 60) ai.routeGoalX = NaN; // (off his way: a new one)
+        if (!there) {
+          const dx = NEXT.x - e.x, dy = NEXT.y - e.y, d = Math.hypot(dx, dy) || 1;
+          mx = dx / d; my = dy / d; speed = S.combat * (ai.sees ? 0.8 : 1); face = Math.atan2(dy, dx);
+        }
+        if (ai.sees) face = Math.atan2(p.y - e.y, p.x - e.x);
+        break;
+      }
       case 'search': {
         const k = time - (ai.searchStart || time);
         face = (ai.lookBase || 0) + Math.sin(k * 1.4) * 1.3;
@@ -389,7 +476,7 @@ export class HumanAISystem {
           const s = (e.id + Math.floor(time)) % 2 ? 1 : -1;
           ai.sideX = -my * s; ai.sideY = mx * s; ai.sideUntil = time + 0.5;
           mx = ai.sideX; my = ai.sideY;
-          if (ai.mode === 'alert' || ai.mode === 'return') ai.routeIdx = Math.min(ai.routeIdx + 1, ai.route.length); // skip a waypoint it cannot reach
+          if (ai.mode === 'alert' || ai.mode === 'return' || ai.mode === 'flee' || ai.mode === 'assault') ai.routeIdx = Math.min(ai.routeIdx + 1, ai.route.length); // skip a waypoint it cannot reach
         }
         ai.progressAt = time; ai.progressX = e.x; ai.progressY = e.y;
       }
@@ -422,7 +509,7 @@ export class HumanAISystem {
   // ---------------- shooting ----------------
   _shoot(e, p, time) {
     const ai = e.ai, g = e.gun, s = g.stats;
-    if (e.harmless || ai.mode !== 'combat' || !ai.sees || !p.alive || time < ai.reactAt || g.reloading) return; // D88
+    if (e.harmless || (ai.mode !== 'combat' && ai.mode !== 'assault') || !ai.sees || !p.alive || time < ai.reactAt || g.reloading) return; // D88 (D148: an attacker on his way too)
     if (!this._onScreen(e)) return; // D82: never from off the screen
     const to = Math.atan2(p.y - e.y, p.x - e.x);
     if (Math.abs(angDiff(to, e.faceAngle)) > 0.3 || time < g.nextShotAt) return;

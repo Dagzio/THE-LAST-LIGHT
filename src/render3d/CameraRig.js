@@ -26,10 +26,17 @@ export class CameraRig {
     this.cfg = cfg;
     this.x = 0;
     this.y = 0;
-    this.view = viewExtents(16 / 9, cfg);
+    this.zoom = 1;
+    this.base = viewExtents(16 / 9, cfg);
+    this.view = this.base;
   }
 
-  setAspect(aspect) { this.view = viewExtents(aspect, this.cfg); }
+  setAspect(aspect) { this.base = viewExtents(aspect, this.cfg); this._apply(); }
+
+  /** D148: a zone's zoom (the watch platform sees further): the view is the base × this. */
+  setZoom(z) { this.zoom = z > 0 && Number.isFinite(z) ? z : 1; this._apply(); }
+
+  _apply() { const z = this.zoom || 1; this.view = z === 1 ? this.base : { w: this.base.w * z, h: this.base.h * z }; }
 
   /** Instantly centre on a point (map start). */
   snap(x, y, mapW, mapH) {

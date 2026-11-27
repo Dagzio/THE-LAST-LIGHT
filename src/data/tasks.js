@@ -9,4 +9,12 @@ export const TASKS = {
   hold: {
     waveWarn: 2,        // s: a wave's entry point is marked this long before it comes in
   },
+  // D148 (Marseille): a scene's spot is looked at faster than a search (nothing to dig through)
+  inspect: {
+    hold: 0.9,
+  },
+  // D148: [ПРИКРЫТИЕ СВЕРХУ] — no new group in the last seconds (the crew is nearly done)
+  defend: {
+    lastWave: 10,
+  },
 };

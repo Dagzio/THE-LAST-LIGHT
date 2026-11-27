@@ -10,6 +10,8 @@ import * as THREE from '../../lib/three.module.js';
 import { PROP_VIEW_ATLAS } from '../data/propViews.js';
 import { TRAINING_VIEW_ATLAS } from '../data/trainingViews.js';
 import { MARSEILLE_L01_VIEW_ATLAS } from '../data/views/marseille_l01.js';
+import { MARSEILLE_L02_VIEW_ATLAS } from '../data/views/marseille_l02.js';
+import { MARSEILLE_L03_VIEW_ATLAS } from '../data/views/marseille_l03.js';
 import { PROP_MODELS } from '../data/propModels.js';
 import { PROP_TYPES } from '../data/props.js';
 import { lightAt } from './officeLights.js';
@@ -26,13 +28,31 @@ const VIEW_GAIN = 0.9;     // …plus the baked lights around (lamps, screens)
 const VIEW_MAX = 1.9;
 const LT = [0, 0, 0];
 
-export const VIEW_ATLASES = { office: PROP_VIEW_ATLAS, training: TRAINING_VIEW_ATLAS, marseille_l01: MARSEILLE_L01_VIEW_ATLAS };
+export const VIEW_ATLASES = {
+  office: PROP_VIEW_ATLAS, training: TRAINING_VIEW_ATLAS, marseille_l01: MARSEILLE_L01_VIEW_ATLAS,
+  marseille_l02: MARSEILLE_L02_VIEW_ATLAS, marseille_l03: MARSEILLE_L03_VIEW_ATLAS, // D148
+};
 /** D145: the atlases loaded at start; a story location's level atlas loads with its level (weight: never before). */
 const GLOBAL_ATLASES = ['office', 'training'];
 const textures = {};
 
 /** D145: the view atlases created so far (anisotropy updates). */
 export const loadedViewAtlases = () => Object.keys(textures);
+
+/**
+ * D148 (memory on phones: a level atlas is ~40 MB in the GPU with its mips): a story level's atlases not wanted by the
+ * level now built are let go (the start-up ones stay). → the atlases released (their materials are dropped by the caller).
+ */
+export function releaseViewAtlases(keep) {
+  const out = [];
+  for (const k of Object.keys(textures)) {
+    if (GLOBAL_ATLASES.includes(k) || keep.includes(k)) continue;
+    textures[k].dispose();
+    delete textures[k];
+    out.push(k);
+  }
+  return out;
+}
 
 /** The view atlas texture (loaded once per atlas). */
 export function propViewTexture(aniso = 4, atlas = 'office') {
@@ -344,7 +364,7 @@ function cellFaces(m, item, A, W, D, H, surf, outline, faces) {
   const front = item.front || item.back;
   const s = Math.min(1, Math.max(0.03, surf)), Hs = H * s;
   if (item.top) { const g = quad(item.top, W, D, A); g.rotateX(-Math.PI / 2); g.translate(0, Hs, 0); faces.push(g); }
-  if (outline && !m.box) {
+  if (outline && !m.box && front) { // (D148: a picture with the top view only — a rug, a stain — has no sides to wrap)
     const inset = Math.min(1, 0.02 * Math.min(W, D)); // units (≤ 1)
     for (const loop of outline) faces.push(outlineWalls(loop, W, D, H, item, A, Hs, inset));
   } else {

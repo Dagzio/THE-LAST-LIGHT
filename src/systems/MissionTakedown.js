@@ -4,6 +4,7 @@
 // knows nothing of the hero (not fighting, not alerted, not searching) can be taken. Pure simulation, game clock only.
 import { StealthDirector } from './StealthDirector.js';
 import { MissionTasks } from './MissionTasks.js';
+import { STEALTH } from '../data/stealth.js';
 
 export class MissionTakedown {
   /** @param {import('../core/MissionRun.js').MissionRun} run */
@@ -40,7 +41,9 @@ export class MissionTakedown {
       return;
     }
     const e = this._findTakedown();
-    this.takedownTarget = e && !e.ai.aware && e.ai.mode !== 'search' && !e.ai.investigate && !(e.ai.suspicion > 0.3) ? e : null;
+    // D148: the man to be taken alive can be caught from behind running too (the hero is faster)
+    const runner = e && e.capture && e.ai.mode === 'flee';
+    this.takedownTarget = e && !e.captured && (runner || (!e.ai.aware && e.ai.mode !== 'search' && !e.ai.investigate && !(e.ai.suspicion > 0.3))) ? e : null;
     if (this.takedownTarget) {
       const viaE = !run.interactTarget && input.consumePressed('interact'); // (touch: the context button; as in stealth)
       if (input.consumePressed('takedown') || viaE) this._startTakedown(this.takedownTarget, time);
@@ -48,9 +51,26 @@ export class MissionTakedown {
   }
 
   update(dt, time) { if (this.tasks) this.tasks.update(dt, time); }
+
+  /** D148: the searchlights of the level (the renderer draws them), or null. */
+  get searchlights() { return this.tasks && this.tasks.lights ? this.tasks.lights.list : null; }
+
+  /**
+   * The takedown's timeline (the stealth run's). D148: the man to be taken alive — the blow lands, he goes down on his
+   * knees alive (no kill, no noise); the rest of the clip plays as usual.
+   */
+  _takedownStep(time) {
+    const td = this.run.player.takedown, e = td && td.e;
+    if (e && e.capture && !td.killed && !(this.run.player.lastHitAt > td.t0) && time - td.t0 >= STEALTH.takedown.killAt) {
+      td.killed = true; // (the timeline's "kill" moment — he is only knocked down)
+      if (this.tasks) this.tasks.capture(e); else { e.captured = true; e.ai.mode = 'grabbed'; }
+      this.run.stats.takedowns += 1;
+    }
+    StealthDirector.prototype._takedownStep.call(this, time);
+    if (e && e.captured) { e.ai.mode = 'grabbed'; e.crouch = true; } // (the end of the clip leaves him kneeling, held)
+  }
 }
 
 // the takedown itself — the stealth run's (one rule set, one clip timeline)
 MissionTakedown.prototype._findTakedown = StealthDirector.prototype._findTakedown;
 MissionTakedown.prototype._startTakedown = StealthDirector.prototype._startTakedown;
-MissionTakedown.prototype._takedownStep = StealthDirector.prototype._takedownStep;

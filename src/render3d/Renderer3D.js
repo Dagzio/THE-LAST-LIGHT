@@ -6,12 +6,14 @@
 import * as THREE from '../../lib/three.module.js';
 import { createRenderGuard, cpuCanvas } from './render-guard.js';
 import { createMaterials } from './materials.js';
-import { buildOfficeScene, officeMaterials, preloadOfficeTextures, setOfficeAnisotropy } from './OfficeScene.js';
+import { buildOfficeScene, officeMaterials, preloadOfficeTextures, setOfficeAnisotropy, zoneElev } from './OfficeScene.js';
+import { LevelFx } from './LevelFx.js';
 import { preloadPropModels, bakeImpostors } from './propModels3d.js';
 import { preloadTreeCrown } from './trainingTree.js';
 import { HumanTemplate, bakeGunGeometry } from './humans.js';
 import { parseSkinnedGLB, loadGLB, blobTexture } from './glb.js';
 import { HUMAN_MODELS, HUMAN_ANIM, GUN_MODELS, gunModelOf, enemyModelOf } from '../data/humanModels.js';
+import { HUMAN_TYPES } from '../data/humans.js';
 import { GRENADES, GRENADE_RULES } from '../data/grenades.js';
 import { TASKS } from '../data/tasks.js';
 import { CameraRig, distanceFor } from './CameraRig.js';
@@ -208,18 +210,7 @@ export class Renderer3D {
     this.anims = animRes;
     try { bakeImpostors(this.renderer); } catch (e) { console.error('prop impostors failed (the pictures stay)', e); } // D96
     this.templates = {};
-    // phones: the 4K body textures are drawn at 2K (the files stay unchanged — user request: no compression)
-    const maxTex = TOUCH ? 2048 : 4096;
-    const make = (key, buf, ref) => {
-      if (!buf || !animRes) return null;
-      try {
-        const m = parseSkinnedGLB(buf);
-        const tpl = new HumanTemplate(m, animRes, HUMAN_MODELS[key].height, ref);
-        tpl.materials = new Map();
-        this.templates[key] = tpl;
-        return bodyTexture(m.image, maxTex).then((t) => { tpl.texture = t; });
-      } catch (e) { console.error('character model failed', key, e); return null; }
-    };
+    const make = (key, buf, ref) => this._makeTemplate(key, buf, ref);
     // D81: the clips fit the hero's rig; the enemy's bones are retargeted against the hero's rest pose
     const heroTex = make('hero', heroBuf, null);
     const heroRest = this.templates.hero ? this.templates.hero.rest : null;
@@ -241,6 +232,34 @@ export class Renderer3D {
       this.grenadeMesh.material = new THREE.MeshLambertMaterial({ map: grenade.texture });
     }
     return true;
+  }
+
+  /** A character template from a model file's bytes (its body texture arrives after: the promise). */
+  _makeTemplate(key, buf, ref) {
+    if (!buf || !this.anims) return null;
+    try {
+      const m = parseSkinnedGLB(buf);
+      const tpl = new HumanTemplate(m, this.anims, HUMAN_MODELS[key].height, ref);
+      tpl.materials = new Map();
+      this.templates[key] = tpl;
+      // phones: a 4K body texture is drawn at 2K at most (D139 / D148: the game's models carry 1K textures now)
+      return bodyTexture(m.image, TOUCH ? 2048 : 4096).then((t) => { tpl.texture = t; });
+    } catch (e) { console.error('character model failed', key, e); return null; }
+  }
+
+  /** D148: the enemy types a level brings (its own list; the office / training ground: the first location's three). */
+  _levelTypes(level) { return level.enemyTypes || ['thug', 'gunman', 'heavy']; }
+
+  /**
+   * D148 (weight: a location's assets load with its levels): the models of the level's enemy types that are not loaded
+   * yet (Marseille's cleaners, the sniper) — fetched now, before its warm-up; a missing file leaves the default enemy.
+   */
+  _loadLevelModels(level) {
+    const want = new Set(this._levelTypes(level).map((t) => HUMAN_TYPES[t] && HUMAN_TYPES[t].model).filter((k) => k && HUMAN_MODELS[k] && !this.templates[k]));
+    if (!want.size) return Promise.resolve();
+    const ref = this.templates.hero ? this.templates.hero.rest : null;
+    return Promise.all([...want].map((k) => fetch(HUMAN_MODELS[k].file).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null)
+      .then((buf) => this._makeTemplate(k, buf, ref)))).then(() => {});
   }
 
   /** Shared skinned material per template + tint. */
@@ -492,6 +511,7 @@ export class Renderer3D {
     this.particles.frustumCulled = false;
     this.scene.add(this.bullets, this.reticle, this.aimDots, this.aimRing, this.grenadeMesh, ...this.blastRings, this.hpBack, this.hpFill,
       this.iconAlert, this.iconCombat, this.objMarker, this.objRing, this.reachRing, this.hlBars, this.hlRings, this.hlArrows, this.pools, this.blobs, this.particles);
+    this.fx = new LevelFx(this.scene); // D148: torches, searchlights, the sniper's laser
   }
 
   _ensureParticleBuffers(capacity) {
@@ -510,10 +530,10 @@ export class Renderer3D {
     const card = mat(0x58c8ff, true), drive = mat(0xff9a2a, true), dark = mat(0x1b1e22);
     this.pickupViews = level.pickups.map((def) => {
       const root = new THREE.Group();
-      root.position.set(def.x, 0, def.y);
+      root.position.set(def.x, def.elev || 0, def.y); // (D148: on the watch platform)
       let lid = null, spin = null;
       let dot = null;
-      if (def.hidden) { /* D88: the training ground's chests — the prop is drawn already */ } else if (def.kind === 'search') {
+      if (def.hidden) { /* D88: the training ground's chests — the prop is drawn already */ } else if (def.kind === 'search' || def.kind === 'inspect') { // (D148: a scene's spot too)
         // D141: a place to search — the white dot over it (the furniture is the level's prop)
         dot = new THREE.Group();
         dot.add(new THREE.Mesh(this._dotGeo || (this._dotGeo = new THREE.SphereGeometry(3.2, 12, 8)), this._dotMat || (this._dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff }))));
@@ -632,7 +652,7 @@ export class Renderer3D {
       const a = e.faceAngle + off + DEATH_DRIFT;
       if (w.segmentHit(e.x, e.y, e.x + Math.cos(a) * DEATH_FALL, e.y + Math.sin(a) * DEATH_FALL, DEATH_WIDE, null, BLOCK_MOVE) === Infinity) { v.deathOff = off; return; }
     }
-    v.deathFade = run.modeId !== 'stealth'; // (stealth: the body must stay for the guards — no fade)
+    v.deathFade = run.modeId !== 'stealth' && !e.noFade; // (stealth: the body must stay for the guards — no fade; D148: Moro)
   }
 
   /** D92: a view's opacity (its own copy of the shared material, the same shader program); 0 hides it. */
@@ -711,6 +731,8 @@ export class Renderer3D {
     this.hemi.color.set(Lt.sky ?? 0xc9d6ec); this.hemi.groundColor.set(Lt.ground ?? 0x2b2722); this.sun.color.set(Lt.sun ?? 0xffe6c8);
     this.scene.background.set(Lt.background ?? 0x07090d);
     this.office = buildOfficeScene(level, { aniso: pr.aniso, shadows: true });
+    this.zoneById = new Map(level.zones.map((z) => [z.id, z])); // D148: raised platforms, the camera's zoom by zone
+    this.zoom = 1; this.rig.setZoom(1);
     this.scene.add(this.office.group);
     this._buildPickups(level);
     // D85: the stealth run's view cones / suspicion bars / noise rings
@@ -720,7 +742,7 @@ export class Renderer3D {
     this._placeCamera();
     this.pausedDrawn = false;
     ls.texWant = TEX.started - ls.tex0; // (the scene's textures were asked for while it was built)
-    return this.assetsReady.then(() => {
+    return this.assetsReady.then(() => this._loadLevelModels(level)).then(() => {
       if (this.map !== level) return null;
       this.hero = this._newView('hero', 0xffffff, 'pistol');
       return this._warmAll();
@@ -730,13 +752,21 @@ export class Renderer3D {
   /** Every material the level may show is compiled now (an enemy view per type, the guns), not on first sight. */
   _warmAll() {
     const warm = [];
-    for (const type of ['thug', 'gunman', 'heavy']) { const v = this._enemyView({ id: -1 - warm.length, typeId: type, type: ENEMY_LOOK[type] }); if (v) warm.push(v); }
+    for (const type of this._levelTypes(this.map)) { const v = this._enemyView({ id: -1 - warm.length, typeId: type, type: HUMAN_TYPES[type] || ENEMY_LOOK.thug }); if (v) warm.push(v); }
     for (const v of warm) for (const g of Object.values(v.guns)) g.visible = true;
     return this.guard.warmUp().then(() => { for (const v of warm) v.dispose(); });
   }
 
+  /** D148: the ground height at a point (a raised platform / a stair of the level), else 0. */
+  _elevAt(run, x, y) {
+    if (!this.zoneById || !this.map || !this.map.zones.some((z) => z.elev || z.steps)) return 0;
+    const id = run.levelWorld.zoneAt(x, y);
+    return id ? zoneElev(this.zoneById.get(id), x, y) : 0;
+  }
+
   unloadMap() {
     this.loadState = null; // D93
+    if (this.fx) this.fx.hide();
     if (this.stealthOverlay) { this.stealthOverlay.dispose(); this.stealthOverlay = null; }
     if (this.office) { this.scene.remove(this.office.group); this.office.dispose(); this.office = null; }
     if (this.pickupGroup) {
@@ -816,6 +846,11 @@ export class Renderer3D {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.rig.setAspect(w / h);
+    this._fitShadow();
+  }
+
+  /** The sun's shadow camera covers the view (+ a margin) — after a resize or a zoom (D148). */
+  _fitShadow() {
     const ext = this.rig.view;
     const half = Math.max(ext.w, ext.h) / 2 + 160;
     const sc = this.sun.shadow.camera;
@@ -880,7 +915,14 @@ export class Renderer3D {
     const p = run.player;
     // D95 (user: the aim drifted while leaning out): leaning out of the corner the camera stays on his spot in cover — the
     // cursor's ground point (the aim) does not slide with the lean, the shots go where he points
-    const pk = p.peek, fx = pk ? pk.baseX : this._lx(p), fy = pk ? pk.baseY : this._ly(p);
+    let fx = p.peek ? p.peek.baseX : this._lx(p), fy = p.peek ? p.peek.baseY : this._ly(p);
+    // D148: a zone that looks at a point (level 3's watch platform: the crane sniper, then the gangway — the objective's
+    // own `look`) frames the hero and that point together (eased)
+    const lz = this.zoneById && this.zoneById.get(run.levelWorld.zoneAt(p.x, p.y)), lo = run.objective;
+    const look = lz && lz.look ? (lo && lo.look) || lz.look : null;
+    this.lookK = (this.lookK || 0) + ((look ? 1 : 0) - (this.lookK || 0)) * Math.min(1, frameDt * 2);
+    if (look) this.lookAt = look;
+    if (this.lookK > 0.001 && this.lookAt) { fx += (this.lookAt[0] - fx) * 0.5 * this.lookK; fy += (this.lookAt[1] - fy) * 0.5 * this.lookK; }
     // D107 (user, the phone): the camera leads ahead of the moving hero (~18 % of the view towards where he walks, eased),
     // centred on him again when he stands; a level zone may frame higher on a phone (the top hint covered the targets)
     if (!paused && run.autoFire) {
@@ -890,6 +932,12 @@ export class Renderer3D {
       this.leadX = (this.leadX || 0) + (lx - (this.leadX || 0)) * k;
       this.leadY = (this.leadY || 0) + (ly + (zo ? zo * v.h : 0) - (this.leadY || 0)) * k;
     } else if (!run.autoFire) { this.leadX = 0; this.leadY = 0; }
+    // D148: a zone may pull the camera back (the watch platform: the crane and the quay on the screen) — eased
+    if (!paused) {
+      const zid = run.levelWorld.zoneAt(p.x, p.y), want = ((this.zoneById && this.zoneById.get(zid)) || {}).zoom || 1;
+      this.zoom += (want - this.zoom) * Math.min(1, frameDt * 2.2);
+      if (Math.abs(this.zoom - this.rig.zoom) > 0.002) { this.rig.setZoom(this.zoom); this._fitShadow(); }
+    }
     if (!paused || falling) this.rig.follow(fx + (this.leadX || 0), fy + (this.leadY || 0), frameDt, this.map.width, this.map.height);
     this._placeCamera(time);
     this._sync(run, time);
@@ -930,9 +978,12 @@ export class Renderer3D {
     let v = this.views.get(e.id);
     if (!v) {
       const L = e.type;
-      const key = enemyModelOf(this.map);
+      // D148: a type with its own model (Marseille's cleaners) — else the level's enemy model (the training ground's)
+      const own = L.model && L.model !== 'enemy' && this.templates && this.templates[L.model] ? L.model : null;
+      const key = own || enemyModelOf(this.map);
       v = this._newView(this.templates && this.templates[key] ? key : 'enemy', L.tint ?? 0xffffff, gunModelOf(e.gun ? e.gun.stats.id : 'enemy_rifle'), L.scale || 1, Math.abs(e.id));
       if (!v) return null;
+      if (L.unarmed && e.id >= 0) { v.setGun('pistol'); if (v.gun) v.gun.visible = false; } // D148: the dispatcher carries nothing (the pistol's arms, no gun)
       if (e.id >= 0) this.views.set(e.id, v);
     }
     return v;
@@ -986,7 +1037,7 @@ export class Renderer3D {
     const hk = Math.min(1, (this.frameDt || 0) * 12);
     this.hugX = (this.hugX || 0) + ((hugOn ? -p.cover.nx * hug : 0) - (this.hugX || 0)) * hk;
     this.hugY = (this.hugY || 0) + ((hugOn ? -p.cover.ny * hug : 0) - (this.hugY || 0)) * hk;
-    h.group.position.set(hx + this.hugX, 0, hy + this.hugY);
+    h.group.position.set(hx + this.hugX, this._elevAt(run, hx, hy), hy + this.hugY); // (D148: up on a platform / a stair)
     h.group.rotation.y = -(this.bodyYaw - h.aimYaw);
     h.settleLegs(); // D124: the legs turn on the spot in steps (after the model is placed)
     if (h.xray) h.xray.visible = p.alive && !(this.map && this.map.noXray); // D86; D90: off where the level says so
@@ -1029,7 +1080,7 @@ export class Renderer3D {
         deadAge: e.alive ? -1 : time - e.deathAt,
         busy: !!e.busy && e.alive && ai.mode === 'idle' && sp < 2, // D83: going through the files until alerted
         crouch: e.alive && e.crouch && sp < 2, // D117: crouched in place (the grenade yard's dummies)
-        kneelAim: !!e.crouch, // D126: …kneeling, the pistol aimed in both hands
+        kneelAim: !!e.crouch && !e.captured, // D126: …kneeling, the pistol aimed in both hands (D148: a captive just kneels)
       });
       // D92 (user: the dead must not fall through walls / furniture / the floor): the fall goes where there is room (a
       // turn of up to 90° eased in while he staggers); with no room he fades out right after the fall. Bodies no
@@ -1040,10 +1091,10 @@ export class Renderer3D {
         const age = time - e.deathAt;
         yaw += v.deathOff * smooth01(age / DEATH_TURN);
         let fade = v.deathFade ? 1 - smooth01((age - DEATH_FADE_AT) / DEATH_FADE) : 1;
-        if (Number.isFinite(run.bodyFade)) fade = Math.min(fade, 1 - smooth01((age - (run.bodyFade - DEATH_FADE - 0.3)) / DEATH_FADE));
+        if (Number.isFinite(run.bodyFade) && !e.noFade) fade = Math.min(fade, 1 - smooth01((age - (run.bodyFade - DEATH_FADE - 0.3)) / DEATH_FADE));
         this._fadeView(v, fade);
       }
-      v.group.position.set(ex, 0, ey);
+      v.group.position.set(ex, e.elev || this._elevAt(run, ex, ey), ey); // (D148: the crane sniper up on his walkway)
       v.group.rotation.y = -(yaw - v.aimYaw);
       v.settleLegs(); // D124
       v.flash.visible = e.alive && time - g.lastShotAt >= 0 && time - g.lastShotAt < SHOT_FLASH;
@@ -1073,6 +1124,10 @@ export class Renderer3D {
     this.ammoMarks.count = mags;
     this.ammoMarks.instanceMatrix.needsUpdate = true;
     for (const im of [this.hpBack, this.hpFill, this.iconAlert, this.iconCombat, this.pools, this.blobs]) im.instanceMatrix.needsUpdate = true;
+
+    // D148: the cleaners' torches, the searchlights, the crane sniper's laser
+    const fxAt = this._fxAt || (this._fxAt = { x: 0, y: 0 });
+    this.fx.sync(run, time, (e) => { fxAt.x = this._lx(e); fxAt.y = this._ly(e); return fxAt; }, (x, y) => this._onScreen(x, y, 120), (x, y) => this._elevAt(run, x, y), FACE_CAM, { x: hx, y: hy });
 
     // ---- level: doors, pickups, objective
     this.office.update(run);

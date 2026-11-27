@@ -38,6 +38,14 @@ export const WEAPONS = {
     projectileSpeed: 950, spreadAngle: 1.5, pelletsPerShot: 1, critChance: 0, critMultiplier: 1.5, penetrationCount: 0,
     noise: 140, sneakMult: 2.5, reserve: 5, reserveMax: 15,
   },
+  // D148 (user-approved roster: the sniper rifle — picked up only, level 3's watch tower): one heavy shot, far, slow;
+  // its own rounds (none on the bodies — only from the tower's case)
+  sniper: {
+    id: 'sniper', nameKey: 'weapon.sniper', gun: 'rifle', ammo: 'sniper',
+    damage: 95, fireInterval: 1.15, magazineSize: 5, reloadDuration: 2.6, range: 1500,
+    projectileSpeed: 2400, spreadAngle: 0.3, pelletsPerShot: 1, critChance: 0, critMultiplier: 1.5, penetrationCount: 0,
+    noise: 900, reserve: 15, reserveMax: 20,
+  },
   // --- enemies (shoot at the hero; damage per bullet)
   enemy_pistol: {
     id: 'enemy_pistol', gun: 'pistol', hostile: true, drops: 'pistol',
@@ -54,10 +62,16 @@ export const WEAPONS = {
     damage: 4.5, fireInterval: 0.1, burst: 5, magazineSize: 40, reloadDuration: 2.4, range: 560,
     projectileSpeed: 720, spreadAngle: 9, pelletsPerShot: 1, critChance: 0, critMultiplier: 1, penetrationCount: 0,
   },
+  // D148: the crane sniper (level 3) — after his laser has held on the hero (data/humans.js sniper); fast, hard, rare
+  enemy_sniper: {
+    id: 'enemy_sniper', gun: 'rifle', hostile: true, drops: null,
+    damage: 34, fireInterval: 1.6, burst: 1, magazineSize: 5, reloadDuration: 2.5, range: 1700,
+    projectileSpeed: 2600, spreadAngle: 0.4, pelletsPerShot: 1, critChance: 0, critMultiplier: 1, penetrationCount: 0,
+  },
 };
 
-/** Weapons the hero can carry, in slot order (1, 2, 3); slot 1 holds whichever pistol the mode gives (D85). */
-export const HERO_WEAPONS = ['pistol', 'smg', 'rifle'];
+/** Weapons the hero can carry, in slot order (1, 2, 3, 4); slot 1 holds whichever pistol the mode gives (D85). */
+export const HERO_WEAPONS = ['pistol', 'smg', 'rifle', 'sniper'];
 
 /**
  * D88 (user request): rounds on a dead enemy, by the class of his gun (`drops`): pistol rounds 5–12, rifle rounds

@@ -1736,6 +1736,7 @@ body.map-over .cover-prompt { display: none; }
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.65)); animation: dlgFace 0.25s ease-out;
 }
 .dlg.right .dlg-portrait { margin-right: 0; margin-left: -3%; }
+.dlg-portrait.none { visibility: hidden; } /* D148: a speaker with no portrait (its place kept) */
 @keyframes dlgFace { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
 .dlg.right .dlg-portrait { animation-name: dlgFaceR; }
 @keyframes dlgFaceR { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }

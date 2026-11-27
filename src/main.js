@@ -19,7 +19,7 @@ import { TouchControls } from './ui/TouchControls.js';
 import { preloadIcons } from './data/icons.js';
 import { initDebugOverlay } from './ui/DebugOverlay.js';
 
-const ENEMY_SHOT_SFX = { enemy_pistol: 'pistol.shot', enemy_rifle: 'assault_rifle.shot', enemy_heavy: 'assault_rifle.shot' };
+const ENEMY_SHOT_SFX = { enemy_pistol: 'pistol.shot', enemy_rifle: 'assault_rifle.shot', enemy_heavy: 'assault_rifle.shot', enemy_sniper: 'assault_rifle.shot' };
 
 /** Gameplay facts → sounds. Repeated sounds get a small cosmetic pitch variation. */
 function wireCombatSounds(events, game) {
@@ -40,8 +40,12 @@ function wireCombatSounds(events, game) {
     if (!p || !enemyShotOk()) return;
     const d = Math.hypot(x - p.x, y - p.y);
     const gain = Math.max(0.12, Math.min(0.75, 1 - d / 900));
+    // (D148: the crane sniper's rifle — the rifle's report pitched down, always loud: it is the warning)
+    if (weaponId === 'enemy_sniper') { Sfx.play('assault_rifle.shot', 0.62, { gain: 0.9, voices: 1 }); return; }
     Sfx.play(ENEMY_SHOT_SFX[weaponId] || 'pistol.shot', 0.9 + Math.random() * 0.12, { gain, voices: 3 });
   });
+  // D148: the helicopter's gunner (level 2's roofs) — rifle rounds from above
+  events.on('heliShot', () => { if (enemyShotOk()) Sfx.play('assault_rifle.shot', 0.8 + Math.random() * 0.08, { gain: 0.5, voices: 2 }); });
   // D87 (user request): no synthesized sounds (Sfx plays only files + data/sounds.js SYNTH_KEEP); the roll, the alarm
   // horn, the takedown thud and the re-pitched UI cues (spotted, suspicion, body found, weapon switch, door) are gone
   // (D132: the stealth lesson's failure screen comes 1 s later — its sound with it)

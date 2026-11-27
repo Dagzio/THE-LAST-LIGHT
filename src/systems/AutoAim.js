@@ -21,6 +21,7 @@ export class AutoAim {
 
   _valid(e, o, reach) {
     if (!e || !e.alive || e.bulletProof) return false; // D89: never at a target rounds cannot fell (training ground)
+    if (e.captured || e.capture) return false; // D148: never at the man to be taken alive (the dispatcher)
     if (this.ok && !this.ok(e)) return false;
     const d = Math.hypot(e.x - o.x, e.y - o.y) - (e.radius || 0);
     if (!(d <= reach)) return false;

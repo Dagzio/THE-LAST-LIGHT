@@ -9,6 +9,12 @@ export const HUMAN_MODELS = {
   enemy: { file: `${DIR}enemy.glb`, height: 56 },
   // D89: the training ground's instructors / dummies (NEW/tutorial/models — the same Mixamo rig, the enemies' clips)
   enemyTraining: { file: `${DIR}enemy_training.glb`, height: 56 },
+  // D148: Marseille's enemies (NEW/enemies — the same Mixamo rig; textures 4096 → 1024 by tools/glb-texture-size.py,
+  // the originals in NEW/models-4096). Loaded with the first level that has them (data/humans.js `model`), not at start
+  cleaner: { file: `${DIR}cleaner_operative.glb`, height: 56, lazy: true },
+  assaulter: { file: `${DIR}cleaner_assaulter.glb`, height: 56, lazy: true },
+  shieldTrooper: { file: `${DIR}cleaner_shield.glb`, height: 57, lazy: true },
+  sniper: { file: `${DIR}sniper_marseille.glb`, height: 56, lazy: true },
 };
 
 /** Enemy model of a level (level.enemyModel) — the key of HUMAN_MODELS; the office keeps the default enemy. */

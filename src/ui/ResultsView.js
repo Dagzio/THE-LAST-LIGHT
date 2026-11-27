@@ -8,6 +8,10 @@ import { Sfx } from '../platform/Sfx.js';
 const LINE_MS = 520;   // count-up time of one line
 const GAP_MS = 170;    // pause before the next line
 const easeOut = (k) => 1 - (1 - k) * (1 - k) * (1 - k);
+/** D148: a story sub-task's failure (run.defeat) → its line under FAILED. */
+const FAIL_LINES = { targetKilled: 'fail.targetKilled', escaped: 'fail.escaped', crew: 'fail.crew' };
+/** The line under a won level's title (the office keeps result.wonText). */
+const WON_LINES = { training: 'result.trainingWon', flat: 'result.flatWon', terminal: 'result.terminalWon' };
 
 export class ResultsView {
   /** @param {import('../core/Game.js').Game} game */
@@ -53,7 +57,8 @@ export class ResultsView {
       el.failTitle.textContent = T('fail.title');
       el.failTitle.dataset.text = el.failTitle.textContent;
       // D118 (user): no line under a plain defeat ("the floor is still theirs" removed)
-      el.failReason.textContent = s.checkpoint ? T('fail.tutDetected') : s.reason === 'detected' ? T('result.detectedText') : '';
+      // D148: a story sub-task failed — its own line (the dispatcher killed / got away, the crew hit)
+      el.failReason.textContent = s.checkpoint ? T('fail.tutDetected') : s.reason === 'detected' ? T('result.detectedText') : FAIL_LINES[s.reason] ? T(FAIL_LINES[s.reason]) : '';
       el.failRetry.textContent = T(s.checkpoint ? 'fail.retryTask' : 'defeat.retry');
       // D132 (user): the training's stealth lesson failed — the whole screen comes 1 s later (`fail-late`: every delay
       // of its animations + --fail-delay), the world still moving under it meanwhile (run.liveUntil)
@@ -103,7 +108,7 @@ export class ResultsView {
     } else {
       el.title.textContent = s.won ? T('victory.title') : T('defeat.player');
       // (D131: the training base's own line — result.wonText is the office's "the drive is ours")
-      el.sub.textContent = s.won ? T(congrats ? 'congrats.text' : s.mapId === 'training' ? 'result.trainingWon' : 'result.wonText') : '';
+      el.sub.textContent = s.won ? T(congrats ? 'congrats.text' : WON_LINES[s.mapId] || 'result.wonText') : ''; // (D148: each level its own line)
       el.stamp.textContent = T(s.won ? 'result.victory' : 'result.defeat');
       // lines: [labelKey, target, format] — KILL LIST (D78): time, kills, accuracy, damage taken (+ best time on a win)
       rows = [

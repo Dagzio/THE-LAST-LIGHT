@@ -21,6 +21,7 @@ export const KEY_BINDINGS = {
   weapon1: ['Digit1', 'Numpad1'],
   weapon2: ['Digit2', 'Numpad2'],
   weapon3: ['Digit3', 'Numpad3'], // D88: the M4A1
+  weapon4: ['Digit4', 'Numpad4'], // D148: the sniper rifle (level 3)
 };
 
 export const ACTIONS = Object.keys(KEY_BINDINGS);

@@ -17,6 +17,10 @@ export const LIGHT_KINDS = {
   red: { color: [1.0, 0.18, 0.12], radius: 105, power: 0.75 },
   led: { color: [1.0, 0.72, 0.42], radius: 48, power: 0.9 },
   wall: { color: [1.0, 0.92, 0.8], radius: 80, power: 0.4 },
+  // D148 (Marseille 2–3): the bars' neon over the alleys, the terminal's floodlights
+  neonPink: { color: [1.0, 0.3, 0.72], radius: 90, power: 0.55 },
+  neonCyan: { color: [0.3, 0.88, 1.0], radius: 90, power: 0.55 },
+  flood: { color: [0.92, 0.95, 1.0], radius: 260, power: 0.5 },
 };
 
 /** Room moods (zone.light): which ceiling light kind, how dense the grid (units between lights). */
@@ -47,6 +51,13 @@ const PROP_LIGHTS = {
   strip_light: [['cool', 26, 0, 1.7, 0.9]],
   booth_desk: [['screen', 10, 0, 2.0, 1.0]],
   street_lantern: [['lamp', 0, 0, 1.5, 1.5]],
+  // D148: Marseille levels 2–3
+  mf_lamp: [['lamp', 0, 0, 1, 1]], mf_lamp_small: [['desk', 0, 0, 1.2, 1.2]], mf_sconce: [['wall', 14, 0, 1.4, 0.9]],
+  mf_entry_lantern: [['lamp', 16, 0, 1.5, 1.5]], mf_roof_lantern: [['lamp', 12, 0, 1.2, 1.2]], mf_alley_lantern: [['lamp', 14, 0, 1.3, 1.3]],
+  mf_neon_pink: [['neonPink', 12, 0, 1.6, 0.9]], mf_neon_cyan: [['neonCyan', 12, 0, 1.6, 0.9]],
+  mt_jetty_lantern: [['lamp', 0, 0, 1.4, 1.4]], mt_fence_lantern: [['lamp', 12, 0, 1.2, 1.2]], mt_gooseneck: [['lamp', 18, 0, 1.4, 1.4]],
+  mt_caged_lantern: [['lamp', 12, 0, 1.2, 1.2]], mt_work_light: [['cool', 18, 0, 1.2, 1.0]],
+  mt_monitor_blue: [['screen', 6, 0, 1, 1]], mt_monitor_cyan: [['screen', 6, 0, 1, 1]], mt_mast: [['flood', 0, 0, 1, 1]],
 };
 
 /**

@@ -10,11 +10,25 @@
 //                   progress runs while the hero is inside `zone` (kept while outside); the marker is gone, the per cent
 //                   over the desk; its `dialogue` once; enemies `trickle` in (1–2 at a time) until it is full; then the
 //                   objective's `gives` fact (the drive → the exit opens, the reinforcements).
+// D148 (Marseille, levels 2–3 — STORY_DESIGN_D133.md §4):
+//   type 'inspect' — [СЦЕНА] the scene: every spot of the task (pickups of kind 'inspect') is looked at (hold E, like a
+//                    search — always "found"), each with its own `dialogue`; all of them → `done`. The marker leads to
+//                    the nearest one left.
+//   type 'call'    — [ЗВОНОК] its `dialogue` plays at once (the game waits while it is on) and it is done.
+//   type 'clear'   — [ЗАЧИСТКА] / the sniper: done once no enemy tagged `tag` stands (those spawned later too);
+//                    the marker on the nearest one left, the count in the text.
+//   type 'capture' — [ЗАХВАТ ЖИВЫМ] the enemy tagged `tag` taken from behind (the takedown — he goes down on his knees,
+//                    alive); killed → failure 'targetKilled'; alarmed he runs for `flee` — reached → 'escaped'.
+//   type 'defend'  — [ПРИКРЫТИЕ СВЕРХУ] the progress runs `duration` s whatever the hero does (the crew works); enemies
+//                    come in `waves` from `spawnPoints` heading for `guard` (a rect); one who stays in it `reachFor` s
+//                    → failure 'crew'. Then `gives`.
+//   level.searchlights — systems/Searchlights.js (the helicopter on the roofs, the towers of the terminal).
 // Restart points (D141/D143, user: at the key moments, with exactly what was carried then): every objective's start
 // and the computer started — a death restarts from the last one: the guns, rounds and grenades of that moment, the
 // facts, who is down, what is open. Pure simulation, game clock only; balance numbers in data/tasks.js / the level.
 import { TASKS } from '../data/tasks.js';
 import { SeededRandom } from '../core/SeededRandom.js';
+import { Searchlights } from './Searchlights.js';
 
 const inRect = (r, x, y) => x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3];
 
@@ -47,6 +61,18 @@ export class MissionTasks {
     this.alarm = null;           // null — quiet, 'on', 'off' (cut: for good)
     this.nextAlarmAt = Infinity;
     this.alarmSpawned = [];
+    // D148: the facts the level's objectives complete / give (the run itself knows keycard / drive / copy)
+    for (const o of run.level.objectives) for (const k of [o.done, o.gives]) if (k && !(k in run.has)) run.has[k] = false;
+    this.inspected = new Set();  // the scene's spots looked at (pickup ids)
+    this.defendTime = 0;         // s done of a 'defend'
+    this.nextWaveAt = Infinity;
+    this.waveIdx = 0;
+    this.atGuard = new Map();    // enemy → s he has stood at the guarded spot
+    this.lights = run.level.searchlights ? new Searchlights(run, this) : null;
+    this._unsubs = [
+      run.events.on('escaped', (e) => { if (e && e.capture && !run.over) run._setDefeat('escaped'); }),
+      run.events.on('kill', (e) => { if (e && e.capture && !e.captured && !run.over) run._setDefeat('targetKilled'); }),
+    ];
   }
 
   get alarmOn() { return this.alarm === 'on'; }
@@ -94,11 +120,14 @@ export class MissionTasks {
 
   _raiseAlarm(time) {
     const run = this.run, A = run.level.alarm;
+    if (!A || this.alarm !== null) return;
     this.alarm = 'on';
     run.stats.alarm = true;
     this.nextAlarmAt = time + A.first;
     run.events.emit('alarm');
     if (A.dialogue) run.events.emit('dialogue', A.dialogue);
+    // D148: a man to be taken alive runs for his way out
+    for (const e of run.enemies) if (e.alive && e.capture && !e.captured) run.ai.flee(e, time);
   }
 
   _cutAlarm(pk) {
@@ -116,14 +145,27 @@ export class MissionTasks {
     return this.run.pickups.filter((q) => q.def.task === 'alarm' && !q.taken);
   }
 
-  dispose() { if (this._unsub) { this._unsub(); this._unsub = null; } }
+  dispose() {
+    if (this._unsub) { this._unsub(); this._unsub = null; }
+    for (const u of this._unsubs || []) u();
+    this._unsubs = [];
+  }
 
   get objective() { return this.run.level.objectives[this.run.objectiveIndex] || null; }
 
-  /** The HUD's progress of the current objective (a hold: its per cent, once started), or null. */
+  /** D148: the living enemies of a tag (a 'clear' / 'capture' objective's). */
+  _tagged(tag) { return this.run.enemies.filter((e) => e.alive && e.tag === tag); }
+  /** D148: the scene's spots of an 'inspect' objective. */
+  _spots(o) { return this.run.pickups.filter((pk) => pk.def.kind === 'inspect' && pk.def.task === o.id); }
+
+  /** The HUD's progress of the current objective (a hold: its per cent, once started; D148: left / seen / %), or null. */
   objectiveProgress() {
     const o = this.objective;
-    if (!o || o.type !== 'hold' || !this.activated) return null;
+    if (!o) return null;
+    if (o.type === 'clear') return this._tagged(o.tag).length;
+    if (o.type === 'inspect') { const s = this._spots(o); return `${s.filter((pk) => pk.taken).length}/${s.length}`; }
+    if (o.type === 'defend') return Math.min(100, Math.floor((this.defendTime / o.duration) * 100));
+    if (o.type !== 'hold' || !this.activated) return null;
     return Math.min(100, Math.floor((this.holdProgress / o.duration) * 100));
   }
 
@@ -153,19 +195,21 @@ export class MissionTasks {
       if (o && o.type === 'hold' && o.activate === pk.def.id && !this.activated && input.consumePressed('interact')) this._activate(pk, time);
       return;
     }
-    if (pk.def.kind !== 'search') { this.searching = null; return; }
+    const inspect = pk.def.kind === 'inspect'; // D148: the scene's spots — held like a search
+    if (pk.def.kind !== 'search' && !inspect) { this.searching = null; return; }
     const S = TASKS.search;
     if (!input.isDown('interact')) { this.searching = null; return; }
     if (!this.searching || this.searching.pk !== pk) this.searching = { pk, t0: time, progress: 0 };
     const s = this.searching;
     // moved off the spot or hit: it starts over
     if (Math.hypot(p.vx, p.vy) > S.stillBelow || p.lastHitAt > s.t0) { s.t0 = time; s.progress = 0; return; }
-    s.progress = Math.min(1, s.progress + dt / (pk.def.hold || S.hold));
+    s.progress = Math.min(1, s.progress + dt / (pk.def.hold || (inspect ? TASKS.inspect.hold : S.hold)));
     input.consumePressed('interact');
     if (s.progress < 1) return;
     // the search is done: the spot is empty or holds the task's item
     pk.taken = true;
     this.searching = null;
+    if (inspect) { this._inspected(pk); return; }
     const task = pk.def.task, found = !!task && this.hidden[task] === pk.def.id && o && o.id === task;
     this.searchNote = { x: pk.def.x, y: pk.def.y, found, until: time + S.resultFor };
     run.events.emit('searched', pk.def.id, found);
@@ -173,6 +217,42 @@ export class MissionTasks {
     // D143 (user): found — the other places of this task are not searched any more (their dots go)
     for (const q of run.pickups) if (q.def.kind === 'search' && q.def.task === task) q.taken = true;
     if (o.gives) run.give(o.gives, time);
+  }
+
+  /** D148: a spot of the scene looked at — its words; the last one completes the objective. */
+  _inspected(pk) {
+    const run = this.run, o = this.objective;
+    this.inspected.add(pk.def.id);
+    run.events.emit('inspected', pk.def.id);
+    if (pk.def.dialogue) run.events.emit('dialogue', pk.def.dialogue);
+    if (o && o.type === 'inspect' && o.id === pk.def.task && this._spots(o).every((q) => q.taken) && o.done) run.has[o.done] = true;
+  }
+
+  /** D148: the enemies an objective brings at its start (`spawn`: hunting the hero with `hunt`, else on their posts). */
+  _spawnFor(o) {
+    const run = this.run;
+    for (const s of o.spawn || []) {
+      const e = run._spawnEnemy(s, !!s.hunt);
+      if (e && s.assault) run.ai.assault(e, s.assault[0], s.assault[1], run.lastTime);
+    }
+  }
+
+  /** D148: a 'defend' objective's next group — from one of its points, heading for the guarded spot. */
+  _wave(o, time) {
+    const run = this.run, W = o.waves;
+    this.nextWaveAt = time + W.every[0] + this.rng.next() * (W.every[1] - W.every[0]);
+    const alive = this._tagged('attacker').length;
+    if (alive >= (W.maxAlive || 6)) return;
+    const from = W.from[this.waveIdx++ % W.from.length], pt = o.spawnPoints[from];
+    if (!pt) return;
+    const n = Math.min((W.maxAlive || 6) - alive, W.group[0] + Math.floor(this.rng.next() * (W.group[1] - W.group[0] + 1)));
+    const g = o.guard, gx = (g[0] + g[2]) / 2, gy = (g[1] + g[3]) / 2;
+    for (let i = 0; i < n; i++) {
+      const type = W.types[Math.floor(this.rng.next() * W.types.length) % W.types.length];
+      const e = run._spawnEnemy({ type, x: pt.x + (i ? 26 : 0), y: pt.y + (i ? 10 : 0), angle: Math.atan2(gy - pt.y, gx - pt.x), tag: 'attacker' }, false);
+      if (e) run.ai.assault(e, gx + (this.rng.next() - 0.5) * (g[2] - g[0]) * 0.6, gy + (this.rng.next() - 0.5) * (g[3] - g[1]) * 0.6, time);
+    }
+    run.events.emit('taskWave', n, pt);
   }
 
   _activate(pk, time) {
@@ -194,8 +274,18 @@ export class MissionTasks {
     const o = this.objective;
     if (!o || run.over || !p.alive) return;
     this._alarmUpdate(time); // D146
+    if (this.lights) this.lights.update(dt, time); // D148
     // D145: 'reach' — done once the hero is in its room (the parking crossed: on the service stairs)
     if (o.type === 'reach' && o.room && run.levelWorld.zoneAt(p.x, p.y) === o.room) { run.has[o.done] = true; return; }
+    // D148: the other sub-tasks of Marseille
+    if (o.type === 'call') { if (o.gives) run.give(o.gives, time); if (o.done) run.has[o.done] = true; return; } // (its words played at its start)
+    if (o.type === 'clear') { if (!this._tagged(o.tag).length && o.done) run.has[o.done] = true; return; }
+    if (o.type === 'capture') {
+      const t = run.enemies.find((e) => e.capture && e.tag === o.tag);
+      if (t && t.captured && o.done) run.has[o.done] = true;
+      return;
+    }
+    if (o.type === 'defend') { this._defendUpdate(o, dt, time); return; }
     if (o.type === 'search' && !this.saidRoom && o.room && run.levelWorld.zoneAt(p.x, p.y) === o.room) {
       this.saidRoom = true;
       if (o.dialogue) run.events.emit('dialogue', o.dialogue);
@@ -223,6 +313,25 @@ export class MissionTasks {
     const run = this.run, o = this.objective;
     if (!o) return null;
     if (o.type === 'search' && o.room && run.levelWorld.zoneAt(run.player.x, run.player.y) === o.room) return null;
+    // D148: the scene — the nearest spot left; a clear — its `via` supply first (the tower's rifle), then the nearest
+    // one left; a capture — the man himself until he is down
+    const p = run.player, nearest = (list, xy) => {
+      let best = null, bd = Infinity;
+      for (const q of list) { const [x, y] = xy(q), d = Math.hypot(x - p.x, y - p.y); if (d < bd) { bd = d; best = [x, y]; } }
+      if (best) { out.x = best[0]; out.y = best[1]; }
+      return best ? out : null;
+    };
+    if (o.type === 'inspect') { const r = nearest(this._spots(o).filter((pk) => !pk.taken), (pk) => [pk.def.x, pk.def.y]); if (r) return r; }
+    if (o.type === 'clear') {
+      const via = o.via && run.pickups.find((pk) => pk.def.id === o.via);
+      if (via && !via.taken && via.openedAt < 0) { out.x = via.def.x; out.y = via.def.y; return out; }
+      const r = nearest(this._tagged(o.tag), (e) => [e.x, e.y]);
+      if (r) return r;
+    }
+    if (o.type === 'capture') {
+      const t = run.enemies.find((e) => e.capture && e.tag === o.tag && e.alive && !e.captured);
+      if (t) { out.x = t.x; out.y = t.y; return out; }
+    }
     if (o.type === 'hold' && o.activate) {
       if (this.activated) return null;
       const pc = run.level.pickups.find((p) => p.id === o.activate);
@@ -235,7 +344,44 @@ export class MissionTasks {
   // ---------------- restart points ----------------
   _onObjective() {
     this.holdProgress = 0; this.activated = false; this.nextTrickleAt = Infinity; this.searching = null; this.saidRoom = false;
+    this._enterObjective();
     this._save();
+    this._startObjective();
+  }
+
+  /** D148: what an objective's start sets up before its restart point is taken (its scene's spots, the woken sniper). */
+  _enterObjective() {
+    const run = this.run, o = this.objective;
+    this.defendTime = 0; this.nextWaveAt = Infinity; this.waveIdx = 0; this.atGuard.clear();
+    if (!o) return;
+    // the scene's spots wait (dormant) until their objective — then the white dots come up
+    if (o.type === 'inspect') for (const pk of this._spots(o)) if (!this.inspected.has(pk.def.id)) pk.taken = false;
+    for (const e of run.enemies) if (e.wakeOn === o.id) e.active = true; // (the crane's sniper: from his duel on)
+    for (const pk of run.pickups) if (pk.def.wakeOn === o.id && pk.openedAt < 0) pk.taken = false; // (the bath's stash: after the call)
+  }
+
+  /** D148: what an objective's start brings after its restart point (enemies, words) — a restart brings them again. */
+  _startObjective() {
+    const run = this.run, o = this.objective;
+    if (!o) return;
+    this._spawnFor(o);
+    if (o.type === 'call' && o.dialogue) run.events.emit('dialogue', o.dialogue);
+    if (o.startDialogue) run.events.emit('dialogue', o.startDialogue);
+    if (o.type === 'defend') this.nextWaveAt = run.lastTime + o.waves.first;
+  }
+
+  /** D148: the guarded spot — the crew's time runs; an attacker who stands in it long enough ends it. */
+  _defendUpdate(o, dt, time) {
+    const run = this.run;
+    this.defendTime = Math.min(o.duration, this.defendTime + dt);
+    if (time >= this.nextWaveAt && this.defendTime < o.duration - (TASKS.defend.lastWave || 8)) this._wave(o, time);
+    const g = o.guard;
+    for (const e of this._tagged('attacker')) {
+      const inside = inRect(g, e.x, e.y), t = inside ? (this.atGuard.get(e) || 0) + dt : 0;
+      this.atGuard.set(e, t);
+      if (t >= (o.reachFor || 3)) { run._setDefeat('crew'); return; }
+    }
+    if (this.defendTime >= o.duration && o.gives) run.give(o.gives, time);
   }
 
   _save() {
@@ -263,6 +409,9 @@ export class MissionTasks {
       activated: this.activated,
       saidRoom: this.saidRoom,
       alarm: this.alarm, // D146: ringing / cut at that moment
+      inspected: [...this.inspected], // D148: the scene's spots looked at
+      captured: run.enemies.filter((e) => e.captured).map((e) => e.spawnIdx), // D148: the dispatcher on his knees
+      lights: this.lights ? this.lights.snap() : null,
     };
   }
 
@@ -302,5 +451,23 @@ export class MissionTasks {
       const o = this.objective, pc = o && run.pickups.find((k) => k.def.id === o.activate);
       if (pc) { this.activated = true; this.holdProgress = 0; this.nextTrickleAt = o.trickle ? o.trickle.first : Infinity; }
     }
+    // D148: the scene's spots seen, the dispatcher taken, the woken sniper; the objective's own enemies come again
+    for (const id of cp.inspected || []) this.inspected.add(id);
+    for (const e of run.enemies) if ((cp.captured || []).includes(e.spawnIdx)) this.capture(e);
+    for (let i = 0; i <= cp.objectiveIndex; i++) { const o = run.level.objectives[i]; for (const e of run.enemies) if (o && e.wakeOn === o.id) e.active = true; }
+    if (this.lights && cp.lights) this.lights.restore(cp.lights);
+    this._enterObjective();
+    for (const pk of run.pickups) if (pk.def.kind === 'inspect' && this.inspected.has(pk.def.id)) pk.taken = true;
+    this._startObjective();
+  }
+
+  /** D148: the man to be taken alive goes down on his knees (the takedown's blow; a restart from after it). */
+  capture(e) {
+    e.captured = true;
+    e.harmless = true;
+    e.crouch = true;
+    e.ai.mode = 'grabbed'; // (held where he is: never moved, never pushed)
+    e.vx = 0; e.vy = 0;
+    this.run.events.emit('captured', e);
   }
 }

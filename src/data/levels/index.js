@@ -3,8 +3,10 @@
 // added here (`next` id optional; otherwise the next one in the list).
 import { OFFICE } from './office.js';
 import { TRAINING } from './training.js';
+import { FLAT } from './flat.js';
+import { TERMINAL } from './terminal.js';
 
 // D88: the training ground first (always open), then the office
-export const LEVELS = [TRAINING, OFFICE];
+export const LEVELS = [TRAINING, OFFICE, FLAT, TERMINAL]; // D148: + Marseille levels 2–3
 
 export const getLevel = (id) => LEVELS.find((l) => l.id === id) || null;

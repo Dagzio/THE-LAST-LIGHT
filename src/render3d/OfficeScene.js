@@ -11,7 +11,7 @@ import { PROP_TYPES, propBox } from '../data/props.js';
 import { TILE, tileUV } from './officeAtlas.js';
 import { buildPropCards, hasSprite, propAtlasTexture, preloadPropAtlas } from './propSprites.js';
 import { levelLights, LIGHT_KINDS } from './officeLights.js';
-import { buildPropViews, buildTargetViews, hasView, propViewTexture, preloadPropViews, VIEW_ATLASES, loadedViewAtlases } from './propViews.js';
+import { buildPropViews, buildTargetViews, hasView, propViewTexture, preloadPropViews, VIEW_ATLASES, loadedViewAtlases, releaseViewAtlases } from './propViews.js';
 import { PROP_MODELS } from '../data/propModels.js';
 import { buildCustomProps } from './confTable.js';
 import { buildWorkstations } from './workstation.js';
@@ -40,6 +40,12 @@ const FLOORS = {
   parking: ['marseille/parking_concrete.webp', 120], ramp: ['marseille/grooved_ramp_concrete.webp', 60],
   road: ['marseille/road_asphalt.webp', 120], sidewalk: ['marseille/sidewalk_flagstones.webp', 72],
   deck_plate: ['marseille/steel_deck_plate.webp', 60],
+  // D148: Marseille levels 2–3 — the safe flat's building, its roofs and the container terminal
+  floorboards: ['marseille/worn_interior_floorboards.webp', 66], encaustic: ['marseille/patterned_encaustic_tile.webp', 48],
+  terracotta: ['marseille/terracotta_checker_tile.webp', 48], bath_tile: ['marseille/small_ceramic_tile.webp', 36],
+  roof: ['marseille/bitumen_flat_roof.webp', 110], planks: ['marseille/weathered_utility_planks.webp', 60],
+  setts: ['marseille/granite_setts.webp', 54], quay: ['marseille/industrial_concrete_slabs.webp', 120],
+  water: ['marseille/harbor_water.webp', 160], grating: ['marseille/steel_walkway_grating.webp', 40],
 };
 const WALLS = {
   ext: ['concrete_blue', 130], int: ['plaster_cool', 110], warm: ['plaster_warm', 110], acoustic: ['acoustic', 80],
@@ -48,11 +54,30 @@ const WALLS = {
   // D145: Marseille — the parking's cladding and its cast concrete
   cladding: ['marseille/charcoal_cladding.webp', 72], formwork: ['marseille/formwork_concrete.webp', 90],
   painted_steel: ['marseille/painted_industrial_steel.webp', 60],
+  // D148: the old building's plaster and stone, the courtyard's brick, the roofs' parapets, the dispatcher's brick
+  // office, the ship's bulwark
+  plaster: ['marseille/peeling_lime_plaster.webp', 96], limestone: ['marseille/dressed_limestone.webp', 90],
+  brick: ['marseille/weathered_red_brick.webp', 72], parapet: ['marseille/dressed_limestone.webp', 90],
+  bulwark: ['marseille/painted_industrial_steel.webp', 60],
 };
 /** D145: a texture of a story location — made on demand (its level only), not with the start-up set. */
 const isLocationTex = (file) => file.startsWith('marseille/');
 /** D88: wall styles drawn as a row of the user's sprites instead of a box (collision: data in core/LevelWorld.js). */
-const SPRITE_WALLS = { fence: 'mesh_fence' };
+const SPRITE_WALLS = { fence: 'mesh_fence', rail: 'guard_rail' }; // D148: rail — the roofs' / the watch platform's railing
+/** D148: low walls — the roofs' parapets, the quay's edge, the ship's bulwark — stand this tall; the rest H. */
+const WALL_H = { parapet: 30, bulwark: 34 };
+/** D148: an edge that is never drawn — a roof's drop, the water's edge (it only stops walkers: core/LevelWorld.js). */
+const HIDDEN_WALLS = new Set(['edge']);
+
+/** D148: the ground height of a point in a zone (a raised platform: `elev`; a stair: `steps` rising along its axis). */
+export function zoneElev(z, x, y) {
+  if (!z) return 0;
+  const s = z.steps;
+  if (!s) return z.elev || 0;
+  const [x0, y0, x1, y1] = z.rect;
+  const k = s.axis === 'x' ? (x - x0) / (x1 - x0 || 1) : (y - y0) / (y1 - y0 || 1);
+  return s.from + (s.to - s.from) * Math.max(0, Math.min(1, k));
+}
 // plain colours with a sheen (merged into the vcShiny mesh); the rest of COLORS are dull (vc mesh)
 const SHINY = { leather: 0x34373d, cushion: 0x41444a, chrome: 0xbfc5cc, black: 0x17191d, metal: 0x7f858d, metalDark: 0x2c3037, stone: 0x36373c };
 const COLORS = {
@@ -60,7 +85,10 @@ const COLORS = {
   white: 0xe4e2dd, cream: 0xd6cdbe, stone: 0x36373c, pot: 0x8c8c88, soil: 0x3a2a1c, plant: 0x2c6629, plantLight: 0x4b8a35,
   cardboard: 0xb08559, tape: 0xd4c39a, red: 0xae2a22, binder: 0x2c4b76, baseboard: 0x26282c,
   yellow: 0x9c7420, cable: 0x2a5aa8, // D83 cable trays
+  outside: 0x0c0f14, // D148: the dark surroundings join the vc mesh (one draw call less)
 };
+// D148: unlit plain colours (lamp shades, light strips, alarm lamps) — one vertex-coloured unlit mesh
+const UNLIT = { lampShade: 0xffd9a0, alarm: 0xff3a2a, lightstrip: 0xffdcaa };
 
 const texCache = new Map();
 /** Loads (once) a repeating sRGB texture of the office set. */
@@ -109,6 +137,7 @@ export function officeMaterials(aniso = 4) {
   // the plain-colour furniture parts are merged into two vertex-coloured meshes (dull / with a sheen): 2 draw calls
   m.vc = new THREE.MeshLambertMaterial({ vertexColors: true });
   m.vcShiny = new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x333333, shininess: 34 });
+  m.vcUnlit = new THREE.MeshBasicMaterial({ vertexColors: true }); // D148
   m.wood = new THREE.MeshLambertMaterial({ map: officeTexture('oak', aniso) });
   m.walnut = new THREE.MeshLambertMaterial({ map: officeTexture('walnut', aniso) });
   m.concrete = new THREE.MeshLambertMaterial({ map: officeTexture('concrete', aniso) });
@@ -178,11 +207,58 @@ function locationMat(mats, key, aniso) {
   if (e) mats[key] = new THREE.MeshLambertMaterial({ map: officeTexture(e[0], aniso) });
 }
 
+// D148 (draw calls): all the floors of a level are one mesh over one texture array (a layer per floor texture), all its
+// walls likewise — one draw call each instead of one per texture. Layers are 512² (every floor / wall texture is).
+const ARRAY_SIZE = 512;
+const liveArrays = new Set();
+const arrayImages = new THREE.ImageLoader();
+const noMap = new THREE.Texture(); // gives the material USE_MAP / vMapUv (identity transform); the array is sampled instead
+/** A texture array of these files (layer = index); layers whose image is not loaded yet fill in when it arrives. */
+function textureArray(files, aniso) {
+  const S = ARRAY_SIZE, bytes = S * S * 4;
+  const data = new Uint8Array(bytes * files.length);
+  const tex = new THREE.DataArrayTexture(data, S, S, files.length);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = aniso;
+  const { g } = cpuCanvas(S, S);
+  const fill = (i, img) => {
+    if (!liveArrays.has(tex)) return; // the level is gone already
+    g.setTransform(1, 0, 0, -1, 0, S); // bottom-up rows, like an image texture's flipY
+    g.drawImage(img, 0, 0, S, S);
+    data.set(g.getImageData(0, 0, S, S).data, i * bytes);
+    tex.addLayerUpdate(i);
+    tex.needsUpdate = true;
+  };
+  liveArrays.add(tex);
+  files.forEach((f, i) => {
+    const t = texCache.get(f);
+    if (t && t.image && t.image.width) fill(i, t.image);
+    else arrayImages.load(texUrl(f), (img) => fill(i, img), undefined, () => console.warn('texture missing', f));
+  });
+  return tex;
+}
+/** A lit material that samples a texture array by the per-vertex `layer` attribute. */
+function arrayMaterial(tex) {
+  const m = new THREE.MeshLambertMaterial({ map: noMap });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.layerMap = { value: tex };
+    sh.vertexShader = 'attribute float layer;\nflat varying float vLayer;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n\tvLayer = layer;');
+    sh.fragmentShader = 'uniform sampler2DArray layerMap;\nflat varying float vLayer;\n' + sh.fragmentShader.replace('#include <map_fragment>', 'diffuseColor *= texture(layerMap, vec3(vMapUv, vLayer));');
+  };
+  m.customProgramCacheKey = () => 'layerMap';
+  return m;
+}
+
 /** Sets the anisotropy of every office texture (graphics preset, applied live). */
 export function setOfficeAnisotropy(aniso) {
   for (const t of texCache.values()) if (t.anisotropy !== aniso) { t.anisotropy = aniso; if (t.image) t.needsUpdate = true; }
   propAtlasTexture(aniso);
   for (const a of loadedViewAtlases()) propViewTexture(aniso, a); // (D145: the location atlases made so far too)
+  for (const t of liveArrays) if (t.anisotropy !== aniso) { t.anisotropy = aniso; t.needsUpdate = true; } // D148
 }
 
 function roundRect(g, x, y, w, h, r) {
@@ -191,13 +267,32 @@ function roundRect(g, x, y, w, h, r) {
   g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); g.fill();
 }
 
+/**
+ * D148: a stair zone (`steps`: axis, from, to, n) — n steel steps rising along its axis (boxes from the ground, the
+ * zone's floor texture, world uv); characters climb it smoothly (zoneElev).
+ */
+function buildSteps(z, putTex, file, tile) {
+  const [x0, y0, x1, y1] = z.rect, s = z.steps, n = s.n || 6, alongX = s.axis === 'x';
+  const e = (t) => s.from + (s.to - s.from) * t;
+  for (let i = 0; i < n; i++) {
+    const a = i / n, b = (i + 1) / n, top = Math.max(0.6, e(a), e(b));
+    const sx0 = alongX ? x0 + (x1 - x0) * a : x0, sx1 = alongX ? x0 + (x1 - x0) * b : x1;
+    const sz0 = alongX ? y0 : y0 + (y1 - y0) * a, sz1 = alongX ? y1 : y0 + (y1 - y0) * b;
+    const w = sx1 - sx0, d = sz1 - sz0, g = new THREE.BoxGeometry(w, top, d), uv = g.attributes.uv;
+    const dims = [[d, top], [d, top], [w, d], [w, d], [w, top], [w, top]];
+    for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const j = f * 4 + k; uv.setXY(j, uv.getX(j) * dims[f][0] / tile, uv.getY(j) * dims[f][1] / tile); }
+    g.translate((sx0 + sx1) / 2, top / 2, (sz0 + sz1) / 2);
+    putTex('floorArr', file, `floor_${z.floor}`, g.toNonIndexed());
+  }
+}
+
 /** Merges non-indexed geometries (position / normal / uv) into one. */
 function merge(list) {
   let n = 0;
   for (const g of list) n += g.attributes.position.count;
-  const withColor = list.some((g) => g.attributes.color);
+  const withColor = list.some((g) => g.attributes.color), withLayer = list.some((g) => g.attributes.layer);
   const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
-  const col = withColor ? new Float32Array(n * 3) : null;
+  const col = withColor ? new Float32Array(n * 3) : null, lay = withLayer ? new Float32Array(n) : null;
   let o = 0;
   for (const g of list) {
     const c = g.attributes.position.count;
@@ -205,6 +300,7 @@ function merge(list) {
     if (g.attributes.normal) nor.set(g.attributes.normal.array, o * 3);
     if (g.attributes.uv) uv.set(g.attributes.uv.array, o * 2);
     if (col && g.attributes.color) col.set(g.attributes.color.array, o * 3);
+    if (lay && g.attributes.layer) lay.set(g.attributes.layer.array, o);
     o += c;
     g.dispose();
   }
@@ -213,6 +309,7 @@ function merge(list) {
   out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   if (col) out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  if (lay) out.setAttribute('layer', new THREE.BufferAttribute(lay, 1)); // D148: the texture-array layer
   out.computeBoundingSphere();
   return out;
 }
@@ -240,7 +337,7 @@ export function drawPieces(level, w, h) {
   const ext = (p, atStart) => {
     let corner = false, stem = false, collinear = false;
     for (const o of level.walls) {
-      if (o === w || (!glass && o.style === 'glass')) continue;
+      if (o === w || (!glass && o.style === 'glass') || HIDDEN_WALLS.has(o.style)) continue; // (D148: an edge is not there)
       const oh = o.y0 === o.y1;
       const olo = oh ? Math.min(o.x0, o.x1) : Math.min(o.y0, o.y1), ohi = oh ? Math.max(o.x0, o.x1) : Math.max(o.y0, o.y1);
       const oline = oh ? o.y0 : o.x0;
@@ -272,29 +369,51 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   const buckets = new Map(); // material key → geometry list
   const put = (k, g) => { let l = buckets.get(k); if (!l) { l = []; buckets.set(k, l); } l.push(g); };
   const H = level.wallHeight, T = level.wallThickness, h = T / 2;
+  // D148: floors / walls go into the level's two texture arrays (layer per texture file); the mirrored training-ground
+  // textures keep their own materials (an array has one wrap mode)
+  const arrays = { floorArr: [], wallArr: [] };
+  const putTex = (arr, file, key, g) => {
+    if (texWrap(file) !== THREE.RepeatWrapping) { put(key, g); return; }
+    const l = arrays[arr];
+    let i = l.indexOf(file);
+    if (i < 0) { i = l.length; l.push(file); }
+    g.setAttribute('layer', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count).fill(i), 1));
+    put(arr, g);
+  };
 
   // floors (one per room) + the dark surroundings
   for (const z of level.zones) {
     const [x0, y0, x1, y1] = z.rect;
-    const [, tile] = FLOORS[z.floor] || FLOORS.concrete;
-    put(`floor_${FLOORS[z.floor] ? z.floor : 'concrete'}`, floorRect(x0, y0, x1, y1, tile));
+    const key = FLOORS[z.floor] ? z.floor : 'concrete', [file, tile] = FLOORS[key];
+    if (z.steps) { buildSteps(z, putTex, file, tile); continue; } // D148: a stair up to a platform
+    putTex('floorArr', file, `floor_${key}`, floorRect(x0, y0, x1, y1, tile, z.elev || 0));
+    if (z.elev > 0) { // D148: a raised platform — its sides down to the ground (the side style's texture)
+      const side = WALLS[z.side] ? z.side : 'painted_steel', [sf, st] = WALLS[side];
+      const g = new THREE.BoxGeometry(x1 - x0, z.elev - 0.4, y1 - y0), uv = g.attributes.uv;
+      const dims = [[y1 - y0, z.elev], [y1 - y0, z.elev], [x1 - x0, y1 - y0], [x1 - x0, y1 - y0], [x1 - x0, z.elev], [x1 - x0, z.elev]];
+      for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * dims[f][0] / st, uv.getY(i) * dims[f][1] / st); }
+      g.translate((x0 + x1) / 2, (z.elev - 0.4) / 2, (y0 + y1) / 2);
+      putTex('wallArr', sf, `wall_${side}`, g.toNonIndexed());
+    }
   }
   const pad = 1600;
   // D88: outdoors (the training ground) the ground goes on as the level's own floor
   const outKey = level.outside && FLOORS[level.outside] ? level.outside : null;
-  put(outKey ? `floor_${outKey}` : 'outside', floorRect(-pad, -pad, level.width + pad, level.height + pad, outKey ? FLOORS[outKey][1] : 100, outKey ? -0.6 : -2));
+  const outRect = floorRect(-pad, -pad, level.width + pad, level.height + pad, outKey ? FLOORS[outKey][1] : 100, outKey ? -0.6 : -2);
+  if (outKey) putTex('floorArr', FLOORS[outKey][0], `floor_${outKey}`, outRect); else put('outside', outRect);
 
   // walls
   const spriteWalls = []; // D88: render-only sprites along the fence lines
   for (const w of level.walls) {
     const horiz = w.y0 === w.y1;
+    if (HIDDEN_WALLS.has(w.style)) continue; // D148
     if (SPRITE_WALLS[w.style]) {
-      const type = SPRITE_WALLS[w.style], step = PROP_TYPES[type].w;
+      const type = (level.spriteWalls || {})[w.style] || SPRITE_WALLS[w.style], step = PROP_TYPES[type].w; // (D148: a level's own fence picture)
       for (const [a, b] of drawPieces(level, w, 0)) {
         const n = Math.max(1, Math.round((b - a) / step)), len = (b - a) / n;
         for (let i = 0; i < n; i++) {
           const c = a + len * (i + 0.5);
-          spriteWalls.push({ type, x: horiz ? c : w.x0, y: horiz ? w.y0 : c, rot: horiz ? 0 : 1, w: len });
+          spriteWalls.push({ type, x: horiz ? c : w.x0, y: horiz ? w.y0 : c, rot: horiz ? 0 : 1, w: len, elev: w.elev || 0 }); // (D148: a railing up on a platform)
         }
       }
       continue;
@@ -319,29 +438,32 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
         continue;
       }
       const [, tile] = WALLS[w.style] || WALLS.int;
+      const WH = WALL_H[w.style] || H; // D148: a parapet / bulwark is low
       const sx = horiz ? len : T, sz = horiz ? T : len;
-      const g = new THREE.BoxGeometry(sx, H, sz);
+      const g = new THREE.BoxGeometry(sx, WH, sz);
       // world uv on the sides
       const uv = g.attributes.uv;
-      const dims = [[sz, H], [sz, H], [sx, sz], [sx, sz], [sx, H], [sx, H]];
+      const dims = [[sz, WH], [sz, WH], [sx, sz], [sx, sz], [sx, WH], [sx, WH]];
       for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * dims[f][0] / tile, uv.getY(i) * dims[f][1] / tile); }
-      g.translate(horiz ? (a + b) / 2 : w.x0, H / 2, horiz ? w.y0 : (a + b) / 2);
-      put(`wall_${WALLS[w.style] ? w.style : 'int'}`, g.toNonIndexed());
-      put(w.style === 'yard' ? 'wallTopLight' : 'wallTop', floorRect(horiz ? a : w.x0 - h, horiz ? w.y0 - h : a, horiz ? b : w.x0 + h, horiz ? w.y0 + h : b, 100, H + 0.2));
+      g.translate(horiz ? (a + b) / 2 : w.x0, WH / 2, horiz ? w.y0 : (a + b) / 2);
+      const style = WALLS[w.style] ? w.style : 'int';
+      putTex('wallArr', WALLS[style][0], `wall_${style}`, g.toNonIndexed());
+      // (D148: a low wall's cap is its own stone, not the dark floor-plan cap of the tall walls)
+      put(w.style === 'yard' || WALL_H[w.style] ? 'wallTopLight' : 'wallTop', floorRect(horiz ? a : w.x0 - h, horiz ? w.y0 - h : a, horiz ? b : w.x0 + h, horiz ? w.y0 + h : b, 100, WH + 0.2));
     }
   }
 
   // D79: baseboards, soft shadow strips along the walls, night windows on the outer walls
   const [bx0, by0, bx1, by1] = buildingRect(level);
   for (const w of level.walls) {
-    if (w.style === 'glass' || SPRITE_WALLS[w.style]) continue;
+    if (w.style === 'glass' || SPRITE_WALLS[w.style] || HIDDEN_WALLS.has(w.style)) continue;
     const horiz = w.y0 === w.y1;
-    const outer = !level.outdoor && (horiz ? (w.y0 === by0 || w.y0 === by1) : (w.x0 === bx0 || w.x0 === bx1)); // D88: no night windows outdoors
+    const outer = !level.outdoor && level.nightWindows !== false && !WALL_H[w.style] && (horiz ? (w.y0 === by0 || w.y0 === by1) : (w.x0 === bx0 || w.x0 === bx1)); // D88: no night windows outdoors (D148: nor on a parapet)
     for (const [a, b] of drawPieces(level, w, h)) {
       const len = b - a, mid = (a + b) / 2;
       const bb = new THREE.BoxGeometry(horiz ? len : T + 2.4, 4, horiz ? T + 2.4 : len);
       bb.translate(horiz ? mid : w.x0, 2, horiz ? w.y0 : mid);
-      if (!level.outdoor) put('baseboard', bb.toNonIndexed());
+      if (!level.outdoor && !WALL_H[w.style] && w.style !== 'brick') put('baseboard', bb.toNonIndexed()); // (D148: not on a parapet / brick)
       for (const side of [-1, 1]) {
         const g = new THREE.PlaneGeometry(len, 30);
         g.rotateX(-Math.PI / 2);                    // v = 1 (the dark edge) on −z
@@ -401,7 +523,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   // D79: a soft contact shadow under every standing object (ambient occlusion look)
   for (const p of level.props) {
     const t = PROP_TYPES[p.type];
-    if (!t || t.flat || t.wall || t.decor || p.solid === false || !(t.h > 2)) continue;
+    if (!t || t.flat || t.wall || t.decor || t.noAo || p.solid === false || !(t.h > 2)) continue; // (D148: noAo — a lattice / legs: no dark slab under it)
     const pad = 6 + Math.min(16, t.h * 0.22);
     for (const [x0, y0, x1, y1] of [propBox(p)]) { // (one soft quad — overlapping quads under parts would stack darker)
       const ao = new THREE.PlaneGeometry(x1 - x0 + 2 * pad, y1 - y0 + 2 * pad);
@@ -439,15 +561,15 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
 
   // plain-colour parts → vertex colours in two shared buckets
   for (const [k, list] of [...buckets]) {
-    const shinyHex = SHINY[k], flatHex = COLORS[k];
-    const hex = shinyHex ?? flatHex;
+    const shinyHex = SHINY[k], flatHex = COLORS[k], unlitHex = UNLIT[k];
+    const hex = unlitHex ?? shinyHex ?? flatHex;
     if (hex === undefined) continue;
     const c = new THREE.Color(hex);
     for (const g of list) {
       const n = g.attributes.position.count, a = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
       g.setAttribute('color', new THREE.BufferAttribute(a, 3));
-      put(shinyHex !== undefined ? 'vcShiny' : 'vc', g);
+      put(unlitHex !== undefined ? 'vcUnlit' : shinyHex !== undefined ? 'vcShiny' : 'vc', g);
     }
     buckets.delete(k);
   }
@@ -456,13 +578,16 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   const meshes = [];
   for (const [k, list] of buckets) {
     locationMat(mats, k, aniso); // D145: a story location's floor / wall — made now (its level only)
-    const mat = mats[k];
+    const layered = k === 'floorArr' || k === 'wallArr', arr = layered ? textureArray(arrays[k], aniso) : null; // D148
+    const mat = layered ? arrayMaterial(arr) : mats[k];
     if (!mat) { console.warn('office material missing', k); continue; }
     const mesh = new THREE.Mesh(merge(list), mat);
-    const flat = k.startsWith('floor_') || k === 'outside' || k === 'lightPool' || k === 'rug' || k === 'stain';
+    mesh.name = k;
+    if (layered) { mesh.userData.ownMaterial = true; mesh.userData.ownTexture = arr; }
+    const flat = k.startsWith('floor') || k === 'outside' || k === 'lightPool' || k === 'rug' || k === 'stain';
     // D81: walls take no shadows — at the grazing angles of their sides the shadow map drew moving stripes (acne)
     mesh.receiveShadow = shadows && k !== 'lightPool' && k !== 'screen' && !k.startsWith('wall');
-    mesh.castShadow = shadows && !flat && k !== 'glass' && k !== 'screen' && k !== 'decal' && k !== 'lampShade' && k !== 'lightstrip' && k !== 'alarm';
+    mesh.castShadow = shadows && !flat && k !== 'glass' && k !== 'screen' && k !== 'decal' && k !== 'vcUnlit';
     if (k === 'lightPool') mesh.renderOrder = 1;
     if (k === 'stain') { mesh.renderOrder = 1; mesh.castShadow = false; }
     if (k === 'aoEdge' || k === 'aoBox') { mesh.renderOrder = 2; mesh.receiveShadow = false; mesh.castShadow = false; }
@@ -477,10 +602,14 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
   // D85: the view boxes (one mesh) — every prop with the user's 5-view art
   // D145: the atlases this level's props use (a story location's level atlas joins only where it is used)
   const atlasList = [...new Set(['office', 'training', ...allProps.map((p) => (PROP_MODELS[p.type] || {}).atlas).filter(Boolean)])];
+  // D148: another story level's atlas (and its material) is let go — only the game's own level does it (a preview
+  // never: it is built beside the level running)
+  if (shadows) for (const k of releaseViewAtlases(atlasList)) { const key = `propViews_${k}`; if (mats[key]) { mats[key].dispose(); delete mats[key]; } }
   for (const [atlas, mat] of atlasList.map((a) => [a, viewMaterial(mats, a, aniso)])) { // D88: one mesh per atlas
     const viewGeo = buildPropViews(allProps, lights, atlas);
     if (!viewGeo) continue;
     const vm = new THREE.Mesh(viewGeo, mat);
+    vm.name = `views_${atlas}`;
     vm.castShadow = shadows;
     vm.receiveShadow = shadows;
     vm.matrixAutoUpdate = false;
@@ -615,6 +744,7 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
     },
     dispose() {
       for (const m of meshes) { if (!m.userData.sharedGeometry) m.geometry.dispose(); if (m.userData.ownMaterial) m.material.dispose(); } // (D122: the shared crown model stays)
+      for (const m of meshes) if (m.userData.ownTexture) { liveArrays.delete(m.userData.ownTexture); m.userData.ownTexture.dispose(); } // D148
       // D96: their own materials; the merged impostor quads (an instanced model keeps the shared, cached geometry)
       for (const mm of modelMeshes) { mm.material.dispose(); if (!mm.isInstancedMesh) mm.geometry.dispose(); }
       leafGeo.dispose();
