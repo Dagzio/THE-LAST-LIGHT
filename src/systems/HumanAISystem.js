@@ -11,6 +11,9 @@
 import { AI_TUNING as T } from '../data/humans.js';
 import { muzzleOf } from '../data/player.js';
 import { BLOCK } from './Collision.js';
+import { STEALTH } from '../data/stealth.js';
+
+const SNEAK = STEALTH.missionSneak; // D149
 
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -71,12 +74,14 @@ export class HumanAISystem {
   _sees(e, p) {
     if (!p.alive) return false;
     const V = e.type.view, dx = p.x - e.x, dy = p.y - e.y, d2 = dx * dx + dy * dy;
-    if (d2 > V.range * V.range) return false;
-    const d = Math.sqrt(d2);
     const tracking = e.ai.mode === 'combat';
+    // D149 (user): a sneaking hero (C / the touch button) is seen nearer and never felt from behind — until a fight
+    const sneak = p.stance === 'crouch' && !tracking, R = V.range * (sneak ? SNEAK.rangeMult : 1);
+    if (d2 > R * R) return false;
+    const d = Math.sqrt(d2);
     // D118: a guard busy at the files (his back to the room) does not feel the hero close behind him — he can be crept
     // up on and taken down (the mission's takedown); only what is in front of him is seen
-    const near = e.busy && e.ai.mode === 'idle' ? 0 : V.near;
+    const near = (e.busy && e.ai.mode === 'idle') || sneak ? 0 : V.near;
     if (!tracking && d > near && Math.abs(angDiff(Math.atan2(dy, dx), e.faceAngle)) > (V.fov * Math.PI) / 360) return false;
     // D82: a hero crouched behind low cover is hidden by the low objects too (D85: or crouching)
     return this.world.clear(e.x, e.y, p.x, p.y, null, p.lowProfile ? BLOCK.SIGHT | BLOCK.LOW : BLOCK.SIGHT);

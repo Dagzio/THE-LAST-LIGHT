@@ -97,17 +97,6 @@ export class ProjectileSystem {
         this._blocked(p, hitT);
         return;
       }
-      // D148: a shield trooper — a round coming at his front (within the shield's arc of where he faces) stops on the
-      // shield (a spark, a clang); from the side / behind it goes through
-      const sh = hit.type && hit.type.shield;
-      if (sh && hit.ai && hit.ai.mode !== 'grabbed') {
-        const from = Math.atan2(-p.vy, -p.vx), d = Math.atan2(Math.sin(from - hit.faceAngle), Math.cos(from - hit.faceAngle));
-        if (Math.abs(d) <= (sh.arc * Math.PI) / 180) {
-          this.events.emit('shieldHit', sx + ex * hitT, sy + ey * hitT, hit, time);
-          this._blocked(p, hitT);
-          return;
-        }
-      }
       const stats = p.stats || this.getWeaponStats(p.weaponId);
       const r = computeDamage(stats.damage, stats, hit, this.modifiers, this.rng, hitDirectionMult(hit, p.vx, p.vy));
       // D85: the silenced pistol fells an enemy who is not fighting the hero (unaware) — ×sneakMult

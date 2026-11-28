@@ -33,9 +33,9 @@ export const HUMAN_TYPES = {
     tint: 0x8c8f96,
   },
   // D148 (Marseille, levels 2–3 — STORY_DESIGN_D133.md §6): Vance's "cleaners", each type its own model (the user's
-  // NEW/enemies). flashlight — a torch on the gun (presentation: a light cone ahead of him); shield — a ballistic shield:
-  // rounds from within `arc`° of where he faces stop on it (ProjectileSystem) — from the side / behind, a grenade, a
-  // takedown; sniper — he never moves, aims `aim` s along a visible laser (lost sight: the aim falls back), then fires
+  // NEW/enemies). flashlight — a torch on the gun (presentation: a light cone ahead of him); the shield trooper
+  // (D149, user: the frontal block left no way to kill him) — no block, the toughest of them all (hp + armour);
+  // sniper — he never moves, aims `aim` s along a visible laser (lost sight: the aim falls back), then fires
   cleaner: {
     id: 'cleaner', nameKey: 'enemy.cleaner', model: 'cleaner', weapon: 'enemy_pistol',
     hp: 50, armor: 0, radius: 15, scale: 1,
@@ -52,10 +52,10 @@ export const HUMAN_TYPES = {
   },
   shield: {
     id: 'shield', nameKey: 'enemy.shield', model: 'shieldTrooper', weapon: 'enemy_pistol',
-    hp: 80, armor: 0, radius: 17, scale: 1,
+    hp: 230, armor: 3, radius: 17, scale: 1,
     speed: { patrol: 26, combat: 50 },
     view: { range: 340, fov: 110, near: 80 },
-    reaction: 0.6, keepRange: 150, tint: 0xffffff, shield: { arc: 70 },
+    reaction: 0.6, keepRange: 150, tint: 0xffffff,
   },
   sniper: {
     id: 'sniper', nameKey: 'enemy.sniper', model: 'sniper', weapon: 'enemy_sniper',

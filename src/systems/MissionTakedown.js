@@ -5,6 +5,10 @@
 import { StealthDirector } from './StealthDirector.js';
 import { MissionTasks } from './MissionTasks.js';
 import { STEALTH } from '../data/stealth.js';
+import { PLAYER } from '../data/player.js';
+
+/** D149: the speeds while sneaking (the controller's profile: only the crouch pace differs). */
+const SNEAK_SPEEDS = { walk: PLAYER.moveSpeed, run: PLAYER.moveSpeed, crouch: STEALTH.missionSneak.speed };
 
 export class MissionTakedown {
   /** @param {import('../core/MissionRun.js').MissionRun} run */
@@ -34,6 +38,12 @@ export class MissionTakedown {
   preUpdate(input, dt, time) {
     const run = this.run, p = run.player;
     if (this.tasks) this.tasks.preUpdate(input, dt, time);
+    // D149 (user): C / the touch button — sneaking on and off (slower, low, unheard: systems/HumanAISystem.js _sees)
+    if (input.consumePressed('crouch') && p.alive && !p.takedown) p.sneak = !p.sneak;
+    const sneaking = !!p.sneak && p.alive && !p.dodging && !p.cover && !p.takedown;
+    p.stance = sneaking ? 'crouch' : 'stand';
+    p.moveMode = sneaking ? 'crouch' : 'walk';
+    run.controller.speedProfile = sneaking ? SNEAK_SPEEDS : null;
     if (!p.alive) { this.takedownTarget = null; return; }
     if (p.takedown) {
       this._takedownStep(time);

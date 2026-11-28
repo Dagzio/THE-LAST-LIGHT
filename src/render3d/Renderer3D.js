@@ -732,7 +732,7 @@ export class Renderer3D {
     this.scene.background.set(Lt.background ?? 0x07090d);
     this.office = buildOfficeScene(level, { aniso: pr.aniso, shadows: true });
     this.zoneById = new Map(level.zones.map((z) => [z.id, z])); // D148: raised platforms, the camera's zoom by zone
-    this.zoom = 1; this.rig.setZoom(1);
+    this.zoom = 1; this.rig.setZoom(1); this._heroAt = null;
     this.scene.add(this.office.group);
     this._buildPickups(level);
     // D85: the stealth run's view cones / suspicion bars / noise rings
@@ -934,10 +934,14 @@ export class Renderer3D {
     } else if (!run.autoFire) { this.leadX = 0; this.leadY = 0; }
     // D148: a zone may pull the camera back (the watch platform: the crane and the quay on the screen) — eased
     if (!paused) {
-      const zid = run.levelWorld.zoneAt(p.x, p.y), want = ((this.zoneById && this.zoneById.get(zid)) || {}).zoom || 1;
+      const zz = (this.zoneById && this.zoneById.get(run.levelWorld.zoneAt(p.x, p.y))) || {};
+      const want = (TOUCH && zz.zoomTouch) || zz.zoom || 1; // (D149: a phone sees less — its own zoom)
       this.zoom += (want - this.zoom) * Math.min(1, frameDt * 2.2);
       if (Math.abs(this.zoom - this.rig.zoom) > 0.002) { this.rig.setZoom(this.zoom); this._fitShadow(); }
     }
+    // D149: the stairs between the floors moved him far at once — the camera is there at once too (under the fade)
+    if (this._heroAt && Math.hypot(p.x - this._heroAt.x, p.y - this._heroAt.y) > 150) { this.rig.snap(fx, fy, this.map.width, this.map.height); this.leadX = 0; this.leadY = 0; }
+    this._heroAt = this._heroAt || { x: 0, y: 0 }; this._heroAt.x = p.x; this._heroAt.y = p.y;
     if (!paused || falling) this.rig.follow(fx + (this.leadX || 0), fy + (this.leadY || 0), frameDt, this.map.width, this.map.height);
     this._placeCamera(time);
     this._sync(run, time);
@@ -972,6 +976,17 @@ export class Renderer3D {
   _onScreen(x, y, margin = 140) {
     const v = this.rig.view;
     return Math.abs(x - this.rig.x) < v.w / 2 + margin && Math.abs(y - this.rig.y) < v.h / 2 + margin + 60;
+  }
+
+  /**
+   * D149: the floor (zone `area`) at a ground point on a level of floors joined by stairs (level.stairs), else null. Only
+   * the hero's floor's people are drawn — the floors beside it are cut open for their rooms, out of his reach and sight.
+   */
+  _areaAt(x, y) {
+    const L = this.map;
+    if (!L || !L.stairs) return null;
+    for (const z of L.zones) { const r = z.rect; if (x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]) return z.area || null; }
+    return null;
   }
 
   _enemyView(e) {
@@ -1048,12 +1063,14 @@ export class Renderer3D {
     let bars = 0, alerts = 0, combats = 0, pools = 0, blobs = 0, mags = 0;
     const seen = this._seen || (this._seen = new Set());
     seen.clear();
+    const floor = this._areaAt(run.player.x, run.player.y); // D149
     for (const e of run.enemies) {
       seen.add(e.id);
       const v = this._enemyView(e);
       if (!v) continue;
       const ex = this._lx(e), ey = this._ly(e);
-      const vis = this._onScreen(ex, ey);
+      let vis = this._onScreen(ex, ey);
+      if (vis && floor) { const a = this._areaAt(ex, ey); vis = !a || a === floor; }
       v.group.visible = vis;
       if (!e.alive && pools < MAX_POOLS && vis) {
         const age = time - e.deathAt, s = Math.min(1, Math.max(0, (age - 0.8) / 2.5)) * 34;

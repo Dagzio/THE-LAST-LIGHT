@@ -237,9 +237,12 @@
       <div class="hud-plate">
         <span class="hud-name"><span class="hud-lv" id="hudLevelName"></span></span>
         <span class="hud-items" id="hudItems"></span>
+        <span class="hud-sneak" id="hudSneak"><kbd>C</kbd><b data-i18n="hud.sneak"></b></span>
       </div>
     </div>
 
+    <!-- D149: the stairs between floors — a short fade over the jump -->
+    <div class="stair-fade" id="stairFade"></div>
     <!-- Touch controls (touch devices only, decision D12) -->
     <div class="touch-controls" id="touchControls">
       <div class="touch-stick" id="touchStick"><div class="touch-knob" id="touchKnob"></div></div>
@@ -252,6 +255,10 @@
           </button>
           <button class="neon-btn neon-small" data-touch-action="reload" data-nosfx data-i18n-aria="aria.reload">
             <svg class="ico" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M19 3.5V8h-4.5"/><path d="M11 9h2v6h-2z" class="fill"/></svg>
+          </button>
+          <!-- D149 (user): sneak on / off in the story missions (lit while sneaking) — a man stooped, stepping softly -->
+          <button class="neon-btn neon-small sneak-neon" id="sneakBtn" data-touch-action="crouch" data-nosfx data-i18n-aria="aria.sneak">
+            <svg class="ico" viewBox="0 0 24 24"><circle class="fill" cx="13.5" cy="4.6" r="2.2"/><path d="M12.4 7.6L9.4 12.2L12.6 14.4L11.4 19.6M9.4 12.2L6.4 15.6L3.6 15.8M12 8.6L16.2 11.2M14.2 19.6H10.6"/></svg>
           </button>
         </div>
         <div class="touch-col">

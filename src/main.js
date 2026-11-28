@@ -63,6 +63,9 @@ function wireCombatSounds(events, game) {
     else if (beat && (!live || frac >= HEARTBEAT.to)) { beat.stop(HEARTBEAT.fade); beat = null; }
   });
   events.on('grenadeThrow', () => Sfx.play('throw'));
+  // D149: up / down the stairs to another floor — a short black fade over the jump (presentation only)
+  const fade = document.getElementById('stairFade');
+  events.on('stairs', () => { if (!fade) return; fade.classList.add('on'); setTimeout(() => fade.classList.remove('on'), 90); });
   events.on('grenadeBlast', () => Sfx.play('boom'));
   events.on('crateOpened', () => Sfx.play('crateOpen'));
   events.on('pickup', () => Sfx.play('levelUp')); // D87: the medkit too — the evidence pickup sound

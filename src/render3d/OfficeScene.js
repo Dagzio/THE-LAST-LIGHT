@@ -59,11 +59,12 @@ const WALLS = {
   plaster: ['marseille/peeling_lime_plaster.webp', 96], limestone: ['marseille/dressed_limestone.webp', 90],
   brick: ['marseille/weathered_red_brick.webp', 72], parapet: ['marseille/dressed_limestone.webp', 90],
   bulwark: ['marseille/painted_industrial_steel.webp', 60],
+  tiles: ['marseille/terracotta_barrel_roof_tile.webp', 60], // D149: the neighbours' gable roofs
 };
 /** D145: a texture of a story location — made on demand (its level only), not with the start-up set. */
 const isLocationTex = (file) => file.startsWith('marseille/');
 /** D88: wall styles drawn as a row of the user's sprites instead of a box (collision: data in core/LevelWorld.js). */
-const SPRITE_WALLS = { fence: 'mesh_fence', rail: 'guard_rail' }; // D148: rail — the roofs' / the watch platform's railing
+const SPRITE_WALLS = { fence: 'mesh_fence', rail: 'guard_rail', banister: 'mf_balustrade' }; // D148: rail — the roofs' / the watch platform's railing; D149: banister — the stairs' wooden balustrade
 /** D148: low walls — the roofs' parapets, the quay's edge, the ship's bulwark — stand this tall; the rest H. */
 const WALL_H = { parapet: 30, bulwark: 34 };
 /** D148: an edge that is never drawn — a roof's drop, the water's edge (it only stops walkers: core/LevelWorld.js). */
@@ -268,21 +269,71 @@ function roundRect(g, x, y, w, h, r) {
 }
 
 /**
- * D148: a stair zone (`steps`: axis, from, to, n) — n steel steps rising along its axis (boxes from the ground, the
- * zone's floor texture, world uv); characters climb it smoothly (zoneElev).
+ * D148: a stair zone (`steps`: axis, from, to, n) — n steps along its axis (boxes, the zone's floor texture, world uv);
+ * characters climb it smoothly (zoneElev). D149 (user: the stairs looked like a slab with a rail): a flight going DOWN
+ * (below 0) sinks into a stairwell — its steps stand on the well's bottom and the well's sides (the `side` wall
+ * texture) close it round, so the way down reads as a real opening in the floor; a flight going up rises to its wall.
  */
 function buildSteps(z, putTex, file, tile) {
   const [x0, y0, x1, y1] = z.rect, s = z.steps, n = s.n || 6, alongX = s.axis === 'x';
   const e = (t) => s.from + (s.to - s.from) * t;
+  const base = Math.min(0, s.from, s.to) - 1;
   for (let i = 0; i < n; i++) {
-    const a = i / n, b = (i + 1) / n, top = Math.max(0.6, e(a), e(b));
+    const a = i / n, b = (i + 1) / n, top = Math.max(base + 0.6, e((a + b) / 2) + (s.to > s.from ? (s.to - s.from) / n / 2 : (s.from - s.to) / n / 2));
     const sx0 = alongX ? x0 + (x1 - x0) * a : x0, sx1 = alongX ? x0 + (x1 - x0) * b : x1;
     const sz0 = alongX ? y0 : y0 + (y1 - y0) * a, sz1 = alongX ? y1 : y0 + (y1 - y0) * b;
-    const w = sx1 - sx0, d = sz1 - sz0, g = new THREE.BoxGeometry(w, top, d), uv = g.attributes.uv;
-    const dims = [[d, top], [d, top], [w, d], [w, d], [w, top], [w, top]];
+    const h = top - base, w = sx1 - sx0, d = sz1 - sz0, g = new THREE.BoxGeometry(w, h, d), uv = g.attributes.uv;
+    const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
     for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const j = f * 4 + k; uv.setXY(j, uv.getX(j) * dims[f][0] / tile, uv.getY(j) * dims[f][1] / tile); }
-    g.translate((sx0 + sx1) / 2, top / 2, (sz0 + sz1) / 2);
+    g.translate((sx0 + sx1) / 2, base + h / 2, (sz0 + sz1) / 2);
     putTex('floorArr', file, `floor_${z.floor}`, g.toNonIndexed());
+  }
+  if (base >= -1) return;
+  // the stairwell's four sides, from its bottom up to the floor, facing in
+  const side = WALLS[z.side] ? z.side : 'plaster', [sf, st] = WALLS[side], depth = -base;
+  for (const [cx, cz, len, ry] of [[(x0 + x1) / 2, y0, x1 - x0, 0], [(x0 + x1) / 2, y1, x1 - x0, Math.PI], [x0, (y0 + y1) / 2, y1 - y0, Math.PI / 2], [x1, (y0 + y1) / 2, y1 - y0, -Math.PI / 2]]) {
+    const g = new THREE.PlaneGeometry(len, depth), uv = g.attributes.uv;
+    for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * len / st, uv.getY(k) * depth / st);
+    g.rotateY(ry);
+    g.translate(cx, base / 2, cz);
+    putTex('wallArr', sf, `wall_${side}`, g.toNonIndexed());
+  }
+}
+
+/**
+ * D149: a tiled gable roof (level.roofs — the neighbours' roofs on level 2): two slopes from its eaves (`eave`, 0) up to
+ * the ridge (`height`) along `ridge` ('x' or 'y'), its gable ends in stone. Not walked (the level's edges keep walkers off).
+ */
+function buildGable(R, putTex) {
+  const [x0, y0, x1, y1] = R.rect, H = R.height || 80, E = R.eave || 0, alongX = (R.ridge || 'x') === 'x';
+  const [tf, tt] = WALLS[R.tiles || 'tiles'], [gf, gt] = WALLS[R.gable || 'limestone'];
+  // a triangle from {p, uv} points, wound so its normal faces `out` (single-sided materials)
+  const tri = (a, b, c, out) => {
+    const ux = b.p[0] - a.p[0], uy = b.p[1] - a.p[1], uz = b.p[2] - a.p[2], vx = c.p[0] - a.p[0], vy = c.p[1] - a.p[1], vz = c.p[2] - a.p[2];
+    const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+    if (n[0] * out[0] + n[1] * out[1] + n[2] * out[2] < 0) [b, c] = [c, b];
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([...a.p, ...b.p, ...c.p], 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute([...a.uv, ...b.uv, ...c.uv], 2));
+    g.computeVertexNormals();
+    return g;
+  };
+  const mid = alongX ? (y0 + y1) / 2 : (x0 + x1) / 2, half = alongX ? (y1 - y0) / 2 : (x1 - x0) / 2, slope = Math.hypot(half, H - E);
+  const len = alongX ? x1 - x0 : y1 - y0;
+  for (const sgn of [-1, 1]) { // the two slopes: their eave lines either side of the ridge
+    const ec = mid + sgn * half;
+    const c = alongX ? [[x0, E, ec], [x1, E, ec], [x1, H, mid], [x0, H, mid]] : [[ec, E, y0], [ec, E, y1], [mid, H, y1], [mid, H, y0]];
+    const uvs = [[0, 0], [len / tt, 0], [len / tt, slope / tt], [0, slope / tt]];
+    const v = c.map((q, k) => ({ p: q, uv: uvs[k] }));
+    const out = alongX ? [0, 1, sgn] : [sgn, 1, 0];
+    putTex('wallArr', tf, 'wall_tiles', tri(v[0], v[1], v[2], out));
+    putTex('wallArr', tf, 'wall_tiles', tri(v[0], v[2], v[3], out));
+  }
+  for (const end of alongX ? [x0, x1] : [y0, y1]) { // the gable ends
+    const sgn = end === (alongX ? x0 : y0) ? -1 : 1;
+    const a = alongX ? [end, E, mid - half] : [mid - half, E, end], b = alongX ? [end, E, mid + half] : [mid + half, E, end], c = alongX ? [end, H, mid] : [mid, H, end];
+    const out = alongX ? [sgn, 0, 0] : [0, 0, sgn];
+    putTex('wallArr', gf, 'wall_limestone', tri({ p: a, uv: [0, 0] }, { p: b, uv: [2 * half / gt, 0] }, { p: c, uv: [half / gt, (H - E) / gt] }, out));
   }
 }
 
@@ -396,10 +447,15 @@ export function buildOfficeScene(level, { aniso = 4, shadows = true } = {}) {
       putTex('wallArr', sf, `wall_${side}`, g.toNonIndexed());
     }
   }
+  for (const R of level.roofs || []) buildGable(R, putTex); // D149: the neighbours' tiled roofs
   const pad = 1600;
   // D88: outdoors (the training ground) the ground goes on as the level's own floor
   const outKey = level.outside && FLOORS[level.outside] ? level.outside : null;
-  const outRect = floorRect(-pad, -pad, level.width + pad, level.height + pad, outKey ? FLOORS[outKey][1] : 100, outKey ? -0.6 : -2);
+  // D149: a flight going down sinks into its stairwell — the surroundings go below its bottom (else they hide its treads)
+  let pit = 0;
+  for (const z of level.zones) if (z.steps) pit = Math.min(pit, z.steps.from, z.steps.to);
+  const outY = Math.min(outKey ? -0.6 : -2, pit < 0 ? pit - 4 : 0);
+  const outRect = floorRect(-pad, -pad, level.width + pad, level.height + pad, outKey ? FLOORS[outKey][1] : 100, outY);
   if (outKey) putTex('floorArr', FLOORS[outKey][0], `floor_${outKey}`, outRect); else put('outside', outRect);
 
   // walls

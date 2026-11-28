@@ -7,6 +7,10 @@ export const STEALTH = {
   // units/s. D88 (user: "on PC I could not sneak up on anyone"): the hero SNEAKS (crouched, quiet, low) by default —
   // Shift stands him up and runs (fast, heard, seen), C toggles an upright walk; crouch 40 → 52 (a fast sneak)
   speeds: { walk: 62, run: 95, crouch: 52 },
+  // D149 (user: in the story levels a guard turned and fired as the hero walked up — a sneak of its own, C / the touch
+  // button): sneaking in a mission he moves at `speed`, is never felt from behind (the guards' near sense), and is
+  // seen only within `rangeMult` of their view range (cone and line of sight as always); a fight sees him whole
+  missionSneak: { speed: 52, rangeMult: 0.6 },
   runNoise: { radius: 150, every: 0.35 },           // a running hero is heard this far, a ring every 0.35 s
   noise: { roll: 180, takedown: 60, silenced: 140 }, // units
   // detection (per enemy suspicion 0…1; the per-tick rate, §3.4)

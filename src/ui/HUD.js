@@ -45,7 +45,7 @@ export class HUD {
       banner: $('waveBanner'), bannerText: $('waveBannerText'), screen: $('screen-game'),
       call: $('introCard'), callKicker: $('introKicker'), callTitle: $('introTitle'), callText: $('introText'),
       crate: $('cratePrompt'), crateText: $('cratePromptText'), arrow: $('objArrow'), arrow2: $('objArrow2'), interactBtn: $('interactBtn'),
-      coverPrompt: $('coverPrompt'), coverBtn: $('coverBtn'),
+      coverPrompt: $('coverPrompt'), coverBtn: $('coverBtn'), sneakBtn: $('sneakBtn'), sneak: $('hudSneak'),
       // D85 stealth
       stealth: $('stealthHud'), alertLabel: $('alertLabel'), vis: $('visLabel'), visText: $('visText'),
       ctx: $('ctxPrompt'), ctxKey: $('ctxKey'), ctxText: $('ctxText'),
@@ -524,6 +524,9 @@ export class HUD {
     const btnKey = offer || '';
     if (btnKey !== c.coverBtn && el.coverBtn) { c.coverBtn = btnKey; el.coverBtn.classList.toggle('on', !!offer); el.coverBtn.classList.toggle('active', offer === 'leave'); }
     this._coverLabel(run, offer === 'take' && !this.game.touchMode && !run.interactTarget);
+    // D149: sneaking — the touch button lit, the "C · SNEAKING" tag on the HUD plate
+    const sneak = running && run.modeId === 'mission' && !!run.player.sneak;
+    if (sneak !== c.sneak) { c.sneak = sneak; if (el.sneakBtn) el.sneakBtn.classList.toggle('active', sneak); if (el.sneak) el.sneak.classList.toggle('on', sneak); }
 
     this._crateLabel(run, running);
     this._objectiveArrow(run, running && !run.over);

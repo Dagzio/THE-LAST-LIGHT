@@ -17,7 +17,7 @@ export const DOOR = {
 // D117 (user: rounds flew through the office glass): glass walls / doors stop walkers AND rounds (seen through)
 // D148: a parapet / the ship's bulwark — low: stops walkers, hides a crouching hero (low cover); a railing and an edge
 // (a roof's drop, the water — never drawn) stop walkers only
-const WALL_BLOCKS = { glass: BLOCK.MOVE | BLOCK.BULLET, fence: BLOCK.MOVE, rail: BLOCK.MOVE, edge: BLOCK.MOVE, parapet: BLOCK.MOVE | BLOCK.LOW, bulwark: BLOCK.MOVE | BLOCK.LOW };
+const WALL_BLOCKS = { glass: BLOCK.MOVE | BLOCK.BULLET, fence: BLOCK.MOVE, rail: BLOCK.MOVE, banister: BLOCK.MOVE, edge: BLOCK.MOVE, parapet: BLOCK.MOVE | BLOCK.LOW, bulwark: BLOCK.MOVE | BLOCK.LOW };
 const DOOR_BLOCKS = { glass: BLOCK.MOVE | BLOCK.BULLET, gate: BLOCK.MOVE };
 
 export class LevelWorld {

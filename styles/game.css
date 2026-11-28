@@ -1699,6 +1699,18 @@ body[data-mode="stealth"] #screen-game .stealth-hud { display: inline-flex; }
 .dl-prompt.paused { opacity: 0.55; color: #e8e2d6; }
 body.map-over .ctx-prompt { display: none; }
 /* D83 touch: the cover button — next to an object one can hide behind; lit (tap leaves) while in cover */
+/* D149: sneaking (C / this button) — the story missions only; lit while on */
+.sneak-neon { display: none; }
+body[data-mode="mission"] .sneak-neon { display: flex; }
+.sneak-neon.active { box-shadow: 0 0 0 2px #9fe3a0, 0 0 16px rgba(159, 227, 160, 0.75); }
+/* (the keyboard's "C · SNEAK" tag: dim — there to be used; lit while sneaking; on touch the button above instead) */
+.hud-sneak { display: none; align-items: center; gap: 6px; margin-left: 10px; font: 800 calc(12px * var(--fs)) / 1 var(--font-display); letter-spacing: 0.14em; color: rgba(184, 240, 176, 0.42); transition: color 0.15s ease; }
+body[data-mode="mission"] .hud-sneak { display: inline-flex; }
+body.touch .hud-sneak { display: none; }
+.hud-sneak.on { color: #c4f5bc; text-shadow: 0 0 8px rgba(159, 227, 160, 0.7); }
+.hud-sneak kbd { padding: 2px 5px; border: 1px solid currentColor; border-radius: 3px; font: inherit; }
+.stair-fade { position: absolute; inset: 0; z-index: 5; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.4s ease-out; }
+.stair-fade.on { opacity: 1; transition: none; }
 .cover-neon { display: none; }
 /* D109: the cover icon — a filled crouching man and a brick wall (dark seams), a little larger than the line icons */
 .cover-neon .ico-cover { width: 60%; height: 60%; }

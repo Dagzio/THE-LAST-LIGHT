@@ -50,6 +50,7 @@ export class MissionRun {
     this.victory = false;
     this.liveUntil = -Infinity; // D132: game time until which a finished run still steps (no controls)
     this.restartPoint = null;   // D141: a story level's restart point (MissionTasks: the current objective's start)
+    this.stairsReadyAt = 0;     // D149: a flight of stairs can be taken again from this time (no bounce back)
     this.lastTime = 0;
 
     this.levelWorld = new LevelWorld(level);
@@ -137,8 +138,6 @@ export class MissionRun {
         this.particles.burst(x, y, 7, 150, 0.28, 2.4, '#b3261e');
       }),
       events.on('bulletBlocked', (x, y) => this.particles.burst(x, y, 4, 120, 0.16, 1.8, '#d7d2c8')),
-      // D148: a round stopped by a shield — sparks off the steel, and the trooper knows where it came from
-      events.on('shieldHit', (x, y, e) => { this.particles.burst(x, y, 7, 170, 0.14, 2, '#ffe2a0'); if (e && e.ai) this.ai.onHit(e, this.player, this.lastTime); }),
       events.on('grenadeBlast', (type, x, y, r) => {
         this.particles.burst(x, y, 26, r * 2.4, 0.5, 3, '#ffb070');
         if (this.ai.stealth) this.noise(x, y, 700, 'loud');
@@ -489,7 +488,46 @@ export class MissionRun {
     return out;
   }
 
+  /**
+   * D149 (level 2: the house's floors are drawn apart, joined by their stairs): stepping onto a flight's far end
+   * (level.stairs[].rect) takes the hero to the other floor's flight (`to`: x, y, facing) — a short fade; the enemies
+   * keep to their floor. Not mid-roll, not in a takedown, not again for a moment.
+   */
+  _stairs(time) {
+    const S = this.level.stairs, p = this.player;
+    if (!S || this.over || !p.alive || p.dodging || p.takedown || time < this.stairsReadyAt) return;
+    for (const s of S) {
+      const r = s.rect;
+      if (p.x < r[0] || p.x > r[2] || p.y < r[1] || p.y > r[3]) continue;
+      const [x, y, a] = s.to;
+      p.x = p.prevX = x; p.y = p.prevY = y; p.vx = 0; p.vy = 0;
+      if (Number.isFinite(a)) { p.aimAngle = p.bodyAngle = a; p.facingX = Math.cos(a); p.facingY = Math.sin(a); }
+      p.cover = null; p.peek = null; p.crouched = false;
+      this.cancelGrenadeAim();
+      this.stairsReadyAt = time + 0.6;
+      this.events.emit('stairs', s.id);
+      return;
+    }
+  }
+
+  /** D149: a target on another floor — the marker leads to this floor's flight towards it (its `leads`, else `forward`). */
+  _viaStairs(t, out) {
+    const S = this.level.stairs;
+    if (!t || !S) return t;
+    const lw = this.levelWorld, areaOf = (x, y) => { const id = lw.zoneAt(x, y), z = id && lw._zone(id); return z ? z.area || null : null; };
+    const here = areaOf(this.player.x, this.player.y), there = areaOf(t.x, t.y);
+    if (!here || !there || here === there) return t;
+    const s = S.find((q) => q.area === here && q.leads && q.leads.includes(there)) || S.find((q) => q.area === here && q.forward);
+    if (!s) return t;
+    out.x = (s.rect[0] + s.rect[2]) / 2; out.y = (s.rect[1] + s.rect[3]) / 2;
+    return out;
+  }
+
   objectiveTarget(out = {}) {
+    return this._viaStairs(this._objectiveTarget(out), out);
+  }
+
+  _objectiveTarget(out) {
     if (this.mode && this.mode.objectiveTarget) return this.mode.objectiveTarget(out); // D85: survival — supplies
     const o = this.objective;
     if (!o) return null;
@@ -559,6 +597,7 @@ export class MissionRun {
     for (let i = 0; i < this.enemies.length; i++) { const e = this.enemies[i]; e.prevX = e.x; e.prevY = e.y; }
     if (this.mode && this.mode.preUpdate) this.mode.preUpdate(input, dt, time); // D85: stance, takedown, copy (stealth)
     this.controller.update(p, input, dt, time);
+    this._stairs(time); // D149
     p.regenerate(dt, time); // D128: the wounds heal once he takes no damage for a while (no medkits)
 
     if (input.consumePressed('switchWeapon')) this.switchWeapon();
